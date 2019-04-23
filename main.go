@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/gophercloud/utils/openstack/clientconfig"
 	db "github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/postlite"
@@ -32,7 +33,14 @@ import (
 
 func main() {
 	dbConn := initDB()
+
+	providerClient, err := clientconfig.AuthenticatedClient(nil)
+	if err != nil {
+		logg.Fatal("cannot connect to OpenStack: " + err.Error())
+	}
+
 	_ = dbConn
+	_ = providerClient
 	fmt.Println("Hello Castellum")
 }
 
@@ -41,7 +49,7 @@ func initDB() *sql.DB {
 	if err != nil {
 		logg.Fatal("malformed CASTELLUM_DB_URI: " + err.Error())
 	}
-	//allow SQLite for testing purposes
+	//allow SQLite for testing purposes (TODO really?)
 	if dbURL.String() == "sqlite://" {
 		dbURL = nil
 	}

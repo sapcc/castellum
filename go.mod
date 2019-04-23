@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	github.com/golang-migrate/migrate v3.5.4+incompatible // indirect
+	github.com/gophercloud/utils v0.0.0-20190313033024-0bcc8e728cb5
 	github.com/lib/pq v1.1.0 // indirect
 	github.com/majewsky/sqlproxy v0.0.0-20170413172413-66c34829b29d // indirect
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
