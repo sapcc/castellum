@@ -24,8 +24,12 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 
+	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/utils/openstack/clientconfig"
+	"github.com/sapcc/castellum/internal/core"
 	db "github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/postlite"
@@ -33,14 +37,18 @@ import (
 
 func main() {
 	dbConn := initDB()
+	providerClient := initGophercloud()
 
-	providerClient, err := clientconfig.AuthenticatedClient(nil)
+	team, err := core.CreateAssetManagers(
+		strings.Split(mustGetenv("CASTELLUM_ASSET_MANAGERS"), ","),
+		providerClient,
+	)
 	if err != nil {
-		logg.Fatal("cannot connect to OpenStack: " + err.Error())
+		logg.Fatal(err.Error())
 	}
 
 	_ = dbConn
-	_ = providerClient
+	_ = team
 	fmt.Println("Hello Castellum")
 }
 
@@ -61,6 +69,19 @@ func initDB() *sql.DB {
 		logg.Fatal("cannot connect to database: " + err.Error())
 	}
 	return dbConn
+}
+
+func initGophercloud() *gophercloud.ProviderClient {
+	ao, err := clientconfig.AuthOptions(nil)
+	if err != nil {
+		logg.Fatal("cannot connect to OpenStack: " + err.Error())
+	}
+	ao.AllowReauth = true
+	providerClient, err := openstack.AuthenticatedClient(*ao)
+	if err != nil {
+		logg.Fatal("cannot connect to OpenStack: " + err.Error())
+	}
+	return providerClient
 }
 
 func mustGetenv(key string) string {
