@@ -1,0 +1,18 @@
+# github.com/golang-migrate/migrate v3.5.4+incompatible
+github.com/golang-migrate/migrate
+github.com/golang-migrate/migrate/database
+github.com/golang-migrate/migrate/database/postgres
+github.com/golang-migrate/migrate/database/sqlite3
+github.com/golang-migrate/migrate/source
+github.com/golang-migrate/migrate/source/go_bindata
+# github.com/lib/pq v1.1.0
+github.com/lib/pq
+github.com/lib/pq/oid
+github.com/lib/pq/scram
+# github.com/majewsky/sqlproxy v0.0.0-20170413172413-66c34829b29d
+github.com/majewsky/sqlproxy
+# github.com/mattn/go-sqlite3 v1.10.0
+github.com/mattn/go-sqlite3
+# github.com/sapcc/go-bits v0.0.0-20190111093410-620b317f22bc
+github.com/sapcc/go-bits/logg
+github.com/sapcc/go-bits/postlite

@@ -1,0 +1,10 @@
+github.com/golang-migrate/migrate v3.5.4+incompatible h1:R7OzwvCJTCgwapPCiX6DyBiu2czIUMDCB118gFTKTUA=
+github.com/golang-migrate/migrate v3.5.4+incompatible/go.mod h1:IsVUlFN5puWOmXrqjgGUfIRIbU7mr8oNBE2tyERd9Wk=
+github.com/lib/pq v1.1.0 h1:/5u4a+KGJptBRqGzPvYQL9p0d/tPR4S31+Tnzj9lEO4=
+github.com/lib/pq v1.1.0/go.mod h1:5WUZQaWbwv1U+lTReE5YruASi9Al49XbQIvNi/34Woo=
+github.com/majewsky/sqlproxy v0.0.0-20170413172413-66c34829b29d h1:ZaEhslK/60Wc1yCUuasPqR1tNj4T7YjU1KoHrEV5or8=
+github.com/majewsky/sqlproxy v0.0.0-20170413172413-66c34829b29d/go.mod h1:2wtXqbyVn/SrnklFtle3Kuncd4ytDddW7539rYI+caA=
+github.com/mattn/go-sqlite3 v1.10.0 h1:jbhqpg7tQe4SupckyijYiy0mJJ/pRyHvXf7JdWK860o=
+github.com/mattn/go-sqlite3 v1.10.0/go.mod h1:FPy6KqzDD04eiIsT53CuJW3U88zkxoIYsOqkbpncsNc=
+github.com/sapcc/go-bits v0.0.0-20190111093410-620b317f22bc h1:sIOSzr29YZS0LSl8Ocku6RCRNjxUgbdb6faHjDaA1Fs=
+github.com/sapcc/go-bits v0.0.0-20190111093410-620b317f22bc/go.mod h1:KeP5OOqQIgrauiDb/8shKWOq1YoplBALYNvpV4jizPo=

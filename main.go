@@ -1,6 +1,6 @@
 /*******************************************************************************
 *
-* Copyright 2018 SAP SE
+* Copyright 2019 SAP SE
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -19,8 +19,46 @@
 
 package main
 
-import "fmt"
+import (
+	"database/sql"
+	"fmt"
+	"net/url"
+	"os"
+
+	db "github.com/sapcc/castellum/internal/db"
+	"github.com/sapcc/go-bits/logg"
+	"github.com/sapcc/go-bits/postlite"
+)
 
 func main() {
+	dbConn := initDB()
+	_ = dbConn
 	fmt.Println("Hello Castellum")
+}
+
+func initDB() *sql.DB {
+	dbURL, err := url.Parse(mustGetenv("CASTELLUM_DB_URI"))
+	if err != nil {
+		logg.Fatal("malformed CASTELLUM_DB_URI: " + err.Error())
+	}
+	//allow SQLite for testing purposes
+	if dbURL.String() == "sqlite://" {
+		dbURL = nil
+	}
+	dbConn, err := postlite.Connect(postlite.Configuration{
+		PostgresURL: dbURL,
+		Migrations:  db.SQLMigrations,
+	})
+	if err != nil {
+		logg.Fatal("cannot connect to database: " + err.Error())
+	}
+	return dbConn
+}
+
+func mustGetenv(key string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		logg.Fatal("missing required environment variable: " + key)
+	}
+	return val
 }
