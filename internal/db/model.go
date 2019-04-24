@@ -20,19 +20,19 @@ package db
 
 import "time"
 
-//ProjectResource describes the autoscaling behavior for a single resource in a
-//single project. Note that we reuse Limes terminology here: A project resource
-//is the totality of all assets (see type Asset) of a single type within a
-//project. For example, a single NFS share is not a resource, it's an asset.
-//But it *belongs* to the resource "NFS shares", and more specifically, to the
-//project resource "NFS shares for project X".
-type ProjectResource struct {
-	//The pair of (.ProjectUUID, .AssetType) uniquely identifies a
-	//ProjectResource on the API level. Internally, other tables reference
-	//ProjectResource by the numeric .ID field.
-	ID          int64  `db:"id"`
-	ProjectUUID string `db:"project_uuid"`
-	AssetType   string `db:"asset_type"`
+//Resource describes the autoscaling behavior for a single resource in a
+//single project or domain. Note that we reuse Limes terminology here: A
+//project resource is the totality of all assets (see type Asset) of a single
+//type within a project. For example, a single NFS share is not a resource,
+//it's an asset. But it *belongs* to the resource "NFS shares", and more
+//specifically, to the project resource "NFS shares for project X".
+type Resource struct {
+	//The pair of (.ScopeUUID, .AssetType) uniquely identifies a Resource on
+	//the API level. Internally, other tables reference Resource by the numeric
+	//.ID field.
+	ID        int64  `db:"id"`
+	ScopeUUID string `db:"scope_uuid"` //either project UUID or domain UUID
+	AssetType string `db:"asset_type"`
 
 	//Assets will resize when they have crossed a certain threshold for a certain
 	//time. Those thresholds (in percent of usage) and delays (in seconds) are
@@ -52,20 +52,19 @@ type ProjectResource struct {
 }
 
 //Asset describes a single thing that can be resized dynamically based on its
-//utilization. Assets are grouped into project resources, see type
-//ProjectResource. Each individual resizing is an operation, see type
-//Operation.
+//utilization. Assets are grouped into resources, see type Resource. Each
+//individual resizing is an operation, see type Operation.
 type Asset struct {
-	//The pair of (.ProjectResourceID, .UUID) uniquely identifies an asset on the
-	//API level. Internally, other tables reference ProjectResource by the
+	//The pair of (.ResourceID, .UUID) uniquely identifies an asset on the
+	//API level. Internally, other tables reference Resource by the
 	//numeric .ID field.
 	//
-	//Note that .UUID may be equal to the project's UUID for assets that exist
-	//only once per project, e.g. quota. In that case, .UUID does not uniquely
-	//identify an asset unless .ProjectResourceID is also considered.
-	ID                int64  `db:"id"`
-	ProjectResourceID int64  `db:"project_resource_id"`
-	UUID              string `db:"uuid"`
+	//Note that .UUID may be a project/domain UUID for assets that exist exactly
+	//once per project/domain, e.g. quota. In that case, .UUID does not uniquely
+	//identify an asset unless .ResourceID is also considered.
+	ID         int64  `db:"id"`
+	ResourceID int64  `db:"resource_id"`
+	UUID       string `db:"uuid"`
 
 	//The asset's current size as reported by OpenStack. The meaning of this
 	//value is defined by the plugin that implements this asset type.

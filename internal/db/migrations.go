@@ -21,7 +21,7 @@ package db
 //SQLMigrations must be public because it's also used by tests.
 var SQLMigrations = map[string]string{
 	"001_initial.down.sql": `
-		DROP TABLE project_resources;
+		DROP TABLE resources;
 		DROP TABLE assets;
 		DROP TYPE op_reason;
 		DROP TYPE op_outcome;
@@ -29,10 +29,10 @@ var SQLMigrations = map[string]string{
 		DROP TABLE operations_history;
 	`,
 	"001_initial.up.sql": `
-		CREATE TABLE project_resources (
-			id           BIGSERIAL NOT NULL PRIMARY KEY,
-			project_uuid TEXT      NOT NULL,
-			asset_type   TEXT      NOT NULL,
+		CREATE TABLE resources (
+			id         BIGSERIAL NOT NULL PRIMARY KEY,
+			scope_uuid TEXT      NOT NULL,
+			asset_type TEXT      NOT NULL,
 
 			low_threshold_percent      INTEGER NOT NULL,
 			low_delay_seconds          INTEGER NOT NULL,
@@ -42,20 +42,20 @@ var SQLMigrations = map[string]string{
 
 			size_step_percent BIGINT,
 
-			UNIQUE(project_uuid, asset_type)
+			UNIQUE(scope_uuid, asset_type)
 		);
 
 		CREATE TABLE assets (
-			id                  BIGSERIAL NOT NULL PRIMARY KEY,
-			project_resource_id BIGINT    NOT NULL REFERENCES project_resources ON DELETE CASCADE,
-			uuid                TEXT      NOT NULL,
+			id          BIGSERIAL NOT NULL PRIMARY KEY,
+			resource_id BIGINT    NOT NULL REFERENCES resources ON DELETE CASCADE,
+			uuid        TEXT      NOT NULL,
 
 			size          BIGINT    NOT NULL,
 			usage_percent INTEGER   NOT NULL,
 			scraped_at    TIMESTAMP NOT NULL,
 			stale         BOOLEAN   NOT NULL DEFAULT FALSE,
 
-			UNIQUE(project_resource_id, uuid)
+			UNIQUE(resource_id, uuid)
 		);
 
 		CREATE TYPE op_reason  AS ENUM ('01-critical', '02-high', '03-low');
