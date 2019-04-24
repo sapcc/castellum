@@ -16,6 +16,11 @@ build/castellum: FORCE
 install: FORCE all
 	install -D -m 0755 build/castellum "$(DESTDIR)$(PREFIX)/bin/castellum"
 
+# convenience target for developers: `make run-api/run-collector/run-worker`
+# runs one of the components, with environment options sourced from $PWD/.env
+run-%: build/castellum
+	set -euo pipefail && source ./.env && ./build/castellum $*
+
 vendor: FORCE
 	$(GO) mod vendor
 

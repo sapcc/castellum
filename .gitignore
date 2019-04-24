@@ -2,6 +2,9 @@
 .gopath/pkg/
 build/
 
+# runtime artifacts (see Makefile)
+.env
+
 # testing artifacts
 testing/postgresql-data/
 testing/postgresql-run/
