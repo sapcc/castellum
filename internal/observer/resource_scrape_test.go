@@ -46,6 +46,8 @@ func setupObserver(t *testing.T) (*Observer, *plugins.AssetManagerStatic, *FakeC
 	dbi, err := db.Init("postgres://postgres@localhost:54321/castellum?sslmode=disable")
 	if err != nil {
 		t.Error(err)
+		t.Log("Try prepending ./testing/with-postgres-db.sh to your command.")
+		t.FailNow()
 	}
 
 	//wipe the DB clean if there are any leftovers from the previous test run
