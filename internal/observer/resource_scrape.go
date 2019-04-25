@@ -88,6 +88,9 @@ func (o Observer) ScrapeNextResource(assetType string) error {
 
 	//create entries for new assets
 	for _, assetUUID := range assetUUIDs {
+		if isAssetInDB[assetUUID] {
+			continue
+		}
 		logg.Info("adding new %s asset to DB: UUID = %s, scope UUID = %s", assetType, assetUUID, res.ScopeUUID)
 		status, err := manager.GetProjectAssetStatus(res.ScopeUUID, assetType, assetUUID)
 		if err != nil {

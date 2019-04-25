@@ -117,6 +117,13 @@ func TestResourceScraping(t *testing.T) {
 	clock.Step()
 	must(t, o.ScrapeNextResource("foo"))
 	postlite.AssertDBContent(t, o.DB.Db, "fixtures/resource-scrape-2.sql")
+
+	//next ScrapeNextResource() should scrape project1/foo again because its
+	//scraped_at timestamp is the smallest; there should be no changes except for
+	//resources.scraped_at
+	clock.Step()
+	must(t, o.ScrapeNextResource("foo"))
+	postlite.AssertDBContent(t, o.DB.Db, "fixtures/resource-scrape-3.sql")
 }
 
 func must(t *testing.T, err error) {
