@@ -20,9 +20,7 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
 
@@ -30,13 +28,19 @@ import (
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	"github.com/sapcc/castellum/internal/core"
-	db "github.com/sapcc/castellum/internal/db"
+	"github.com/sapcc/castellum/internal/db"
+	"github.com/sapcc/castellum/internal/observer"
 	"github.com/sapcc/go-bits/logg"
-	"github.com/sapcc/go-bits/postlite"
+
+	//load asset managers
+	_ "github.com/sapcc/castellum/internal/plugins"
 )
 
 func main() {
-	dbConn := initDB()
+	dbi, err := db.Init(mustGetenv("CASTELLUM_DB_URI"))
+	if err != nil {
+		logg.Fatal(err.Error())
+	}
 	providerClient := initGophercloud()
 
 	team, err := core.CreateAssetManagers(
@@ -47,28 +51,9 @@ func main() {
 		logg.Fatal(err.Error())
 	}
 
-	_ = dbConn
-	_ = team
+	o := observer.Observer{DB: dbi, Team: team}
+	o.ApplyDefaults()
 	fmt.Println("Hello Castellum")
-}
-
-func initDB() *sql.DB {
-	dbURL, err := url.Parse(mustGetenv("CASTELLUM_DB_URI"))
-	if err != nil {
-		logg.Fatal("malformed CASTELLUM_DB_URI: " + err.Error())
-	}
-	//allow SQLite for testing purposes (TODO really?)
-	if dbURL.String() == "sqlite://" {
-		dbURL = nil
-	}
-	dbConn, err := postlite.Connect(postlite.Configuration{
-		PostgresURL: dbURL,
-		Migrations:  db.SQLMigrations,
-	})
-	if err != nil {
-		logg.Fatal("cannot connect to database: " + err.Error())
-	}
-	return dbConn
 }
 
 func initGophercloud() *gophercloud.ProviderClient {

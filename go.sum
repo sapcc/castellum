@@ -14,8 +14,12 @@ github.com/mattn/go-sqlite3 v1.10.0/go.mod h1:FPy6KqzDD04eiIsT53CuJW3U88zkxoIYsO
 github.com/mitchellh/go-homedir v1.1.0/go.mod h1:SfyaCUpYCn1Vlf4IUYiD9fPX4A5wJrkLzIz1N1q0pr0=
 github.com/sapcc/go-bits v0.0.0-20190111093410-620b317f22bc h1:sIOSzr29YZS0LSl8Ocku6RCRNjxUgbdb6faHjDaA1Fs=
 github.com/sapcc/go-bits v0.0.0-20190111093410-620b317f22bc/go.mod h1:KeP5OOqQIgrauiDb/8shKWOq1YoplBALYNvpV4jizPo=
+github.com/sapcc/go-bits v0.0.0-20190425131010-53eeb20fde03 h1:2fJaWdbNys9gCBfTvQ7sM4cxsHtc4y8MB1urtyyfmgo=
+github.com/sapcc/go-bits v0.0.0-20190425131010-53eeb20fde03/go.mod h1:KeP5OOqQIgrauiDb/8shKWOq1YoplBALYNvpV4jizPo=
 golang.org/x/crypto v0.0.0-20190211182817-74369b46fc67/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/sys v0.0.0-20190209173611-3b5209105503/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+gopkg.in/gorp.v2 v2.0.0 h1:PaLYclsRb+/3x8HTXlYOk9w3gIasonq9ak8dEhYCPsY=
+gopkg.in/gorp.v2 v2.0.0/go.mod h1:b+Lg0ZTcCi+VKrQTMxcDUr+yXYz665DxYSYCiJ8BTPE=
 gopkg.in/yaml.v2 v2.2.2 h1:ZCJp+EgiOT7lHqUV2J862kp8Qj64Jo6az82+3Td9dZw=
 gopkg.in/yaml.v2 v2.2.2/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=

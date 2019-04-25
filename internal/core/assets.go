@@ -93,3 +93,17 @@ func CreateAssetManagers(factoryIDs []string, provider *gophercloud.ProviderClie
 	}
 	return team, nil
 }
+
+//ForAssetType returns the asset manager for the given asset type, or nil if
+//the asset type is not supported.
+func (team AssetManagerTeam) ForAssetType(assetType string) AssetManager {
+	for _, manager := range team {
+		types := manager.AssetTypes()
+		for _, t := range types {
+			if assetType == t {
+				return manager
+			}
+		}
+	}
+	return nil
+}

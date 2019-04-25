@@ -18,7 +18,14 @@
 
 package db
 
-import "time"
+import (
+	"fmt"
+	"net/url"
+	"time"
+
+	"github.com/sapcc/go-bits/postlite"
+	"gopkg.in/gorp.v2"
+)
 
 //Resource describes the autoscaling behavior for a single resource in a
 //single project or domain. Note that we reuse Limes terminology here: A
@@ -34,6 +41,9 @@ type Resource struct {
 	ScopeUUID string `db:"scope_uuid"` //either project UUID or domain UUID
 	AssetType string `db:"asset_type"`
 
+	//When we last checked this Resource for new or deleted assets.
+	ScrapedAt *time.Time `db:"scraped_at"`
+
 	//Assets will resize when they have crossed a certain threshold for a certain
 	//time. Those thresholds (in percent of usage) and delays (in seconds) are
 	//defined here. The "critical" threshold will cause immediate upscaling, so
@@ -41,7 +51,7 @@ type Resource struct {
 	LowThresholdPercent      uint32 `db:"low_threshold_percent"`
 	LowDelaySeconds          uint32 `db:"low_delay_seconds"`
 	HighThresholdPercent     uint32 `db:"high_threshold_percent"`
-	HighDelaySeconds         uint32 `db:"hight_delay_seconds"`
+	HighDelaySeconds         uint32 `db:"high_delay_seconds"`
 	CriticalThresholdPercent uint32 `db:"critical_threshold_percent"`
 
 	//This defines how much the the asset's size changes per
@@ -158,3 +168,25 @@ const (
 	//OperationOutcomeCancelled indicates that a resize operation was cancelled. This happens when usage falls back into normal
 	OperationOutcomeCancelled = "cancelled"
 )
+
+//Init connects to the database and initializes the schema and model types.
+func Init(urlStr string) (*gorp.DbMap, error) {
+	dbURL, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, fmt.Errorf("malformed CASTELLUM_DB_URI: " + err.Error())
+	}
+	dbConn, err := postlite.Connect(postlite.Configuration{
+		PostgresURL: dbURL,
+		Migrations:  SQLMigrations,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cannot connect to database: " + err.Error())
+	}
+
+	gorpDB := &gorp.DbMap{Db: dbConn, Dialect: gorp.PostgresDialect{}}
+	gorpDB.AddTableWithName(Resource{}, "resources").SetKeys(true, "id")
+	gorpDB.AddTableWithName(Asset{}, "assets").SetKeys(true, "id")
+	gorpDB.AddTableWithName(PendingOperation{}, "pending_operations").SetKeys(true, "id")
+	gorpDB.AddTableWithName(FinishedOperation{}, "finished_operations")
+	return gorpDB, nil
+}

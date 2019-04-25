@@ -10,7 +10,7 @@ step() {
 
 if [ ! -d testing/postgresql-data/ ]; then
   step "First-time setup: Creating PostgreSQL database for testing"
-  initdb testing/postgresql-data/
+  initdb -A trust -U postgres testing/postgresql-data/
 fi
 mkdir -p testing/postgresql-run/
 

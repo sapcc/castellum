@@ -34,6 +34,8 @@ var SQLMigrations = map[string]string{
 			scope_uuid TEXT      NOT NULL,
 			asset_type TEXT      NOT NULL,
 
+			scraped_at TIMESTAMP DEFAULT NULL,
+
 			low_threshold_percent      INTEGER NOT NULL,
 			low_delay_seconds          INTEGER NOT NULL,
 			high_threshold_percent     INTEGER NOT NULL,
