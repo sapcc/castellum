@@ -80,7 +80,7 @@ func (o Observer) ScrapeNextResource(assetType string) error {
 			continue
 		}
 		logg.Info("removing deleted %s asset from DB: UUID = %s, scope UUID = %s", assetType, dbAsset.UUID, res.ScopeUUID)
-		_, err = o.DB.Delete(dbAsset)
+		_, err = o.DB.Delete(&dbAsset)
 		if err != nil {
 			return fmt.Errorf("cannot cleanup deleted %s asset %s: %s", assetType, dbAsset.UUID, err.Error())
 		}

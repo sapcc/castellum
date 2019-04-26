@@ -2,6 +2,17 @@
 
 TODO write more
 
+## Running the test suite
+
+Run the full test suite with:
+
+```sh
+$ ./testing/with-postgres-db.sh make check
+```
+
+This will produce a coverage report at `build/cover.html`. If you don't need
+that, substitute `check` for `quick-check` to get slightly better performance.
+
 ## Core terminology and state machine
 
 The database schema contains the following basic objects:

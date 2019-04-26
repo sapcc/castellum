@@ -79,6 +79,10 @@ func setupObserver(t *testing.T) (*Observer, *plugins.AssetManagerStatic, *FakeC
 func TestResourceScraping(t *testing.T) {
 	o, amStatic, clock := setupObserver(t)
 
+	//ScrapeNextResource() without any resources just does nothing
+	must(t, o.ScrapeNextResource("foo"))
+	postlite.AssertDBContent(t, o.DB.Db, "fixtures/resource-scrape-0.sql")
+
 	//create some project resources for testing
 	must(t, o.DB.Insert(&db.Resource{
 		ScopeUUID: "project1",
@@ -126,6 +130,28 @@ func TestResourceScraping(t *testing.T) {
 	clock.Step()
 	must(t, o.ScrapeNextResource("foo"))
 	postlite.AssertDBContent(t, o.DB.Db, "fixtures/resource-scrape-3.sql")
+
+	//simulate deletion of an asset
+	delete(amStatic.Assets["project3"], "asset6")
+	clock.Step()
+	must(t, o.ScrapeNextResource("foo"))
+	postlite.AssertDBContent(t, o.DB.Db, "fixtures/resource-scrape-4.sql")
+
+	//simulate addition of a new asset
+	amStatic.Assets["project1"]["asset7"] = plugins.StaticAsset{Size: 10, Usage: 3}
+	clock.Step()
+	must(t, o.ScrapeNextResource("foo"))
+	postlite.AssertDBContent(t, o.DB.Db, "fixtures/resource-scrape-5.sql")
+
+	//check behavior on a resource without assets
+	must(t, o.DB.Insert(&db.Resource{
+		ScopeUUID: "project4",
+		AssetType: "foo",
+	}))
+	amStatic.Assets["project4"] = nil
+	clock.Step()
+	must(t, o.ScrapeNextResource("foo"))
+	postlite.AssertDBContent(t, o.DB.Db, "fixtures/resource-scrape-6.sql")
 }
 
 func must(t *testing.T, err error) {
