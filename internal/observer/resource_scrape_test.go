@@ -19,6 +19,7 @@
 package observer
 
 import (
+	"database/sql"
 	"testing"
 	"time"
 
@@ -80,7 +81,10 @@ func TestResourceScraping(t *testing.T) {
 	o, amStatic, clock := setupObserver(t)
 
 	//ScrapeNextResource() without any resources just does nothing
-	must(t, o.ScrapeNextResource("foo"))
+	err := o.ScrapeNextResource("foo", o.TimeNow())
+	if err != sql.ErrNoRows {
+		t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
+	}
 	postlite.AssertDBContent(t, o.DB.Db, "fixtures/resource-scrape-0.sql")
 
 	//create some project resources for testing
@@ -115,32 +119,32 @@ func TestResourceScraping(t *testing.T) {
 
 	//first ScrapeNextResource() should scrape project1/foo
 	clock.Step()
-	must(t, o.ScrapeNextResource("foo"))
+	must(t, o.ScrapeNextResource("foo", o.TimeNow()))
 	postlite.AssertDBContent(t, o.DB.Db, "fixtures/resource-scrape-1.sql")
 
 	//first ScrapeNextResource() should scrape project3/foo
 	//(NOT project2 because its resource has a different asset type)
 	clock.Step()
-	must(t, o.ScrapeNextResource("foo"))
+	must(t, o.ScrapeNextResource("foo", o.TimeNow()))
 	postlite.AssertDBContent(t, o.DB.Db, "fixtures/resource-scrape-2.sql")
 
 	//next ScrapeNextResource() should scrape project1/foo again because its
 	//scraped_at timestamp is the smallest; there should be no changes except for
 	//resources.scraped_at
 	clock.Step()
-	must(t, o.ScrapeNextResource("foo"))
+	must(t, o.ScrapeNextResource("foo", o.TimeNow()))
 	postlite.AssertDBContent(t, o.DB.Db, "fixtures/resource-scrape-3.sql")
 
 	//simulate deletion of an asset
 	delete(amStatic.Assets["project3"], "asset6")
 	clock.Step()
-	must(t, o.ScrapeNextResource("foo"))
+	must(t, o.ScrapeNextResource("foo", o.TimeNow()))
 	postlite.AssertDBContent(t, o.DB.Db, "fixtures/resource-scrape-4.sql")
 
 	//simulate addition of a new asset
 	amStatic.Assets["project1"]["asset7"] = plugins.StaticAsset{Size: 10, Usage: 3}
 	clock.Step()
-	must(t, o.ScrapeNextResource("foo"))
+	must(t, o.ScrapeNextResource("foo", o.TimeNow()))
 	postlite.AssertDBContent(t, o.DB.Db, "fixtures/resource-scrape-5.sql")
 
 	//check behavior on a resource without assets
@@ -150,7 +154,7 @@ func TestResourceScraping(t *testing.T) {
 	}))
 	amStatic.Assets["project4"] = nil
 	clock.Step()
-	must(t, o.ScrapeNextResource("foo"))
+	must(t, o.ScrapeNextResource("foo", o.TimeNow()))
 	postlite.AssertDBContent(t, o.DB.Db, "fixtures/resource-scrape-6.sql")
 }
 

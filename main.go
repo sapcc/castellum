@@ -20,7 +20,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -31,6 +30,7 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/observer"
 	"github.com/sapcc/go-bits/logg"
+	"gopkg.in/gorp.v2"
 
 	//load asset managers
 	_ "github.com/sapcc/castellum/internal/plugins"
@@ -51,9 +51,23 @@ func main() {
 		logg.Fatal(err.Error())
 	}
 
+	//TODO: implement the other subcommands
+	runObserver(dbi, team)
+}
+
+func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam) {
 	o := observer.Observer{DB: dbi, Team: team}
 	o.ApplyDefaults()
-	fmt.Println("Hello Castellum")
+
+	for _, manager := range team {
+		for _, assetType := range manager.AssetTypes() {
+			go o.ScrapeResources(assetType)
+			//TODO scrape assets
+		}
+	}
+	//TODO garbage-collect finished_operations
+
+	select {}
 }
 
 func initGophercloud() *gophercloud.ProviderClient {

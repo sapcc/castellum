@@ -21,6 +21,7 @@ package observer
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/logg"
@@ -30,29 +31,51 @@ import (
 //for use with gorp.SelectOne()
 var scrapeResourceSearchQuery = `
 	SELECT * FROM resources
-	WHERE asset_type = $1
+	WHERE asset_type = $1 AND (scraped_at IS NULL or scraped_at < $2)
 	-- order by update priority (first new resources, then outdated resources, then ID for deterministic test behavior)
 	ORDER BY COALESCE(scraped_at, to_timestamp(-1)) ASC, id ASC
 	LIMIT 1
 `
 
+//ScrapeResources is a job that calls ScrapeNextResource continuously. Errors
+//are logged and do not lead to the abortion of this function.
+func (o Observer) ScrapeResources(assetType string) {
+	for {
+		err := o.ScrapeNextResource(assetType, time.Now().Add(-30*time.Minute))
+		switch err {
+		case nil:
+			//nothing to do here
+		case sql.ErrNoRows:
+			//nothing to do right now - slow down a bit to avoid useless DB load
+			logg.Debug("no %s resources to scrape - slowing down...")
+			time.Sleep(10 * time.Second)
+		default:
+			logg.Error(err.Error())
+		}
+	}
+}
+
 //ScrapeNextResource finds the next resource of the given asset type that needs
 //scraping and scrapes it, i.e. it looks for new and deleted assets within that
 //resource.
-func (o Observer) ScrapeNextResource(assetType string) error {
+//
+//Returns sql.ErrNoRows when no resource needed scraping, to indicate to the
+//caller to slow down.
+func (o Observer) ScrapeNextResource(assetType string, maxScrapedAt time.Time) error {
 	manager := o.Team.ForAssetType(assetType)
 	if manager == nil {
-		return fmt.Errorf("no asset manager for asset type %q", assetType)
+		panic(fmt.Sprintf("no asset manager for asset type %q", assetType))
 	}
 
 	var res db.Resource
-	err := o.DB.SelectOne(&res, scrapeResourceSearchQuery, assetType)
+	err := o.DB.SelectOne(&res, scrapeResourceSearchQuery, assetType, maxScrapedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil //nothing to do
+			return err
 		}
 		return fmt.Errorf("cannot get next scrapeable resource: %s", err.Error())
 	}
+	logg.Debug("scraping %s resource for project %s", assetType, res.ScopeUUID)
 
 	//check which assets exist in this resource in OpenStack
 	assetUUIDs, err := manager.ListProjectAssets(res.ScopeUUID, assetType)
