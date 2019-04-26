@@ -23,6 +23,7 @@ import (
 	"sort"
 
 	"github.com/sapcc/castellum/internal/core"
+	"github.com/sapcc/castellum/internal/db"
 )
 
 //StaticAsset represents an asset managed by AssetManagerStatic. It is only
@@ -54,12 +55,12 @@ var (
 	errTooSmall       = errors.New("cannot set size smaller than current usage")
 )
 
-//ListProjectAssets implements the core.AssetManager interface.
-func (m AssetManagerStatic) ListProjectAssets(projectUUID, assetType string) ([]string, error) {
-	if assetType != m.AssetType {
+//ListAssets implements the core.AssetManager interface.
+func (m AssetManagerStatic) ListAssets(res db.Resource) ([]string, error) {
+	if res.AssetType != m.AssetType {
 		return nil, errWrongAssetType
 	}
-	assets, exists := m.Assets[projectUUID]
+	assets, exists := m.Assets[res.ScopeUUID]
 	if !exists {
 		return nil, errUnknownProject
 	}
@@ -71,12 +72,12 @@ func (m AssetManagerStatic) ListProjectAssets(projectUUID, assetType string) ([]
 	return uuids, nil
 }
 
-//GetProjectAssetStatus implements the core.AssetManager interface.
-func (m AssetManagerStatic) GetProjectAssetStatus(projectUUID, assetType, assetUUID string) (core.AssetStatus, error) {
-	if assetType != m.AssetType {
+//GetAssetStatus implements the core.AssetManager interface.
+func (m AssetManagerStatic) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
+	if res.AssetType != m.AssetType {
 		return core.AssetStatus{}, errWrongAssetType
 	}
-	assets, exists := m.Assets[projectUUID]
+	assets, exists := m.Assets[res.ScopeUUID]
 	if !exists {
 		return core.AssetStatus{}, errUnknownProject
 	}
@@ -90,12 +91,12 @@ func (m AssetManagerStatic) GetProjectAssetStatus(projectUUID, assetType, assetU
 	}, nil
 }
 
-//SetProjectAssetSize implements the core.AssetManager interface.
-func (m AssetManagerStatic) SetProjectAssetSize(projectUUID, assetType, assetUUID string, size uint64) error {
-	if assetType != m.AssetType {
+//SetAssetSize implements the core.AssetManager interface.
+func (m AssetManagerStatic) SetAssetSize(res db.Resource, assetUUID string, size uint64) error {
+	if res.AssetType != m.AssetType {
 		return errWrongAssetType
 	}
-	assets, exists := m.Assets[projectUUID]
+	assets, exists := m.Assets[res.ScopeUUID]
 	if !exists {
 		return errUnknownProject
 	}

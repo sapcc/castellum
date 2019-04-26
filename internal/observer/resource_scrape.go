@@ -27,8 +27,7 @@ import (
 	"github.com/sapcc/go-bits/logg"
 )
 
-//query that finds the next resource that needs to be scraped,
-//for use with gorp.SelectOne()
+//query that finds the next resource that needs to be scraped
 var scrapeResourceSearchQuery = `
 	SELECT * FROM resources
 	WHERE asset_type = $1 AND (scraped_at IS NULL or scraped_at < $2)
@@ -36,24 +35,6 @@ var scrapeResourceSearchQuery = `
 	ORDER BY COALESCE(scraped_at, to_timestamp(-1)) ASC, id ASC
 	LIMIT 1
 `
-
-//ScrapeResources is a job that calls ScrapeNextResource continuously. Errors
-//are logged and do not lead to the abortion of this function.
-func (o Observer) ScrapeResources(assetType string) {
-	for {
-		err := o.ScrapeNextResource(assetType, time.Now().Add(-30*time.Minute))
-		switch err {
-		case nil:
-			//nothing to do here
-		case sql.ErrNoRows:
-			//nothing to do right now - slow down a bit to avoid useless DB load
-			logg.Debug("no %s resources to scrape - slowing down...")
-			time.Sleep(10 * time.Second)
-		default:
-			logg.Error(err.Error())
-		}
-	}
-}
 
 //ScrapeNextResource finds the next resource of the given asset type that needs
 //scraping and scrapes it, i.e. it looks for new and deleted assets within that
@@ -71,14 +52,15 @@ func (o Observer) ScrapeNextResource(assetType string, maxScrapedAt time.Time) e
 	err := o.DB.SelectOne(&res, scrapeResourceSearchQuery, assetType, maxScrapedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return err
+			logg.Debug("no %s resources to scrape - slowing down...", assetType)
+			return sql.ErrNoRows
 		}
-		return fmt.Errorf("cannot get next scrapeable resource: %s", err.Error())
+		return err
 	}
 	logg.Debug("scraping %s resource for project %s", assetType, res.ScopeUUID)
 
 	//check which assets exist in this resource in OpenStack
-	assetUUIDs, err := manager.ListProjectAssets(res.ScopeUUID, assetType)
+	assetUUIDs, err := manager.ListAssets(res)
 	if err != nil {
 		return fmt.Errorf("cannot list %s assets in project %s: %s", assetType, res.ScopeUUID, err.Error())
 	}
@@ -91,7 +73,7 @@ func (o Observer) ScrapeNextResource(assetType string, maxScrapedAt time.Time) e
 	var dbAssets []db.Asset
 	_, err = o.DB.Select(&dbAssets, `SELECT * FROM assets WHERE resource_id = $1`, res.ID)
 	if err != nil {
-		return fmt.Errorf("cannot list assets in DB: %s", err.Error())
+		return err
 	}
 	resourceScrapedTime := o.TimeNow()
 
@@ -105,7 +87,7 @@ func (o Observer) ScrapeNextResource(assetType string, maxScrapedAt time.Time) e
 		logg.Info("removing deleted %s asset from DB: UUID = %s, scope UUID = %s", assetType, dbAsset.UUID, res.ScopeUUID)
 		_, err = o.DB.Delete(&dbAsset)
 		if err != nil {
-			return fmt.Errorf("cannot cleanup deleted %s asset %s: %s", assetType, dbAsset.UUID, err.Error())
+			return err
 		}
 	}
 
@@ -115,7 +97,7 @@ func (o Observer) ScrapeNextResource(assetType string, maxScrapedAt time.Time) e
 			continue
 		}
 		logg.Info("adding new %s asset to DB: UUID = %s, scope UUID = %s", assetType, assetUUID, res.ScopeUUID)
-		status, err := manager.GetProjectAssetStatus(res.ScopeUUID, assetType, assetUUID)
+		status, err := manager.GetAssetStatus(res, assetUUID, nil)
 		if err != nil {
 			return fmt.Errorf("cannot query status of %s %s: %s", assetType, assetUUID, err.Error())
 		}
@@ -130,14 +112,14 @@ func (o Observer) ScrapeNextResource(assetType string, maxScrapedAt time.Time) e
 		}
 		err = o.DB.Insert(&dbAsset)
 		if err != nil {
-			return fmt.Errorf("cannot insert DB entry for %s %s: %s", assetType, assetUUID, err.Error())
+			return err
 		}
 	}
 
 	//record successful scrape
 	_, err = o.DB.Exec("UPDATE resources SET scraped_at = $1 WHERE id = $2", resourceScrapedTime, res.ID)
 	if err != nil {
-		return fmt.Errorf("cannot update scraped_at for resource %d: %s", res.ID, err.Error())
+		return err
 	}
 
 	return nil

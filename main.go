@@ -20,8 +20,10 @@
 package main
 
 import (
+	"database/sql"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
@@ -61,13 +63,35 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam) {
 
 	for _, manager := range team {
 		for _, assetType := range manager.AssetTypes() {
-			go o.ScrapeResources(assetType)
-			//TODO scrape assets
+			go observerJobLoop(func() error {
+				return o.ScrapeNextResource(assetType, time.Now().Add(-30*time.Minute))
+			})
+			go observerJobLoop(func() error {
+				return o.ScrapeNextAsset(assetType, time.Now().Add(-5*time.Minute))
+			})
 		}
 	}
 	//TODO garbage-collect finished_operations
 
 	select {}
+}
+
+//Execute a task repeatedly, but slow down when sql.ErrNoRows is returned by it.
+//(Observer.ScrapeNextX methods use this error value to indicate that nothing
+//needs scraping, so we can back off a bit to avoid useless database load.)
+func observerJobLoop(task func() error) {
+	for {
+		err := task()
+		switch err {
+		case nil:
+			//nothing to do here
+		case sql.ErrNoRows:
+			//nothing to do right now - slow down a bit to avoid useless DB load
+			time.Sleep(10 * time.Second)
+		default:
+			logg.Error(err.Error())
+		}
+	}
 }
 
 func initGophercloud() *gophercloud.ProviderClient {

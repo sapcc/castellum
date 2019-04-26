@@ -76,7 +76,9 @@ var SQLMigrations = map[string]string{
 			confirmed_at TIMESTAMP DEFAULT NULL,
 			greenlit_at  TIMESTAMP DEFAULT NULL,
 
-			greenlit_by_user_uuid TEXT DEFAULT NULL
+			greenlit_by_user_uuid TEXT DEFAULT NULL,
+
+			UNIQUE(asset_id)
 		);
 
 		CREATE TABLE finished_operations (

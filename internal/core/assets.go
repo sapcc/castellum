@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/gophercloud/gophercloud"
+	"github.com/sapcc/castellum/internal/db"
 )
 
 //AssetStatus shows the current state of an asset. It is returned by AssetManager.GetProjectAssetStatus().
@@ -38,9 +39,11 @@ type AssetManager interface {
 	//Returns the list of all asset types supported by this asset manager.
 	AssetTypes() []string
 
-	ListProjectAssets(projectUUID, assetType string) ([]string, error)
-	GetProjectAssetStatus(projectUUID, assetType, assetUUID string) (AssetStatus, error)
-	SetProjectAssetSize(projectUUID, assetType, assetUUID string, size uint64) error
+	ListAssets(res db.Resource) ([]string, error)
+	SetAssetSize(res db.Resource, assetUUID string, size uint64) error
+	//previousStatus will be nil when this function is called for the first time
+	//for the given asset.
+	GetAssetStatus(res db.Resource, assetUUID string, previousStatus *AssetStatus) (AssetStatus, error)
 }
 
 //AssetManagerFactory is something that creates AssetManager instances. This
