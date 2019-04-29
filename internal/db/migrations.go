@@ -93,7 +93,7 @@ var SQLMigrations = map[string]string{
 			created_at   TIMESTAMP  NOT NULL,
 			confirmed_at TIMESTAMP  DEFAULT NULL,
 			greenlit_at  TIMESTAMP  DEFAULT NULL,
-			finished_at  TIMESTAMP  DEFAULT NULL,
+			finished_at  TIMESTAMP  NOT NULL,
 
 			greenlit_by_user_uuid TEXT DEFAULT NULL
 		);

@@ -21,61 +21,11 @@ package observer
 import (
 	"database/sql"
 	"testing"
-	"time"
 
-	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/go-bits/postlite"
-	"gopkg.in/gorp.v2"
 )
-
-//FakeClock is a clock that only changes when we tell it to.
-type FakeClock int64
-
-//Now is a double for time.Now().
-func (f *FakeClock) Now() time.Time {
-	return time.Unix(int64(*f), 0).UTC()
-}
-
-//Step advances the clock by one second.
-func (f *FakeClock) Step() {
-	*f++
-}
-
-func setupObserver(t *testing.T) (*Observer, *plugins.AssetManagerStatic, *FakeClock) {
-	dbi, err := db.Init("postgres://postgres@localhost:54321/castellum?sslmode=disable")
-	if err != nil {
-		t.Error(err)
-		t.Log("Try prepending ./testing/with-postgres-db.sh to your command.")
-		t.FailNow()
-	}
-
-	//wipe the DB clean if there are any leftovers from the previous test run
-	mustExec(t, dbi, "DELETE FROM resources")
-	mustExec(t, dbi, "DELETE FROM assets")
-	mustExec(t, dbi, "DELETE FROM pending_operations")
-	mustExec(t, dbi, "DELETE FROM finished_operations")
-	//reset all primary key sequences for reproducible row IDs
-	mustExec(t, dbi, "ALTER SEQUENCE resources_id_seq RESTART WITH 1")
-	mustExec(t, dbi, "ALTER SEQUENCE assets_id_seq RESTART WITH 1")
-	mustExec(t, dbi, "ALTER SEQUENCE pending_operations_id_seq RESTART WITH 1")
-
-	amStatic := &plugins.AssetManagerStatic{
-		AssetType: "foo",
-	}
-	//clock starts at an easily recognizable value
-	clockVar := FakeClock(99990)
-	clock := &clockVar
-
-	return &Observer{
-		DB: dbi,
-		Team: core.AssetManagerTeam{
-			amStatic,
-		},
-		TimeNow: clock.Now,
-	}, amStatic, clock
-}
 
 func TestResourceScraping(t *testing.T) {
 	o, amStatic, clock := setupObserver(t)
@@ -156,15 +106,4 @@ func TestResourceScraping(t *testing.T) {
 	clock.Step()
 	must(t, o.ScrapeNextResource("foo", o.TimeNow()))
 	postlite.AssertDBContent(t, o.DB.Db, "fixtures/resource-scrape-6.sql")
-}
-
-func must(t *testing.T, err error) {
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-}
-
-func mustExec(t *testing.T, dbi *gorp.DbMap, query string) {
-	_, err := dbi.Exec(query)
-	must(t, err)
 }

@@ -20,7 +20,6 @@ package observer
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"time"
 
@@ -110,31 +109,138 @@ func (o Observer) ScrapeNextAsset(assetType string, maxScrapedAt time.Time) erro
 		return err
 	}
 
-	switch {
-	case pendingOp == nil:
-		return o.maybeCreateOperation(tx, res, asset)
-	case pendingOp.ConfirmedAt == nil: //status "created"
-		return o.maybeConfirmOrCancelOperation(tx, res, asset, *pendingOp)
-	case pendingOp.GreenlitAt == nil: //status "confirmed"
-		return o.maybeCancelOperation(tx, res, asset, *pendingOp)
-	case pendingOp.GreenlitAt.After(o.TimeNow()): //status "will be greenlit"
-		return o.maybeCancelOperation(tx, res, asset, *pendingOp)
-	default:
-		//do not touch operations in status "greenlit" - they may be executing on
-		//a worker right now
+	//never touch operations in status "greenlit" - they may be executing on a
+	//worker right now
+	if pendingOp != nil && pendingOp.GreenlitAt != nil && !pendingOp.GreenlitAt.After(o.TimeNow()) {
+		return tx.Commit()
+	}
+
+	//if there is a pending operation, try to move it forward
+	if pendingOp != nil {
+		pendingOp, err = o.maybeCancelOperation(tx, res, asset, *pendingOp)
+		if err != nil {
+			return fmt.Errorf("cannot cancel operation on %s %s: %s", assetType, asset.UUID, err.Error())
+		}
+	}
+	if pendingOp != nil {
+		pendingOp, err = o.maybeConfirmOperation(tx, res, asset, *pendingOp)
+		if err != nil {
+			return fmt.Errorf("cannot confirm operation on %s %s: %s", assetType, asset.UUID, err.Error())
+		}
+	}
+	//if there is no pending operation (or if we just cancelled it), see if we can start one
+	if pendingOp == nil {
+		err = o.maybeCreateOperation(tx, res, asset)
+		if err != nil {
+			return fmt.Errorf("cannot create operation on %s %s: %s", assetType, asset.UUID, err.Error())
+		}
 	}
 
 	return tx.Commit()
 }
 
 func (o Observer) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset) error {
-	return errors.New("unimplemented") //TODO
+	op := db.PendingOperation{
+		AssetID:      asset.ID,
+		OldSize:      asset.Size,
+		UsagePercent: asset.UsagePercent,
+		CreatedAt:    o.TimeNow(),
+	}
+
+	match := getMatchingReasons(res, asset)
+	switch {
+	case match[db.OperationReasonCritical]:
+		op.Reason = db.OperationReasonCritical
+		op.NewSize = getNewSize(asset, res, true)
+	case match[db.OperationReasonHigh]:
+		op.Reason = db.OperationReasonHigh
+		op.NewSize = getNewSize(asset, res, true)
+	case match[db.OperationReasonLow]:
+		op.Reason = db.OperationReasonLow
+		op.NewSize = getNewSize(asset, res, false)
+	default:
+		//no threshold exceeded -> do not create an operation
+		return nil
+	}
+
+	//critical operations can be confirmed immediately
+	if op.Reason == db.OperationReasonCritical {
+		op.ConfirmedAt = &op.CreatedAt
+		//right now, nothing requires operator approval
+		op.GreenlitAt = op.ConfirmedAt
+	}
+
+	return tx.Insert(&op)
 }
 
-func (o Observer) maybeConfirmOrCancelOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, pendingOp db.PendingOperation) error {
-	return errors.New("unimplemented") //TODO
+func (o Observer) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, op db.PendingOperation) (*db.PendingOperation, error) {
+	//cancel when the threshold that triggered this operation is no longer being crossed
+	match := getMatchingReasons(res, asset)
+	doCancel := !match[op.Reason]
+	if op.Reason == db.OperationReasonHigh && match[db.OperationReasonCritical] {
+		//as an exception, cancel a "High" operation when we've crossed the
+		//"Critical" threshold in the meantime - when we get to
+		//maybeCreateOperation() next, a new operation with reason "Critical" will
+		//be created instead
+		doCancel = true
+	}
+	if !doCancel {
+		return &op, nil
+	}
+
+	finishedOp := op.IntoFinishedOperation(db.OperationOutcomeCancelled, o.TimeNow())
+	_, err := tx.Delete(&op)
+	if err != nil {
+		return nil, err
+	}
+	return nil, tx.Insert(&finishedOp)
 }
 
-func (o Observer) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, pendingOp db.PendingOperation) error {
-	return errors.New("unimplemented") //TODO
+func (o Observer) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, op db.PendingOperation) (*db.PendingOperation, error) {
+	//can only confirm when the corresponding threshold is still being crossed
+	if !getMatchingReasons(res, asset)[op.Reason] {
+		return &op, nil
+	}
+
+	//can only confirm when it has been like this for at least the configured delay
+	var earliestConfirm time.Time
+	switch op.Reason {
+	case db.OperationReasonLow:
+		earliestConfirm = op.CreatedAt.Add(time.Duration(res.LowDelaySeconds) * time.Second)
+	case db.OperationReasonHigh:
+		earliestConfirm = op.CreatedAt.Add(time.Duration(res.HighDelaySeconds) * time.Second)
+	case db.OperationReasonCritical:
+		//defense in depth - maybeCreateOperation() should already have confirmed this
+		earliestConfirm = op.CreatedAt
+	}
+	if o.TimeNow().Before(earliestConfirm) {
+		return &op, nil
+	}
+
+	confirmedAt := o.TimeNow()
+	op.ConfirmedAt = &confirmedAt
+	_, err := tx.Update(&op)
+	return &op, err
+}
+
+func getMatchingReasons(res db.Resource, asset db.Asset) map[db.OperationReason]bool {
+	result := make(map[db.OperationReason]bool)
+	if res.LowThresholdPercent > 0 && asset.UsagePercent <= res.LowThresholdPercent {
+		result[db.OperationReasonLow] = true
+	}
+	if res.HighThresholdPercent > 0 && asset.UsagePercent >= res.HighThresholdPercent {
+		result[db.OperationReasonHigh] = true
+	}
+	if res.CriticalThresholdPercent > 0 && asset.UsagePercent >= res.CriticalThresholdPercent {
+		result[db.OperationReasonCritical] = true
+	}
+	return result
+}
+
+func getNewSize(asset db.Asset, res db.Resource, up bool) uint64 {
+	step := (asset.Size * uint64(res.SizeStepPercent)) / 100
+	if up {
+		return asset.Size + step
+	}
+	return asset.Size - step
 }

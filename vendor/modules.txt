@@ -26,6 +26,7 @@ github.com/mattn/go-sqlite3
 # github.com/sapcc/go-bits v0.0.0-20190425131010-53eeb20fde03
 github.com/sapcc/go-bits/logg
 github.com/sapcc/go-bits/postlite
+github.com/sapcc/go-bits/assert
 # gopkg.in/gorp.v2 v2.0.0
 gopkg.in/gorp.v2
 # gopkg.in/yaml.v2 v2.2.2

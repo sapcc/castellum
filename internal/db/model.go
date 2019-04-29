@@ -98,7 +98,7 @@ type PendingOperation struct {
 	//.OldSize and .UsagePercent mirror the state of the asset when the operation
 	//was created, and .NewSize defines the target size.
 	OldSize      uint64 `db:"old_size"`
-	NewSize      uint64 `db:"old_size"`
+	NewSize      uint64 `db:"new_size"`
 	UsagePercent uint32 `db:"usage_percent"`
 
 	//This sequence of timestamps represent the various states that an operation enters in its lifecycle.
@@ -120,6 +120,23 @@ type PendingOperation struct {
 	GreenlitByUserUUID *string `db:"greenlit_by_user_uuid"`
 }
 
+//IntoFinishedOperation creates the FinishedOperation for this PendingOperation.
+func (o PendingOperation) IntoFinishedOperation(outcome OperationOutcome, finishedAt time.Time) FinishedOperation {
+	return FinishedOperation{
+		AssetID:            o.AssetID,
+		Reason:             o.Reason,
+		Outcome:            outcome,
+		OldSize:            o.OldSize,
+		NewSize:            o.NewSize,
+		UsagePercent:       o.UsagePercent,
+		CreatedAt:          o.CreatedAt,
+		ConfirmedAt:        o.ConfirmedAt,
+		GreenlitAt:         o.GreenlitAt,
+		FinishedAt:         finishedAt,
+		GreenlitByUserUUID: o.GreenlitByUserUUID,
+	}
+}
+
 //FinishedOperation describes a finished resize operation for an asset.
 type FinishedOperation struct {
 	//All fields are identical in semantics to those in type PendingOperation, except
@@ -129,12 +146,12 @@ type FinishedOperation struct {
 	Outcome OperationOutcome `db:"outcome"`
 
 	OldSize      uint64 `db:"old_size"`
-	NewSize      uint64 `db:"old_size"`
+	NewSize      uint64 `db:"new_size"`
 	UsagePercent uint32 `db:"usage_percent"`
 
-	CreatedAt   time.Time `db:"created_at"`
-	ConfirmedAt time.Time `db:"confirmed_at"`
-	GreenlitAt  time.Time `db:"greenlit_at"`
+	CreatedAt   time.Time  `db:"created_at"`
+	ConfirmedAt *time.Time `db:"confirmed_at"`
+	GreenlitAt  *time.Time `db:"greenlit_at"`
 	//When the resize operation succeeded, failed, or was cancelled.
 	FinishedAt time.Time `db:"finished_at"`
 
