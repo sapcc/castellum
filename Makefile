@@ -16,10 +16,12 @@ build/castellum: FORCE
 install: FORCE all
 	install -D -m 0755 build/castellum "$(DESTDIR)$(PREFIX)/bin/castellum"
 
-# convenience target for developers: `make run-api/run-collector/run-worker`
+# convenience targets for developers: `make run-api/run-collector/run-worker/test-asset-type-*`
 # runs one of the components, with environment options sourced from $PWD/.env
 run-%: build/castellum
 	set -euo pipefail && source ./.env && ./build/castellum $*
+test-asset-type-%: build/castellum
+	set -euo pipefail && source ./.env && ./build/castellum test-asset-type $*
 
 # which packages to test with static checkers?
 GO_ALLPKGS := $(PKG) $(shell go list $(PKG)/internal/...)

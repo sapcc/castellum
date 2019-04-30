@@ -104,7 +104,7 @@ func (m AssetManagerStatic) SetAssetSize(res db.Resource, assetUUID string, size
 	if !exists {
 		return errUnknownAsset
 	}
-	if asset.Usage < size {
+	if asset.Usage > size {
 		return errTooSmall
 	}
 	assets[assetUUID] = StaticAsset{size, asset.Usage}

@@ -20,8 +20,11 @@
 package main
 
 import (
+	"bufio"
 	"database/sql"
+	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,6 +39,14 @@ import (
 	//load asset managers
 	_ "github.com/sapcc/castellum/internal/plugins"
 )
+
+func usage() {
+	fmt.Fprintf(os.Stderr,
+		"usage:\n\t%s [api|observer|worker]\n\t%s test-asset-type <type>\n",
+		os.Args[0], os.Args[0],
+	)
+	os.Exit(1)
+}
 
 func main() {
 	//initialize DB connection
@@ -64,9 +75,45 @@ func main() {
 		logg.Fatal(err.Error())
 	}
 
-	//TODO: implement the other subcommands
-	runObserver(dbi, team)
+	if len(os.Args) < 2 {
+		usage()
+	}
+	switch os.Args[1] {
+	case "api":
+		if len(os.Args) != 2 {
+			usage()
+		}
+		fmt.Println("TODO unimplemented")
+	case "observer":
+		if len(os.Args) != 2 {
+			usage()
+		}
+		runObserver(dbi, team)
+	case "worker":
+		if len(os.Args) != 2 {
+			usage()
+		}
+		fmt.Println("TODO unimplemented")
+	case "test-asset-type":
+		if len(os.Args) != 3 {
+			usage()
+		}
+		runAssetTypeTestShell(dbi, team, os.Args[2])
+	default:
+		usage()
+	}
 }
+
+func mustGetenv(key string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		logg.Fatal("missing required environment variable: " + key)
+	}
+	return val
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// task: observer
 
 func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam) {
 	o := observer.Observer{DB: dbi, Team: team}
@@ -113,10 +160,103 @@ func observerJobLoop(task func() error) {
 	}
 }
 
-func mustGetenv(key string) string {
-	val := os.Getenv(key)
-	if val == "" {
-		logg.Fatal("missing required environment variable: " + key)
+////////////////////////////////////////////////////////////////////////////////
+// task: test-asset-type
+
+func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetType string) {
+	manager := team.ForAssetType(assetType)
+	if manager == nil {
+		logg.Fatal("no manager configured for asset type: %q", assetType)
 	}
-	return val
+
+	fmt.Println("")
+	fmt.Println("supported commands:")
+	fmt.Println("\tlist   <project-id>                            - calls manager.ListAssets()")
+	fmt.Println("\tshow   <project-id> <asset-id>                 - calls manager.GetAssetStatus() with previousStatus == nil")
+	fmt.Println("\tshow   <project-id> <asset-id> <size> <usage%> - calls manager.GetAssetStatus() with previousStatus != nil")
+	fmt.Println("\tresize <project-id> <asset-id> <size>          - calls manager.SetAssetSize()")
+	fmt.Println("")
+
+	stdin := bufio.NewReader(os.Stdin)
+	for {
+		//show prompt
+		os.Stdout.Write([]byte("> "))
+		input, err := stdin.ReadString('\n')
+		if err != nil {
+			logg.Fatal(err.Error())
+		}
+
+		fields := strings.Fields(strings.TrimSpace(input))
+		if len(fields) == 0 {
+			continue
+		}
+		var res db.Resource
+		if len(fields) > 1 {
+			res.AssetType = assetType
+			res.ScopeUUID = fields[1]
+		}
+
+		switch fields[0] {
+		case "list":
+			if len(fields) != 2 {
+				logg.Error("wrong number of arguments")
+				continue
+			}
+			result, err := manager.ListAssets(res)
+			if err != nil {
+				logg.Error(err.Error())
+				continue
+			}
+			for idx, assetUUID := range result {
+				logg.Info("result[%d] = %q", idx, assetUUID)
+			}
+
+		case "show":
+			var previousStatus *core.AssetStatus
+			switch len(fields) {
+			case 3:
+				previousStatus = nil
+			case 5:
+				size, err := strconv.ParseUint(fields[3], 10, 64)
+				if err != nil {
+					logg.Error(err.Error())
+					continue
+				}
+				usagePerc, err := strconv.ParseUint(fields[4], 10, 32)
+				if err != nil {
+					logg.Error(err.Error())
+					continue
+				}
+				previousStatus = &core.AssetStatus{Size: size, UsagePercent: uint32(usagePerc)}
+			default:
+				logg.Error("wrong number of arguments")
+				continue
+			}
+			result, err := manager.GetAssetStatus(res, fields[2], previousStatus)
+			if err != nil {
+				logg.Error(err.Error())
+				continue
+			}
+			logg.Info("size = %d, usage = %d%%", result.Size, result.UsagePercent)
+
+		case "resize":
+			if len(fields) != 4 {
+				logg.Error("wrong number of arguments")
+				continue
+			}
+			newSize, err := strconv.ParseUint(fields[3], 10, 64)
+			if err != nil {
+				logg.Error(err.Error())
+				continue
+			}
+			err = manager.SetAssetSize(res, fields[2], newSize)
+			if err != nil {
+				logg.Error(err.Error())
+				continue
+			}
+
+		default:
+			logg.Error(err.Error())
+		}
+	}
 }

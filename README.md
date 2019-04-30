@@ -12,10 +12,11 @@ In this document:
 In other documents:
 
 * [API specification](./docs/api-spec.md)
+* [Notes for developers/contributors](./CONTRIBUTING.md)
 
 ## Terminology
 
-- An **asset** is anything that has a size and usage, and that Castellum knows how to resize based on its usage.
+- An **asset** is a thing that Castellum can resize. Assets have a size and usage, such that `0 <= usage <= size`.
   - example: "NFS share 2180c598-58f3-4d1d-b03e-303db22de1be"
 - A **resource** is the sum of all assets in a certain authentication scope. Castellum's behavior is configured at this
   level, e.g. thresholds and resizing steps. See [*API specification*](./docs/api-spec.md) for details.
