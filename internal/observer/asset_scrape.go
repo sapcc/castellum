@@ -170,6 +170,7 @@ func (o Observer) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, as
 		op.GreenlitAt = op.ConfirmedAt
 	}
 
+	core.CountStateTransition(res.AssetType, db.OperationStateDidNotExist, op.State())
 	return tx.Insert(&op)
 }
 
@@ -188,6 +189,7 @@ func (o Observer) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, as
 		return &op, nil
 	}
 
+	core.CountStateTransition(res.AssetType, op.State(), db.OperationStateCancelled)
 	finishedOp := op.IntoFinishedOperation(db.OperationOutcomeCancelled, o.TimeNow())
 	_, err := tx.Delete(&op)
 	if err != nil {
@@ -217,11 +219,12 @@ func (o Observer) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, a
 		return &op, nil
 	}
 
+	previousState := op.State()
 	confirmedAt := o.TimeNow()
 	op.ConfirmedAt = &confirmedAt
-	//right now, nothing requires operator approval
-	op.GreenlitAt = op.ConfirmedAt
+	op.GreenlitAt = op.ConfirmedAt //right now, nothing requires operator approval
 	_, err := tx.Update(&op)
+	core.CountStateTransition(res.AssetType, previousState, op.State())
 	return &op, err
 }
 

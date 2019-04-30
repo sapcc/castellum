@@ -186,6 +186,44 @@ const (
 	OperationOutcomeCancelled = "cancelled"
 )
 
+//OperationState is an enumeration type for all possible states of an operation.
+type OperationState string
+
+const (
+	//OperationStateDidNotExist is a bogus state for transitions where there is no
+	//previous state.
+	OperationStateDidNotExist OperationState = "none"
+	//OperationStateCreated is a PendingOperation with ConfirmedAt == nil.
+	OperationStateCreated = "created"
+	//OperationStateConfirmed is a PendingOperation with ConfirmedAt != nil && GreenlitAt == nil.
+	OperationStateConfirmed = "confirmed"
+	//OperationStateGreenlit is a PendingOperation with ConfirmedAt != nil && GreenlitAt != nil.
+	OperationStateGreenlit = "greenlit"
+	//OperationStateCancelled is a FinishedOperation with OperationOutcomeCancelled.
+	OperationStateCancelled = OperationState(OperationOutcomeCancelled)
+	//OperationStateSucceeded is a FinishedOperation with OperationOutcomeSucceeded.
+	OperationStateSucceeded = OperationState(OperationOutcomeSucceeded)
+	//OperationStateFailed is a FinishedOperation with OperationOutcomeFailed.
+	OperationStateFailed = OperationState(OperationOutcomeFailed)
+)
+
+//State returns the operation's state as a word.
+func (o PendingOperation) State() OperationState {
+	switch {
+	case o.ConfirmedAt == nil:
+		return OperationStateCreated
+	case o.GreenlitAt == nil:
+		return OperationStateConfirmed
+	default:
+		return OperationStateGreenlit
+	}
+}
+
+//State returns the operation's state as a word.
+func (o FinishedOperation) State() OperationState {
+	return OperationState(o.Outcome)
+}
+
 //Init connects to the database and initializes the schema and model types.
 func Init(urlStr string) (*gorp.DbMap, error) {
 	dbURL, err := url.Parse(urlStr)

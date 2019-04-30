@@ -23,6 +23,7 @@ import (
 	"bufio"
 	"database/sql"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -30,6 +31,7 @@ import (
 
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/utils/openstack/clientconfig"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/observer"
@@ -66,6 +68,12 @@ func main() {
 		logg.Fatal("cannot connect to OpenStack: " + err.Error())
 	}
 
+	//get HTTP listen address
+	httpListenAddr := os.Getenv("CASTELLUM_HTTP_LISTEN_ADDRESS")
+	if httpListenAddr == "" {
+		httpListenAddr = ":8080"
+	}
+
 	//initialize asset managers
 	team, err := core.CreateAssetManagers(
 		strings.Split(mustGetenv("CASTELLUM_ASSET_MANAGERS"), ","),
@@ -83,17 +91,17 @@ func main() {
 		if len(os.Args) != 2 {
 			usage()
 		}
-		fmt.Println("TODO unimplemented")
+		runAPI(dbi, team, httpListenAddr)
 	case "observer":
 		if len(os.Args) != 2 {
 			usage()
 		}
-		runObserver(dbi, team)
+		runObserver(dbi, team, httpListenAddr)
 	case "worker":
 		if len(os.Args) != 2 {
 			usage()
 		}
-		fmt.Println("TODO unimplemented")
+		runWorker(dbi, team, httpListenAddr)
 	case "test-asset-type":
 		if len(os.Args) != 3 {
 			usage()
@@ -113,9 +121,17 @@ func mustGetenv(key string) string {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// task: API
+
+func runAPI(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
+	logg.Error("TODO unimplemented")
+	//TODO do not forget to expose Prometheus metrics
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // task: observer
 
-func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam) {
+func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
 	o := observer.Observer{DB: dbi, Team: team}
 	o.ApplyDefaults()
 
@@ -139,7 +155,10 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam) {
 		}
 	}()
 
-	select {}
+	//use main goroutine to emit Prometheus metrics
+	http.Handle("/metrics", promhttp.Handler())
+	logg.Info("listening on " + httpListenAddr)
+	logg.Error(http.ListenAndServe(httpListenAddr, nil).Error())
 }
 
 //Execute a task repeatedly, but slow down when sql.ErrNoRows is returned by it.
@@ -158,6 +177,14 @@ func observerJobLoop(task func() error) {
 			logg.Error(err.Error())
 		}
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// task: worker
+
+func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
+	logg.Error("TODO unimplemented")
+	//TODO do not forget to expose Prometheus metrics
 }
 
 ////////////////////////////////////////////////////////////////////////////////
