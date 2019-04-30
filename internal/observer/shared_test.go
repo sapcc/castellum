@@ -19,6 +19,7 @@
 package observer
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -96,4 +97,51 @@ func setupObserver(t *testing.T) (*Observer, *plugins.AssetManagerStatic, *FakeC
 		},
 		TimeNow: clock.Now,
 	}, amStatic, clock
+}
+
+func expectAssets(t *testing.T, dbi *gorp.DbMap, assets ...db.Asset) {
+	t.Helper()
+	var dbAssets []db.Asset
+	_, err := dbi.Select(&dbAssets, `SELECT * FROM assets ORDER BY id`)
+	must(t, err)
+	if len(dbAssets) == 0 {
+		dbAssets = nil
+	}
+	assertJSONEqual(t, "assets", dbAssets, assets)
+}
+
+func expectPendingOperations(t *testing.T, dbi *gorp.DbMap, ops ...db.PendingOperation) {
+	t.Helper()
+	var dbOps []db.PendingOperation
+	_, err := dbi.Select(&dbOps, `SELECT * FROM pending_operations ORDER BY id`)
+	must(t, err)
+	if len(dbOps) == 0 {
+		dbOps = nil
+	}
+	assertJSONEqual(t, "pending operations", dbOps, ops)
+}
+
+func expectFinishedOperations(t *testing.T, dbi *gorp.DbMap, ops ...db.FinishedOperation) {
+	t.Helper()
+	var dbOps []db.FinishedOperation
+	_, err := dbi.Select(&dbOps, `SELECT * FROM finished_operations ORDER BY created_at, finished_at`)
+	must(t, err)
+	if len(dbOps) == 0 {
+		dbOps = nil
+	}
+	assertJSONEqual(t, "finished operations", dbOps, ops)
+}
+
+func assertJSONEqual(t *testing.T, variable string, actual, expected interface{}) {
+	expectedJSON, _ := json.Marshal(expected)
+	actualJSON, _ := json.Marshal(actual)
+	if string(expectedJSON) != string(actualJSON) {
+		t.Errorf("expected %s = %s", variable, string(expectedJSON))
+		t.Errorf("  actual %s = %s", variable, string(actualJSON))
+	}
+}
+
+//Take pointer to time.Time expression.
+func p2time(t time.Time) *time.Time {
+	return &t
 }

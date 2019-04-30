@@ -25,7 +25,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/utils/openstack/clientconfig"
 	"github.com/sapcc/castellum/internal/core"
@@ -39,12 +38,24 @@ import (
 )
 
 func main() {
+	//initialize DB connection
 	dbi, err := db.Init(mustGetenv("CASTELLUM_DB_URI"))
 	if err != nil {
 		logg.Fatal(err.Error())
 	}
-	providerClient := initGophercloud()
 
+	//initialize OpenStack connection
+	ao, err := clientconfig.AuthOptions(nil)
+	if err != nil {
+		logg.Fatal("cannot connect to OpenStack: " + err.Error())
+	}
+	ao.AllowReauth = true
+	providerClient, err := openstack.AuthenticatedClient(*ao)
+	if err != nil {
+		logg.Fatal("cannot connect to OpenStack: " + err.Error())
+	}
+
+	//initialize asset managers
 	team, err := core.CreateAssetManagers(
 		strings.Split(mustGetenv("CASTELLUM_ASSET_MANAGERS"), ","),
 		providerClient,
@@ -71,7 +82,15 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam) {
 			})
 		}
 	}
-	//TODO garbage-collect finished_operations
+	go func() {
+		for {
+			err := observer.CollectGarbage(dbi, time.Now().Add(-14*24*time.Hour)) //14 days
+			if err != nil {
+				logg.Error(err.Error())
+			}
+			time.Sleep(time.Hour)
+		}
+	}()
 
 	select {}
 }
@@ -92,19 +111,6 @@ func observerJobLoop(task func() error) {
 			logg.Error(err.Error())
 		}
 	}
-}
-
-func initGophercloud() *gophercloud.ProviderClient {
-	ao, err := clientconfig.AuthOptions(nil)
-	if err != nil {
-		logg.Fatal("cannot connect to OpenStack: " + err.Error())
-	}
-	ao.AllowReauth = true
-	providerClient, err := openstack.AuthenticatedClient(*ao)
-	if err != nil {
-		logg.Fatal("cannot connect to OpenStack: " + err.Error())
-	}
-	return providerClient
 }
 
 func mustGetenv(key string) string {
