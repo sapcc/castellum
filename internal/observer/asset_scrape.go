@@ -219,6 +219,8 @@ func (o Observer) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, a
 
 	confirmedAt := o.TimeNow()
 	op.ConfirmedAt = &confirmedAt
+	//right now, nothing requires operator approval
+	op.GreenlitAt = op.ConfirmedAt
 	_, err := tx.Update(&op)
 	return &op, err
 }
