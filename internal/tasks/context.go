@@ -16,7 +16,7 @@
 *
 ******************************************************************************/
 
-package observer
+package tasks
 
 import (
 	"time"
@@ -25,9 +25,9 @@ import (
 	"gopkg.in/gorp.v2"
 )
 
-//Observer holds things used by the various worker implementations in this
+//Context holds things used by the various task implementations in this
 //package.
-type Observer struct {
+type Context struct {
 	DB   *gorp.DbMap
 	Team core.AssetManagerTeam
 
@@ -36,7 +36,7 @@ type Observer struct {
 	TimeNow func() time.Time
 }
 
-//ApplyDefaults injects the regular runtime dependencies into this Observer.
-func (o *Observer) ApplyDefaults() {
-	o.TimeNow = time.Now
+//ApplyDefaults injects the regular runtime dependencies into this Context.
+func (c *Context) ApplyDefaults() {
+	c.TimeNow = time.Now
 }

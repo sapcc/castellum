@@ -16,7 +16,7 @@
 *
 ******************************************************************************/
 
-package observer
+package tasks
 
 import (
 	"testing"
@@ -26,20 +26,20 @@ import (
 )
 
 func TestCollectGarbage(t *testing.T) {
-	o, _, _ := setupObserver(t)
+	c, _, _ := setupContext(t)
 	fakeNow := time.Unix(0, 0).UTC()
 
 	//setup some minimal scaffolding (we can only insert finished_operations
 	//with valid asset IDs into the DB)
-	must(t, o.DB.Insert(&db.Resource{
+	must(t, c.DB.Insert(&db.Resource{
 		ScopeUUID: "project1",
 		AssetType: "foo",
 	}))
-	must(t, o.DB.Insert(&db.Asset{
+	must(t, c.DB.Insert(&db.Asset{
 		ResourceID: 1,
 		UUID:       "asset1",
 	}))
-	must(t, o.DB.Insert(&db.Asset{
+	must(t, c.DB.Insert(&db.Asset{
 		ResourceID: 1,
 		UUID:       "asset2",
 	}))
@@ -79,10 +79,10 @@ func TestCollectGarbage(t *testing.T) {
 		},
 	}
 	for _, op := range ops {
-		must(t, o.DB.Insert(&op))
+		must(t, c.DB.Insert(&op))
 	}
 
-	expectFinishedOperations(t, o.DB, ops...)
-	must(t, CollectGarbage(o.DB, fakeNow.Add(-15*time.Minute)))
-	expectFinishedOperations(t, o.DB, ops[2])
+	expectFinishedOperations(t, c.DB, ops...)
+	must(t, CollectGarbage(c.DB, fakeNow.Add(-15*time.Minute)))
+	expectFinishedOperations(t, c.DB, ops[2])
 }

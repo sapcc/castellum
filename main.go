@@ -34,7 +34,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
-	"github.com/sapcc/castellum/internal/observer"
+	"github.com/sapcc/castellum/internal/tasks"
 	"github.com/sapcc/go-bits/logg"
 	"gopkg.in/gorp.v2"
 
@@ -132,22 +132,22 @@ func runAPI(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) 
 // task: observer
 
 func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
-	o := observer.Observer{DB: dbi, Team: team}
-	o.ApplyDefaults()
+	c := tasks.Context{DB: dbi, Team: team}
+	c.ApplyDefaults()
 
 	for _, manager := range team {
 		for _, assetType := range manager.AssetTypes() {
-			go observerJobLoop(func() error {
-				return o.ScrapeNextResource(assetType, time.Now().Add(-30*time.Minute))
+			go jobLoop(func() error {
+				return c.ScrapeNextResource(assetType, time.Now().Add(-30*time.Minute))
 			})
-			go observerJobLoop(func() error {
-				return o.ScrapeNextAsset(assetType, time.Now().Add(-5*time.Minute))
+			go jobLoop(func() error {
+				return c.ScrapeNextAsset(assetType, time.Now().Add(-5*time.Minute))
 			})
 		}
 	}
 	go func() {
 		for {
-			err := observer.CollectGarbage(dbi, time.Now().Add(-14*24*time.Hour)) //14 days
+			err := tasks.CollectGarbage(dbi, time.Now().Add(-14*24*time.Hour)) //14 days
 			if err != nil {
 				logg.Error(err.Error())
 			}
@@ -162,9 +162,9 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 }
 
 //Execute a task repeatedly, but slow down when sql.ErrNoRows is returned by it.
-//(Observer.ScrapeNextX methods use this error value to indicate that nothing
-//needs scraping, so we can back off a bit to avoid useless database load.)
-func observerJobLoop(task func() error) {
+//(Tasks use this error value to indicate that nothing needs scraping, so we
+//can back off a bit to avoid useless database load.)
+func jobLoop(task func() error) {
 	for {
 		err := task()
 		switch err {

@@ -16,7 +16,7 @@
 *
 ******************************************************************************/
 
-package observer
+package tasks
 
 import (
 	"encoding/json"
@@ -65,7 +65,7 @@ func (f *FakeClock) StepBy(d time.Duration) {
 	*f += FakeClock(d / time.Second)
 }
 
-func setupObserver(t *testing.T) (*Observer, *plugins.AssetManagerStatic, *FakeClock) {
+func setupContext(t *testing.T) (*Context, *plugins.AssetManagerStatic, *FakeClock) {
 	dbi, err := db.Init("postgres://postgres@localhost:54321/castellum?sslmode=disable")
 	if err != nil {
 		t.Error(err)
@@ -90,11 +90,9 @@ func setupObserver(t *testing.T) (*Observer, *plugins.AssetManagerStatic, *FakeC
 	clockVar := FakeClock(99990)
 	clock := &clockVar
 
-	return &Observer{
-		DB: dbi,
-		Team: core.AssetManagerTeam{
-			amStatic,
-		},
+	return &Context{
+		DB:      dbi,
+		Team:    core.AssetManagerTeam{amStatic},
 		TimeNow: clock.Now,
 	}, amStatic, clock
 }

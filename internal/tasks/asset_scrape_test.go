@@ -16,7 +16,7 @@
 *
 ******************************************************************************/
 
-package observer
+package tasks
 
 import (
 	"database/sql"
@@ -28,18 +28,18 @@ import (
 	"github.com/sapcc/go-bits/postlite"
 )
 
-func setupAssetScrapeTest(t *testing.T) (*Observer, func(uint64), *FakeClock) {
-	o, amStatic, clock := setupObserver(t)
+func setupAssetScrapeTest(t *testing.T) (*Context, func(uint64), *FakeClock) {
+	c, amStatic, clock := setupContext(t)
 
 	//ScrapeNextAsset() without any resources just does nothing
-	err := o.ScrapeNextAsset("foo", o.TimeNow())
+	err := c.ScrapeNextAsset("foo", c.TimeNow())
 	if err != sql.ErrNoRows {
 		t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
 	}
-	postlite.AssertDBContent(t, o.DB.Db, "fixtures/resource-scrape-0.sql")
+	postlite.AssertDBContent(t, c.DB.Db, "fixtures/resource-scrape-0.sql")
 
 	//create a resource and asset to test with
-	must(t, o.DB.Insert(&db.Resource{
+	must(t, c.DB.Insert(&db.Resource{
 		ScopeUUID:                "project1",
 		AssetType:                "foo",
 		LowThresholdPercent:      20,
@@ -49,12 +49,12 @@ func setupAssetScrapeTest(t *testing.T) (*Observer, func(uint64), *FakeClock) {
 		CriticalThresholdPercent: 95,
 		SizeStepPercent:          20,
 	}))
-	must(t, o.DB.Insert(&db.Asset{
+	must(t, c.DB.Insert(&db.Asset{
 		ResourceID:   1,
 		UUID:         "asset1",
 		Size:         1000,
 		UsagePercent: 50,
-		ScrapedAt:    o.TimeNow(),
+		ScrapedAt:    c.TimeNow(),
 		Stale:        false,
 	}))
 
@@ -71,27 +71,27 @@ func setupAssetScrapeTest(t *testing.T) (*Observer, func(uint64), *FakeClock) {
 		}
 	}
 
-	return o, setAssetUsagePercent, clock
+	return c, setAssetUsagePercent, clock
 }
 
 func TestNoOperationWhenNoThreshold(t *testing.T) {
-	o, _, clock := setupAssetScrapeTest(t)
+	c, _, clock := setupAssetScrapeTest(t)
 
 	//when no threshold is crossed, no operation gets created
 	clock.StepBy(10 * time.Minute)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
-	expectPendingOperations(t, o.DB /*, nothing */)
-	expectFinishedOperations(t, o.DB /*, nothing */)
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
+	expectPendingOperations(t, c.DB /*, nothing */)
+	expectFinishedOperations(t, c.DB /*, nothing */)
 }
 
 func TestNormalUpsizeTowardsGreenlight(t *testing.T) {
-	o, setAssetUsagePercent, clock := setupAssetScrapeTest(t)
+	c, setAssetUsagePercent, clock := setupAssetScrapeTest(t)
 
 	//when the "High" threshold gets crossed, a "High" operation gets created in
 	//state "created"
 	clock.StepBy(10 * time.Minute)
 	setAssetUsagePercent(80)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
 
 	expectedOp := db.PendingOperation{
 		ID:           1,
@@ -100,82 +100,82 @@ func TestNormalUpsizeTowardsGreenlight(t *testing.T) {
 		OldSize:      1000,
 		NewSize:      1200,
 		UsagePercent: 80,
-		CreatedAt:    o.TimeNow(),
+		CreatedAt:    c.TimeNow(),
 	}
-	expectPendingOperations(t, o.DB, expectedOp)
-	expectFinishedOperations(t, o.DB /*, nothing */)
+	expectPendingOperations(t, c.DB, expectedOp)
+	expectFinishedOperations(t, c.DB /*, nothing */)
 
 	//another scrape while the delay is not over should not change the state
 	clock.StepBy(40 * time.Minute)
 	setAssetUsagePercent(82)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
-	expectPendingOperations(t, o.DB, expectedOp)
-	expectFinishedOperations(t, o.DB /*, nothing */)
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
+	expectPendingOperations(t, c.DB, expectedOp)
+	expectFinishedOperations(t, c.DB /*, nothing */)
 
 	//when the delay is over, the next scrape moves into state "Confirmed/Greenlit"
 	clock.StepBy(40 * time.Minute)
 	setAssetUsagePercent(84)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
-	expectedOp.ConfirmedAt = p2time(o.TimeNow())
-	expectedOp.GreenlitAt = p2time(o.TimeNow())
-	expectPendingOperations(t, o.DB, expectedOp)
-	expectFinishedOperations(t, o.DB /*, nothing */)
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
+	expectedOp.ConfirmedAt = p2time(c.TimeNow())
+	expectedOp.GreenlitAt = p2time(c.TimeNow())
+	expectPendingOperations(t, c.DB, expectedOp)
+	expectFinishedOperations(t, c.DB /*, nothing */)
 
 	//since the operation is now greenlit and can be picked up by a worker at any
 	//moment, we should not touch it anymore even if the reason disappears
 	clock.StepBy(40 * time.Minute)
 	setAssetUsagePercent(78)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
-	expectPendingOperations(t, o.DB, expectedOp)
-	expectFinishedOperations(t, o.DB /*, nothing */)
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
+	expectPendingOperations(t, c.DB, expectedOp)
+	expectFinishedOperations(t, c.DB /*, nothing */)
 }
 
 func TestNormalUpsizeTowardsCancel(t *testing.T) {
-	o, setAssetUsagePercent, clock := setupAssetScrapeTest(t)
+	c, setAssetUsagePercent, clock := setupAssetScrapeTest(t)
 
 	//when the "High" threshold gets crossed, a "High" operation gets created in
 	//state "created"
 	clock.StepBy(10 * time.Minute)
 	setAssetUsagePercent(80)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
 
-	expectPendingOperations(t, o.DB, db.PendingOperation{
+	expectPendingOperations(t, c.DB, db.PendingOperation{
 		ID:           1,
 		AssetID:      1,
 		Reason:       db.OperationReasonHigh,
 		OldSize:      1000,
 		NewSize:      1200,
 		UsagePercent: 80,
-		CreatedAt:    o.TimeNow(),
+		CreatedAt:    c.TimeNow(),
 	})
-	expectFinishedOperations(t, o.DB /*, nothing */)
+	expectFinishedOperations(t, c.DB /*, nothing */)
 
 	//when the reason disappears within the delay, the operation is cancelled
 	clock.StepBy(40 * time.Minute)
 	setAssetUsagePercent(79)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
 
-	expectPendingOperations(t, o.DB /*, nothing */)
-	expectFinishedOperations(t, o.DB, db.FinishedOperation{
+	expectPendingOperations(t, c.DB /*, nothing */)
+	expectFinishedOperations(t, c.DB, db.FinishedOperation{
 		AssetID:      1,
 		Reason:       db.OperationReasonHigh,
 		Outcome:      db.OperationOutcomeCancelled,
 		OldSize:      1000,
 		NewSize:      1200,
 		UsagePercent: 80,
-		CreatedAt:    o.TimeNow().Add(-40 * time.Minute),
-		FinishedAt:   o.TimeNow(),
+		CreatedAt:    c.TimeNow().Add(-40 * time.Minute),
+		FinishedAt:   c.TimeNow(),
 	})
 }
 
 func TestNormalDownsizeTowardsGreenlight(t *testing.T) {
-	o, setAssetUsagePercent, clock := setupAssetScrapeTest(t)
+	c, setAssetUsagePercent, clock := setupAssetScrapeTest(t)
 
 	//when the "Low" threshold gets crossed, a "Low" operation gets created in
 	//state "created"
 	clock.StepBy(10 * time.Minute)
 	setAssetUsagePercent(20)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
 
 	expectedOp := db.PendingOperation{
 		ID:           1,
@@ -184,82 +184,82 @@ func TestNormalDownsizeTowardsGreenlight(t *testing.T) {
 		OldSize:      1000,
 		NewSize:      800,
 		UsagePercent: 20,
-		CreatedAt:    o.TimeNow(),
+		CreatedAt:    c.TimeNow(),
 	}
-	expectPendingOperations(t, o.DB, expectedOp)
-	expectFinishedOperations(t, o.DB /*, nothing */)
+	expectPendingOperations(t, c.DB, expectedOp)
+	expectFinishedOperations(t, c.DB /*, nothing */)
 
 	//another scrape while the delay is not over should not change the state
 	clock.StepBy(40 * time.Minute)
 	setAssetUsagePercent(18)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
-	expectPendingOperations(t, o.DB, expectedOp)
-	expectFinishedOperations(t, o.DB /*, nothing */)
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
+	expectPendingOperations(t, c.DB, expectedOp)
+	expectFinishedOperations(t, c.DB /*, nothing */)
 
 	//when the delay is over, the next scrape moves into state "Confirmed/Greenlit"
 	clock.StepBy(40 * time.Minute)
 	setAssetUsagePercent(16)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
-	expectedOp.ConfirmedAt = p2time(o.TimeNow())
-	expectedOp.GreenlitAt = p2time(o.TimeNow())
-	expectPendingOperations(t, o.DB, expectedOp)
-	expectFinishedOperations(t, o.DB /*, nothing */)
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
+	expectedOp.ConfirmedAt = p2time(c.TimeNow())
+	expectedOp.GreenlitAt = p2time(c.TimeNow())
+	expectPendingOperations(t, c.DB, expectedOp)
+	expectFinishedOperations(t, c.DB /*, nothing */)
 
 	//since the operation is now greenlit and can be picked up by a worker at any
 	//moment, we should not touch it anymore even if the reason disappears
 	clock.StepBy(40 * time.Minute)
 	setAssetUsagePercent(22)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
-	expectPendingOperations(t, o.DB, expectedOp)
-	expectFinishedOperations(t, o.DB /*, nothing */)
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
+	expectPendingOperations(t, c.DB, expectedOp)
+	expectFinishedOperations(t, c.DB /*, nothing */)
 }
 
 func TestNormalDownsizeTowardsCancel(t *testing.T) {
-	o, setAssetUsagePercent, clock := setupAssetScrapeTest(t)
+	c, setAssetUsagePercent, clock := setupAssetScrapeTest(t)
 
 	//when the "Low" threshold gets crossed, a "Low" operation gets created in
 	//state "created"
 	clock.StepBy(10 * time.Minute)
 	setAssetUsagePercent(20)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
 
-	expectPendingOperations(t, o.DB, db.PendingOperation{
+	expectPendingOperations(t, c.DB, db.PendingOperation{
 		ID:           1,
 		AssetID:      1,
 		Reason:       db.OperationReasonLow,
 		OldSize:      1000,
 		NewSize:      800,
 		UsagePercent: 20,
-		CreatedAt:    o.TimeNow(),
+		CreatedAt:    c.TimeNow(),
 	})
-	expectFinishedOperations(t, o.DB /*, nothing */)
+	expectFinishedOperations(t, c.DB /*, nothing */)
 
 	//when the reason disappears within the delay, the operation is cancelled
 	clock.StepBy(40 * time.Minute)
 	setAssetUsagePercent(21)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
 
-	expectPendingOperations(t, o.DB /*, nothing */)
-	expectFinishedOperations(t, o.DB, db.FinishedOperation{
+	expectPendingOperations(t, c.DB /*, nothing */)
+	expectFinishedOperations(t, c.DB, db.FinishedOperation{
 		AssetID:      1,
 		Reason:       db.OperationReasonLow,
 		Outcome:      db.OperationOutcomeCancelled,
 		OldSize:      1000,
 		NewSize:      800,
 		UsagePercent: 20,
-		CreatedAt:    o.TimeNow().Add(-40 * time.Minute),
-		FinishedAt:   o.TimeNow(),
+		CreatedAt:    c.TimeNow().Add(-40 * time.Minute),
+		FinishedAt:   c.TimeNow(),
 	})
 }
 
 func TestCriticalUpsizeTowardsGreenlight(t *testing.T) {
-	o, setAssetUsagePercent, clock := setupAssetScrapeTest(t)
+	c, setAssetUsagePercent, clock := setupAssetScrapeTest(t)
 
 	//when the "Critical" threshold gets crossed, a "Critical" operation gets
 	//created and immediately confirmed/greenlit
 	clock.StepBy(10 * time.Minute)
 	setAssetUsagePercent(95)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
 
 	expectedOp := db.PendingOperation{
 		ID:           1,
@@ -268,69 +268,69 @@ func TestCriticalUpsizeTowardsGreenlight(t *testing.T) {
 		OldSize:      1000,
 		NewSize:      1200,
 		UsagePercent: 95,
-		CreatedAt:    o.TimeNow(),
-		ConfirmedAt:  p2time(o.TimeNow()),
-		GreenlitAt:   p2time(o.TimeNow()),
+		CreatedAt:    c.TimeNow(),
+		ConfirmedAt:  p2time(c.TimeNow()),
+		GreenlitAt:   p2time(c.TimeNow()),
 	}
-	expectPendingOperations(t, o.DB, expectedOp)
-	expectFinishedOperations(t, o.DB /*, nothing */)
+	expectPendingOperations(t, c.DB, expectedOp)
+	expectFinishedOperations(t, c.DB /*, nothing */)
 }
 
 func TestReplaceNormalWithCriticalUpsize(t *testing.T) {
-	o, setAssetUsagePercent, clock := setupAssetScrapeTest(t)
+	c, setAssetUsagePercent, clock := setupAssetScrapeTest(t)
 
 	//when the "High" threshold gets crossed, a "High" operation gets created in
 	//state "created"
 	clock.StepBy(10 * time.Minute)
 	setAssetUsagePercent(90)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
 
-	expectPendingOperations(t, o.DB, db.PendingOperation{
+	expectPendingOperations(t, c.DB, db.PendingOperation{
 		ID:           1,
 		AssetID:      1,
 		Reason:       db.OperationReasonHigh,
 		OldSize:      1000,
 		NewSize:      1200,
 		UsagePercent: 90,
-		CreatedAt:    o.TimeNow(),
+		CreatedAt:    c.TimeNow(),
 	})
-	expectFinishedOperations(t, o.DB /*, nothing */)
+	expectFinishedOperations(t, c.DB /*, nothing */)
 
 	//when the "Critical" threshold gets crossed while the the "High" operation
 	//is not yet confirmed, the "High" operation is cancelled and a "Critical"
 	//operation replaces it
 	clock.StepBy(10 * time.Minute)
 	setAssetUsagePercent(96)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
 
-	expectPendingOperations(t, o.DB, db.PendingOperation{
+	expectPendingOperations(t, c.DB, db.PendingOperation{
 		ID:           2,
 		AssetID:      1,
 		Reason:       db.OperationReasonCritical,
 		OldSize:      1000,
 		NewSize:      1200,
 		UsagePercent: 96,
-		CreatedAt:    o.TimeNow(),
-		ConfirmedAt:  p2time(o.TimeNow()),
-		GreenlitAt:   p2time(o.TimeNow()),
+		CreatedAt:    c.TimeNow(),
+		ConfirmedAt:  p2time(c.TimeNow()),
+		GreenlitAt:   p2time(c.TimeNow()),
 	})
-	expectFinishedOperations(t, o.DB, db.FinishedOperation{
+	expectFinishedOperations(t, c.DB, db.FinishedOperation{
 		AssetID:      1,
 		Reason:       db.OperationReasonHigh,
 		Outcome:      db.OperationOutcomeCancelled,
 		OldSize:      1000,
 		NewSize:      1200,
 		UsagePercent: 90,
-		CreatedAt:    o.TimeNow().Add(-10 * time.Minute),
-		FinishedAt:   o.TimeNow(),
+		CreatedAt:    c.TimeNow().Add(-10 * time.Minute),
+		FinishedAt:   c.TimeNow(),
 	})
 }
 
 func TestAssetScrapeOrdering(t *testing.T) {
-	o, amStatic, clock := setupObserver(t)
+	c, amStatic, clock := setupContext(t)
 
 	//create a resource and multiple assets to test with
-	must(t, o.DB.Insert(&db.Resource{
+	must(t, c.DB.Insert(&db.Resource{
 		ScopeUUID:                "project1",
 		AssetType:                "foo",
 		LowThresholdPercent:      20,
@@ -346,7 +346,7 @@ func TestAssetScrapeOrdering(t *testing.T) {
 			UUID:         "asset1",
 			Size:         1000,
 			UsagePercent: 50,
-			ScrapedAt:    o.TimeNow(),
+			ScrapedAt:    c.TimeNow(),
 			Stale:        false,
 		},
 		{
@@ -354,7 +354,7 @@ func TestAssetScrapeOrdering(t *testing.T) {
 			UUID:         "asset2",
 			Size:         1000,
 			UsagePercent: 50,
-			ScrapedAt:    o.TimeNow(),
+			ScrapedAt:    c.TimeNow(),
 			Stale:        false,
 		},
 		{
@@ -362,13 +362,13 @@ func TestAssetScrapeOrdering(t *testing.T) {
 			UUID:         "asset3",
 			Size:         1000,
 			UsagePercent: 50,
-			ScrapedAt:    o.TimeNow(),
+			ScrapedAt:    c.TimeNow(),
 			Stale:        false,
 		},
 	}
-	must(t, o.DB.Insert(&assets[0]))
-	must(t, o.DB.Insert(&assets[1]))
-	must(t, o.DB.Insert(&assets[2]))
+	must(t, c.DB.Insert(&assets[0]))
+	must(t, c.DB.Insert(&assets[1]))
+	must(t, c.DB.Insert(&assets[2]))
 
 	amStatic.Assets = map[string]map[string]plugins.StaticAsset{
 		"project1": {
@@ -380,34 +380,34 @@ func TestAssetScrapeOrdering(t *testing.T) {
 
 	//this should scrape each asset once, in order
 	clock.StepBy(time.Minute)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
 	clock.StepBy(time.Minute)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
 	clock.StepBy(time.Minute)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
 
 	//so the asset table should look like this now
-	assets[0].ScrapedAt = o.TimeNow().Add(-2 * time.Minute)
-	assets[1].ScrapedAt = o.TimeNow().Add(-time.Minute)
-	assets[2].ScrapedAt = o.TimeNow()
+	assets[0].ScrapedAt = c.TimeNow().Add(-2 * time.Minute)
+	assets[1].ScrapedAt = c.TimeNow().Add(-time.Minute)
+	assets[2].ScrapedAt = c.TimeNow()
 	assets[0].UsagePercent = 51
 	assets[1].UsagePercent = 52
 	assets[2].UsagePercent = 53
-	expectAssets(t, o.DB, assets...)
+	expectAssets(t, c.DB, assets...)
 
 	//next scrape should work identically
 	clock.StepBy(time.Minute)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
 	clock.StepBy(time.Minute)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
 	clock.StepBy(time.Minute)
-	must(t, o.ScrapeNextAsset("foo", o.TimeNow()))
-	assets[0].ScrapedAt = o.TimeNow().Add(-2 * time.Minute)
-	assets[1].ScrapedAt = o.TimeNow().Add(-time.Minute)
-	assets[2].ScrapedAt = o.TimeNow()
-	expectAssets(t, o.DB, assets...)
+	must(t, c.ScrapeNextAsset("foo", c.TimeNow()))
+	assets[0].ScrapedAt = c.TimeNow().Add(-2 * time.Minute)
+	assets[1].ScrapedAt = c.TimeNow().Add(-time.Minute)
+	assets[2].ScrapedAt = c.TimeNow()
+	expectAssets(t, c.DB, assets...)
 
 	//and all of this should not have created any operations
-	expectPendingOperations(t, o.DB /*, nothing */)
-	expectFinishedOperations(t, o.DB /*, nothing */)
+	expectPendingOperations(t, c.DB /*, nothing */)
+	expectFinishedOperations(t, c.DB /*, nothing */)
 }

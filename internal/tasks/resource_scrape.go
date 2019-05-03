@@ -16,7 +16,7 @@
 *
 ******************************************************************************/
 
-package observer
+package tasks
 
 import (
 	"database/sql"
@@ -42,14 +42,14 @@ var scrapeResourceSearchQuery = `
 //
 //Returns sql.ErrNoRows when no resource needed scraping, to indicate to the
 //caller to slow down.
-func (o Observer) ScrapeNextResource(assetType string, maxScrapedAt time.Time) error {
-	manager := o.Team.ForAssetType(assetType)
+func (c Context) ScrapeNextResource(assetType string, maxScrapedAt time.Time) error {
+	manager := c.Team.ForAssetType(assetType)
 	if manager == nil {
 		panic(fmt.Sprintf("no asset manager for asset type %q", assetType))
 	}
 
 	var res db.Resource
-	err := o.DB.SelectOne(&res, scrapeResourceSearchQuery, assetType, maxScrapedAt)
+	err := c.DB.SelectOne(&res, scrapeResourceSearchQuery, assetType, maxScrapedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			logg.Debug("no %s resources to scrape - slowing down...", assetType)
@@ -71,11 +71,11 @@ func (o Observer) ScrapeNextResource(assetType string, maxScrapedAt time.Time) e
 
 	//load existing asset entries from DB
 	var dbAssets []db.Asset
-	_, err = o.DB.Select(&dbAssets, `SELECT * FROM assets WHERE resource_id = $1`, res.ID)
+	_, err = c.DB.Select(&dbAssets, `SELECT * FROM assets WHERE resource_id = $1`, res.ID)
 	if err != nil {
 		return err
 	}
-	resourceScrapedTime := o.TimeNow()
+	resourceScrapedTime := c.TimeNow()
 
 	//cleanup asset entries for deleted assets
 	isAssetInDB := make(map[string]bool)
@@ -85,7 +85,7 @@ func (o Observer) ScrapeNextResource(assetType string, maxScrapedAt time.Time) e
 			continue
 		}
 		logg.Info("removing deleted %s asset from DB: UUID = %s, scope UUID = %s", assetType, dbAsset.UUID, res.ScopeUUID)
-		_, err = o.DB.Delete(&dbAsset)
+		_, err = c.DB.Delete(&dbAsset)
 		if err != nil {
 			return err
 		}
@@ -107,17 +107,17 @@ func (o Observer) ScrapeNextResource(assetType string, maxScrapedAt time.Time) e
 			UUID:         assetUUID,
 			Size:         status.Size,
 			UsagePercent: status.UsagePercent,
-			ScrapedAt:    o.TimeNow(),
+			ScrapedAt:    c.TimeNow(),
 			Stale:        false,
 		}
-		err = o.DB.Insert(&dbAsset)
+		err = c.DB.Insert(&dbAsset)
 		if err != nil {
 			return err
 		}
 	}
 
 	//record successful scrape
-	_, err = o.DB.Exec("UPDATE resources SET scraped_at = $1 WHERE id = $2", resourceScrapedTime, res.ID)
+	_, err = c.DB.Exec("UPDATE resources SET scraped_at = $1 WHERE id = $2", resourceScrapedTime, res.ID)
 	if err != nil {
 		return err
 	}
