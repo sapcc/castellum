@@ -95,7 +95,8 @@ var SQLMigrations = map[string]string{
 			greenlit_at  TIMESTAMP  DEFAULT NULL,
 			finished_at  TIMESTAMP  NOT NULL,
 
-			greenlit_by_user_uuid TEXT DEFAULT NULL
+			greenlit_by_user_uuid TEXT DEFAULT NULL,
+			error_message         TEXT NOT NULL DEFAULT ''
 		);
 	`,
 }

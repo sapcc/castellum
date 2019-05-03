@@ -156,6 +156,7 @@ type FinishedOperation struct {
 	FinishedAt time.Time `db:"finished_at"`
 
 	GreenlitByUserUUID *string `db:"greenlit_by_user_uuid"`
+	ErrorMessage       string  `db:"error_message"`
 }
 
 //OperationReason is an enumeration type for possible reasons for a resize operation.

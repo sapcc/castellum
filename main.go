@@ -183,8 +183,17 @@ func jobLoop(task func() error) {
 // task: worker
 
 func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
-	logg.Error("TODO unimplemented")
-	//TODO do not forget to expose Prometheus metrics
+	c := tasks.Context{DB: dbi, Team: team}
+	c.ApplyDefaults()
+
+	go jobLoop(func() error {
+		return c.ExecuteNextResize()
+	})
+
+	//use main goroutine to emit Prometheus metrics
+	http.Handle("/metrics", promhttp.Handler())
+	logg.Info("listening on " + httpListenAddr)
+	logg.Error(http.ListenAndServe(httpListenAddr, nil).Error())
 }
 
 ////////////////////////////////////////////////////////////////////////////////
