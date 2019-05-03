@@ -77,6 +77,12 @@ func (c Context) ExecuteNextResize() error {
 		return fmt.Errorf("no asset manager for asset type %q", res.AssetType)
 	}
 
+	//when running in a unit test, wait for the test harness to unblock us
+	if c.Blocker != nil {
+		for range c.Blocker {
+		}
+	}
+
 	//perform the resize operation
 	err = manager.SetAssetSize(res, asset.UUID, op.NewSize)
 	outcome := db.OperationOutcomeSucceeded

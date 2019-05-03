@@ -122,7 +122,7 @@ func expectPendingOperations(t *testing.T, dbi *gorp.DbMap, ops ...db.PendingOpe
 func expectFinishedOperations(t *testing.T, dbi *gorp.DbMap, ops ...db.FinishedOperation) {
 	t.Helper()
 	var dbOps []db.FinishedOperation
-	_, err := dbi.Select(&dbOps, `SELECT * FROM finished_operations ORDER BY created_at, finished_at`)
+	_, err := dbi.Select(&dbOps, `SELECT * FROM finished_operations ORDER BY asset_id, created_at, finished_at`)
 	must(t, err)
 	if len(dbOps) == 0 {
 		dbOps = nil

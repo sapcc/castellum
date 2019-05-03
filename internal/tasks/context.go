@@ -34,6 +34,10 @@ type Context struct {
 	//dependency injection slots (usually filled by ApplyDefaults(), but filled
 	//with doubles in tests)
 	TimeNow func() time.Time
+
+	//When Blocker is not nil, tasks that support concurrent operation will
+	//withhold operations until this channel is closed.
+	Blocker <-chan struct{}
 }
 
 //ApplyDefaults injects the regular runtime dependencies into this Context.

@@ -20,6 +20,8 @@ package tasks
 
 import (
 	"database/sql"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,34 +29,37 @@ import (
 	"github.com/sapcc/castellum/internal/plugins"
 )
 
-func setupAssetResizeTest(t *testing.T, c *Context, amStatic *plugins.AssetManagerStatic) {
-	//create a resource and asset to test with
+func setupAssetResizeTest(t *testing.T, c *Context, amStatic *plugins.AssetManagerStatic, assetCount int) {
+	//create a resource and assets to test with
 	must(t, c.DB.Insert(&db.Resource{
 		ScopeUUID: "project1",
 		AssetType: "foo",
 	}))
-	must(t, c.DB.Insert(&db.Asset{
-		ResourceID:   1,
-		UUID:         "asset1",
-		Size:         1000,
-		UsagePercent: 50,
-		ScrapedAt:    c.TimeNow(),
-		Stale:        false,
-	}))
-
 	amStatic.Assets = map[string]map[string]plugins.StaticAsset{
-		"project1": {
-			"asset1": {
-				Size:  1000,
-				Usage: 500,
-			},
-		},
+		"project1": {},
+	}
+
+	for idx := 1; idx <= assetCount; idx++ {
+		uuid := fmt.Sprintf("asset%d", idx)
+		must(t, c.DB.Insert(&db.Asset{
+			ResourceID:   1,
+			UUID:         uuid,
+			Size:         1000,
+			UsagePercent: 50,
+			ScrapedAt:    c.TimeNow(),
+			Stale:        false,
+		}))
+
+		amStatic.Assets["project1"][uuid] = plugins.StaticAsset{
+			Size:  1000,
+			Usage: 500,
+		}
 	}
 }
 
 func TestSuccessfulResize(t *testing.T) {
 	c, amStatic, clock := setupContext(t)
-	setupAssetResizeTest(t, c, amStatic)
+	setupAssetResizeTest(t, c, amStatic, 1)
 
 	//add a greenlit PendingOperation
 	clock.StepBy(5 * time.Minute)
@@ -99,7 +104,7 @@ func TestSuccessfulResize(t *testing.T) {
 
 func TestFailingResize(t *testing.T) {
 	c, amStatic, clock := setupContext(t)
-	setupAssetResizeTest(t, c, amStatic)
+	setupAssetResizeTest(t, c, amStatic, 1)
 
 	//add a greenlit PendingOperation that will fail in SetAssetSize()
 	clock.StepBy(10 * time.Minute)
@@ -133,4 +138,45 @@ func TestFailingResize(t *testing.T) {
 	})
 }
 
-//TODO TestOperationQueueBehavior
+func TestOperationQueueBehavior(t *testing.T) {
+	//This test checks that, when there are multiple operations to execute, each
+	//operation gets executed /exactly once/.
+	c, amStatic, clock := setupContext(t)
+	setupAssetResizeTest(t, c, amStatic, 10)
+
+	//add 10 pending operations that are all ready to execute immediately
+	clock.StepBy(10 * time.Minute)
+	var finishedOps []db.FinishedOperation
+	for idx := uint64(1); idx <= 10; idx++ {
+		pendingOp := db.PendingOperation{
+			AssetID:      int64(idx),
+			Reason:       db.OperationReasonHigh,
+			OldSize:      1000,
+			NewSize:      1200 + idx, //need operations to be distinguishable
+			UsagePercent: 50,
+			CreatedAt:    c.TimeNow().Add(-10 * time.Minute),
+			ConfirmedAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
+			GreenlitAt:   p2time(c.TimeNow().Add(-5 * time.Minute)),
+		}
+		must(t, c.DB.Insert(&pendingOp))
+		finishedOps = append(finishedOps,
+			pendingOp.IntoFinishedOperation(db.OperationOutcomeSucceeded, c.TimeNow()),
+		)
+	}
+
+	//execute them all in parallel
+	blocker := make(chan struct{})
+	c.Blocker = blocker
+	wg := &sync.WaitGroup{}
+	wg.Add(10)
+	for idx := 0; idx < 10; idx++ {
+		go func() {
+			defer wg.Done()
+			must(t, c.ExecuteNextResize())
+		}()
+	}
+
+	close(blocker)
+	wg.Wait()
+	expectFinishedOperations(t, c.DB, finishedOps...)
+}
