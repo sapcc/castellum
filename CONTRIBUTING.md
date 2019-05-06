@@ -25,7 +25,7 @@ variables from a file `.env`, which should look like this:
 
 ```sh
 export CASTELLUM_DB_URI="postgres://postgres@localhost/castellum?sslmode=disable"
-export CASTELLUM_ASSET_MANAGERS="nfs_shares,project_quota"
+export CASTELLUM_ASSET_MANAGERS="nfs-shares,project-quota"
 export OS_AUTH_URL="https://keystone.example.com/v3"
 ...
 ```

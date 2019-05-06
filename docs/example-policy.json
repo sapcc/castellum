@@ -9,6 +9,6 @@
   "project_nfs_editor": "rule:domain_nfs_editor or (rule:project_scope and role:sharedfilesystem_admin)",
   "project_nfs_viewer": "rule:domain_nfs_viewer or (rule:project_scope and role:sharedfilesystem_viewer) or rule:project_nfs_editor",
 
-  "project:edit:nfs_share": "rule:project_nfs_editor",
-  "project:show:nfs_share": "rule:project_nfs_viewer"
+  "project:edit:nfs-shares": "rule:project_nfs_editor",
+  "project:show:nfs-shares": "rule:project_nfs_viewer"
 }
