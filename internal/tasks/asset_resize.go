@@ -100,5 +100,14 @@ func (c Context) ExecuteNextResize() error {
 		return err
 	}
 
+	//mark asset as stale (its size field is no longer accurate)
+	if outcome == db.OperationOutcomeSucceeded {
+		_, err := tx.Exec(`UPDATE assets SET stale = $1 WHERE id = $2`, true, asset.ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	core.CountStateTransition(res.AssetType, db.OperationStateGreenlit, finishedOp.State())
 	return tx.Commit()
 }

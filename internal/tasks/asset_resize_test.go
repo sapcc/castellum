@@ -100,6 +100,18 @@ func TestSuccessfulResize(t *testing.T) {
 		FinishedAt:   c.TimeNow(),
 		Outcome:      db.OperationOutcomeSucceeded,
 	})
+
+	//expect asset to be marked as stale, but still show the old size (until the
+	//next asset scrape)
+	expectAssets(t, c.DB, db.Asset{
+		ID:           1,
+		ResourceID:   1,
+		UUID:         "asset1",
+		Size:         1000,
+		UsagePercent: 50,
+		ScrapedAt:    c.TimeNow().Add(-15 * time.Minute),
+		Stale:        true,
+	})
 }
 
 func TestFailingResize(t *testing.T) {
@@ -135,6 +147,17 @@ func TestFailingResize(t *testing.T) {
 		FinishedAt:   c.TimeNow(),
 		Outcome:      db.OperationOutcomeFailed,
 		ErrorMessage: "cannot set size smaller than current usage",
+	})
+
+	//check that asset was not marked as stale
+	expectAssets(t, c.DB, db.Asset{
+		ID:           1,
+		ResourceID:   1,
+		UUID:         "asset1",
+		Size:         1000,
+		UsagePercent: 50,
+		ScrapedAt:    c.TimeNow().Add(-10 * time.Minute),
+		Stale:        false,
 	})
 }
 
