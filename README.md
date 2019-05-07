@@ -56,13 +56,12 @@ All components receive configuration via environment variables. The following va
 | `CASTELLUM_ASSET_MANAGERS` | *(required)* | A comma-separated list of all asset managers that can be enabled. This configures what kinds of assets Castellum can handle. [See below](#supported-asset-types) for which asset managers exist. |
 | `CASTELLUM_DB_URI` | *(required)* | A [libpq connection URI][pq-uri] that locates the Limes database. The non-URI "connection string" format is not allowed; it must be a URI. |
 | `CASTELLUM_HTTP_LISTEN_ADDRESS` | `:8080` | Listen address for the internal HTTP server. For `castellum observer/worker`, this just exposes Prometheus metrics on `/metrics`. For `castelum api`, this also exposes [the REST API](./docs/api-spec.md). |
+| `CASTELLUM_OSLO_POLICY_PATH` | *(required)* | Path to the oslo.policy file for this service. See [*Oslo policy*](#oslo-policy) for details. |
 | `OS_...` | *(required)* | A full set of OpenStack auth environment variables for Castellum's service user. See [documentation for openstackclient][os-env] for details. |
 
-### Supported asset types
+### Oslo policy
 
-The following asset managers are available:
-
-- TODO
+TODO explain policy, reference docs/example-policy.json
 
 ### Prometheus metrics
 
@@ -71,6 +70,12 @@ Each component (API, observer and worker) exposes Prometheus metrics via HTTP, o
 | Metric/Component | Description |
 | ---------------- | ----------- |
 | `castellum_operation_state_transitions`<br/>(API, observer, worker) | Counter for state transitions of operations.<br/>Labels: `project_id`, `asset` (asset type), `from_state` and `to_state`. |
+
+### Supported asset types
+
+The following asset managers are available:
+
+- TODO
 
 [pq-uri]: https://www.postgresql.org/docs/9.6/static/libpq-connect.html#LIBPQ-CONNSTRING
 [os-env]: https://docs.openstack.org/python-openstackclient/latest/cli/man/openstack.html

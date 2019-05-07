@@ -39,13 +39,13 @@ type StaticAsset struct {
 //
 //Attempts to resize assets will succeed if and only if `newSize > usage`.
 type AssetManagerStatic struct {
-	AssetType string
+	AssetType db.AssetType
 	Assets    map[string]map[string]StaticAsset
 }
 
 //AssetTypes implements the core.AssetManager interface.
-func (m AssetManagerStatic) AssetTypes() []string {
-	return []string{m.AssetType}
+func (m AssetManagerStatic) AssetTypes() []db.AssetType {
+	return []db.AssetType{m.AssetType}
 }
 
 var (

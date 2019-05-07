@@ -21,6 +21,7 @@ package db
 import (
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/sapcc/go-bits/postlite"
@@ -37,9 +38,9 @@ type Resource struct {
 	//The pair of (.ScopeUUID, .AssetType) uniquely identifies a Resource on
 	//the API level. Internally, other tables reference Resource by the numeric
 	//.ID field.
-	ID        int64  `db:"id"`
-	ScopeUUID string `db:"scope_uuid"` //either project UUID or domain UUID
-	AssetType string `db:"asset_type"`
+	ID        int64     `db:"id"`
+	ScopeUUID string    `db:"scope_uuid"` //either project UUID or domain UUID
+	AssetType AssetType `db:"asset_type"`
 
 	//When we last checked this Resource for new or deleted assets.
 	ScrapedAt *time.Time `db:"scraped_at"`
@@ -59,6 +60,27 @@ type Resource struct {
 	//when the asset type defines size steps differently. For example, for the
 	//asset type "instance", we will have a list of allowed flavors somewhere else.
 	SizeStepPercent uint32 `db:"size_step_percent"`
+}
+
+//AssetType is the type of Resource.AssetType. It extends type string with some
+//convenience methods.
+type AssetType string
+
+//PolicyRuleForRead returns the name of the policy rule that allows read access
+//to this resource.
+func (a AssetType) PolicyRuleForRead() string {
+	//only consider the asset type up to the first colon, e.g.
+	//  assetType = "quota:compute:instances"
+	//  -> result = "project:show:quota"
+	assetTypeFields := strings.SplitN(string(a), ":", 2)
+	return "project:show:" + assetTypeFields[0]
+}
+
+//PolicyRuleForWrite returns the name of the policy rule that allows write
+//access to this resource.
+func (a AssetType) PolicyRuleForWrite() string {
+	assetTypeFields := strings.SplitN(string(a), ":", 2)
+	return "project:edit:" + assetTypeFields[0]
 }
 
 //Asset describes a single thing that can be resized dynamically based on its

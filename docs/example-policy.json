@@ -1,6 +1,7 @@
 {
   "project_scope": "project_domain_id:%(domain_id)s and project_id:%(project_id)s",
   "domain_scope": "domain_id:%(domain_id)s",
+  "cluster_scope": "project_domain_name:ccadmin and project_name:cloud_admin",
 
   "cluster_nfs_editor": "role:cloud_sharedfilesystem_admin",
   "cluster_nfs_viewer": "role:cloud_sharedfilesystem_viewer or rule:cluster_nfs_editor",
@@ -8,6 +9,8 @@
   "domain_nfs_viewer":  "rule:cluster_nfs_viewer or (rule:domain_scope and role:sharedfilesystem_viewer) or rule:domain_nfs_editor",
   "project_nfs_editor": "rule:domain_nfs_editor or (rule:project_scope and role:sharedfilesystem_admin)",
   "project_nfs_viewer": "rule:domain_nfs_viewer or (rule:project_scope and role:sharedfilesystem_viewer) or rule:project_nfs_editor",
+
+  "project:access": "rule:project_scope or rule:domain_scope or rule:cluster_scope",
 
   "project:edit:nfs-shares": "rule:project_nfs_editor",
   "project:show:nfs-shares": "rule:project_nfs_viewer"

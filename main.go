@@ -29,9 +29,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/utils/openstack/clientconfig"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/cors"
+	"github.com/sapcc/castellum/internal/api"
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/tasks"
@@ -91,7 +95,7 @@ func main() {
 		if len(os.Args) != 2 {
 			usage()
 		}
-		runAPI(dbi, team, httpListenAddr)
+		runAPI(dbi, team, providerClient, httpListenAddr)
 	case "observer":
 		if len(os.Args) != 2 {
 			usage()
@@ -106,7 +110,7 @@ func main() {
 		if len(os.Args) != 3 {
 			usage()
 		}
-		runAssetTypeTestShell(dbi, team, os.Args[2])
+		runAssetTypeTestShell(dbi, team, db.AssetType(os.Args[2]))
 	default:
 		usage()
 	}
@@ -123,9 +127,38 @@ func mustGetenv(key string) string {
 ////////////////////////////////////////////////////////////////////////////////
 // task: API
 
-func runAPI(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
-	logg.Error("TODO unimplemented")
-	//TODO do not forget to expose Prometheus metrics
+func runAPI(dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient *gophercloud.ProviderClient, httpListenAddr string) {
+	//wrap the main API handler in several layers of middleware (CORS is
+	//deliberately the outermost middleware, to exclude preflight checks from
+	//logging)
+	handler := api.NewHandler(dbi, team, providerClient, mustGetenv("CASTELLUM_OSLO_POLICY_PATH"))
+	handler = logg.Middleware{}.Wrap(handler)
+	handler = prometheus.InstrumentHandler("castellum-api", handler)
+	handler = cors.New(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{"HEAD", "GET", "POST", "PUT"},
+		AllowedHeaders: []string{"Content-Type", "User-Agent", "X-Auth-Token"},
+	}).Handler(handler)
+
+	//metrics and healthcheck are deliberately not covered by any of the
+	//middlewares - we do not want to log those requests
+	http.Handle("/", handler)
+	http.Handle("/metrics", promhttp.Handler())
+	http.Handle("/healthcheck", http.HandlerFunc(healthCheckHandler))
+
+	logg.Info("listening on " + httpListenAddr)
+	logg.Error(http.ListenAndServe(httpListenAddr, nil).Error())
+}
+
+func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	if r.URL.Path == "/healthcheck" && r.Method == "GET" {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	} else {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("not found"))
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -200,7 +233,7 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 ////////////////////////////////////////////////////////////////////////////////
 // task: test-asset-type
 
-func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetType string) {
+func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetType db.AssetType) {
 	manager := team.ForAssetType(assetType)
 	if manager == nil {
 		logg.Fatal("no manager configured for asset type: %q", assetType)

@@ -37,7 +37,7 @@ type AssetStatus struct {
 //It is created by CreateAssetManagers() using AssetManagerFactory.
 type AssetManager interface {
 	//Returns the list of all asset types supported by this asset manager.
-	AssetTypes() []string
+	AssetTypes() []db.AssetType
 
 	ListAssets(res db.Resource) ([]string, error)
 	SetAssetSize(res db.Resource, assetUUID string, size uint64) error
@@ -99,7 +99,7 @@ func CreateAssetManagers(factoryIDs []string, provider *gophercloud.ProviderClie
 
 //ForAssetType returns the asset manager for the given asset type, or nil if
 //the asset type is not supported.
-func (team AssetManagerTeam) ForAssetType(assetType string) AssetManager {
+func (team AssetManagerTeam) ForAssetType(assetType db.AssetType) AssetManager {
 	for _, manager := range team {
 		types := manager.AssetTypes()
 		for _, t := range types {

@@ -65,7 +65,7 @@ func init() {
 func (c Context) InitializeScrapingCounters() {
 	for _, manager := range c.Team {
 		for _, assetType := range manager.AssetTypes() {
-			labels := prometheus.Labels{"asset": assetType}
+			labels := prometheus.Labels{"asset": string(assetType)}
 			resourceScrapeSuccessCounter.With(labels).Add(0)
 			resourceScrapeFailedCounter.With(labels).Add(0)
 			assetScrapeSuccessCounter.With(labels).Add(0)

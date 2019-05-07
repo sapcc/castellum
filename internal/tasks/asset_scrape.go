@@ -45,9 +45,9 @@ var scrapeAssetSearchQuery = `
 //
 //Returns sql.ErrNoRows when no asset needed scraping, to indicate to the
 //caller to slow down.
-func (c Context) ScrapeNextAsset(assetType string, maxScrapedAt time.Time) (returnedError error) {
+func (c Context) ScrapeNextAsset(assetType db.AssetType, maxScrapedAt time.Time) (returnedError error) {
 	defer func() {
-		labels := prometheus.Labels{"asset": assetType}
+		labels := prometheus.Labels{"asset": string(assetType)}
 		if returnedError == nil {
 			assetScrapeSuccessCounter.With(labels).Inc()
 		} else {
