@@ -134,6 +134,7 @@ func runAPI(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) 
 func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
 	c := tasks.Context{DB: dbi, Team: team}
 	c.ApplyDefaults()
+	c.InitializeScrapingCounters()
 
 	for _, manager := range team {
 		for _, assetType := range manager.AssetTypes() {

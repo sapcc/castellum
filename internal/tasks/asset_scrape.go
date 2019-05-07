@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/logg"
@@ -44,7 +45,16 @@ var scrapeAssetSearchQuery = `
 //
 //Returns sql.ErrNoRows when no asset needed scraping, to indicate to the
 //caller to slow down.
-func (c Context) ScrapeNextAsset(assetType string, maxScrapedAt time.Time) error {
+func (c Context) ScrapeNextAsset(assetType string, maxScrapedAt time.Time) (returnedError error) {
+	defer func() {
+		labels := prometheus.Labels{"asset": assetType}
+		if returnedError == nil {
+			assetScrapeSuccessCounter.With(labels).Inc()
+		} else {
+			assetScrapeFailedCounter.With(labels).Inc()
+		}
+	}()
+
 	manager := c.Team.ForAssetType(assetType)
 	if manager == nil {
 		panic(fmt.Sprintf("no asset manager for asset type %q", assetType))
