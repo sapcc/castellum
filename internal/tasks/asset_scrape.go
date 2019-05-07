@@ -173,6 +173,12 @@ func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, ass
 		return nil
 	}
 
+	//skip the operation if the size would not change (this is especially true
+	//for reason "low" and oldSize = 1)
+	if op.OldSize == op.NewSize {
+		return nil
+	}
+
 	//critical operations can be confirmed immediately
 	if op.Reason == db.OperationReasonCritical {
 		op.ConfirmedAt = &op.CreatedAt
@@ -254,8 +260,19 @@ func getMatchingReasons(res db.Resource, asset db.Asset) map[db.OperationReason]
 
 func getNewSize(asset db.Asset, res db.Resource, up bool) uint64 {
 	step := (asset.Size * uint64(res.SizeStepPercent)) / 100
+	//a small fraction of a small value (e.g. 10% of size = 6) may round down to zero
+	if step == 0 {
+		step = 1
+	}
+
 	if up {
 		return asset.Size + step
+	}
+
+	//when going down, we have to take care not to end up with zero
+	if asset.Size < 1+step {
+		//^ This condition is equal to `asset.Size - step < 1`, but cannot overflow below 0.
+		return 1
 	}
 	return asset.Size - step
 }
