@@ -108,6 +108,6 @@ func (c Context) ExecuteNextResize() error {
 		}
 	}
 
-	core.CountStateTransition(res.AssetType, db.OperationStateGreenlit, finishedOp.State())
+	core.CountStateTransition(res, db.OperationStateGreenlit, finishedOp.State())
 	return tx.Commit()
 }

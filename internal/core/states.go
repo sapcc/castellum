@@ -28,7 +28,7 @@ var opStateTransitionCounter = prometheus.NewCounterVec(
 		Name: "castellum_operation_state_transitions",
 		Help: "Counter for state transitions of operations.",
 	},
-	[]string{"asset", "from_state", "to_state"},
+	[]string{"project_id", "asset", "from_state", "to_state"},
 )
 
 func init() {
@@ -37,9 +37,10 @@ func init() {
 
 //CountStateTransition must be called whenever an operation changes to a
 //different state.
-func CountStateTransition(assetType string, from, to db.OperationState) {
+func CountStateTransition(res db.Resource, from, to db.OperationState) {
 	labels := prometheus.Labels{
-		"asset":      assetType,
+		"project_id": res.ScopeUUID,
+		"asset":      res.AssetType,
 		"from_state": string(from),
 		"to_state":   string(to),
 	}

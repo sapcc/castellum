@@ -70,7 +70,7 @@ Each component (API, observer and worker) exposes Prometheus metrics via HTTP, o
 
 | Metric/Component | Description |
 | ---------------- | ----------- |
-| `castellum_operation_state_transitions`<br/>(API, observer, worker) | Counter for state transitions of operations. Labels: `asset` (asset type), `from_state` and `to_state`. |
+| `castellum_operation_state_transitions`<br/>(API, observer, worker) | Counter for state transitions of operations.<br/>Labels: `project_id`, `asset` (asset type), `from_state` and `to_state`. |
 
 [pq-uri]: https://www.postgresql.org/docs/9.6/static/libpq-connect.html#LIBPQ-CONNSTRING
 [os-env]: https://docs.openstack.org/python-openstackclient/latest/cli/man/openstack.html
