@@ -57,10 +57,27 @@ func NewHandler(dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient *gop
 	h.tokenValidator = &tv
 
 	router := mux.NewRouter()
-	router.Methods("GET").Path(`/v1/projects/{project_id}`).HandlerFunc(h.GetProject)
-	router.Methods("GET").Path(`/v1/projects/{project_id}/resources/{asset_type}`).HandlerFunc(h.GetResource)
-	router.Methods("PUT").Path(`/v1/projects/{project_id}/resources/{asset_type}`).HandlerFunc(h.PutResource)
-	router.Methods("DELETE").Path(`/v1/projects/{project_id}/resources/{asset_type}`).HandlerFunc(h.DeleteResource)
+	router.Methods("GET").
+		Path(`/v1/projects/{project_id}`).
+		HandlerFunc(h.GetProject)
+
+	router.Methods("GET").
+		Path(`/v1/projects/{project_id}/resources/{asset_type}`).
+		HandlerFunc(h.GetResource)
+	router.Methods("PUT").
+		Path(`/v1/projects/{project_id}/resources/{asset_type}`).
+		HandlerFunc(h.PutResource)
+	router.Methods("DELETE").
+		Path(`/v1/projects/{project_id}/resources/{asset_type}`).
+		HandlerFunc(h.DeleteResource)
+
+	router.Methods("GET").
+		Path(`/v1/projects/{project_id}/assets/{asset_type}`).
+		HandlerFunc(h.GetAssets)
+	router.Methods("GET").
+		Path(`/v1/projects/{project_id}/assets/{asset_type}/{asset_uuid}`).
+		HandlerFunc(h.GetAsset)
+
 	return router
 }
 
