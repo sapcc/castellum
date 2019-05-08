@@ -16,33 +16,30 @@
 *
 ******************************************************************************/
 
-package tasks
+package test
 
 import (
-	"time"
+	"testing"
 
-	"github.com/sapcc/castellum/internal/core"
-	"github.com/sapcc/castellum/internal/plugins"
-	"github.com/sapcc/castellum/internal/test"
+	"gopkg.in/gorp.v2"
 )
 
-func setupContext(t test.T) (*Context, *plugins.AssetManagerStatic, *test.FakeClock) {
-	dbi := t.PrepareDB()
-	amStatic := &plugins.AssetManagerStatic{
-		AssetType: "foo",
-	}
-	//clock starts at an easily recognizable value
-	clockVar := test.FakeClock(99990)
-	clock := &clockVar
-
-	return &Context{
-		DB:      dbi,
-		Team:    core.AssetManagerTeam{amStatic},
-		TimeNow: clock.Now,
-	}, amStatic, clock
+//T extends testing.T with custom helper methods.
+type T struct {
+	*testing.T
 }
 
-//Take pointer to time.Time expression.
-func p2time(t time.Time) *time.Time {
-	return &t
+//Must fails the test if the given error is non-nil.
+func (t T) Must(err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+}
+
+//MustExec fails the test if dbi.Exec(query) returns an error.
+func (t T) MustExec(dbi *gorp.DbMap, query string) {
+	t.Helper()
+	_, err := dbi.Exec(query)
+	t.Must(err)
 }

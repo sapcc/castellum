@@ -27,11 +27,12 @@ import (
 
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
+	"github.com/sapcc/castellum/internal/test"
 )
 
-func setupAssetResizeTest(t *testing.T, c *Context, amStatic *plugins.AssetManagerStatic, assetCount int) {
+func setupAssetResizeTest(t test.T, c *Context, amStatic *plugins.AssetManagerStatic, assetCount int) {
 	//create a resource and assets to test with
-	must(t, c.DB.Insert(&db.Resource{
+	t.Must(c.DB.Insert(&db.Resource{
 		ScopeUUID: "project1",
 		AssetType: "foo",
 	}))
@@ -41,7 +42,7 @@ func setupAssetResizeTest(t *testing.T, c *Context, amStatic *plugins.AssetManag
 
 	for idx := 1; idx <= assetCount; idx++ {
 		uuid := fmt.Sprintf("asset%d", idx)
-		must(t, c.DB.Insert(&db.Asset{
+		t.Must(c.DB.Insert(&db.Asset{
 			ResourceID:   1,
 			UUID:         uuid,
 			Size:         1000,
@@ -57,7 +58,8 @@ func setupAssetResizeTest(t *testing.T, c *Context, amStatic *plugins.AssetManag
 	}
 }
 
-func TestSuccessfulResize(t *testing.T) {
+func TestSuccessfulResize(baseT *testing.T) {
+	t := test.T{T: baseT}
 	c, amStatic, clock := setupContext(t)
 	setupAssetResizeTest(t, c, amStatic, 1)
 
@@ -73,7 +75,7 @@ func TestSuccessfulResize(t *testing.T) {
 		ConfirmedAt:  p2time(c.TimeNow()),
 		GreenlitAt:   p2time(c.TimeNow().Add(5 * time.Minute)),
 	}
-	must(t, c.DB.Insert(&pendingOp))
+	t.Must(c.DB.Insert(&pendingOp))
 
 	//ExecuteNextResize() should do nothing right now because that operation is
 	//only greenlit in the future, but not right now
@@ -81,14 +83,14 @@ func TestSuccessfulResize(t *testing.T) {
 	if err != sql.ErrNoRows {
 		t.Fatalf("expected sql.ErrNoRows, got %s instead", err.Error())
 	}
-	expectPendingOperations(t, c.DB, pendingOp)
-	expectFinishedOperations(t, c.DB /*, nothing */)
+	t.ExpectPendingOperations(c.DB, pendingOp)
+	t.ExpectFinishedOperations(c.DB /*, nothing */)
 
 	//go into the future and check that the operation gets executed
 	clock.StepBy(10 * time.Minute)
-	must(t, c.ExecuteNextResize())
-	expectPendingOperations(t, c.DB /*, nothing */)
-	expectFinishedOperations(t, c.DB, db.FinishedOperation{
+	t.Must(c.ExecuteNextResize())
+	t.ExpectPendingOperations(c.DB /*, nothing */)
+	t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
 		AssetID:      1,
 		Reason:       db.OperationReasonHigh,
 		OldSize:      1000,
@@ -103,7 +105,7 @@ func TestSuccessfulResize(t *testing.T) {
 
 	//expect asset to be marked as stale, but still show the old size (until the
 	//next asset scrape)
-	expectAssets(t, c.DB, db.Asset{
+	t.ExpectAssets(c.DB, db.Asset{
 		ID:           1,
 		ResourceID:   1,
 		UUID:         "asset1",
@@ -114,7 +116,8 @@ func TestSuccessfulResize(t *testing.T) {
 	})
 }
 
-func TestFailingResize(t *testing.T) {
+func TestFailingResize(tBase *testing.T) {
+	t := test.T{T: tBase}
 	c, amStatic, clock := setupContext(t)
 	setupAssetResizeTest(t, c, amStatic, 1)
 
@@ -130,12 +133,12 @@ func TestFailingResize(t *testing.T) {
 		ConfirmedAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
 		GreenlitAt:   p2time(c.TimeNow().Add(-5 * time.Minute)),
 	}
-	must(t, c.DB.Insert(&pendingOp))
+	t.Must(c.DB.Insert(&pendingOp))
 
 	//check that resizing fails as expected
-	must(t, c.ExecuteNextResize())
-	expectPendingOperations(t, c.DB /*, nothing */)
-	expectFinishedOperations(t, c.DB, db.FinishedOperation{
+	t.Must(c.ExecuteNextResize())
+	t.ExpectPendingOperations(c.DB /*, nothing */)
+	t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
 		AssetID:      1,
 		Reason:       db.OperationReasonLow,
 		OldSize:      1000,
@@ -150,7 +153,7 @@ func TestFailingResize(t *testing.T) {
 	})
 
 	//check that asset was not marked as stale
-	expectAssets(t, c.DB, db.Asset{
+	t.ExpectAssets(c.DB, db.Asset{
 		ID:           1,
 		ResourceID:   1,
 		UUID:         "asset1",
@@ -161,7 +164,8 @@ func TestFailingResize(t *testing.T) {
 	})
 }
 
-func TestOperationQueueBehavior(t *testing.T) {
+func TestOperationQueueBehavior(baseT *testing.T) {
+	t := test.T{T: baseT}
 	//This test checks that, when there are multiple operations to execute, each
 	//operation gets executed /exactly once/.
 	c, amStatic, clock := setupContext(t)
@@ -181,7 +185,7 @@ func TestOperationQueueBehavior(t *testing.T) {
 			ConfirmedAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
 			GreenlitAt:   p2time(c.TimeNow().Add(-5 * time.Minute)),
 		}
-		must(t, c.DB.Insert(&pendingOp))
+		t.Must(c.DB.Insert(&pendingOp))
 		finishedOps = append(finishedOps,
 			pendingOp.IntoFinishedOperation(db.OperationOutcomeSucceeded, c.TimeNow()),
 		)
@@ -195,11 +199,11 @@ func TestOperationQueueBehavior(t *testing.T) {
 	for idx := 0; idx < 10; idx++ {
 		go func() {
 			defer wg.Done()
-			must(t, c.ExecuteNextResize())
+			t.Must(c.ExecuteNextResize())
 		}()
 	}
 
 	close(blocker)
 	wg.Wait()
-	expectFinishedOperations(t, c.DB, finishedOps...)
+	t.ExpectFinishedOperations(c.DB, finishedOps...)
 }

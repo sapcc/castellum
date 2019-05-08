@@ -24,10 +24,12 @@ import (
 
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
+	"github.com/sapcc/castellum/internal/test"
 	"github.com/sapcc/go-bits/postlite"
 )
 
-func TestResourceScraping(t *testing.T) {
+func TestResourceScraping(baseT *testing.T) {
+	t := test.T{T: baseT}
 	c, amStatic, clock := setupContext(t)
 
 	//ScrapeNextResource() without any resources just does nothing
@@ -35,18 +37,18 @@ func TestResourceScraping(t *testing.T) {
 	if err != sql.ErrNoRows {
 		t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
 	}
-	postlite.AssertDBContent(t, c.DB.Db, "fixtures/resource-scrape-0.sql")
+	postlite.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-0.sql")
 
 	//create some project resources for testing
-	must(t, c.DB.Insert(&db.Resource{
+	t.Must(c.DB.Insert(&db.Resource{
 		ScopeUUID: "project1",
 		AssetType: "foo",
 	}))
-	must(t, c.DB.Insert(&db.Resource{
+	t.Must(c.DB.Insert(&db.Resource{
 		ScopeUUID: "project2",
 		AssetType: "bar", //note: different asset type
 	}))
-	must(t, c.DB.Insert(&db.Resource{
+	t.Must(c.DB.Insert(&db.Resource{
 		ScopeUUID: "project3",
 		AssetType: "foo",
 	}))
@@ -69,41 +71,41 @@ func TestResourceScraping(t *testing.T) {
 
 	//first ScrapeNextResource() should scrape project1/foo
 	clock.Step()
-	must(t, c.ScrapeNextResource("foo", c.TimeNow()))
-	postlite.AssertDBContent(t, c.DB.Db, "fixtures/resource-scrape-1.sql")
+	t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+	postlite.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-1.sql")
 
 	//first ScrapeNextResource() should scrape project3/foo
 	//(NOT project2 because its resource has a different asset type)
 	clock.Step()
-	must(t, c.ScrapeNextResource("foo", c.TimeNow()))
-	postlite.AssertDBContent(t, c.DB.Db, "fixtures/resource-scrape-2.sql")
+	t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+	postlite.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-2.sql")
 
 	//next ScrapeNextResource() should scrape project1/foo again because its
 	//scraped_at timestamp is the smallest; there should be no changes except for
 	//resources.scraped_at
 	clock.Step()
-	must(t, c.ScrapeNextResource("foo", c.TimeNow()))
-	postlite.AssertDBContent(t, c.DB.Db, "fixtures/resource-scrape-3.sql")
+	t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+	postlite.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-3.sql")
 
 	//simulate deletion of an asset
 	delete(amStatic.Assets["project3"], "asset6")
 	clock.Step()
-	must(t, c.ScrapeNextResource("foo", c.TimeNow()))
-	postlite.AssertDBContent(t, c.DB.Db, "fixtures/resource-scrape-4.sql")
+	t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+	postlite.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-4.sql")
 
 	//simulate addition of a new asset
 	amStatic.Assets["project1"]["asset7"] = plugins.StaticAsset{Size: 10, Usage: 3}
 	clock.Step()
-	must(t, c.ScrapeNextResource("foo", c.TimeNow()))
-	postlite.AssertDBContent(t, c.DB.Db, "fixtures/resource-scrape-5.sql")
+	t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+	postlite.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-5.sql")
 
 	//check behavior on a resource without assets
-	must(t, c.DB.Insert(&db.Resource{
+	t.Must(c.DB.Insert(&db.Resource{
 		ScopeUUID: "project4",
 		AssetType: "foo",
 	}))
 	amStatic.Assets["project4"] = nil
 	clock.Step()
-	must(t, c.ScrapeNextResource("foo", c.TimeNow()))
-	postlite.AssertDBContent(t, c.DB.Db, "fixtures/resource-scrape-6.sql")
+	t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+	postlite.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-6.sql")
 }

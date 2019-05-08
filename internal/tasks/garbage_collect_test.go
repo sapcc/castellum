@@ -23,23 +23,25 @@ import (
 	"time"
 
 	"github.com/sapcc/castellum/internal/db"
+	"github.com/sapcc/castellum/internal/test"
 )
 
-func TestCollectGarbage(t *testing.T) {
+func TestCollectGarbage(baseT *testing.T) {
+	t := test.T{T: baseT}
 	c, _, _ := setupContext(t)
 	fakeNow := time.Unix(0, 0).UTC()
 
 	//setup some minimal scaffolding (we can only insert finished_operations
 	//with valid asset IDs into the DB)
-	must(t, c.DB.Insert(&db.Resource{
+	t.Must(c.DB.Insert(&db.Resource{
 		ScopeUUID: "project1",
 		AssetType: "foo",
 	}))
-	must(t, c.DB.Insert(&db.Asset{
+	t.Must(c.DB.Insert(&db.Asset{
 		ResourceID: 1,
 		UUID:       "asset1",
 	}))
-	must(t, c.DB.Insert(&db.Asset{
+	t.Must(c.DB.Insert(&db.Asset{
 		ResourceID: 1,
 		UUID:       "asset2",
 	}))
@@ -79,10 +81,10 @@ func TestCollectGarbage(t *testing.T) {
 		},
 	}
 	for _, op := range ops {
-		must(t, c.DB.Insert(&op))
+		t.Must(c.DB.Insert(&op))
 	}
 
-	expectFinishedOperations(t, c.DB, ops...)
-	must(t, CollectGarbage(c.DB, fakeNow.Add(-15*time.Minute)))
-	expectFinishedOperations(t, c.DB, ops[2])
+	t.ExpectFinishedOperations(c.DB, ops...)
+	t.Must(CollectGarbage(c.DB, fakeNow.Add(-15*time.Minute)))
+	t.ExpectFinishedOperations(c.DB, ops[2])
 }

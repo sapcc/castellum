@@ -16,33 +16,24 @@
 *
 ******************************************************************************/
 
-package tasks
+package test
 
-import (
-	"time"
+import "time"
 
-	"github.com/sapcc/castellum/internal/core"
-	"github.com/sapcc/castellum/internal/plugins"
-	"github.com/sapcc/castellum/internal/test"
-)
+//FakeClock is a clock that only changes when we tell it to.
+type FakeClock int64
 
-func setupContext(t test.T) (*Context, *plugins.AssetManagerStatic, *test.FakeClock) {
-	dbi := t.PrepareDB()
-	amStatic := &plugins.AssetManagerStatic{
-		AssetType: "foo",
-	}
-	//clock starts at an easily recognizable value
-	clockVar := test.FakeClock(99990)
-	clock := &clockVar
-
-	return &Context{
-		DB:      dbi,
-		Team:    core.AssetManagerTeam{amStatic},
-		TimeNow: clock.Now,
-	}, amStatic, clock
+//Now is a double for time.Now().
+func (f *FakeClock) Now() time.Time {
+	return time.Unix(int64(*f), 0).UTC()
 }
 
-//Take pointer to time.Time expression.
-func p2time(t time.Time) *time.Time {
-	return &t
+//Step advances the clock by one second.
+func (f *FakeClock) Step() {
+	*f++
+}
+
+//StepBy advances the clock by the given duration
+func (f *FakeClock) StepBy(d time.Duration) {
+	*f += FakeClock(d / time.Second)
 }
