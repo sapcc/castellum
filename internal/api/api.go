@@ -22,9 +22,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"time"
 
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gorilla/mux"
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -35,27 +34,18 @@ import (
 )
 
 type handler struct {
-	DB   *gorp.DbMap
-	Team core.AssetManagerTeam
-
-	tokenValidator gopherpolicy.Validator
+	DB        *gorp.DbMap
+	Team      core.AssetManagerTeam
+	Validator gopherpolicy.Validator
 }
 
 //NewHandler constructs the main http.Handler for this package.
-func NewHandler(dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient *gophercloud.ProviderClient, policyFilePath string) http.Handler {
-	h := &handler{DB: dbi, Team: team}
+func NewHandler(dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator) http.Handler {
+	h := &handler{DB: dbi, Team: team, Validator: validator}
+	return h.BuildRouter()
+}
 
-	identityV3, err := openstack.NewIdentityV3(providerClient, gophercloud.EndpointOpts{})
-	if err != nil {
-		logg.Fatal("cannot find Keystone v3 API: " + err.Error())
-	}
-	tv := gopherpolicy.TokenValidator{IdentityV3: identityV3}
-	err = tv.LoadPolicyFile(policyFilePath)
-	if err != nil {
-		logg.Fatal("cannot load oslo.policy: " + err.Error())
-	}
-	h.tokenValidator = &tv
-
+func (h *handler) BuildRouter() http.Handler {
 	router := mux.NewRouter()
 	router.Methods("GET").
 		Path(`/v1/projects/{project_id}`).
@@ -110,7 +100,9 @@ func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *go
 
 	//all endpoints are project-scoped, so we require the user to have access to
 	//the selected project
-	token := h.tokenValidator.CheckToken(r)
+	token := h.Validator.CheckToken(r)
+	token.Context.Logger = logg.Debug
+	token.Context.Request = mux.Vars(r)
 	if !token.Require(w, "project:access") {
 		return "", nil
 	}
@@ -141,4 +133,12 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 		return nil
 	}
 	return &res
+}
+
+func timeOrNullToUnix(t *time.Time) *int64 {
+	if t == nil {
+		return nil
+	}
+	tst := t.Unix()
+	return &tst
 }

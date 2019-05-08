@@ -39,6 +39,7 @@ import (
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/tasks"
+	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/logg"
 	"gopkg.in/gorp.v2"
 
@@ -55,6 +56,8 @@ func usage() {
 }
 
 func main() {
+	logg.ShowDebug, _ = strconv.ParseBool(os.Getenv("CASTELLUM_DEBUG"))
+
 	//initialize DB connection
 	dbi, err := db.Init(mustGetenv("CASTELLUM_DB_URI"))
 	if err != nil {
@@ -128,10 +131,20 @@ func mustGetenv(key string) string {
 // task: API
 
 func runAPI(dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient *gophercloud.ProviderClient, httpListenAddr string) {
+	identityV3, err := openstack.NewIdentityV3(providerClient, gophercloud.EndpointOpts{})
+	if err != nil {
+		logg.Fatal("cannot find Keystone v3 API: " + err.Error())
+	}
+	tv := gopherpolicy.TokenValidator{IdentityV3: identityV3}
+	err = tv.LoadPolicyFile(mustGetenv("CASTELLUM_OSLO_POLICY_PATH"))
+	if err != nil {
+		logg.Fatal("cannot load oslo.policy: " + err.Error())
+	}
+
 	//wrap the main API handler in several layers of middleware (CORS is
 	//deliberately the outermost middleware, to exclude preflight checks from
 	//logging)
-	handler := api.NewHandler(dbi, team, providerClient, mustGetenv("CASTELLUM_OSLO_POLICY_PATH"))
+	handler := api.NewHandler(dbi, team, &tv)
 	handler = logg.Middleware{}.Wrap(handler)
 	handler = prometheus.InstrumentHandler("castellum-api", handler)
 	handler = cors.New(cors.Options{

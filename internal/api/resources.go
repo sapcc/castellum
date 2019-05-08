@@ -21,7 +21,6 @@ package api
 import (
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/respondwith"
@@ -32,7 +31,7 @@ import (
 
 //Resource is how a db.Resource looks like in the API.
 type Resource struct {
-	ScrapedAt         *time.Time `json:"scraped_at,omitempty"`
+	ScrapedAtUnix     *int64     `json:"scraped_at,omitempty"`
 	LowThreshold      *Threshold `json:"low_threshold,omitempty"`
 	HighThreshold     *Threshold `json:"high_threshold,omitempty"`
 	CriticalThreshold *Threshold `json:"critical_threshold,omitempty"`
@@ -56,8 +55,8 @@ type SizeSteps struct {
 //ResourceFromDB converts a db.Resource into an api.Resource.
 func ResourceFromDB(res db.Resource) Resource {
 	result := Resource{
-		ScrapedAt: res.ScrapedAt,
-		SizeSteps: SizeSteps{Percent: res.SizeStepPercent},
+		ScrapedAtUnix: timeOrNullToUnix(res.ScrapedAt),
+		SizeSteps:     SizeSteps{Percent: res.SizeStepPercent},
 	}
 	if res.LowThresholdPercent > 0 {
 		result.LowThreshold = &Threshold{
@@ -84,7 +83,7 @@ func ResourceFromDB(res db.Resource) Resource {
 func (r Resource) UpdateDBResource(res *db.Resource) (errors []string) {
 	complain := func(msg string) { errors = append(errors, msg) }
 
-	if r.ScrapedAt != nil {
+	if r.ScrapedAtUnix != nil {
 		complain("resource.scraped_at cannot be set via the API")
 	}
 
@@ -135,7 +134,15 @@ func (r Resource) UpdateDBResource(res *db.Resource) (errors []string) {
 		}
 	}
 
+	if r.LowThreshold == nil && r.HighThreshold == nil && r.CriticalThreshold == nil {
+		complain("at least one threshold must be configured")
+	}
+
 	res.SizeStepPercent = r.SizeSteps.Percent
+	if res.SizeStepPercent == 0 {
+		complain("size step must be greater than 0%")
+	}
+
 	return
 }
 
@@ -150,7 +157,7 @@ func (h handler) GetProject(w http.ResponseWriter, r *http.Request) {
 
 	var dbResources []db.Resource
 	_, err := h.DB.Select(&dbResources,
-		`SELECT * FROM resources WHERE project_uuid = $1`, projectUUID)
+		`SELECT * FROM resources WHERE scope_uuid = $1`, projectUUID)
 	if respondwith.ErrorText(w, err) {
 		return
 	}

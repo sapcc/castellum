@@ -22,7 +22,6 @@ import (
 	"database/sql"
 	"net/http"
 	"sort"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/sapcc/castellum/internal/db"
@@ -43,7 +42,7 @@ type Asset struct {
 	UUID               string       `json:"id"`
 	Size               uint64       `json:"size"`
 	UsagePercent       uint32       `json:"usage_percent"`
-	ScrapedAt          time.Time    `json:"scraped_at"`
+	ScrapedAtUnix      int64        `json:"scraped_at"`
 	Stale              bool         `json:"stale"`
 	PendingOperation   *Operation   `json:"pending_operation,omitempty"`
 	FinishedOperations *[]Operation `json:"finished_operations,omitempty"`
@@ -64,25 +63,25 @@ type Operation struct {
 
 //OperationCreation appears in type Operation.
 type OperationCreation struct {
-	At           time.Time `json:"at"`
-	UsagePercent uint32    `json:"usage_percent"`
+	AtUnix       int64  `json:"at"`
+	UsagePercent uint32 `json:"usage_percent"`
 }
 
 //OperationConfirmation appears in type Operation.
 type OperationConfirmation struct {
-	At time.Time `json:"at"`
+	AtUnix int64 `json:"at"`
 }
 
 //OperationGreenlight appears in type Operation.
 type OperationGreenlight struct {
-	At         time.Time `json:"at"`
-	ByUserUUID *string   `json:"by_user,omitempty"`
+	AtUnix     int64   `json:"at"`
+	ByUserUUID *string `json:"by_user,omitempty"`
 }
 
 //OperationFinish appears in type Operation.
 type OperationFinish struct {
-	At           time.Time `json:"at"`
-	ErrorMessage string    `json:"error,omitempty"`
+	AtUnix       int64  `json:"at"`
+	ErrorMessage string `json:"error,omitempty"`
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -101,11 +100,11 @@ func AssetListFromDB(assets []db.Asset) []AssetInList {
 //AssetFromDB converts a db.Asset into an api.Asset.
 func AssetFromDB(asset db.Asset) Asset {
 	return Asset{
-		UUID:         asset.UUID,
-		Size:         asset.Size,
-		UsagePercent: asset.UsagePercent,
-		ScrapedAt:    asset.ScrapedAt,
-		Stale:        asset.Stale,
+		UUID:          asset.UUID,
+		Size:          asset.Size,
+		UsagePercent:  asset.UsagePercent,
+		ScrapedAtUnix: asset.ScrapedAt.Unix(),
+		Stale:         asset.Stale,
 	}
 }
 
@@ -117,19 +116,19 @@ func PendingOperationFromDB(dbOp db.PendingOperation) *Operation {
 		OldSize: dbOp.OldSize,
 		NewSize: dbOp.NewSize,
 		Created: OperationCreation{
-			At:           dbOp.CreatedAt,
+			AtUnix:       dbOp.CreatedAt.Unix(),
 			UsagePercent: dbOp.UsagePercent,
 		},
 		Finished: nil,
 	}
 	if dbOp.ConfirmedAt != nil {
 		op.Confirmed = &OperationConfirmation{
-			At: *dbOp.ConfirmedAt,
+			AtUnix: dbOp.ConfirmedAt.Unix(),
 		}
 	}
 	if dbOp.GreenlitAt != nil {
 		op.Greenlit = &OperationGreenlight{
-			At:         *dbOp.GreenlitAt,
+			AtUnix:     dbOp.GreenlitAt.Unix(),
 			ByUserUUID: dbOp.GreenlitByUserUUID,
 		}
 	}
@@ -144,22 +143,22 @@ func FinishedOperationFromDB(dbOp db.FinishedOperation) Operation {
 		OldSize: dbOp.OldSize,
 		NewSize: dbOp.NewSize,
 		Created: OperationCreation{
-			At:           dbOp.CreatedAt,
+			AtUnix:       dbOp.CreatedAt.Unix(),
 			UsagePercent: dbOp.UsagePercent,
 		},
 		Finished: &OperationFinish{
-			At:           dbOp.FinishedAt,
+			AtUnix:       dbOp.FinishedAt.Unix(),
 			ErrorMessage: dbOp.ErrorMessage,
 		},
 	}
 	if dbOp.ConfirmedAt != nil {
 		op.Confirmed = &OperationConfirmation{
-			At: *dbOp.ConfirmedAt,
+			AtUnix: dbOp.ConfirmedAt.Unix(),
 		}
 	}
 	if dbOp.GreenlitAt != nil {
 		op.Greenlit = &OperationGreenlight{
-			At:         *dbOp.GreenlitAt,
+			AtUnix:     dbOp.GreenlitAt.Unix(),
 			ByUserUUID: dbOp.GreenlitByUserUUID,
 		}
 	}
