@@ -20,6 +20,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/sapcc/castellum/internal/db"
@@ -76,6 +77,66 @@ func ResourceFromDB(res db.Resource) Resource {
 		}
 	}
 	return result
+}
+
+//UpdateDBResource updates the given db.Resource with the values provided in
+//this api.Resource.
+func (r Resource) UpdateDBResource(res *db.Resource) (errors []string) {
+	complain := func(msg string) { errors = append(errors, msg) }
+
+	if r.ScrapedAt != nil {
+		complain("resource.scraped_at cannot be set via the API")
+	}
+
+	if r.LowThreshold == nil {
+		res.LowThresholdPercent = 0
+		res.LowDelaySeconds = 0
+	} else {
+		res.LowThresholdPercent = r.LowThreshold.UsagePercent
+		res.LowDelaySeconds = r.LowThreshold.DelaySeconds
+		if res.LowThresholdPercent > 100 {
+			complain("low threshold must be between 0% and 100% of usage")
+		}
+	}
+
+	if r.HighThreshold == nil {
+		res.HighThresholdPercent = 0
+		res.HighDelaySeconds = 0
+	} else {
+		res.HighThresholdPercent = r.HighThreshold.UsagePercent
+		res.HighDelaySeconds = r.HighThreshold.DelaySeconds
+		if res.HighThresholdPercent > 100 {
+			complain("high threshold must be between 0% and 100% of usage")
+		}
+	}
+
+	if r.CriticalThreshold == nil {
+		res.CriticalThresholdPercent = 0
+	} else {
+		res.CriticalThresholdPercent = r.CriticalThreshold.UsagePercent
+		if res.CriticalThresholdPercent > 100 {
+			complain("critical threshold must be between 0% and 100% of usage")
+		}
+	}
+
+	if r.LowThreshold != nil && r.HighThreshold != nil {
+		if res.LowThresholdPercent > res.HighThresholdPercent {
+			complain("low threshold must be below high threshold")
+		}
+	}
+	if r.LowThreshold != nil && r.CriticalThreshold != nil {
+		if res.LowThresholdPercent > res.CriticalThresholdPercent {
+			complain("low threshold must be below critical threshold")
+		}
+	}
+	if r.HighThreshold != nil && r.CriticalThreshold != nil {
+		if res.HighThresholdPercent > res.CriticalThresholdPercent {
+			complain("high threshold must be below critical threshold")
+		}
+	}
+
+	res.SizeStepPercent = r.SizeSteps.Percent
+	return
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -143,8 +204,16 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//TODO implement
-	http.Error(w, "TODO: implement", http.StatusInternalServerError)
+	errs := input.UpdateDBResource(dbResource)
+	if len(errs) > 0 {
+		http.Error(w, strings.Join(errs, "\n"), http.StatusUnprocessableEntity)
+	}
+	_, err := h.DB.Update(dbResource)
+	if respondwith.ErrorText(w, err) {
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
