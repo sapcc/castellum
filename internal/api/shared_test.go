@@ -23,13 +23,14 @@ import (
 
 	policy "github.com/databus23/goslo.policy"
 	"github.com/sapcc/castellum/internal/core"
+	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/postlite"
 )
 
-func setupTest(t test.T) (*handler, http.Handler, *MockValidator) {
+func setupTest(t test.T) (*handler, http.Handler, *MockValidator, []db.Resource) {
 	dbi := t.PrepareDB()
 	team := core.AssetManagerTeam{
 		&plugins.AssetManagerStatic{AssetType: "foo"},
@@ -40,8 +41,12 @@ func setupTest(t test.T) (*handler, http.Handler, *MockValidator) {
 	//configure some resources as a baseline for testing
 	postlite.ExecSQLFile(t.T, dbi.Db, "fixtures/start-data.sql")
 
+	var resources []db.Resource
+	_, err := dbi.Select(&resources, `SELECT * FROM resources ORDER BY ID`)
+	t.Must(err)
+
 	h := &handler{DB: dbi, Team: team, Validator: mv}
-	return h, h.BuildRouter(), mv
+	return h, h.BuildRouter(), mv, resources
 }
 
 //MockValidator implements the gopherpolicy.Enforcer and gopherpolicy.Validator

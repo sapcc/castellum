@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/test"
 	"github.com/sapcc/go-bits/assert"
 )
@@ -55,7 +56,7 @@ var (
 
 func TestGetProject(baseT *testing.T) {
 	t := test.T{T: baseT}
-	_, hh, validator := setupTest(t)
+	_, hh, validator, _ := setupTest(t)
 
 	//endpoint requires a token with project access
 	validator.Forbid("project:access")
@@ -106,7 +107,7 @@ func TestGetProject(baseT *testing.T) {
 
 func TestGetResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	_, hh, validator := setupTest(t)
+	_, hh, validator, _ := setupTest(t)
 
 	//endpoint requires a token with project access
 	validator.Forbid("project:access")
@@ -160,4 +161,74 @@ func TestGetResource(baseT *testing.T) {
 		ExpectStatus: http.StatusOK,
 		ExpectBody:   initialBarResourceJSON,
 	}.Check(t.T, hh)
+}
+
+func TestDeleteResource(baseT *testing.T) {
+	t := test.T{T: baseT}
+	h, hh, validator, allResources := setupTest(t)
+
+	//endpoint requires a token with project access
+	validator.Forbid("project:access")
+	assert.HTTPRequest{
+		Method:       "DELETE",
+		Path:         "/v1/projects/project1/resources/foo",
+		ExpectStatus: http.StatusForbidden,
+	}.Check(t.T, hh)
+	validator.Allow("project:access")
+
+	//expect error for unknown project or resource
+	assert.HTTPRequest{
+		Method:       "DELETE",
+		Path:         "/v1/projects/project2/resources/foo",
+		ExpectStatus: http.StatusNotFound,
+	}.Check(t.T, hh)
+	assert.HTTPRequest{
+		Method:       "DELETE",
+		Path:         "/v1/projects/project1/resources/doesnotexist",
+		ExpectStatus: http.StatusNotFound,
+	}.Check(t.T, hh)
+
+	//the "unknown" resource exists, but it should be 404 regardless because we
+	//don't have an asset manager for it
+	assert.HTTPRequest{
+		Method:       "DELETE",
+		Path:         "/v1/projects/project1/resources/unknown",
+		ExpectStatus: http.StatusNotFound,
+	}.Check(t.T, hh)
+
+	//expect error for inaccessible resource
+	validator.Forbid("project:show:foo")
+	assert.HTTPRequest{
+		Method:       "DELETE",
+		Path:         "/v1/projects/project1/resources/foo",
+		ExpectStatus: http.StatusForbidden,
+	}.Check(t.T, hh)
+	validator.Allow("project:show:foo")
+
+	validator.Forbid("project:edit:foo")
+	assert.HTTPRequest{
+		Method:       "DELETE",
+		Path:         "/v1/projects/project1/resources/foo",
+		ExpectStatus: http.StatusForbidden,
+	}.Check(t.T, hh)
+	validator.Allow("project:edit:foo")
+
+	//since all tests above were error cases, expect all resources to still be there
+	t.ExpectResources(h.DB, allResources...)
+
+	//happy path
+	assert.HTTPRequest{
+		Method:       "DELETE",
+		Path:         "/v1/projects/project1/resources/foo",
+		ExpectStatus: http.StatusNoContent,
+	}.Check(t.T, hh)
+
+	//expect this resource to be gone
+	var remainingResources []db.Resource
+	for _, res := range allResources {
+		if res.ScopeUUID != "project1" || res.AssetType != "foo" {
+			remainingResources = append(remainingResources, res)
+		}
+	}
+	t.ExpectResources(h.DB, remainingResources...)
 }
