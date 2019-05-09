@@ -20,6 +20,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/sapcc/castellum/internal/db"
@@ -161,6 +162,225 @@ func TestGetResource(baseT *testing.T) {
 		ExpectStatus: http.StatusOK,
 		ExpectBody:   initialBarResourceJSON,
 	}.Check(t.T, hh)
+}
+
+func TestPutResource(baseT *testing.T) {
+	t := test.T{T: baseT}
+	h, hh, validator, allResources := setupTest(t)
+
+	//mostly like `initialFooResourceJSON`, but with some delays changed
+	newFooResourceJSON1 := assert.JSONObject{
+		"low_threshold": assert.JSONObject{
+			"usage_percent": 20,
+			"delay_seconds": 1800,
+		},
+		"high_threshold": assert.JSONObject{
+			"usage_percent": 80,
+			"delay_seconds": 900,
+		},
+		"size_steps": assert.JSONObject{
+			"percent": 20,
+		},
+	}
+
+	//endpoint requires a token with project access
+	validator.Forbid("project:access")
+	assert.HTTPRequest{
+		Method:       "PUT",
+		Path:         "/v1/projects/project1/resources/foo",
+		Body:         newFooResourceJSON1,
+		ExpectStatus: http.StatusForbidden,
+	}.Check(t.T, hh)
+	validator.Allow("project:access")
+
+	//expect error for unknown project or resource
+	assert.HTTPRequest{
+		Method:       "PUT",
+		Path:         "/v1/projects/project2/resources/foo",
+		Body:         newFooResourceJSON1,
+		ExpectStatus: http.StatusNotFound,
+	}.Check(t.T, hh)
+	assert.HTTPRequest{
+		Method:       "PUT",
+		Path:         "/v1/projects/project1/resources/doesnotexist",
+		Body:         newFooResourceJSON1,
+		ExpectStatus: http.StatusNotFound,
+	}.Check(t.T, hh)
+
+	//the "unknown" resource exists, but it should be 404 regardless because we
+	//don't have an asset manager for it
+	assert.HTTPRequest{
+		Method:       "PUT",
+		Path:         "/v1/projects/project1/resources/unknown",
+		Body:         newFooResourceJSON1,
+		ExpectStatus: http.StatusNotFound,
+	}.Check(t.T, hh)
+
+	//expect error for inaccessible resource
+	validator.Forbid("project:show:foo")
+	assert.HTTPRequest{
+		Method:       "PUT",
+		Path:         "/v1/projects/project1/resources/foo",
+		Body:         newFooResourceJSON1,
+		ExpectStatus: http.StatusForbidden,
+	}.Check(t.T, hh)
+	validator.Allow("project:show:foo")
+
+	validator.Forbid("project:edit:foo")
+	assert.HTTPRequest{
+		Method:       "PUT",
+		Path:         "/v1/projects/project1/resources/foo",
+		Body:         newFooResourceJSON1,
+		ExpectStatus: http.StatusForbidden,
+	}.Check(t.T, hh)
+	validator.Allow("project:edit:foo")
+
+	//since all tests above were error cases, expect the DB to be unchanged
+	t.ExpectResources(h.DB, allResources...)
+
+	//happy path
+	assert.HTTPRequest{
+		Method:       "PUT",
+		Path:         "/v1/projects/project1/resources/foo",
+		Body:         newFooResourceJSON1,
+		ExpectStatus: http.StatusAccepted,
+	}.Check(t.T, hh)
+
+	//expect the resource to have been updated
+	var newResources1 []db.Resource
+	for _, res := range allResources {
+		cloned := res
+		if res.ScopeUUID == "project1" && res.AssetType == "foo" {
+			cloned.LowDelaySeconds = 1800
+			cloned.HighDelaySeconds = 900
+		}
+		newResources1 = append(newResources1, cloned)
+	}
+	t.ExpectResources(h.DB, newResources1...)
+
+	//test disabling low and high thresholds, and enabling critical threshold
+	newFooResourceJSON2 := assert.JSONObject{
+		"critical_threshold": assert.JSONObject{
+			"usage_percent": 98,
+		},
+		"size_steps": assert.JSONObject{
+			"percent": 15,
+		},
+	}
+	assert.HTTPRequest{
+		Method:       "PUT",
+		Path:         "/v1/projects/project1/resources/foo",
+		Body:         newFooResourceJSON2,
+		ExpectStatus: http.StatusAccepted,
+	}.Check(t.T, hh)
+
+	//expect the resource to have been updated
+	var newResources2 []db.Resource
+	for _, res := range allResources {
+		if res.ScopeUUID == "project1" && res.AssetType == "foo" {
+			newResources2 = append(newResources2, db.Resource{
+				ID:                       res.ID,
+				ScopeUUID:                "project1",
+				AssetType:                "foo",
+				ScrapedAt:                res.ScrapedAt,
+				CriticalThresholdPercent: 98,
+				SizeStepPercent:          15,
+			})
+		} else {
+			newResources2 = append(newResources2, res)
+		}
+	}
+	t.ExpectResources(h.DB, newResources2...)
+
+	//test enabling low and high thresholds, and disabling critical threshold
+	assert.HTTPRequest{
+		Method:       "PUT",
+		Path:         "/v1/projects/project1/resources/foo",
+		Body:         newFooResourceJSON1,
+		ExpectStatus: http.StatusAccepted,
+	}.Check(t.T, hh)
+	t.ExpectResources(h.DB, newResources1...)
+}
+
+func TestPutResourceValidationErrors(baseT *testing.T) {
+	t := test.T{T: baseT}
+	h, hh, _, allResources := setupTest(t)
+
+	expectErrors := func(body assert.JSONObject, errors ...string) {
+		assert.HTTPRequest{
+			Method:       "PUT",
+			Path:         "/v1/projects/project1/resources/foo",
+			Body:         body,
+			ExpectStatus: http.StatusUnprocessableEntity,
+			ExpectBody:   assert.StringData(strings.Join(errors, "\n") + "\n"),
+		}.Check(t.T, hh)
+	}
+
+	expectErrors(
+		assert.JSONObject{
+			"critical_dingsbums": assert.JSONObject{"usage_percent": 95},
+		},
+		`request body is not valid JSON: json: unknown field "critical_dingsbums"`,
+	)
+
+	expectErrors(
+		assert.JSONObject{},
+		"at least one threshold must be configured",
+		"size step must be greater than 0%",
+	)
+
+	expectErrors(
+		assert.JSONObject{
+			"scraped_at":     12345,
+			"low_threshold":  assert.JSONObject{"usage_percent": 20},
+			"high_threshold": assert.JSONObject{"usage_percent": 80},
+			"size_steps":     assert.JSONObject{"percent": 10},
+		},
+		"resource.scraped_at cannot be set via the API",
+		"delay for low threshold is missing",
+		"delay for high threshold is missing",
+	)
+
+	expectErrors(
+		assert.JSONObject{
+			"critical_threshold": assert.JSONObject{"usage_percent": 95, "delay_seconds": 60},
+			"size_steps":         assert.JSONObject{"percent": 10},
+		},
+		"critical threshold may not have a delay",
+	)
+
+	expectErrors(
+		assert.JSONObject{
+			"low_threshold":  assert.JSONObject{"usage_percent": 120, "delay_seconds": 60},
+			"high_threshold": assert.JSONObject{"usage_percent": 80, "delay_seconds": 60},
+			"size_steps":     assert.JSONObject{"percent": 10},
+		},
+		"low threshold must be between 0% and 100% of usage",
+		"low threshold must be below high threshold",
+	)
+
+	expectErrors(
+		assert.JSONObject{
+			"high_threshold":     assert.JSONObject{"usage_percent": 120, "delay_seconds": 60},
+			"critical_threshold": assert.JSONObject{"usage_percent": 105},
+			"size_steps":         assert.JSONObject{"percent": 10},
+		},
+		"high threshold must be between 0% and 100% of usage",
+		"critical threshold must be between 0% and 100% of usage",
+		"high threshold must be below critical threshold",
+	)
+
+	expectErrors(
+		assert.JSONObject{
+			"low_threshold":      assert.JSONObject{"usage_percent": 20, "delay_seconds": 60},
+			"critical_threshold": assert.JSONObject{"usage_percent": 15},
+			"size_steps":         assert.JSONObject{"percent": 10},
+		},
+		"low threshold must be below critical threshold",
+	)
+
+	//none of this should have touched the DB
+	t.ExpectResources(h.DB, allResources...)
 }
 
 func TestDeleteResource(baseT *testing.T) {

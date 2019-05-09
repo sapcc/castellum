@@ -78,7 +78,7 @@ func RequireJSON(w http.ResponseWriter, r *http.Request, data interface{}) bool 
 	dec.DisallowUnknownFields()
 	err := dec.Decode(data)
 	if err != nil {
-		http.Error(w, "request body is not valid JSON: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, "request body is not valid JSON: "+err.Error(), http.StatusUnprocessableEntity)
 		return false
 	}
 	return true

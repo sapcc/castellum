@@ -96,6 +96,9 @@ func (r Resource) UpdateDBResource(res *db.Resource) (errors []string) {
 		if res.LowThresholdPercent > 100 {
 			complain("low threshold must be between 0% and 100% of usage")
 		}
+		if res.LowDelaySeconds == 0 {
+			complain("delay for low threshold is missing")
+		}
 	}
 
 	if r.HighThreshold == nil {
@@ -107,6 +110,9 @@ func (r Resource) UpdateDBResource(res *db.Resource) (errors []string) {
 		if res.HighThresholdPercent > 100 {
 			complain("high threshold must be between 0% and 100% of usage")
 		}
+		if res.HighDelaySeconds == 0 {
+			complain("delay for high threshold is missing")
+		}
 	}
 
 	if r.CriticalThreshold == nil {
@@ -115,6 +121,9 @@ func (r Resource) UpdateDBResource(res *db.Resource) (errors []string) {
 		res.CriticalThresholdPercent = r.CriticalThreshold.UsagePercent
 		if res.CriticalThresholdPercent > 100 {
 			complain("critical threshold must be between 0% and 100% of usage")
+		}
+		if r.CriticalThreshold.DelaySeconds != 0 {
+			complain("critical threshold may not have a delay")
 		}
 	}
 
@@ -214,6 +223,7 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	errs := input.UpdateDBResource(dbResource)
 	if len(errs) > 0 {
 		http.Error(w, strings.Join(errs, "\n"), http.StatusUnprocessableEntity)
+		return
 	}
 	_, err := h.DB.Update(dbResource)
 	if respondwith.ErrorText(w, err) {

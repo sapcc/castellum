@@ -79,7 +79,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 
 	//ExecuteNextResize() should do nothing right now because that operation is
 	//only greenlit in the future, but not right now
-	err := c.ExecuteNextResize()
+	_, err := c.ExecuteNextResize()
 	if err != sql.ErrNoRows {
 		t.Fatalf("expected sql.ErrNoRows, got %s instead", err.Error())
 	}
@@ -88,7 +88,8 @@ func TestSuccessfulResize(baseT *testing.T) {
 
 	//go into the future and check that the operation gets executed
 	clock.StepBy(10 * time.Minute)
-	t.Must(c.ExecuteNextResize())
+	_, err = c.ExecuteNextResize()
+	t.Must(err)
 	t.ExpectPendingOperations(c.DB /*, nothing */)
 	t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
 		AssetID:      1,
@@ -136,7 +137,8 @@ func TestFailingResize(tBase *testing.T) {
 	t.Must(c.DB.Insert(&pendingOp))
 
 	//check that resizing fails as expected
-	t.Must(c.ExecuteNextResize())
+	_, err := c.ExecuteNextResize()
+	t.Must(err)
 	t.ExpectPendingOperations(c.DB /*, nothing */)
 	t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
 		AssetID:      1,
@@ -199,7 +201,8 @@ func TestOperationQueueBehavior(baseT *testing.T) {
 	for idx := 0; idx < 10; idx++ {
 		go func() {
 			defer wg.Done()
-			t.Must(c.ExecuteNextResize())
+			_, err := c.ExecuteNextResize()
+			t.Must(err)
 		}()
 	}
 
