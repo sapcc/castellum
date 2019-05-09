@@ -115,6 +115,11 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 		respondWithNotFound(w)
 		return nil
 	}
+	if h.Team.ForAssetType(assetType) == nil {
+		//only report resources when we have an asset manager configured
+		respondWithNotFound(w)
+		return nil
+	}
 
 	if !token.Require(w, assetType.PolicyRuleForRead()) {
 		return nil

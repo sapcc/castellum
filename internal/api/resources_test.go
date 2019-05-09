@@ -103,3 +103,61 @@ func TestGetProject(baseT *testing.T) {
 		},
 	}.Check(t.T, hh)
 }
+
+func TestGetResource(baseT *testing.T) {
+	t := test.T{T: baseT}
+	_, hh, validator := setupTest(t)
+
+	//endpoint requires a token with project access
+	validator.Forbid("project:access")
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/foo",
+		ExpectStatus: http.StatusForbidden,
+	}.Check(t.T, hh)
+	validator.Allow("project:access")
+
+	//expect error for unknown project or resource
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project2/resources/foo",
+		ExpectStatus: http.StatusNotFound,
+	}.Check(t.T, hh)
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/doesnotexist",
+		ExpectStatus: http.StatusNotFound,
+	}.Check(t.T, hh)
+
+	//the "unknown" resource exists, but it should be 404 regardless because we
+	//don't have an asset manager for it
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/unknown",
+		ExpectStatus: http.StatusNotFound,
+	}.Check(t.T, hh)
+
+	//expect error for inaccessible resource
+	validator.Forbid("project:show:foo")
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/foo",
+		ExpectStatus: http.StatusForbidden,
+	}.Check(t.T, hh)
+	validator.Allow("project:show:foo")
+
+	//happy path
+	validator.Forbid("project:edit:foo") //this should not be an issue
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/foo",
+		ExpectStatus: http.StatusOK,
+		ExpectBody:   initialFooResourceJSON,
+	}.Check(t.T, hh)
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/bar",
+		ExpectStatus: http.StatusOK,
+		ExpectBody:   initialBarResourceJSON,
+	}.Check(t.T, hh)
+}

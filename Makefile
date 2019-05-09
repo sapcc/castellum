@@ -28,7 +28,7 @@ GO_ALLPKGS := $(PKG) $(shell $(GO) list $(PKG)/internal/...)
 # which packages to test with `go test`?
 GO_TESTPKGS := $(shell $(GO) list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' $(PKG)/internal/...)
 # which packages to measure coverage for?
-GO_COVERPKGS := $(shell $(GO) list $(PKG)/internal/... | grep -v plugins)
+GO_COVERPKGS := $(shell $(GO) list $(PKG)/internal/... | grep -vw plugins | grep -vw test)
 # output files from `go test`
 GO_COVERFILES := $(patsubst %,build/%.cover.out,$(subst /,_,$(GO_TESTPKGS)))
 

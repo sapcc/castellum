@@ -3,7 +3,7 @@ module github.com/sapcc/castellum
 go 1.12
 
 require (
-	github.com/databus23/goslo.policy v0.0.0-20170317131957-3ae74dd07ebf // indirect
+	github.com/databus23/goslo.policy v0.0.0-20170317131957-3ae74dd07ebf
 	github.com/golang-migrate/migrate v3.5.4+incompatible // indirect
 	github.com/gophercloud/gophercloud v0.0.0-20190212181753-892256c46858
 	github.com/gophercloud/utils v0.0.0-20190313033024-0bcc8e728cb5

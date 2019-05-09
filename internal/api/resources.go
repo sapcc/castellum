@@ -190,7 +190,7 @@ func (h handler) GetResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondwith.JSON(w, http.StatusOK, dbResource)
+	respondwith.JSON(w, http.StatusOK, ResourceFromDB(*dbResource))
 }
 
 func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
