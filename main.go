@@ -232,9 +232,11 @@ func jobLoop(task func() error) {
 func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
 	c := tasks.Context{DB: dbi, Team: team}
 	c.ApplyDefaults()
+	c.InitializeResizingCounters()
 
 	go jobLoop(func() error {
-		return c.ExecuteNextResize()
+		_, err := c.ExecuteNextResize()
+		return err
 	})
 
 	//use main goroutine to emit Prometheus metrics

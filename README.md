@@ -53,7 +53,7 @@ All components receive configuration via environment variables. The following va
 
 | Variable | Default | Explanation |
 | -------- | ------- | ----------- |
-| `CASTELLUM_ASSET_MANAGERS` | *(required)* | A comma-separated list of all asset managers that can be enabled. This configures what kinds of assets Castellum can handle. [See below](#supported-asset-types) for which asset managers exist. |
+| `CASTELLUM_ASSET_MANAGERS` | *(required)* | A comma-separated list of all asset managers that can be enabled. This configures what kinds of assets Castellum can handle. See [*Supported asset types*](#supported-asset-types) for which asset managers exist. |
 | `CASTELLUM_DB_URI` | *(required)* | A [libpq connection URI][pq-uri] that locates the Limes database. The non-URI "connection string" format is not allowed; it must be a URI. |
 | `CASTELLUM_HTTP_LISTEN_ADDRESS` | `:8080` | Listen address for the internal HTTP server. For `castellum observer/worker`, this just exposes Prometheus metrics on `/metrics`. For `castelum api`, this also exposes [the REST API](./docs/api-spec.md). |
 | `CASTELLUM_OSLO_POLICY_PATH` | *(required)* | Path to the oslo.policy file for this service. See [*Oslo policy*](#oslo-policy) for details. |
@@ -70,6 +70,16 @@ Each component (API, observer and worker) exposes Prometheus metrics via HTTP, o
 | Metric/Component | Description |
 | ---------------- | ----------- |
 | `castellum_operation_state_transitions`<br/>(API, observer, worker) | Counter for state transitions of operations.<br/>Labels: `project_id`, `asset` (asset type), `from_state` and `to_state`. |
+| `castellum_successful_resource_scrapes`<br/>(observer) | Counter for successful resource scrape operations.<br/>Labels: `asset` (asset type). |
+| `castellum_failed_resource_scrapes`<br/>(observer) | Counter for failed resource scrape operations.<br/>Labels: `asset` (asset type). |
+| `castellum_successful_asset_scrapes`<br/>(observer) | Counter for successful asset scrape operations.<br/>Labels: `asset` (asset type). |
+| `castellum_failed_asset_scrapes`<br/>(observer) | Counter for failed asset scrape operations.<br/>Labels: `asset` (asset type). |
+| `castellum_asset_resizes`<br/>(worker) | Counter for asset resize operations that ran to completion, i.e. which consumed a PendingOperation and produced a FinishedOperation in either "succeeded" or "failed" state.<br/>Labels: `asset` (asset type). |
+| `castellum_errored_asset_resizes`<br/>(worker) | Counter for asset resize operations that encountered an unexpected error, i.e. which could not consume a PendingOperation and produce a FinishedOperation.<br/>Labels: `asset` (asset type). |
+
+Note that `castellum_asset_resizes` is also incremented for resize operations that move into state "failed". The counter
+`castellum_errored_asset_resizes` is only incremented when a greenlit operation cannot be moved out of the "greenlit"
+state at all. Resize operations that move into state "failed" are counted by `castellum_operation_state_transitions{to_state="failed"}`.
 
 ### Supported asset types
 

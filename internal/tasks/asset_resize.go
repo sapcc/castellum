@@ -22,6 +22,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/logg"
@@ -42,11 +43,25 @@ var selectAndDeleteNextResizeQuery = `
 //
 //Returns sql.ErrNoRows when no operation was in the queue, to indicate to the
 //caller to slow down.
-func (c Context) ExecuteNextResize() error {
+//
+//The caller will usually not need the `targetAssetType` return value. We just
+//return it so that a deferred function inside this function has it in scope.
+func (c Context) ExecuteNextResize() (targetAssetType db.AssetType, returnedError error) {
+	defer func() {
+		if targetAssetType != "" {
+			labels := prometheus.Labels{"asset": string(targetAssetType)}
+			if returnedError == nil {
+				assetResizeCounter.With(labels).Inc()
+			} else {
+				assetResizeErroredCounter.With(labels).Inc()
+			}
+		}
+	}()
+
 	//we need a DB transaction for the row-level locking to work correctly
 	tx, err := c.DB.Begin()
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer core.RollbackUnlessCommitted(tx)
 
@@ -56,25 +71,25 @@ func (c Context) ExecuteNextResize() error {
 	if err != nil {
 		if err == sql.ErrNoRows {
 			logg.Debug("no assets to resize - slowing down...")
-			return sql.ErrNoRows
+			return "", sql.ErrNoRows
 		}
-		return err
+		return "", err
 	}
 
 	//find the corresponding asset, resource and asset manager
 	var asset db.Asset
 	err = tx.SelectOne(&asset, `SELECT * FROM assets WHERE id = $1`, op.AssetID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	var res db.Resource
 	err = tx.SelectOne(&res, `SELECT * FROM resources WHERE id = $1`, asset.ResourceID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	manager := c.Team.ForAssetType(res.AssetType)
 	if manager == nil {
-		return fmt.Errorf("no asset manager for asset type %q", res.AssetType)
+		return res.AssetType, fmt.Errorf("no asset manager for asset type %q", res.AssetType)
 	}
 
 	//when running in a unit test, wait for the test harness to unblock us
@@ -97,17 +112,17 @@ func (c Context) ExecuteNextResize() error {
 	finishedOp.ErrorMessage = errorMessage
 	err = tx.Insert(&finishedOp)
 	if err != nil {
-		return err
+		return res.AssetType, err
 	}
 
 	//mark asset as stale (its size field is no longer accurate)
 	if outcome == db.OperationOutcomeSucceeded {
 		_, err := tx.Exec(`UPDATE assets SET stale = $1 WHERE id = $2`, true, asset.ID)
 		if err != nil {
-			return err
+			return res.AssetType, err
 		}
 	}
 
 	core.CountStateTransition(res, db.OperationStateGreenlit, finishedOp.State())
-	return tx.Commit()
+	return res.AssetType, tx.Commit()
 }

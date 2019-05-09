@@ -51,6 +51,20 @@ var (
 		},
 		[]string{"asset"},
 	)
+	assetResizeCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "castellum_asset_resizes",
+			Help: `Counter for asset resize operations that ran to completion, yielding a FinishedOperation in either "succeeded" or "failed" state.`,
+		},
+		[]string{"asset"},
+	)
+	assetResizeErroredCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "castellum_errored_asset_resizes",
+			Help: "Counter for asset resize operations that encountered an unexpected error and could not produce a FinishedOperation.",
+		},
+		[]string{"asset"},
+	)
 )
 
 func init() {
@@ -70,6 +84,18 @@ func (c Context) InitializeScrapingCounters() {
 			resourceScrapeFailedCounter.With(labels).Add(0)
 			assetScrapeSuccessCounter.With(labels).Add(0)
 			assetScrapeFailedCounter.With(labels).Add(0)
+		}
+	}
+}
+
+//InitializeResizingCounters adds 0 to all resizing counters, to ensure that
+//all relevant timeseries exist.
+func (c Context) InitializeResizingCounters() {
+	for _, manager := range c.Team {
+		for _, assetType := range manager.AssetTypes() {
+			labels := prometheus.Labels{"asset": string(assetType)}
+			assetResizeCounter.With(labels).Add(0)
+			assetResizeErroredCounter.With(labels).Add(0)
 		}
 	}
 }
