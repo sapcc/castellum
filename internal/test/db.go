@@ -20,6 +20,7 @@ package test
 
 import (
 	"encoding/json"
+	"os"
 
 	"github.com/sapcc/castellum/internal/db"
 	"gopkg.in/gorp.v2"
@@ -28,7 +29,15 @@ import (
 //PrepareDB prepares a DB reference for this test, or fails the test if the DB
 //is not ready.
 func (t T) PrepareDB() *gorp.DbMap {
-	dbi, err := db.Init("postgres://postgres@localhost:54321/castellum?sslmode=disable")
+	var postgresURL string
+	if os.Getenv("TRAVIS") == "true" {
+		//cf. https://docs.travis-ci.com/user/database-setup/#postgresql
+		postgresURL = "postgres://postgres@localhost/castellum?sslmode=disable"
+	} else {
+		//suitable for use with ./testing/with-postgres-db.sh
+		postgresURL = "postgres://postgres@localhost:54321/castellum?sslmode=disable"
+	}
+	dbi, err := db.Init(postgresURL)
 	if err != nil {
 		t.Error(err)
 		t.Log("Try prepending ./testing/with-postgres-db.sh to your command.")
