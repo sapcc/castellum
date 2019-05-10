@@ -60,7 +60,8 @@ var SQLMigrations = map[string]string{
 			UNIQUE(resource_id, uuid)
 		);
 
-		CREATE TYPE op_reason  AS ENUM ('01-critical', '02-high', '03-low');
+		-- NOTE: order of op_reason is important because we "ORDER BY reason" in some queries
+		CREATE TYPE op_reason  AS ENUM ('critical', 'high', 'low');
 		CREATE TYPE op_outcome AS ENUM ('succeeded', 'failed', 'cancelled');
 
 		CREATE TABLE pending_operations (

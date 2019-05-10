@@ -187,13 +187,13 @@ type OperationReason string
 const (
 	//OperationReasonCritical indicates that the resize operation was triggered
 	//because the asset's usage exceeded the critical threshold.
-	OperationReasonCritical OperationReason = "01-critical"
+	OperationReasonCritical OperationReason = "critical"
 	//OperationReasonHigh indicates that the resize operation was triggered
 	//because the asset's usage exceeded the high threshold.
-	OperationReasonHigh = "02-high"
+	OperationReasonHigh = "high"
 	//OperationReasonLow indicates that the resize operation was triggered
 	//because the asset's usage deceeded the low threshold.
-	OperationReasonLow = "03-low"
+	OperationReasonLow = "low"
 )
 
 //OperationOutcome is an enumeration type for possible outcomes for a resize operation.
