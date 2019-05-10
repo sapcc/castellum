@@ -207,6 +207,10 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	err := h.DB.SelectOne(&dbAsset,
 		`SELECT * FROM assets WHERE resource_id = $1 AND uuid = $2`,
 		dbResource.ID, mux.Vars(r)["asset_uuid"])
+	if err == sql.ErrNoRows {
+		respondWithNotFound(w)
+		return
+	}
 	if respondwith.ErrorText(w, err) {
 		return
 	}

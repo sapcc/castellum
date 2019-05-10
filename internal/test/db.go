@@ -48,6 +48,12 @@ func (t T) PrepareDB() *gorp.DbMap {
 	return dbi
 }
 
+//MustUpdate aborts the test if dbi.Update(row) throws an error.
+func (t T) MustUpdate(dbi *gorp.DbMap, row interface{}) {
+	_, err := dbi.Update(row)
+	t.Must(err)
+}
+
 //ExpectResources checks that the DB contains exactly the given resources.
 func (t T) ExpectResources(dbi *gorp.DbMap, resources ...db.Resource) {
 	t.Helper()

@@ -156,7 +156,7 @@ Otherwise returns 200 and a JSON response body like this:
 
   "finished_operations": [
     {
-      "outcome": "cancelled",
+      "state": "cancelled",
       "reason": "high",
       "old_size": 1000,
       "new_size": 1200,
@@ -184,9 +184,7 @@ The following fields may be returned:
 | `scraped_at` | integer | When the size and usage of the asset was last checked by Castellum. |
 | `stale` | bool | This flag is set by Castellum after a resize operation to indicate that the reported size and usage are probably not accurate anymore. Will be cleared by the next scrape. |
 | `pending_operation` | object | Information about an automated resize operation that is currently in progress. If there is no resize operation ongoing, this field will be omitted. |
-| `pending_operation.state` | string | The current state of this operation. One of `created`, `confirmed` or `greenlit`. See [README.md](../README.md#terminology) for details. |
 | `finished_operations` | array of objects | Information about earlier automated resize operations. **This field is only shown on request** because it may be quite large. Add the query parameter `?history` to see it. |
-| `finished_operations[].outcome` | string | The final state of this operation. One of `cancelled`, `succeeded` or `failed`. See [README.md](../README.md#terminology) for details. |
 | `finished_operations[].finished.at` | timestamp | When the operation entered that final state. |
 | `finished_operations[].finished.error` | string | The backend error that caused this operation to fail. Only present when `outcome` is `failed.` |
 
@@ -194,6 +192,7 @@ The following fields may be returned for each operation, both below `pending_ope
 
 | Field | Type | Explanation |
 | ----- | ---- | ----------- |
+| `.state` | string | The current state of this operation. For pending operations, this is one of "created", "confirmed" or "greenlit". For finished operations, this is one of "cancelled", "succeeded" or "failed". See [README.md](../README.md#terminology) for details. |
 | `.reason` | string | One of "low", "high" or "critical". Identifies which threshold being crossed triggered this operation. |
 | `.old_size` | integer | The asset's size before this resize operation. |
 | `.new_size` | integer | The (projected) asset's size after the successful completion of the resize operation. |
