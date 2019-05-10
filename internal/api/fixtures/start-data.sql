@@ -7,3 +7,13 @@ INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_per
 -- insert some resources that we should not be able to list (ID=3 has wrong project ID, ID=4 has unknown asset type)
 INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent) VALUES (3, 'something-else', 'foo', UNIX(3), 20, 3600, 80, 1800, 95, 20);
 INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent) VALUES (4, 'project1', 'unknown', UNIX(4), 20, 3600, 80, 1800, 95, 20);
+
+-- insert some assets in 'project1' that we can list
+INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, stale) VALUES (1, 1, 'fooasset1', 1024, 50, UNIX(11), FALSE);
+INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, stale) VALUES (2, 1, 'fooasset2', 512, 80, UNIX(12), TRUE);
+INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, stale) VALUES (3, 2, 'barasset1', 2000, 10, UNIX(13), FALSE);
+-- insert a bogus asset in an unknown asset type; we should not be able to list this in the API
+INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, stale) VALUES (4, 4, 'bogusasset', 100, 50, UNIX(14), FALSE);
+
+-- INSERT INTO pending_operations (id, asset_id, reason, old_size, new_size, usage_percent, created_at, confirmed_at, greenlit_at, greenlit_by_user_uuid) VALUES (...);
+-- INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, usage_percent, created_at, confirmed_at, greenlit_at, greenlit_by_user_uuid, finished_at, error_message) VALUES (...);

@@ -34,7 +34,7 @@ import (
 //AssetInList is how a db.Asset looks like in the API endpoint where assets are
 //listed.
 type AssetInList struct {
-	UUID int64 `json:"id"`
+	UUID string `json:"id"`
 }
 
 //Asset is how a db.Asset looks like in the API.
@@ -90,7 +90,7 @@ type OperationFinish struct {
 //AssetListFromDB converts a []db.Asset into an []api.AssetInList.
 func AssetListFromDB(assets []db.Asset) []AssetInList {
 	result := make([]AssetInList, len(assets))
-	for idx, asset := range result {
+	for idx, asset := range assets {
 		result[idx] = AssetInList{UUID: asset.UUID}
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].UUID < result[j].UUID })
@@ -177,13 +177,10 @@ func (h handler) GetAssets(w http.ResponseWriter, r *http.Request) {
 	if dbResource == nil {
 		return
 	}
-	if !token.Require(w, dbResource.AssetType.PolicyRuleForRead()) {
-		return
-	}
 
 	var dbAssets []db.Asset
 	_, err := h.DB.Select(&dbAssets,
-		`SELECT * FROM assets WHERE resource_id = $1`, dbResource.ID)
+		`SELECT * FROM assets WHERE resource_id = $1 ORDER BY uuid`, dbResource.ID)
 	if respondwith.ErrorText(w, err) {
 		return
 	}
@@ -203,9 +200,6 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	}
 	dbResource := h.LoadResource(w, r, projectUUID, token)
 	if dbResource == nil {
-		return
-	}
-	if !token.Require(w, dbResource.AssetType.PolicyRuleForRead()) {
 		return
 	}
 

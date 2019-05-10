@@ -30,7 +30,7 @@ import (
 	"github.com/sapcc/go-bits/postlite"
 )
 
-func setupTest(t test.T) (*handler, http.Handler, *MockValidator, []db.Resource) {
+func setupTest(t test.T) (*handler, http.Handler, *MockValidator, []db.Resource, []db.Asset) {
 	dbi := t.PrepareDB()
 	team := core.AssetManagerTeam{
 		&plugins.AssetManagerStatic{AssetType: "foo"},
@@ -45,8 +45,12 @@ func setupTest(t test.T) (*handler, http.Handler, *MockValidator, []db.Resource)
 	_, err := dbi.Select(&resources, `SELECT * FROM resources ORDER BY ID`)
 	t.Must(err)
 
+	var assets []db.Asset
+	_, err = dbi.Select(&assets, `SELECT * FROM assets ORDER BY ID`)
+	t.Must(err)
+
 	h := &handler{DB: dbi, Team: team, Validator: mv}
-	return h, h.BuildRouter(), mv, resources
+	return h, h.BuildRouter(), mv, resources, assets
 }
 
 //MockValidator implements the gopherpolicy.Enforcer and gopherpolicy.Validator

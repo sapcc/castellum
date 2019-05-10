@@ -166,7 +166,7 @@ func (h handler) GetProject(w http.ResponseWriter, r *http.Request) {
 
 	var dbResources []db.Resource
 	_, err := h.DB.Select(&dbResources,
-		`SELECT * FROM resources WHERE scope_uuid = $1`, projectUUID)
+		`SELECT * FROM resources WHERE scope_uuid = $1 ORDER BY asset_type`, projectUUID)
 	if respondwith.ErrorText(w, err) {
 		return
 	}

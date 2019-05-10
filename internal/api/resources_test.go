@@ -57,7 +57,7 @@ var (
 
 func TestGetProject(baseT *testing.T) {
 	t := test.T{T: baseT}
-	_, hh, validator, _ := setupTest(t)
+	_, hh, validator, _, _ := setupTest(t)
 
 	//endpoint requires a token with project access
 	validator.Forbid("project:access")
@@ -108,7 +108,7 @@ func TestGetProject(baseT *testing.T) {
 
 func TestGetResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	_, hh, validator, _ := setupTest(t)
+	_, hh, validator, _, _ := setupTest(t)
 
 	//endpoint requires a token with project access
 	validator.Forbid("project:access")
@@ -166,7 +166,7 @@ func TestGetResource(baseT *testing.T) {
 
 func TestPutResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	h, hh, validator, allResources := setupTest(t)
+	h, hh, validator, allResources, _ := setupTest(t)
 
 	//mostly like `initialFooResourceJSON`, but with some delays changed
 	newFooResourceJSON1 := assert.JSONObject{
@@ -304,7 +304,7 @@ func TestPutResource(baseT *testing.T) {
 
 func TestPutResourceValidationErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
-	h, hh, _, allResources := setupTest(t)
+	h, hh, _, allResources, _ := setupTest(t)
 
 	expectErrors := func(body assert.JSONObject, errors ...string) {
 		assert.HTTPRequest{
@@ -385,7 +385,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 
 func TestDeleteResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	h, hh, validator, allResources := setupTest(t)
+	h, hh, validator, allResources, allAssets := setupTest(t)
 
 	//endpoint requires a token with project access
 	validator.Forbid("project:access")
@@ -443,12 +443,22 @@ func TestDeleteResource(baseT *testing.T) {
 		ExpectStatus: http.StatusNoContent,
 	}.Check(t.T, hh)
 
-	//expect this resource to be gone
+	//expect this resource and its assets to be gone
 	var remainingResources []db.Resource
+	isRemainingResource := make(map[int64]bool)
 	for _, res := range allResources {
 		if res.ScopeUUID != "project1" || res.AssetType != "foo" {
 			remainingResources = append(remainingResources, res)
+			isRemainingResource[res.ID] = true
 		}
 	}
 	t.ExpectResources(h.DB, remainingResources...)
+
+	var remainingAssets []db.Asset
+	for _, asset := range allAssets {
+		if isRemainingResource[asset.ResourceID] {
+			remainingAssets = append(remainingAssets, asset)
+		}
+	}
+	t.ExpectAssets(h.DB, remainingAssets...)
 }
