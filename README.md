@@ -1,4 +1,4 @@
-# castellum
+# Castellum
 
 [![Build Status](https://travis-ci.org/sapcc/castellum.svg?branch=master)](https://travis-ci.org/sapcc/castellum)
 [![Coverage Status](https://coveralls.io/repos/github/sapcc/castellum/badge.svg?branch=master)](https://coveralls.io/github/sapcc/castellum?branch=master)
@@ -11,8 +11,9 @@ In this document:
 
 * [Terminology](#terminology)
 * [Building and running](#building-and-running)
-  * [Supported asset types](#supported-asset-types)
+  * [Oslo policy](#oslo-policy)
   * [Prometheus metrics](#prometheus-metrics)
+  * [Supported asset types](#supported-asset-types)
 
 In other documents:
 
