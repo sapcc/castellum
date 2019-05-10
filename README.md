@@ -1,5 +1,9 @@
 # castellum
 
+[![Build Status](https://travis-ci.org/sapcc/castellum.svg?branch=master)](https://travis-ci.org/sapcc/castellum)
+[![Coverage Status](https://coveralls.io/repos/github/sapcc/castellum/badge.svg?branch=master)](https://coveralls.io/github/sapcc/castellum?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/sapcc/castellum)](https://goreportcard.com/report/github.com/sapcc/castellum)
+
 Castellum is a vertical autoscaling service for OpenStack. It can perform autonomous resize operations, upscaling assets
 with a high usage and downscaling assets with a low usage.
 
