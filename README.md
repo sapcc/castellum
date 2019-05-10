@@ -56,12 +56,25 @@ All components receive configuration via environment variables. The following va
 | `CASTELLUM_ASSET_MANAGERS` | *(required)* | A comma-separated list of all asset managers that can be enabled. This configures what kinds of assets Castellum can handle. See [*Supported asset types*](#supported-asset-types) for which asset managers exist. |
 | `CASTELLUM_DB_URI` | *(required)* | A [libpq connection URI][pq-uri] that locates the Limes database. The non-URI "connection string" format is not allowed; it must be a URI. |
 | `CASTELLUM_HTTP_LISTEN_ADDRESS` | `:8080` | Listen address for the internal HTTP server. For `castellum observer/worker`, this just exposes Prometheus metrics on `/metrics`. For `castelum api`, this also exposes [the REST API](./docs/api-spec.md). |
-| `CASTELLUM_OSLO_POLICY_PATH` | *(required)* | Path to the oslo.policy file for this service. See [*Oslo policy*](#oslo-policy) for details. |
+| `CASTELLUM_OSLO_POLICY_PATH` | *(required)* | Path to the `policy.json` file for this service. See [*Oslo policy*](#oslo-policy) for details. |
 | `OS_...` | *(required)* | A full set of OpenStack auth environment variables for Castellum's service user. See [documentation for openstackclient][os-env] for details. |
 
 ### Oslo policy
 
-TODO explain policy, reference docs/example-policy.json
+Castellum understands access rules in the [`oslo.policy` JSON format][os-pol]. An example can be seen at
+[`docs/example-policy.json`](./docs/example-policy.json). The following rules are expected:
+
+- `project:access` gates access to all endpoints relating to a project, even if more specific rules are checked later on.
+- `project:show:<asset_type_shortened>` gates access to all endpoints relating to a project resource.
+- `project:edit:<asset_type_shortened>` gates access to the PUT and DELETE endpoints relating to a project resource.
+
+All project-level policy rules can use the object attribute `%(project_id)s`.
+
+When policy rule names reference the asset type, only the part of the asset type up until the first colon is used. For
+example, access to project resources with asset type `quota:compute:instances` would be gated by the rules
+`project:show:quota` and `project:edit:quota`.
+
+See also: [List of available API attributes](https://github.com/sapcc/go-bits/blob/53eeb20fde03c3d0a35e76cf9c9a06b63a415e6b/gopherpolicy/pkg.go#L151-L164)
 
 ### Prometheus metrics
 
@@ -89,3 +102,4 @@ The following asset managers are available:
 
 [pq-uri]: https://www.postgresql.org/docs/9.6/static/libpq-connect.html#LIBPQ-CONNSTRING
 [os-env]: https://docs.openstack.org/python-openstackclient/latest/cli/man/openstack.html
+[os-pol]: https://docs.openstack.org/oslo.policy/latest/admin/policy-json-file.html
