@@ -204,6 +204,7 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 
 	//use main goroutine to emit Prometheus metrics
 	http.Handle("/metrics", promhttp.Handler())
+	http.Handle("/healthcheck", http.HandlerFunc(healthCheckHandler))
 	logg.Info("listening on " + httpListenAddr)
 	logg.Error(http.ListenAndServe(httpListenAddr, nil).Error())
 }
@@ -241,6 +242,7 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 
 	//use main goroutine to emit Prometheus metrics
 	http.Handle("/metrics", promhttp.Handler())
+	http.Handle("/healthcheck", http.HandlerFunc(healthCheckHandler))
 	logg.Info("listening on " + httpListenAddr)
 	logg.Error(http.ListenAndServe(httpListenAddr, nil).Error())
 }
