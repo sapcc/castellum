@@ -72,6 +72,8 @@ func init() {
 	prometheus.MustRegister(resourceScrapeFailedCounter)
 	prometheus.MustRegister(assetScrapeSuccessCounter)
 	prometheus.MustRegister(assetScrapeFailedCounter)
+	prometheus.MustRegister(assetResizeCounter)
+	prometheus.MustRegister(assetResizeErroredCounter)
 }
 
 //InitializeScrapingCounters adds 0 to all scraping counters, to ensure that
