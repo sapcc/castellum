@@ -33,9 +33,9 @@ import (
 //query that finds the next resource that needs to be scraped
 var scrapeAssetSearchQuery = `
 	SELECT a.* FROM assets a JOIN resources r ON r.asset_type = $1
-	WHERE a.scraped_at < $2 OR a.stale
-	-- order by update priority (first stale assets, then outdated assets, then by ID for deterministic test behavior)
-	ORDER BY a.stale DESC, a.scraped_at ASC, a.id ASC
+	WHERE a.scraped_at < $2
+	-- order by update priority (first outdated assets, then by ID for deterministic test behavior)
+	ORDER BY a.scraped_at ASC, a.id ASC
 	LIMIT 1
 `
 
@@ -104,19 +104,46 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxScrapedAt time.Time)
 		return fmt.Errorf("cannot query status of %s %s: %s", assetType, asset.UUID, err.Error())
 	}
 
+	//update asset attributes - We have four separate cases here, which
+	//correspond to the branches of the `switch` statement. When changing any of
+	//this, tread very carefully.
+	asset.ScrapedAt = c.TimeNow()
+	canTouchPendingOperations := true
+	switch {
+	case asset.ExpectedSize == nil:
+		//normal case: no resize operation has recently completed -> record
+		//status.Size as actual size
+		fallthrough
+	case *asset.ExpectedSize == status.Size:
+		//a resize operation has completed, and now we're seeing the new size in
+		//the backend -> record status.Size as actualSize and clear ExpectedSize
+		fallthrough
+	case asset.Size != status.Size:
+		//while waiting for a resize operation to be reflected in the backend,
+		//we're observing an entirely different size (i.e. neither the operation's
+		//OldSize nor its NewSize) -> assume that some other user changed the size
+		//in parallel and take that new value as the actual size
+		asset.Size = status.Size
+		asset.UsagePercent = status.UsagePercent
+		asset.ExpectedSize = nil
+	default:
+		//we are waiting for a resize operation to reflect in the backend, but
+		//the backend is still reporting the old size -> do not touch anything until the backend is showing the new size
+		canTouchPendingOperations = false
+	}
+
 	//update asset in DB
 	tx, err := c.DB.Begin()
 	if err != nil {
 		return err
 	}
 	defer core.RollbackUnlessCommitted(tx)
-	asset.Size = status.Size
-	asset.UsagePercent = status.UsagePercent
-	asset.ScrapedAt = c.TimeNow()
-	asset.Stale = false
 	_, err = tx.Update(&asset)
 	if err != nil {
 		return err
+	}
+	if !canTouchPendingOperations {
+		return tx.Commit()
 	}
 
 	//never touch operations in status "greenlit" - they may be executing on a

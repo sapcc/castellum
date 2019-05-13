@@ -55,7 +55,7 @@ var SQLMigrations = map[string]string{
 			size          BIGINT    NOT NULL,
 			usage_percent INTEGER   NOT NULL,
 			scraped_at    TIMESTAMP NOT NULL,
-			stale         BOOLEAN   NOT NULL DEFAULT FALSE,
+			expected_size BIGINT    DEFAULT NULL,
 
 			UNIQUE(resource_id, uuid)
 		);

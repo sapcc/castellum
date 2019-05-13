@@ -46,3 +46,8 @@ func setupContext(t test.T) (*Context, *plugins.AssetManagerStatic, *test.FakeCl
 func p2time(t time.Time) *time.Time {
 	return &t
 }
+
+//Take pointer to uint64 expression.
+func p2uint64(x uint64) *uint64 {
+	return &x
+}

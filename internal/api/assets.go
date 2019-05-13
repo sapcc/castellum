@@ -104,7 +104,7 @@ func AssetFromDB(asset db.Asset) Asset {
 		Size:          asset.Size,
 		UsagePercent:  asset.UsagePercent,
 		ScrapedAtUnix: asset.ScrapedAt.Unix(),
-		Stale:         asset.Stale,
+		Stale:         asset.ExpectedSize != nil,
 	}
 }
 

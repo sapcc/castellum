@@ -107,8 +107,13 @@ type Asset struct {
 	//When the current .UsagePercent value was obtained.
 	ScrapedAt time.Time `db:"scraped_at"`
 	//This flag is set by a Castellum worker after a resize operation to indicate
-	//that the .Size attribute is outdated.
-	Stale bool `db:"stale"`
+	//that the .Size attribute is outdated. The value is the new_size of the
+	//resize operation. We should expect this size to show in the next
+	//GetAssetStatus(), but sometimes it doesn't because of information flow
+	//delays. That's why we have both .Size and .ExpectedSize: to accurately
+	//detect when the resize operation has reflected in the datastore that we're
+	//polling for GetAssetStatus().
+	ExpectedSize *uint64 `db:"expected_size"`
 }
 
 //PendingOperation describes an ongoing resize operation for an asset.

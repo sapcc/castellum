@@ -115,9 +115,11 @@ func (c Context) ExecuteNextResize() (targetAssetType db.AssetType, returnedErro
 		return res.AssetType, err
 	}
 
-	//mark asset as stale (its size field is no longer accurate)
+	//mark asset as having just completed as resize operation (see
+	//logic in ScrapeNextAsset() for details)
 	if outcome == db.OperationOutcomeSucceeded {
-		_, err := tx.Exec(`UPDATE assets SET stale = $1 WHERE id = $2`, true, asset.ID)
+		_, err := tx.Exec(`UPDATE assets SET expected_size = $1 WHERE id = $2`,
+			finishedOp.NewSize, asset.ID)
 		if err != nil {
 			return res.AssetType, err
 		}

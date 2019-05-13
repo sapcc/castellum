@@ -118,7 +118,7 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 			Size:         status.Size,
 			UsagePercent: status.UsagePercent,
 			ScrapedAt:    c.TimeNow(),
-			Stale:        false,
+			ExpectedSize: nil,
 		}
 		err = c.DB.Insert(&dbAsset)
 		if err != nil {

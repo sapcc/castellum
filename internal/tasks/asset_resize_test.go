@@ -48,7 +48,7 @@ func setupAssetResizeTest(t test.T, c *Context, amStatic *plugins.AssetManagerSt
 			Size:         1000,
 			UsagePercent: 50,
 			ScrapedAt:    c.TimeNow(),
-			Stale:        false,
+			ExpectedSize: nil,
 		}))
 
 		amStatic.Assets["project1"][uuid] = plugins.StaticAsset{
@@ -104,8 +104,8 @@ func TestSuccessfulResize(baseT *testing.T) {
 		Outcome:      db.OperationOutcomeSucceeded,
 	})
 
-	//expect asset to be marked as stale, but still show the old size (until the
-	//next asset scrape)
+	//expect asset to report an expected size, but still show the old size
+	//(until the next asset scrape)
 	t.ExpectAssets(c.DB, db.Asset{
 		ID:           1,
 		ResourceID:   1,
@@ -113,7 +113,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 		Size:         1000,
 		UsagePercent: 50,
 		ScrapedAt:    c.TimeNow().Add(-15 * time.Minute),
-		Stale:        true,
+		ExpectedSize: p2uint64(1200),
 	})
 }
 
@@ -154,7 +154,7 @@ func TestFailingResize(tBase *testing.T) {
 		ErrorMessage: "cannot set size smaller than current usage",
 	})
 
-	//check that asset was not marked as stale
+	//check that asset does not have an ExpectedSize
 	t.ExpectAssets(c.DB, db.Asset{
 		ID:           1,
 		ResourceID:   1,
@@ -162,7 +162,7 @@ func TestFailingResize(tBase *testing.T) {
 		Size:         1000,
 		UsagePercent: 50,
 		ScrapedAt:    c.TimeNow().Add(-10 * time.Minute),
-		Stale:        false,
+		ExpectedSize: nil,
 	})
 }
 

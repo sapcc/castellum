@@ -9,11 +9,11 @@ INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_per
 INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent) VALUES (4, 'project1', 'unknown', UNIX(4), 20, 3600, 80, 1800, 95, 20);
 
 -- insert some assets in 'project1' that we can list
-INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, stale) VALUES (1, 1, 'fooasset1', 1024, 50, UNIX(11), TRUE);
-INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, stale) VALUES (2, 1, 'fooasset2', 512, 80, UNIX(12), FALSE);
-INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, stale) VALUES (3, 2, 'barasset1', 2000, 10, UNIX(13), FALSE);
+INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size) VALUES (1, 1, 'fooasset1', 1024, 50, UNIX(11), 1200);
+INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size) VALUES (2, 1, 'fooasset2', 512, 80, UNIX(12), NULL);
+INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size) VALUES (3, 2, 'barasset1', 2000, 10, UNIX(13), NULL);
 -- insert a bogus asset in an unknown asset type; we should not be able to list this in the API
-INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, stale) VALUES (4, 4, 'bogusasset', 100, 50, UNIX(14), FALSE);
+INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size) VALUES (4, 4, 'bogusasset', 100, 50, UNIX(14), NULL);
 
 INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, usage_percent, created_at, confirmed_at, greenlit_at, greenlit_by_user_uuid, finished_at, error_message) VALUES (1, 'low', 'cancelled', 1000, 900, 20, UNIX(31), NULL, NULL, NULL, UNIX(32), '');
 INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, usage_percent, created_at, confirmed_at, greenlit_at, greenlit_by_user_uuid, finished_at, error_message) VALUES (1, 'high', 'succeeded', 1023, 1024, 80, UNIX(41), UNIX(42), UNIX(43), 'user2', UNIX(44), '');

@@ -56,7 +56,7 @@ func setupAssetScrapeTest(t test.T) (*Context, func(plugins.StaticAsset), *test.
 		Size:         1000,
 		UsagePercent: 50,
 		ScrapedAt:    c.TimeNow(),
-		Stale:        false,
+		ExpectedSize: nil,
 	}))
 
 	//setup asset with configurable size
@@ -353,7 +353,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 			Size:         1000,
 			UsagePercent: 50,
 			ScrapedAt:    c.TimeNow(),
-			Stale:        false,
+			ExpectedSize: nil,
 		},
 		{
 			ResourceID:   1,
@@ -361,7 +361,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 			Size:         1000,
 			UsagePercent: 50,
 			ScrapedAt:    c.TimeNow(),
-			Stale:        false,
+			ExpectedSize: nil,
 		},
 		{
 			ResourceID:   1,
@@ -369,7 +369,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 			Size:         1000,
 			UsagePercent: 50,
 			ScrapedAt:    c.TimeNow(),
-			Stale:        false,
+			ExpectedSize: nil,
 		},
 	}
 	t.Must(c.DB.Insert(&assets[0]))
