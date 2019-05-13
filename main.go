@@ -74,6 +74,11 @@ func main() {
 	if err != nil {
 		logg.Fatal("cannot connect to OpenStack: " + err.Error())
 	}
+	eo := gophercloud.EndpointOpts{
+		//note that empty values are acceptable in both fields
+		Region:       os.Getenv("OS_REGION_NAME"),
+		Availability: gophercloud.Availability(os.Getenv("OS_INTERFACE")),
+	}
 
 	//get HTTP listen address
 	httpListenAddr := os.Getenv("CASTELLUM_HTTP_LISTEN_ADDRESS")
@@ -84,7 +89,7 @@ func main() {
 	//initialize asset managers
 	team, err := core.CreateAssetManagers(
 		strings.Split(mustGetenv("CASTELLUM_ASSET_MANAGERS"), ","),
-		providerClient,
+		providerClient, eo,
 	)
 	if err != nil {
 		logg.Fatal(err.Error())
@@ -98,7 +103,7 @@ func main() {
 		if len(os.Args) != 2 {
 			usage()
 		}
-		runAPI(dbi, team, providerClient, httpListenAddr)
+		runAPI(dbi, team, providerClient, eo, httpListenAddr)
 	case "observer":
 		if len(os.Args) != 2 {
 			usage()
@@ -130,8 +135,8 @@ func mustGetenv(key string) string {
 ////////////////////////////////////////////////////////////////////////////////
 // task: API
 
-func runAPI(dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient *gophercloud.ProviderClient, httpListenAddr string) {
-	identityV3, err := openstack.NewIdentityV3(providerClient, gophercloud.EndpointOpts{})
+func runAPI(dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient *gophercloud.ProviderClient, eo gophercloud.EndpointOpts, httpListenAddr string) {
+	identityV3, err := openstack.NewIdentityV3(providerClient, eo)
 	if err != nil {
 		logg.Fatal("cannot find Keystone v3 API: " + err.Error())
 	}
@@ -258,10 +263,10 @@ func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetTyp
 
 	fmt.Println("")
 	fmt.Println("supported commands:")
-	fmt.Println("\tlist   <project-id>                            - calls manager.ListAssets()")
-	fmt.Println("\tshow   <project-id> <asset-id>                 - calls manager.GetAssetStatus() with previousStatus == nil")
-	fmt.Println("\tshow   <project-id> <asset-id> <size> <usage%> - calls manager.GetAssetStatus() with previousStatus != nil")
-	fmt.Println("\tresize <project-id> <asset-id> <size>          - calls manager.SetAssetSize()")
+	fmt.Println("\tlist   <project-id>                                  - calls manager.ListAssets()")
+	fmt.Println("\tshow   <project-id> <asset-id>                       - calls manager.GetAssetStatus() with previousStatus == nil")
+	fmt.Println("\tshow   <project-id> <asset-id> <size> <usage%>       - calls manager.GetAssetStatus() with previousStatus != nil")
+	fmt.Println("\tresize <project-id> <asset-id> <old-size> <new-size> - calls manager.SetAssetSize()")
 	fmt.Println("")
 
 	stdin := bufio.NewReader(os.Stdin)
@@ -327,16 +332,21 @@ func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetTyp
 			logg.Info("size = %d, usage = %d%%", result.Size, result.UsagePercent)
 
 		case "resize":
-			if len(fields) != 4 {
+			if len(fields) != 5 {
 				logg.Error("wrong number of arguments")
 				continue
 			}
-			newSize, err := strconv.ParseUint(fields[3], 10, 64)
+			oldSize, err := strconv.ParseUint(fields[3], 10, 64)
 			if err != nil {
 				logg.Error(err.Error())
 				continue
 			}
-			err = manager.SetAssetSize(res, fields[2], newSize)
+			newSize, err := strconv.ParseUint(fields[4], 10, 64)
+			if err != nil {
+				logg.Error(err.Error())
+				continue
+			}
+			err = manager.SetAssetSize(res, fields[2], oldSize, newSize)
 			if err != nil {
 				logg.Error(err.Error())
 				continue

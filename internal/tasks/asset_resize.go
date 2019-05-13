@@ -99,7 +99,7 @@ func (c Context) ExecuteNextResize() (targetAssetType db.AssetType, returnedErro
 	}
 
 	//perform the resize operation
-	err = manager.SetAssetSize(res, asset.UUID, op.NewSize)
+	err = manager.SetAssetSize(res, asset.UUID, op.OldSize, op.NewSize)
 	outcome := db.OperationOutcomeSucceeded
 	errorMessage := ""
 	if err != nil {

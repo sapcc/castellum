@@ -55,10 +55,11 @@ func (m AssetManagerStatic) AssetTypes() []db.AssetType {
 }
 
 var (
-	errWrongAssetType = errors.New("wrong asset type for this asset manager")
-	errUnknownProject = errors.New("no such project")
-	errUnknownAsset   = errors.New("no such asset")
-	errTooSmall       = errors.New("cannot set size smaller than current usage")
+	errWrongAssetType  = errors.New("wrong asset type for this asset manager")
+	errUnknownProject  = errors.New("no such project")
+	errUnknownAsset    = errors.New("no such asset")
+	errOldSizeMismatch = errors.New("asset has different size than expected")
+	errTooSmall        = errors.New("cannot set size smaller than current usage")
 )
 
 //ListAssets implements the core.AssetManager interface.
@@ -107,7 +108,7 @@ func (m AssetManagerStatic) GetAssetStatus(res db.Resource, assetUUID string, pr
 }
 
 //SetAssetSize implements the core.AssetManager interface.
-func (m AssetManagerStatic) SetAssetSize(res db.Resource, assetUUID string, size uint64) error {
+func (m AssetManagerStatic) SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) error {
 	if res.AssetType != m.AssetType {
 		return errWrongAssetType
 	}
@@ -119,9 +120,12 @@ func (m AssetManagerStatic) SetAssetSize(res db.Resource, assetUUID string, size
 	if !exists {
 		return errUnknownAsset
 	}
-	if asset.Usage > size {
+	if asset.Size != oldSize {
+		return errOldSizeMismatch
+	}
+	if asset.Usage > newSize {
 		return errTooSmall
 	}
-	assets[assetUUID] = StaticAsset{Size: size, Usage: asset.Usage}
+	assets[assetUUID] = StaticAsset{Size: newSize, Usage: asset.Usage}
 	return nil
 }
