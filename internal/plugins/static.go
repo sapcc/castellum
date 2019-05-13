@@ -31,6 +31,12 @@ import (
 type StaticAsset struct {
 	Size  uint64
 	Usage uint64
+
+	//When non-zero, these fields model a resize operation that will only be
+	//reflected after GetAssetStatus() has been called for as many times as
+	//indicated in the .RemainingDelay field.
+	NewSize        uint64
+	RemainingDelay uint
 }
 
 //AssetManagerStatic is a core.AssetManager for testing purposes. It just
@@ -85,6 +91,15 @@ func (m AssetManagerStatic) GetAssetStatus(res db.Resource, assetUUID string, pr
 	if !exists {
 		return core.AssetStatus{}, errUnknownAsset
 	}
+
+	if asset.NewSize != 0 {
+		asset.RemainingDelay--
+		if asset.RemainingDelay == 0 {
+			asset = StaticAsset{Size: asset.NewSize, Usage: asset.Usage}
+		}
+		assets[assetUUID] = asset
+	}
+
 	return core.AssetStatus{
 		Size:         asset.Size,
 		UsagePercent: uint32(asset.Usage * 100 / asset.Size),
@@ -107,6 +122,6 @@ func (m AssetManagerStatic) SetAssetSize(res db.Resource, assetUUID string, size
 	if asset.Usage > size {
 		return errTooSmall
 	}
-	assets[assetUUID] = StaticAsset{size, asset.Usage}
+	assets[assetUUID] = StaticAsset{Size: size, Usage: asset.Usage}
 	return nil
 }

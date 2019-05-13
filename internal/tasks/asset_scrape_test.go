@@ -430,3 +430,87 @@ func TestNoOperationWhenNoSizeChange(baseT *testing.T) {
 	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
 	t.ExpectPendingOperations(c.DB /*, nothing */)
 }
+
+func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
+	t := test.T{T: baseT}
+	c, setAsset, clock := setupAssetScrapeTest(t)
+
+	//make asset look like it just completed a resize operation
+	t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100`)
+	setAsset(plugins.StaticAsset{
+		Size:           1000,
+		Usage:          1000,
+		NewSize:        1100,
+		RemainingDelay: 2,
+	})
+	asset := db.Asset{
+		ID:           1,
+		ResourceID:   1,
+		UUID:         "asset1",
+		Size:         1000,
+		UsagePercent: 50,
+		ScrapedAt:    c.TimeNow(),
+		ExpectedSize: p2uint64(1100),
+	}
+
+	//first scrape will not touch anything about the asset, and also not create
+	//any operations (even though it could because of the currently high usage)
+	//because the backend does not yet reflect the changed size
+	clock.StepBy(5 * time.Minute)
+	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+
+	asset.ScrapedAt = c.TimeNow()
+	t.ExpectAssets(c.DB, asset)
+
+	t.ExpectPendingOperations(c.DB /*, nothing */)
+
+	//second scrape will see the new size and update the asset accordingly, and
+	//it will also create an operation because the usage is still above 80% after
+	//the resize
+	clock.StepBy(5 * time.Minute)
+	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+
+	asset.Size = 1100
+	asset.UsagePercent = 90
+	asset.ScrapedAt = c.TimeNow()
+	asset.ExpectedSize = nil
+	t.ExpectAssets(c.DB, asset)
+
+	t.ExpectPendingOperations(c.DB, db.PendingOperation{
+		ID:           1,
+		AssetID:      1,
+		Reason:       db.OperationReasonHigh,
+		OldSize:      1100,
+		NewSize:      1320,
+		UsagePercent: 90,
+		CreatedAt:    c.TimeNow(),
+	})
+}
+
+func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
+	//This is very similar to TestAssetScrapeReflectingResizeOperationWithDelay,
+	//but we simulate an unrelated user-triggered resize operation taking place
+	//in parallel with Castellum's resize operation, so we observe a new size
+	//that's different from the expected size.
+	t := test.T{T: baseT}
+	c, setAsset, clock := setupAssetScrapeTest(t)
+
+	//make asset look like it just completed a resize operation
+	t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100`)
+	setAsset(plugins.StaticAsset{
+		Size:  1200, //!= asset.ExpectedSize (see above)
+		Usage: 600,
+	})
+
+	clock.StepBy(5 * time.Minute)
+	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+	t.ExpectAssets(c.DB, db.Asset{
+		ID:           1,
+		ResourceID:   1,
+		UUID:         "asset1",
+		Size:         1200,
+		UsagePercent: 50,
+		ScrapedAt:    c.TimeNow(),
+		ExpectedSize: nil,
+	})
+}
