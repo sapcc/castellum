@@ -21,16 +21,19 @@ package plugins
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares"
+	prom_api "github.com/prometheus/client_golang/api"
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 )
 
 type assetManagerNFS struct {
-	Manila *gophercloud.ServiceClient
+	Manila     *gophercloud.ServiceClient
+	Prometheus prom_api.Client
 }
 
 func init() {
@@ -40,7 +43,18 @@ func init() {
 			return nil, err
 		}
 		manila.Microversion = "2.23"
-		return &assetManagerNFS{manila}, nil
+
+		prometheusURL := os.Getenv("CASTELLUM_NFS_PROMETHEUS_URL")
+		if prometheusURL == "" {
+			return nil, errors.New("missing required environment variable: CASTELLUM_NFS_PROMETHEUS_URL")
+		}
+		promClient, err := prom_api.NewClient(prom_api.Config{Address: prometheusURL})
+		if err != nil {
+			return nil, fmt.Errorf("cannot connect to Prometheus at %s: %s",
+				prometheusURL, err.Error())
+		}
+
+		return &assetManagerNFS{manila, promClient}, nil
 	})
 }
 
