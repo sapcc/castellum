@@ -125,6 +125,6 @@ func (c Context) ExecuteNextResize() (targetAssetType db.AssetType, returnedErro
 		}
 	}
 
-	core.CountStateTransition(res, db.OperationStateGreenlit, finishedOp.State())
+	core.CountStateTransition(res, asset.UUID, db.OperationStateGreenlit, finishedOp.State())
 	return res.AssetType, tx.Commit()
 }

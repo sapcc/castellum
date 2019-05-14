@@ -21,6 +21,7 @@ package core
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/castellum/internal/db"
+	"github.com/sapcc/go-bits/logg"
 )
 
 var opStateTransitionCounter = prometheus.NewCounterVec(
@@ -37,7 +38,7 @@ func init() {
 
 //CountStateTransition must be called whenever an operation changes to a
 //different state.
-func CountStateTransition(res db.Resource, from, to db.OperationState) {
+func CountStateTransition(res db.Resource, assetUUID string, from, to db.OperationState) {
 	labels := prometheus.Labels{
 		"project_id": res.ScopeUUID,
 		"asset":      string(res.AssetType),
@@ -45,4 +46,5 @@ func CountStateTransition(res db.Resource, from, to db.OperationState) {
 		"to_state":   string(to),
 	}
 	opStateTransitionCounter.With(labels).Inc()
+	logg.Info("moving operation on %s %s from state %s to state %s", res.AssetType, assetUUID, from, to)
 }
