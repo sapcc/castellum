@@ -48,7 +48,7 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 		labels := prometheus.Labels{"asset": string(assetType)}
 		if returnedError == nil {
 			resourceScrapeSuccessCounter.With(labels).Inc()
-		} else {
+		} else if returnedError != sql.ErrNoRows {
 			resourceScrapeFailedCounter.With(labels).Inc()
 		}
 	}()

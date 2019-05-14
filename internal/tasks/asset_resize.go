@@ -52,7 +52,7 @@ func (c Context) ExecuteNextResize() (targetAssetType db.AssetType, returnedErro
 			labels := prometheus.Labels{"asset": string(targetAssetType)}
 			if returnedError == nil {
 				assetResizeCounter.With(labels).Inc()
-			} else {
+			} else if returnedError != sql.ErrNoRows {
 				assetResizeErroredCounter.With(labels).Inc()
 			}
 		}

@@ -50,7 +50,7 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxScrapedAt time.Time)
 		labels := prometheus.Labels{"asset": string(assetType)}
 		if returnedError == nil {
 			assetScrapeSuccessCounter.With(labels).Inc()
-		} else {
+		} else if returnedError != sql.ErrNoRows {
 			assetScrapeFailedCounter.With(labels).Inc()
 		}
 	}()
