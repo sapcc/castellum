@@ -356,7 +356,7 @@ func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetTyp
 			}
 
 		default:
-			logg.Error(err.Error())
+			logg.Error("unknown command: %q", fields[0])
 		}
 	}
 
