@@ -23,6 +23,7 @@ import (
 	"bufio"
 	"database/sql"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -270,11 +271,13 @@ func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetTyp
 	fmt.Println("")
 
 	stdin := bufio.NewReader(os.Stdin)
-	for {
+	eof := false
+	for !eof {
 		//show prompt
 		os.Stdout.Write([]byte("> "))
 		input, err := stdin.ReadString('\n')
-		if err != nil {
+		eof = err == io.EOF
+		if !eof && err != nil {
 			logg.Fatal(err.Error())
 		}
 
@@ -356,4 +359,6 @@ func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetTyp
 			logg.Error(err.Error())
 		}
 	}
+
+	os.Stdout.Write([]byte("\n"))
 }
