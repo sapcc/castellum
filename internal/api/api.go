@@ -111,7 +111,7 @@ func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *go
 	return projectUUID, token
 }
 
-func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUID string, token *gopherpolicy.Token) *db.Resource {
+func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUID string, token *gopherpolicy.Token, createIfMissing bool) *db.Resource {
 	assetType := db.AssetType(mux.Vars(r)["asset_type"])
 	if assetType == "" {
 		respondWithNotFound(w)
@@ -133,6 +133,12 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 		projectUUID, assetType,
 	)
 	if err == sql.ErrNoRows {
+		if createIfMissing {
+			return &db.Resource{
+				ScopeUUID: projectUUID,
+				AssetType: assetType,
+			}
+		}
 		respondWithNotFound(w)
 		return nil
 	}

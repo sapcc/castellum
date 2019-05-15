@@ -194,7 +194,7 @@ func (h handler) GetResource(w http.ResponseWriter, r *http.Request) {
 	if token == nil {
 		return
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token)
+	dbResource := h.LoadResource(w, r, projectUUID, token, false)
 	if dbResource == nil {
 		return
 	}
@@ -207,7 +207,7 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	if token == nil {
 		return
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token)
+	dbResource := h.LoadResource(w, r, projectUUID, token, true)
 	if dbResource == nil {
 		return
 	}
@@ -225,7 +225,12 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, strings.Join(errs, "\n"), http.StatusUnprocessableEntity)
 		return
 	}
-	_, err := h.DB.Update(dbResource)
+	var err error
+	if dbResource.ID == 0 {
+		err = h.DB.Insert(dbResource)
+	} else {
+		_, err = h.DB.Update(dbResource)
+	}
 	if respondwith.ErrorText(w, err) {
 		return
 	}
@@ -238,7 +243,7 @@ func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
 	if token == nil {
 		return
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token)
+	dbResource := h.LoadResource(w, r, projectUUID, token, false)
 	if dbResource == nil {
 		return
 	}

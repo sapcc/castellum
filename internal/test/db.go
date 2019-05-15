@@ -20,15 +20,17 @@ package test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"github.com/sapcc/castellum/internal/db"
+	"github.com/sapcc/go-bits/postlite"
 	"gopkg.in/gorp.v2"
 )
 
 //PrepareDB prepares a DB reference for this test, or fails the test if the DB
 //is not ready.
-func (t T) PrepareDB() *gorp.DbMap {
+func (t T) PrepareDB(fixtureFile *string) *gorp.DbMap {
 	var postgresURL string
 	if os.Getenv("TRAVIS") == "true" {
 		//cf. https://docs.travis-ci.com/user/database-setup/#postgresql
@@ -49,10 +51,22 @@ func (t T) PrepareDB() *gorp.DbMap {
 	t.MustExec(dbi, "DELETE FROM assets")
 	t.MustExec(dbi, "DELETE FROM pending_operations")
 	t.MustExec(dbi, "DELETE FROM finished_operations")
+
+	//populate with initial resources if a baseline fixture has been given
+	if fixtureFile != nil {
+		postlite.ExecSQLFile(t.T, dbi.Db, *fixtureFile)
+	}
+
 	//reset all primary key sequences for reproducible row IDs
-	t.MustExec(dbi, "ALTER SEQUENCE resources_id_seq RESTART WITH 1")
-	t.MustExec(dbi, "ALTER SEQUENCE assets_id_seq RESTART WITH 1")
-	t.MustExec(dbi, "ALTER SEQUENCE pending_operations_id_seq RESTART WITH 1")
+	for _, tableName := range []string{"resources", "assets", "pending_operations"} {
+		nextID, err := dbi.SelectInt(fmt.Sprintf(
+			"SELECT 1 + COALESCE(MAX(id), 0) FROM %s", tableName,
+		))
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		t.MustExec(dbi, fmt.Sprintf(`ALTER SEQUENCE %s_id_seq RESTART WITH %d`, tableName, nextID))
+	}
 
 	return dbi
 }

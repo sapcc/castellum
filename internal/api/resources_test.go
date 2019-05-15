@@ -193,13 +193,7 @@ func TestPutResource(baseT *testing.T) {
 	}.Check(t.T, hh)
 	validator.Allow("project:access")
 
-	//expect error for unknown project or resource
-	assert.HTTPRequest{
-		Method:       "PUT",
-		Path:         "/v1/projects/project2/resources/foo",
-		Body:         newFooResourceJSON1,
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
+	//expect error for unknown resource
 	assert.HTTPRequest{
 		Method:       "PUT",
 		Path:         "/v1/projects/project1/resources/doesnotexist",
@@ -300,6 +294,21 @@ func TestPutResource(baseT *testing.T) {
 		ExpectStatus: http.StatusAccepted,
 	}.Check(t.T, hh)
 	t.ExpectResources(h.DB, newResources1...)
+
+	//test creating a new resource from scratch (rather than updating an existing one)
+	assert.HTTPRequest{
+		Method:       "PUT",
+		Path:         "/v1/projects/project3/resources/foo",
+		Body:         newFooResourceJSON2,
+		ExpectStatus: http.StatusAccepted,
+	}.Check(t.T, hh)
+	t.ExpectResources(h.DB, append(newResources1, db.Resource{
+		ID:                       5,
+		ScopeUUID:                "project3",
+		AssetType:                "foo",
+		CriticalThresholdPercent: 98,
+		SizeStepPercent:          15,
+	})...)
 }
 
 func TestPutResourceValidationErrors(baseT *testing.T) {

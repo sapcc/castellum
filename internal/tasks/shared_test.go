@@ -27,7 +27,7 @@ import (
 )
 
 func setupContext(t test.T) (*Context, *plugins.AssetManagerStatic, *test.FakeClock) {
-	dbi := t.PrepareDB()
+	dbi := t.PrepareDB(nil)
 	amStatic := &plugins.AssetManagerStatic{
 		AssetType: "foo",
 	}

@@ -27,19 +27,16 @@ import (
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
 	"github.com/sapcc/go-bits/gopherpolicy"
-	"github.com/sapcc/go-bits/postlite"
 )
 
 func setupTest(t test.T) (*handler, http.Handler, *MockValidator, []db.Resource, []db.Asset) {
-	dbi := t.PrepareDB()
+	baseline := "fixtures/start-data.sql"
+	dbi := t.PrepareDB(&baseline)
 	team := core.AssetManagerTeam{
 		&plugins.AssetManagerStatic{AssetType: "foo"},
 		&plugins.AssetManagerStatic{AssetType: "bar"},
 	}
 	mv := &MockValidator{}
-
-	//configure some resources as a baseline for testing
-	postlite.ExecSQLFile(t.T, dbi.Db, "fixtures/start-data.sql")
 
 	var resources []db.Resource
 	_, err := dbi.Select(&resources, `SELECT * FROM resources ORDER BY ID`)
