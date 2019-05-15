@@ -36,6 +36,8 @@ github.com/sapcc/go-bits v0.0.0-20190111093410-620b317f22bc h1:sIOSzr29YZS0LSl8O
 github.com/sapcc/go-bits v0.0.0-20190111093410-620b317f22bc/go.mod h1:KeP5OOqQIgrauiDb/8shKWOq1YoplBALYNvpV4jizPo=
 github.com/sapcc/go-bits v0.0.0-20190425131010-53eeb20fde03 h1:2fJaWdbNys9gCBfTvQ7sM4cxsHtc4y8MB1urtyyfmgo=
 github.com/sapcc/go-bits v0.0.0-20190425131010-53eeb20fde03/go.mod h1:KeP5OOqQIgrauiDb/8shKWOq1YoplBALYNvpV4jizPo=
+github.com/sapcc/go-bits v0.0.0-20190515124317-ff6faf17ad02 h1:TdKE6fGWVELxpDf7SQbDDBNuugtLe7grokMCRKRTN+g=
+github.com/sapcc/go-bits v0.0.0-20190515124317-ff6faf17ad02/go.mod h1:KeP5OOqQIgrauiDb/8shKWOq1YoplBALYNvpV4jizPo=
 golang.org/x/crypto v0.0.0-20190211182817-74369b46fc67/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/net v0.0.0-20181201002055-351d144fa1fc/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 golang.org/x/sync v0.0.0-20181108010431-42b317875d0f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=

@@ -53,7 +53,7 @@ github.com/prometheus/procfs/xfs
 github.com/prometheus/procfs/internal/util
 # github.com/rs/cors v1.6.0
 github.com/rs/cors
-# github.com/sapcc/go-bits v0.0.0-20190425131010-53eeb20fde03
+# github.com/sapcc/go-bits v0.0.0-20190515124317-ff6faf17ad02
 github.com/sapcc/go-bits/gopherpolicy
 github.com/sapcc/go-bits/logg
 github.com/sapcc/go-bits/respondwith
