@@ -46,7 +46,7 @@ static-check: FORCE
 	@printf "\e[1;36m>> golint\e[0m\n"
 	@if s="$$(golint . && find cmd pkg -type d -exec golint {} \; 2>/dev/null)" && test -n "$$s"; then printf ' => %s\n%s\n' golint "$$s"; false; fi
 	@printf "\e[1;36m>> go vet\e[0m\n"
-	@$(GO) vet $(GO_ALLPKGS)
+	@$(GO) vet $(GO_BUILDFLAGS) $(GO_ALLPKGS)
 
 # detailed unit test run (incl. test coverage)
 build/%.cover.out: FORCE
