@@ -103,6 +103,8 @@ func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *go
 	token := h.Validator.CheckToken(r)
 	token.Context.Logger = logg.Debug
 	token.Context.Request = mux.Vars(r)
+	logg.Debug("token has auth = %v", token.Context.Auth)
+	logg.Debug("found has roles = %v", token.Context.Roles)
 	if !token.Require(w, "project:access") {
 		return "", nil
 	}
