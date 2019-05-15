@@ -53,7 +53,7 @@ build/%.cover.out: FORCE
 	@printf "\e[1;36m>> go test $(subst _,/,$*)\e[0m\n"
 	$(GO) test $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' -coverprofile=$@ -covermode=count -coverpkg=$(subst $(space),$(comma),$(GO_COVERPKGS)) $(subst _,/,$*)
 build/cover.out: $(GO_COVERFILES)
-	utils/gocovcat.go $(GO_COVERFILES) > $@
+	$(GO) run $(GO_BUILDFLAGS) utils/gocovcat.go $(GO_COVERFILES) > $@
 build/cover.html: build/cover.out
 	$(GO) tool cover -html $< -o $@
 
