@@ -58,6 +58,7 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 		panic(fmt.Sprintf("no asset manager for asset type %q", assetType))
 	}
 
+	logg.Debug("looking for %s resource to scrape, maxScrapedAt = %s", assetType, maxScrapedAt.String())
 	var res db.Resource
 	err := c.DB.SelectOne(&res, scrapeResourceSearchQuery, assetType, maxScrapedAt)
 	if err != nil {
