@@ -26,7 +26,7 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
-	"github.com/sapcc/go-bits/postlite"
+	"github.com/sapcc/go-bits/easypg"
 )
 
 func setupAssetScrapeTest(t test.T) (*Context, func(plugins.StaticAsset), *test.FakeClock) {
@@ -37,7 +37,7 @@ func setupAssetScrapeTest(t test.T) (*Context, func(plugins.StaticAsset), *test.
 	if err != sql.ErrNoRows {
 		t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
 	}
-	postlite.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-0.sql")
+	easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-0.sql")
 
 	//create a resource and asset to test with
 	t.Must(c.DB.Insert(&db.Resource{

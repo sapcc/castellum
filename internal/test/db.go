@@ -24,7 +24,7 @@ import (
 	"os"
 
 	"github.com/sapcc/castellum/internal/db"
-	"github.com/sapcc/go-bits/postlite"
+	"github.com/sapcc/go-bits/easypg"
 	"gopkg.in/gorp.v2"
 )
 
@@ -54,7 +54,7 @@ func (t T) PrepareDB(fixtureFile *string) *gorp.DbMap {
 
 	//populate with initial resources if a baseline fixture has been given
 	if fixtureFile != nil {
-		postlite.ExecSQLFile(t.T, dbi.Db, *fixtureFile)
+		easypg.ExecSQLFile(t.T, dbi.Db, *fixtureFile)
 	}
 
 	//reset all primary key sequences for reproducible row IDs

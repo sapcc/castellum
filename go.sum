@@ -17,6 +17,8 @@ github.com/lib/pq v1.1.0 h1:/5u4a+KGJptBRqGzPvYQL9p0d/tPR4S31+Tnzj9lEO4=
 github.com/lib/pq v1.1.0/go.mod h1:5WUZQaWbwv1U+lTReE5YruASi9Al49XbQIvNi/34Woo=
 github.com/majewsky/sqlproxy v0.0.0-20170413172413-66c34829b29d h1:ZaEhslK/60Wc1yCUuasPqR1tNj4T7YjU1KoHrEV5or8=
 github.com/majewsky/sqlproxy v0.0.0-20170413172413-66c34829b29d/go.mod h1:2wtXqbyVn/SrnklFtle3Kuncd4ytDddW7539rYI+caA=
+github.com/majewsky/sqlproxy v0.0.0-20190524080451-ba724456c4af h1:o+sSGflMaFTg/r5iUYYX6PxQ2+nJf6dkjY6CaUgDxg4=
+github.com/majewsky/sqlproxy v0.0.0-20190524080451-ba724456c4af/go.mod h1:2wtXqbyVn/SrnklFtle3Kuncd4ytDddW7539rYI+caA=
 github.com/mattn/go-sqlite3 v1.10.0 h1:jbhqpg7tQe4SupckyijYiy0mJJ/pRyHvXf7JdWK860o=
 github.com/mattn/go-sqlite3 v1.10.0/go.mod h1:FPy6KqzDD04eiIsT53CuJW3U88zkxoIYsOqkbpncsNc=
 github.com/matttproud/golang_protobuf_extensions v1.0.1 h1:4hp9jkHxhMHkqkrB3Ix0jegS5sx/RkqARlsWZ6pIwiU=
@@ -38,6 +40,8 @@ github.com/sapcc/go-bits v0.0.0-20190425131010-53eeb20fde03 h1:2fJaWdbNys9gCBfTv
 github.com/sapcc/go-bits v0.0.0-20190425131010-53eeb20fde03/go.mod h1:KeP5OOqQIgrauiDb/8shKWOq1YoplBALYNvpV4jizPo=
 github.com/sapcc/go-bits v0.0.0-20190515124317-ff6faf17ad02 h1:TdKE6fGWVELxpDf7SQbDDBNuugtLe7grokMCRKRTN+g=
 github.com/sapcc/go-bits v0.0.0-20190515124317-ff6faf17ad02/go.mod h1:KeP5OOqQIgrauiDb/8shKWOq1YoplBALYNvpV4jizPo=
+github.com/sapcc/go-bits v0.0.0-20190522121402-dabab492e20b h1:uNHlkQrn6OfRnZA7C/UBDJsD0QLsThgpLur3BVlRmdQ=
+github.com/sapcc/go-bits v0.0.0-20190522121402-dabab492e20b/go.mod h1:KeP5OOqQIgrauiDb/8shKWOq1YoplBALYNvpV4jizPo=
 golang.org/x/crypto v0.0.0-20190211182817-74369b46fc67/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/net v0.0.0-20181201002055-351d144fa1fc/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 golang.org/x/sync v0.0.0-20181108010431-42b317875d0f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=

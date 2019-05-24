@@ -19,12 +19,17 @@
 package db
 
 import (
+	"database/sql"
 	"fmt"
 	"net/url"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/sapcc/go-bits/postlite"
+	"github.com/majewsky/sqlproxy"
+	"github.com/sapcc/go-bits/easypg"
+	"github.com/sapcc/go-bits/logg"
 	"gopkg.in/gorp.v2"
 )
 
@@ -252,16 +257,32 @@ func (o FinishedOperation) State() OperationState {
 	return OperationState(o.Outcome)
 }
 
+func init() {
+	logger := func(msg string) {
+		logg.Debug(msg)
+	}
+	sql.Register("postgres-with-logging", &sqlproxy.Driver{
+		ProxiedDriverName: "postgres",
+		BeforeQueryHook:   sqlproxy.TraceQuery(logger),
+	})
+}
+
 //Init connects to the database and initializes the schema and model types.
 func Init(urlStr string) (*gorp.DbMap, error) {
 	dbURL, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, fmt.Errorf("malformed CASTELLUM_DB_URI: " + err.Error())
 	}
-	dbConn, err := postlite.Connect(postlite.Configuration{
+
+	cfg := easypg.Configuration{
 		PostgresURL: dbURL,
 		Migrations:  SQLMigrations,
-	})
+	}
+	if logStatements, _ := strconv.ParseBool(os.Getenv("CASTELLUM_DEBUG_SQL")); logStatements {
+		cfg.OverrideDriverName = "postgres-with-logging"
+	}
+
+	dbConn, err := easypg.Connect(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect to database: " + err.Error())
 	}
