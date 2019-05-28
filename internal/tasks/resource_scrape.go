@@ -75,6 +75,7 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 	if err != nil {
 		return fmt.Errorf("cannot list %s assets in project %s: %s", assetType, res.ScopeUUID, err.Error())
 	}
+	logg.Debug("scraped %d assets for %s resource for project %s", assetType, res.ScopeUUID, len(assetUUIDs))
 	isExistingAsset := make(map[string]bool, len(assetUUIDs))
 	for _, uuid := range assetUUIDs {
 		isExistingAsset[uuid] = true
