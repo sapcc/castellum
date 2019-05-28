@@ -111,7 +111,8 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 		logg.Info("adding new %s asset to DB: UUID = %s, scope UUID = %s", assetType, assetUUID, res.ScopeUUID)
 		status, err := manager.GetAssetStatus(res, assetUUID, nil)
 		if err != nil {
-			return fmt.Errorf("cannot query status of %s %s: %s", assetType, assetUUID, err.Error())
+			logg.Error("skipping %s %s - cannot query status: %s", assetType, assetUUID, err.Error())
+			continue
 		}
 
 		dbAsset := db.Asset{
