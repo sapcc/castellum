@@ -219,7 +219,7 @@ func (client *ProviderClient) Reauthenticate(previousToken string) (err error) {
 		return nil
 	}
 
-	if client.mut == nil {
+	if client.reauthmut == nil {
 		return client.ReauthFunc()
 	}
 
@@ -233,9 +233,6 @@ func (client *ProviderClient) Reauthenticate(previousToken string) (err error) {
 		return err
 	}
 	client.reauthmut.Unlock()
-
-	client.mut.Lock()
-	defer client.mut.Unlock()
 
 	client.reauthmut.Lock()
 	client.reauthmut.reauthing = true
