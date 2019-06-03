@@ -101,7 +101,24 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxScrapedAt time.Time)
 	}
 	status, err := manager.GetAssetStatus(res, asset.UUID, &oldStatus)
 	if err != nil {
-		return fmt.Errorf("cannot query status of %s %s: %s", assetType, asset.UUID, err.Error())
+		//TODO: that case needs better handling, but right now it will just log the error and
+		//update the scrape time. Otherwise the asset where the status cannot be queried
+		//will always be the first of the scrapeAssetSearchQuery
+		//happend for manila shares which are in status Deleting and no prometheus data available anymore
+		logg.Error("cannot query status of %s %s: %s", assetType, asset.UUID, err.Error())
+		asset.ScrapedAt = c.TimeNow()
+		//update asset in DB
+		tx, err := c.DB.Begin()
+		if err != nil {
+			return err
+		}
+		defer core.RollbackUnlessCommitted(tx)
+		_, err = tx.Update(&asset)
+		if err != nil {
+			return err
+		}
+		return tx.Commit()
+		//return fmt.Errorf("cannot query status of %s %s: %s", assetType, asset.UUID, err.Error())
 	}
 
 	//update asset attributes - We have four separate cases here, which
