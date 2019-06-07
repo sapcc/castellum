@@ -290,7 +290,9 @@ func (c Context) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, as
 
 func getMatchingReasons(res db.Resource, asset db.Asset) map[db.OperationReason]bool {
 	result := make(map[db.OperationReason]bool)
-	if res.LowThresholdPercent > 0 && asset.UsagePercent <= res.LowThresholdPercent {
+	//TODO: This realizes a fixed min size of 100G with a step size of 10% for manila shares
+	//This must be done in a proper resource setting
+	if res.LowThresholdPercent > 0 && asset.UsagePercent <= res.LowThresholdPercent && asset.Size >= 111 {
 		result[db.OperationReasonLow] = true
 	}
 	if res.HighThresholdPercent > 0 && asset.UsagePercent >= res.HighThresholdPercent {
