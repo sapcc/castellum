@@ -10,7 +10,7 @@ github.com/golang-migrate/migrate/source/go_bindata
 github.com/golang-migrate/migrate/source
 # github.com/golang/protobuf v1.2.0
 github.com/golang/protobuf/proto
-# github.com/gophercloud/gophercloud v0.0.0-20190212181753-892256c46858
+# github.com/gophercloud/gophercloud v0.1.0
 github.com/gophercloud/gophercloud
 github.com/gophercloud/gophercloud/openstack
 github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares
