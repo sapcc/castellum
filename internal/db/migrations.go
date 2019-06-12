@@ -100,4 +100,12 @@ var SQLMigrations = map[string]string{
 			error_message         TEXT NOT NULL DEFAULT ''
 		);
 	`,
+	"002_add_assets_checked_at.down.sql": `
+		ALTER TABLE assets DROP COLUMN checked_at;
+	`,
+	"002_add_assets_checked_at.up.sql": `
+		ALTER TABLE assets ADD COLUMN checked_at TIMESTAMP;
+		UPDATE assets SET checked_at = scraped_at;
+		ALTER TABLE assets ALTER COLUMN checked_at SET NOT NULL;
+	`,
 }

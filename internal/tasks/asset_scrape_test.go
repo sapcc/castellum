@@ -55,6 +55,7 @@ func setupAssetScrapeTest(t test.T) (*Context, func(plugins.StaticAsset), *test.
 		UUID:         "asset1",
 		Size:         1000,
 		UsagePercent: 50,
+		CheckedAt:    c.TimeNow(),
 		ScrapedAt:    c.TimeNow(),
 		ExpectedSize: nil,
 	}))
@@ -352,6 +353,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 			UUID:         "asset1",
 			Size:         1000,
 			UsagePercent: 50,
+			CheckedAt:    c.TimeNow(),
 			ScrapedAt:    c.TimeNow(),
 			ExpectedSize: nil,
 		},
@@ -360,6 +362,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 			UUID:         "asset2",
 			Size:         1000,
 			UsagePercent: 50,
+			CheckedAt:    c.TimeNow(),
 			ScrapedAt:    c.TimeNow(),
 			ExpectedSize: nil,
 		},
@@ -368,6 +371,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 			UUID:         "asset3",
 			Size:         1000,
 			UsagePercent: 50,
+			CheckedAt:    c.TimeNow(),
 			ScrapedAt:    c.TimeNow(),
 			ExpectedSize: nil,
 		},
@@ -399,6 +403,9 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 	assets[0].UsagePercent = 51
 	assets[1].UsagePercent = 52
 	assets[2].UsagePercent = 53
+	for idx := 0; idx < len(assets); idx++ {
+		assets[idx].CheckedAt = assets[idx].ScrapedAt
+	}
 	t.ExpectAssets(c.DB, assets...)
 
 	//next scrape should work identically
@@ -411,6 +418,9 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 	assets[0].ScrapedAt = c.TimeNow().Add(-2 * time.Minute)
 	assets[1].ScrapedAt = c.TimeNow().Add(-time.Minute)
 	assets[2].ScrapedAt = c.TimeNow()
+	for idx := 0; idx < len(assets); idx++ {
+		assets[idx].CheckedAt = assets[idx].ScrapedAt
+	}
 	t.ExpectAssets(c.DB, assets...)
 
 	//and all of this should not have created any operations
@@ -449,6 +459,7 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 		UUID:         "asset1",
 		Size:         1000,
 		UsagePercent: 50,
+		CheckedAt:    c.TimeNow(),
 		ScrapedAt:    c.TimeNow(),
 		ExpectedSize: p2uint64(1100),
 	}
@@ -459,6 +470,7 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 	clock.StepBy(5 * time.Minute)
 	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
 
+	asset.CheckedAt = c.TimeNow()
 	asset.ScrapedAt = c.TimeNow()
 	t.ExpectAssets(c.DB, asset)
 
@@ -472,6 +484,7 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 
 	asset.Size = 1100
 	asset.UsagePercent = 90
+	asset.CheckedAt = c.TimeNow()
 	asset.ScrapedAt = c.TimeNow()
 	asset.ExpectedSize = nil
 	t.ExpectAssets(c.DB, asset)
@@ -510,7 +523,43 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
 		UUID:         "asset1",
 		Size:         1200,
 		UsagePercent: 50,
+		CheckedAt:    c.TimeNow(),
 		ScrapedAt:    c.TimeNow(),
+		ExpectedSize: nil,
+	})
+}
+
+func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
+	//This tests the behavior when GetAssetStatus returns an error. The error is
+	//passed through to the caller of ScrapeNextAsset, but the asset's checked_at
+	//timestamp is still updated to ensure that the main loop progresses to the
+	//next asset.
+	t := test.T{T: baseT}
+	c, setAsset, clock := setupAssetScrapeTest(t)
+
+	setAsset(plugins.StaticAsset{
+		Size:                 1000,
+		Usage:                600,
+		CannotGetAssetStatus: true,
+	})
+
+	clock.StepBy(5 * time.Minute)
+	err := c.ScrapeNextAsset("foo", c.TimeNow())
+	expectedMsg := "cannot query status of foo asset1: GetAssetStatus failing as requested"
+	if err == nil {
+		t.Error("ScrapeNextAsset should have failed here")
+	} else if err.Error() != expectedMsg {
+		t.Errorf("expected error %q, got %q", expectedMsg, err.Error())
+	}
+
+	t.ExpectAssets(c.DB, db.Asset{
+		ID:           1,
+		ResourceID:   1,
+		UUID:         "asset1",
+		Size:         1000,
+		UsagePercent: 50,                                //changed usage not observed because of error
+		ScrapedAt:    c.TimeNow().Add(-5 * time.Minute), //not updated by ScrapeNextAsset!
+		CheckedAt:    c.TimeNow(),                       //but this WAS updated!
 		ExpectedSize: nil,
 	})
 }

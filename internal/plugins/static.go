@@ -37,6 +37,9 @@ type StaticAsset struct {
 	//indicated in the .RemainingDelay field.
 	NewSize        uint64
 	RemainingDelay uint
+
+	//When true, return a bogus error from GetAssetStatus().
+	CannotGetAssetStatus bool
 }
 
 //AssetManagerStatic is a core.AssetManager for testing purposes. It just
@@ -55,11 +58,12 @@ func (m AssetManagerStatic) AssetTypes() []db.AssetType {
 }
 
 var (
-	errWrongAssetType  = errors.New("wrong asset type for this asset manager")
-	errUnknownProject  = errors.New("no such project")
-	errUnknownAsset    = errors.New("no such asset")
-	errOldSizeMismatch = errors.New("asset has different size than expected")
-	errTooSmall        = errors.New("cannot set size smaller than current usage")
+	errWrongAssetType   = errors.New("wrong asset type for this asset manager")
+	errUnknownProject   = errors.New("no such project")
+	errUnknownAsset     = errors.New("no such asset")
+	errOldSizeMismatch  = errors.New("asset has different size than expected")
+	errTooSmall         = errors.New("cannot set size smaller than current usage")
+	errSimulatedFailure = errors.New("GetAssetStatus failing as requested")
 )
 
 //ListAssets implements the core.AssetManager interface.
@@ -91,6 +95,10 @@ func (m AssetManagerStatic) GetAssetStatus(res db.Resource, assetUUID string, pr
 	asset, exists := assets[assetUUID]
 	if !exists {
 		return core.AssetStatus{}, errUnknownAsset
+	}
+
+	if asset.CannotGetAssetStatus {
+		return core.AssetStatus{}, errSimulatedFailure
 	}
 
 	if asset.NewSize != 0 {

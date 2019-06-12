@@ -120,6 +120,7 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 			UUID:         assetUUID,
 			Size:         status.Size,
 			UsagePercent: status.UsagePercent,
+			CheckedAt:    c.TimeNow(),
 			ScrapedAt:    c.TimeNow(),
 			ExpectedSize: nil,
 		}

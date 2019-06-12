@@ -109,7 +109,9 @@ type Asset struct {
 	//The asset's current utilization as a percentage of its size. This must
 	//always be between 0 and 100.
 	UsagePercent uint32 `db:"usage_percent"`
-	//When the current .UsagePercent value was obtained.
+	//When we last tried to obtain the current .Size and .UsagePercent values.
+	CheckedAt time.Time `db:"checked_at"`
+	//When the current .Size and .UsagePercent values were obtained.
 	ScrapedAt time.Time `db:"scraped_at"`
 	//This flag is set by a Castellum worker after a resize operation to indicate
 	//that the .Size attribute is outdated. The value is the new_size of the

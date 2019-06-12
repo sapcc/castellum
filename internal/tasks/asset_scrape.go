@@ -33,9 +33,9 @@ import (
 //query that finds the next resource that needs to be scraped
 var scrapeAssetSearchQuery = `
 	SELECT a.* FROM assets a JOIN resources r ON r.asset_type = $1
-	WHERE a.scraped_at < $2
+	WHERE a.checked_at < $2
 	-- order by update priority (first outdated assets, then by ID for deterministic test behavior)
-	ORDER BY a.scraped_at ASC, a.id ASC
+	ORDER BY a.checked_at ASC, a.id ASC
 	LIMIT 1
 `
 
@@ -45,7 +45,7 @@ var scrapeAssetSearchQuery = `
 //
 //Returns sql.ErrNoRows when no asset needed scraping, to indicate to the
 //caller to slow down.
-func (c Context) ScrapeNextAsset(assetType db.AssetType, maxScrapedAt time.Time) (returnedError error) {
+func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time) (returnedError error) {
 	defer func() {
 		labels := prometheus.Labels{"asset": string(assetType)}
 		if returnedError == nil {
@@ -62,7 +62,7 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxScrapedAt time.Time)
 
 	//find asset
 	var asset db.Asset
-	err := c.DB.SelectOne(&asset, scrapeAssetSearchQuery, assetType, maxScrapedAt)
+	err := c.DB.SelectOne(&asset, scrapeAssetSearchQuery, assetType, maxCheckedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			logg.Debug("no %s assets to scrape - slowing down...", assetType)
@@ -101,30 +101,23 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxScrapedAt time.Time)
 	}
 	status, err := manager.GetAssetStatus(res, asset.UUID, &oldStatus)
 	if err != nil {
-		//TODO: that case needs better handling, but right now it will just log the error and
-		//update the scrape time. Otherwise the asset where the status cannot be queried
-		//will always be the first of the scrapeAssetSearchQuery
-		//happend for manila shares which are in status Deleting and no prometheus data available anymore
-		logg.Error("cannot query status of %s %s: %s", assetType, asset.UUID, err.Error())
-		asset.ScrapedAt = c.TimeNow()
-		//update asset in DB
-		tx, err := c.DB.Begin()
-		if err != nil {
-			return err
+		//GetAssetStatus may fail for single assets, e.g. for Manila shares in
+		//transitional states like Creating/Deleting; in that case, update
+		//checked_at so that the next call continues with the next asset, but leave
+		//scraped_at unchanged to indicate old data
+		asset.CheckedAt = c.TimeNow()
+		_, dbErr := c.DB.Update(&asset)
+		if dbErr != nil {
+			return dbErr
 		}
-		defer core.RollbackUnlessCommitted(tx)
-		_, err = tx.Update(&asset)
-		if err != nil {
-			return err
-		}
-		return tx.Commit()
-		//return fmt.Errorf("cannot query status of %s %s: %s", assetType, asset.UUID, err.Error())
+		return fmt.Errorf("cannot query status of %s %s: %s", assetType, asset.UUID, err.Error())
 	}
 
 	//update asset attributes - We have four separate cases here, which
 	//correspond to the branches of the `switch` statement. When changing any of
 	//this, tread very carefully.
-	asset.ScrapedAt = c.TimeNow()
+	asset.CheckedAt = c.TimeNow()
+	asset.ScrapedAt = asset.CheckedAt
 	canTouchPendingOperations := true
 	switch {
 	case asset.ExpectedSize == nil:
