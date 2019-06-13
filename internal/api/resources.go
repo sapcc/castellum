@@ -31,11 +31,12 @@ import (
 
 //Resource is how a db.Resource looks like in the API.
 type Resource struct {
-	ScrapedAtUnix     *int64     `json:"scraped_at,omitempty"`
-	LowThreshold      *Threshold `json:"low_threshold,omitempty"`
-	HighThreshold     *Threshold `json:"high_threshold,omitempty"`
-	CriticalThreshold *Threshold `json:"critical_threshold,omitempty"`
-	SizeSteps         SizeSteps  `json:"size_steps"`
+	ScrapedAtUnix     *int64           `json:"scraped_at,omitempty"`
+	LowThreshold      *Threshold       `json:"low_threshold,omitempty"`
+	HighThreshold     *Threshold       `json:"high_threshold,omitempty"`
+	CriticalThreshold *Threshold       `json:"critical_threshold,omitempty"`
+	SizeConstraints   *SizeConstraints `json:"size_constraints,omitempty"`
+	SizeSteps         SizeSteps        `json:"size_steps"`
 }
 
 //Threshold appears in type Resource.
@@ -47,6 +48,12 @@ type Threshold struct {
 //SizeSteps appears in type Resource.
 type SizeSteps struct {
 	Percent uint32 `json:"percent"`
+}
+
+//SizeConstraints appears in type Resource.
+type SizeConstraints struct {
+	Minimum *uint64 `json:"minimum,omitempty"`
+	Maximum *uint64 `json:"maximum,omitempty"`
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -73,6 +80,12 @@ func ResourceFromDB(res db.Resource) Resource {
 	if res.CriticalThresholdPercent > 0 {
 		result.CriticalThreshold = &Threshold{
 			UsagePercent: res.CriticalThresholdPercent,
+		}
+	}
+	if res.MinimumSize != nil || res.MaximumSize != nil {
+		result.SizeConstraints = &SizeConstraints{
+			Minimum: res.MinimumSize,
+			Maximum: res.MaximumSize,
 		}
 	}
 	return result
@@ -150,6 +163,27 @@ func (r Resource) UpdateDBResource(res *db.Resource) (errors []string) {
 	res.SizeStepPercent = r.SizeSteps.Percent
 	if res.SizeStepPercent == 0 {
 		complain("size step must be greater than 0%")
+	}
+
+	if r.SizeConstraints == nil {
+		res.MinimumSize = nil
+		res.MaximumSize = nil
+	} else {
+		res.MinimumSize = r.SizeConstraints.Minimum
+		if res.MinimumSize != nil && *res.MinimumSize == 0 {
+			res.MinimumSize = nil
+		}
+
+		res.MaximumSize = r.SizeConstraints.Maximum
+		if res.MaximumSize != nil {
+			min := uint64(0)
+			if res.MinimumSize != nil {
+				min = *res.MinimumSize
+			}
+			if *res.MaximumSize <= min {
+				complain("maximum size must be greater than minimum size")
+			}
+		}
 	}
 
 	return

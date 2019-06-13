@@ -108,4 +108,12 @@ var SQLMigrations = map[string]string{
 		UPDATE assets SET checked_at = scraped_at;
 		ALTER TABLE assets ALTER COLUMN checked_at SET NOT NULL;
 	`,
+	"003_add_resources_min_size_max_size.down.sql": `
+		ALTER TABLE resources DROP COLUMN min_size;
+		ALTER TABLE resources DROP COLUMN max_size;
+	`,
+	"003_add_resources_min_size_max_size.up.sql": `
+		ALTER TABLE resources ADD COLUMN min_size BIGINT DEFAULT NULL;
+		ALTER TABLE resources ADD COLUMN max_size BIGINT DEFAULT NULL;
+	`,
 }

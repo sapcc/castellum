@@ -65,6 +65,11 @@ type Resource struct {
 	//when the asset type defines size steps differently. For example, for the
 	//asset type "instance", we will have a list of allowed flavors somewhere else.
 	SizeStepPercent uint32 `db:"size_step_percent"`
+
+	//This defines absolute boundaries for the asset size. If configured, resize
+	//operations will never move to a size outside this range.
+	MinimumSize *uint64 `db:"min_size"`
+	MaximumSize *uint64 `db:"max_size"`
 }
 
 //AssetType is the type of Resource.AssetType. It extends type string with some

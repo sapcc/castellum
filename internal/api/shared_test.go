@@ -80,3 +80,7 @@ func (mv *MockValidator) CheckToken(r *http.Request) *gopherpolicy.Token {
 func (mv *MockValidator) Enforce(rule string, ctx policy.Context) bool {
 	return !mv.ForbiddenRules[rule]
 }
+
+func p2uint64(x uint64) *uint64 {
+	return &x
+}

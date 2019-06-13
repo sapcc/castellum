@@ -49,6 +49,9 @@ var (
 		"critical_threshold": assert.JSONObject{
 			"usage_percent": 95,
 		},
+		"size_constraints": assert.JSONObject{
+			"maximum": 20000,
+		},
 		"size_steps": assert.JSONObject{
 			"percent": 10,
 		},
@@ -302,13 +305,54 @@ func TestPutResource(baseT *testing.T) {
 		Body:         newFooResourceJSON2,
 		ExpectStatus: http.StatusAccepted,
 	}.Check(t.T, hh)
-	t.ExpectResources(h.DB, append(newResources1, db.Resource{
+	allResources = append(newResources1, db.Resource{
 		ID:                       5,
 		ScopeUUID:                "project3",
 		AssetType:                "foo",
 		CriticalThresholdPercent: 98,
 		SizeStepPercent:          15,
-	})...)
+	})
+	t.ExpectResources(h.DB, allResources...)
+
+	//test setting constraints
+	newFooResourceJSON3 := assert.JSONObject{
+		"critical_threshold": assert.JSONObject{
+			"usage_percent": 98,
+		},
+		"size_steps": assert.JSONObject{
+			"percent": 15,
+		},
+		"size_constraints": assert.JSONObject{
+			"minimum": 0,
+			"maximum": 42000,
+		},
+	}
+	assert.HTTPRequest{
+		Method:       "PUT",
+		Path:         "/v1/projects/project1/resources/foo",
+		Body:         newFooResourceJSON3,
+		ExpectStatus: http.StatusAccepted,
+	}.Check(t.T, hh)
+
+	//expect the resource to have been updated
+	var newResources3 []db.Resource
+	for _, res := range allResources {
+		if res.ScopeUUID == "project1" && res.AssetType == "foo" {
+			newResources3 = append(newResources3, db.Resource{
+				ID:                       res.ID,
+				ScopeUUID:                "project1",
+				AssetType:                "foo",
+				ScrapedAt:                res.ScrapedAt,
+				CriticalThresholdPercent: 98,
+				SizeStepPercent:          15,
+				MinimumSize:              nil, //0 gets normalized to NULL
+				MaximumSize:              p2uint64(42000),
+			})
+		} else {
+			newResources3 = append(newResources3, res)
+		}
+	}
+	t.ExpectResources(h.DB, newResources3...)
 }
 
 func TestPutResourceValidationErrors(baseT *testing.T) {
@@ -340,20 +384,23 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 
 	expectErrors(
 		assert.JSONObject{
-			"scraped_at":     12345,
-			"low_threshold":  assert.JSONObject{"usage_percent": 20},
-			"high_threshold": assert.JSONObject{"usage_percent": 80},
-			"size_steps":     assert.JSONObject{"percent": 10},
+			"scraped_at":       12345,
+			"low_threshold":    assert.JSONObject{"usage_percent": 20},
+			"high_threshold":   assert.JSONObject{"usage_percent": 80},
+			"size_steps":       assert.JSONObject{"percent": 10},
+			"size_constraints": assert.JSONObject{"minimum": 30, "maximum": 20},
 		},
 		"resource.scraped_at cannot be set via the API",
 		"delay for low threshold is missing",
 		"delay for high threshold is missing",
+		"maximum size must be greater than minimum size",
 	)
 
 	expectErrors(
 		assert.JSONObject{
 			"critical_threshold": assert.JSONObject{"usage_percent": 95, "delay_seconds": 60},
 			"size_steps":         assert.JSONObject{"percent": 10},
+			"size_constraints":   assert.JSONObject{"minimum": 20, "maximum": 30},
 		},
 		"critical threshold may not have a delay",
 	)
