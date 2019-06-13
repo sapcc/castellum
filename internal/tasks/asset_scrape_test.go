@@ -88,6 +88,11 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
 	c, setAsset, clock := setupAssetScrapeTest(t)
 
+	//set a maximum size that does not contradict the following operations
+	//(down below, there's a separate test for when the maximum size actually
+	//inhibits upsizing)
+	t.MustExec(c.DB, `UPDATE resources SET max_size = 2000`)
+
 	//when the "High" threshold gets crossed, a "High" operation gets created in
 	//state "created"
 	clock.StepBy(10 * time.Minute)
@@ -173,6 +178,11 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
 	c, setAsset, clock := setupAssetScrapeTest(t)
+
+	//set a minimum size that does not contradict the following operations
+	//(down below, there's a separate test for when the minimum size actually
+	//inhibits upsizing)
+	t.MustExec(c.DB, `UPDATE resources SET min_size = 200`)
 
 	//when the "Low" threshold gets crossed, a "Low" operation gets created in
 	//state "created"
@@ -562,4 +572,40 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 		CheckedAt:    c.TimeNow(),                       //but this WAS updated!
 		ExpectedSize: nil,
 	})
+}
+
+func TestSkipDownsizeBecauseOfMinimumSize(baseT *testing.T) {
+	t := test.T{T: baseT}
+	c, setAsset, clock := setupAssetScrapeTest(t)
+
+	//configure a minimum size on the resource
+	t.MustExec(c.DB, `UPDATE resources SET min_size = 900`)
+
+	//set a usage that is ripe for downsizing
+	setAsset(plugins.StaticAsset{Size: 1000, Usage: 100})
+
+	//ScrapeNextAsset should *not* create a downsize operation because the
+	//minimum size would be crossed
+	clock.StepBy(5 * time.Minute)
+	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+	t.ExpectPendingOperations(c.DB /*, nothing */)
+	t.ExpectFinishedOperations(c.DB /*, nothing */)
+}
+
+func TestSkipUpsizeBecauseOfMaximumSize(baseT *testing.T) {
+	t := test.T{T: baseT}
+	c, setAsset, clock := setupAssetScrapeTest(t)
+
+	//configure a maximum size on the resource
+	t.MustExec(c.DB, `UPDATE resources SET max_size = 1100`)
+
+	//set a usage that is ripe for upsizing, even for critical upsizing
+	setAsset(plugins.StaticAsset{Size: 1000, Usage: 999})
+
+	//ScrapeNextAsset should *not* create any operations because the
+	//maximum size would be crossed
+	clock.StepBy(5 * time.Minute)
+	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+	t.ExpectPendingOperations(c.DB /*, nothing */)
+	t.ExpectFinishedOperations(c.DB /*, nothing */)
 }

@@ -198,13 +198,13 @@ func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, ass
 	switch {
 	case match[db.OperationReasonCritical]:
 		op.Reason = db.OperationReasonCritical
-		op.NewSize = getNewSize(asset, res, true)
+		op.NewSize = getNewSize(res, asset, true)
 	case match[db.OperationReasonHigh]:
 		op.Reason = db.OperationReasonHigh
-		op.NewSize = getNewSize(asset, res, true)
+		op.NewSize = getNewSize(res, asset, true)
 	case match[db.OperationReasonLow]:
 		op.Reason = db.OperationReasonLow
-		op.NewSize = getNewSize(asset, res, false)
+		op.NewSize = getNewSize(res, asset, false)
 	default:
 		//no threshold exceeded -> do not create an operation
 		return nil
@@ -283,21 +283,39 @@ func (c Context) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, as
 
 func getMatchingReasons(res db.Resource, asset db.Asset) map[db.OperationReason]bool {
 	result := make(map[db.OperationReason]bool)
-	//TODO: This realizes a fixed min size of 100G with a step size of 10% for manila shares
-	//TODO: replace hard-coded boundary with inspection of res.MinimumSize, res.MaximumSize
-	if res.LowThresholdPercent > 0 && asset.UsagePercent <= res.LowThresholdPercent && asset.Size >= 111 {
-		result[db.OperationReasonLow] = true
+	if res.LowThresholdPercent > 0 && asset.UsagePercent <= res.LowThresholdPercent {
+		if canDownsize(res, asset) {
+			result[db.OperationReasonLow] = true
+		}
 	}
 	if res.HighThresholdPercent > 0 && asset.UsagePercent >= res.HighThresholdPercent {
-		result[db.OperationReasonHigh] = true
+		if canUpsize(res, asset) {
+			result[db.OperationReasonHigh] = true
+		}
 	}
 	if res.CriticalThresholdPercent > 0 && asset.UsagePercent >= res.CriticalThresholdPercent {
-		result[db.OperationReasonCritical] = true
+		if canUpsize(res, asset) {
+			result[db.OperationReasonCritical] = true
+		}
 	}
 	return result
 }
 
-func getNewSize(asset db.Asset, res db.Resource, up bool) uint64 {
+func canDownsize(res db.Resource, asset db.Asset) bool {
+	if res.MinimumSize == nil {
+		return true
+	}
+	return getNewSize(res, asset, false) >= *res.MinimumSize
+}
+
+func canUpsize(res db.Resource, asset db.Asset) bool {
+	if res.MaximumSize == nil {
+		return true
+	}
+	return getNewSize(res, asset, true) <= *res.MaximumSize
+}
+
+func getNewSize(res db.Resource, asset db.Asset, up bool) uint64 {
 	step := (asset.Size * uint64(res.SizeStepPercent)) / 100
 	//a small fraction of a small value (e.g. 10% of size = 6) may round down to zero
 	if step == 0 {
