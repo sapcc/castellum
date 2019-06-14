@@ -126,3 +126,8 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 	pendingOpJSON["greenlit"] = assert.JSONObject{"at": 23, "by_user": "user1"}
 	req.Check(t.T, hh)
 }
+
+func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
+	t := test.T{T: baseT}
+	t.Fatal("TODO")
+}

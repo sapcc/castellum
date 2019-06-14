@@ -71,6 +71,9 @@ func (h *handler) BuildRouter() http.Handler {
 	router.Methods("GET").
 		Path(`/v1/projects/{project_id}/resources/{asset_type}/operations/pending`).
 		HandlerFunc(h.GetPendingOperationsForResource)
+	router.Methods("GET").
+		Path(`/v1/projects/{project_id}/resources/{asset_type}/operations/recently-failed`).
+		HandlerFunc(h.GetRecentlyFailedOperationsForResource)
 
 	return router
 }

@@ -139,8 +139,9 @@ func PendingOperationFromDB(dbOp db.PendingOperation, assetID string) Operation 
 }
 
 //FinishedOperationFromDB converts a db.FinishedOperation into an api.Operation.
-func FinishedOperationFromDB(dbOp db.FinishedOperation) Operation {
+func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string) Operation {
 	op := Operation{
+		AssetID: assetID,
 		State:   dbOp.State(),
 		Reason:  dbOp.Reason,
 		OldSize: dbOp.OldSize,
@@ -243,7 +244,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		}
 		finishedOps := make([]Operation, len(dbFinishedOps))
 		for idx, op := range dbFinishedOps {
-			finishedOps[idx] = FinishedOperationFromDB(op)
+			finishedOps[idx] = FinishedOperationFromDB(op, "")
 		}
 		asset.FinishedOperations = &finishedOps
 	}
