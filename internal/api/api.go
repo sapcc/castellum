@@ -68,6 +68,10 @@ func (h *handler) BuildRouter() http.Handler {
 		Path(`/v1/projects/{project_id}/assets/{asset_type}/{asset_uuid}`).
 		HandlerFunc(h.GetAsset)
 
+	router.Methods("GET").
+		Path(`/v1/projects/{project_id}/resources/{asset_type}/operations/pending`).
+		HandlerFunc(h.GetPendingOperationsForResource)
+
 	return router
 }
 
