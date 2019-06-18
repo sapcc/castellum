@@ -129,5 +129,125 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 
 func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	t.Fatal("TODO")
+	h, hh, validator, _, _ := setupTest(t)
+
+	//endpoint requires a token with project access
+	validator.Forbid("project:access")
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/foo/operations/recently-failed",
+		ExpectStatus: http.StatusForbidden,
+	}.Check(t.T, hh)
+	validator.Allow("project:access")
+
+	//expect error for unknown project or resource
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project2/resources/foo/operations/recently-failed",
+		ExpectStatus: http.StatusNotFound,
+	}.Check(t.T, hh)
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/doesnotexist/operations/recently-failed",
+		ExpectStatus: http.StatusNotFound,
+	}.Check(t.T, hh)
+
+	//the "unknown" resource exists, but it should be 404 regardless because we
+	//don't have an asset manager for it
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/unknown/operations/recently-failed",
+		ExpectStatus: http.StatusNotFound,
+	}.Check(t.T, hh)
+
+	//expect error for inaccessible resource
+	validator.Forbid("project:show:foo")
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/foo/operations/recently-failed",
+		ExpectStatus: http.StatusForbidden,
+	}.Check(t.T, hh)
+	validator.Allow("project:show:foo")
+
+	//start-data.sql has a recently failed critical operation for fooasset1, but
+	//it will not be shown because fooasset1 does not have critical usage levels
+	//anymore
+	expectedOps := []assert.JSONObject{}
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/foo/operations/recently-failed",
+		ExpectStatus: http.StatusOK,
+		ExpectBody:   assert.JSONObject{"recently_failed_operations": expectedOps},
+	}.Check(t.T, hh)
+
+	//to make the recently-failed operation appear, move fooasset1 back to
+	//critical usage levels
+	t.MustExec(h.DB, `UPDATE resources SET critical_threshold_percent = 95 WHERE id = 1`)
+	t.MustExec(h.DB, `UPDATE assets SET usage_percent = 97 WHERE id = 1`)
+	expectedOps = []assert.JSONObject{{
+		"asset_id": "fooasset1",
+		"reason":   "critical",
+		"state":    "failed",
+		"old_size": 1024,
+		"new_size": 1025,
+		"created": assert.JSONObject{
+			"at":            51,
+			"usage_percent": 97,
+		},
+		"confirmed": assert.JSONObject{
+			"at": 52,
+		},
+		"greenlit": assert.JSONObject{
+			"at": 52,
+		},
+		"finished": assert.JSONObject{
+			"at":    53,
+			"error": "datacenter is on fire",
+		},
+	}}
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/foo/operations/recently-failed",
+		ExpectStatus: http.StatusOK,
+		ExpectBody:   assert.JSONObject{"recently_failed_operations": expectedOps},
+	}.Check(t.T, hh)
+
+	//operation should NOT disappear when there is a pending operation that has
+	//not yet finished
+	t.Must(h.DB.Insert(&db.PendingOperation{
+		AssetID:      1,
+		Reason:       db.OperationReasonHigh,
+		OldSize:      1024,
+		NewSize:      2048,
+		UsagePercent: 60,
+		CreatedAt:    time.Unix(61, 0).UTC(),
+	}))
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/foo/operations/recently-failed",
+		ExpectStatus: http.StatusOK,
+		ExpectBody:   assert.JSONObject{"recently_failed_operations": expectedOps},
+	}.Check(t.T, hh)
+
+	//operation should disappear when there is a non-failed operation that
+	//finished after the failed one
+	t.Must(h.DB.Insert(&db.FinishedOperation{
+		AssetID:      1,
+		Reason:       db.OperationReasonHigh,
+		Outcome:      db.OperationOutcomeSucceeded,
+		OldSize:      1024,
+		NewSize:      2048,
+		UsagePercent: 60,
+		CreatedAt:    time.Unix(61, 0).UTC(),
+		ConfirmedAt:  p2time(time.Unix(61, 0).UTC()),
+		GreenlitAt:   p2time(time.Unix(61, 0).UTC()),
+		FinishedAt:   time.Unix(61, 0).UTC(),
+	}))
+	expectedOps = []assert.JSONObject{}
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/foo/operations/recently-failed",
+		ExpectStatus: http.StatusOK,
+		ExpectBody:   assert.JSONObject{"recently_failed_operations": expectedOps},
+	}.Check(t.T, hh)
 }

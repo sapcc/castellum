@@ -99,7 +99,7 @@ func (h handler) GetRecentlyFailedOperationsForResource(w http.ResponseWriter, r
 	//find failed operations
 	var failedOps []db.FinishedOperation
 	_, err := h.DB.Select(&failedOps, `
-		SELECT * FROM finished_operations o
+		SELECT o.* FROM finished_operations o
 		  JOIN assets a ON a.id = o.asset_id
 		 WHERE a.resource_id = $1 AND o.outcome = 'failed'
 	`, dbResource.ID)
@@ -151,7 +151,7 @@ func (h handler) GetRecentlyFailedOperationsForResource(w http.ResponseWriter, r
 	if respondwith.ErrorText(w, err) {
 		return
 	}
-	var relevantOps []Operation
+	relevantOps := []Operation{}
 	for _, asset := range assets {
 		op, exists := failedOpsByAssetID[asset.ID]
 		if !exists {
