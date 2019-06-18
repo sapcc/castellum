@@ -51,6 +51,8 @@ type Asset struct {
 //Operation is how a db.PendingOperation or db.FinishedOperation looks like in
 //the API.
 type Operation struct {
+	AssetID string `json:"asset_id,omitempty"`
+	//^ AssetID is left empty when Operation appears inside type Asset.
 	State     db.OperationState      `json:"state"`
 	Reason    db.OperationReason     `json:"reason"`
 	OldSize   uint64                 `json:"old_size"`
@@ -109,8 +111,9 @@ func AssetFromDB(asset db.Asset) Asset {
 }
 
 //PendingOperationFromDB converts a db.PendingOperation into an api.Operation.
-func PendingOperationFromDB(dbOp db.PendingOperation) *Operation {
+func PendingOperationFromDB(dbOp db.PendingOperation, assetID string) Operation {
 	op := Operation{
+		AssetID: assetID,
 		State:   dbOp.State(),
 		Reason:  dbOp.Reason,
 		OldSize: dbOp.OldSize,
@@ -132,12 +135,13 @@ func PendingOperationFromDB(dbOp db.PendingOperation) *Operation {
 			ByUserUUID: dbOp.GreenlitByUserUUID,
 		}
 	}
-	return &op
+	return op
 }
 
 //FinishedOperationFromDB converts a db.FinishedOperation into an api.Operation.
-func FinishedOperationFromDB(dbOp db.FinishedOperation) Operation {
+func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string) Operation {
 	op := Operation{
+		AssetID: assetID,
 		State:   dbOp.State(),
 		Reason:  dbOp.Reason,
 		OldSize: dbOp.OldSize,
@@ -225,7 +229,8 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	} else if respondwith.ErrorText(w, err) {
 		return
 	} else {
-		asset.PendingOperation = PendingOperationFromDB(dbPendingOp)
+		op := PendingOperationFromDB(dbPendingOp, "")
+		asset.PendingOperation = &op
 	}
 
 	_, wantsFinishedOps := r.URL.Query()["history"]
@@ -239,7 +244,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		}
 		finishedOps := make([]Operation, len(dbFinishedOps))
 		for idx, op := range dbFinishedOps {
-			finishedOps[idx] = FinishedOperationFromDB(op)
+			finishedOps[idx] = FinishedOperationFromDB(op, "")
 		}
 		asset.FinishedOperations = &finishedOps
 	}

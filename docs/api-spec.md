@@ -15,6 +15,8 @@ This document uses the terminology defined in the [README.md](../README.md#termi
 * [DELETE /v1/projects/:id/resources/:type](#delete-v1projectsidresourcestype)
 * [GET /v1/projects/:id/assets/:type](#get-v1projectsidassetstype)
 * [GET /v1/projects/:id/assets/:type/:id](#get-v1projectsidassetstypeid)
+* [GET /v1/projects/:id/resources/:type/operations/pending](#get-v1projectsidresourcestypeoperationspending)
+* [GET /v1/projects/:id/resources/:type/operations/recently-failed](#get-v1projectsidresourcestypeoperationsrecently-failed)
 
 ## GET /v1/projects/:id
 
@@ -160,7 +162,7 @@ Otherwise returns 200 and a JSON response body like this:
     "greenlit": {
       "at": 1557129600,
       "by_user": "980a0405-c6d2-410a-bca1-a3b109aaabc0"
-    },
+    }
   },
 
   "finished_operations": [
@@ -212,3 +214,94 @@ The following fields may be returned for each operation, both below `pending_ope
 | `.greenlit.by_user` | string | The UUID of the user that greenlit this operation. For operations in states `created` or `confirmed`, this field is not shown. For operations not subject to operator approval, this field is not shown. |
 
 The previous table contains a lot of rules like "this field is not shown for operations in state X". When this is confusing to you, have a look at the state machine diagram in [README.md](../README.md#terminology). The reason why many fields are optional is that they only have values when the respective state was entered in the operation's lifecycle.
+
+## GET /v1/projects/:id/resources/:type/operations/pending
+
+Shows information about all pending operations for assets in the given project resource.
+
+Returns 404 if autoscaling is not enabled for this resource.
+Otherwise returns 200 and a JSON response body like this:
+
+```json
+{
+  "pending_operations": [
+    {
+      "asset_id": "acc137e0-ac0f-43c4-a3de-ba728c0091fd",
+      "state": "greenlit",
+      "reason": "high",
+      "old_size": 1000,
+      "new_size": 1200,
+      "created": {
+        "at": 1557122400,
+        "usage_percent": 81
+      },
+      "confirmed": {
+        "at": 1557126000
+      },
+      "greenlit": {
+        "at": 1557129600,
+        "by_user": "980a0405-c6d2-410a-bca1-a3b109aaabc0"
+      }
+    },
+    ...
+  ]
+}
+```
+
+Each pending operation has the same format as the `.pending_operation` field in the JSON response returned by
+`GET /v1/projects/:id/assets/:type/:id` (see above), except that the additional field `asset_id` indicates which asset
+is being worked on.
+
+For each asset in this resource, at most one pending operation will be listed.
+
+## GET /v1/projects/:id/resources/:type/operations/recently-failed
+
+Shows information about all operations on assets in the given project resource that **recently failed**. This is
+intended to give operators a view of all assets in a resource where manual intervention may be required because
+autoscaling is not working properly. Recent failure is defined as follows:
+
+1. There is an operation in state "failed".
+2. There is no newer operation for the same asset which *finished* after the failed operation.
+3. The asset is still eligible for resizing for the same reason as stated in the failed operation.
+
+Point 2 ensures that we don't see failures where the next attempt succeeded. Point 3 ensures that we don't see failures
+for assets where the usage returned to normal levels in the meantime.
+
+Returns 404 if autoscaling is not enabled for this resource.
+Otherwise returns 200 and a JSON response body like this:
+
+```json
+{
+  "recently_failed_operations": [
+    {
+      "asset_id": "acc137e0-ac0f-43c4-a3de-ba728c0091fd",
+      "state": "failed",
+      "reason": "high",
+      "old_size": 1000,
+      "new_size": 1200,
+      "created": {
+        "at": 1557122400,
+        "usage_percent": 81
+      },
+      "confirmed": {
+        "at": 1557126000
+      },
+      "greenlit": {
+        "at": 1557129600,
+        "by_user": "980a0405-c6d2-410a-bca1-a3b109aaabc0"
+      },
+      "finished": {
+        "at": 1557137800,
+        "error": "datacenter is on fire"
+      }
+    },
+    ...
+  ]
+}
+```
+
+Each failed operation has the same format as the entries in the `.finished_operations` field in the JSON response
+returned by `GET /v1/projects/:id/assets/:type/:id` (see above), except that the additional field `asset_id` indicates
+which asset was being worked on.
+
+For each asset in this resource, at most one failed operation will be listed (the most recent one).

@@ -194,17 +194,17 @@ func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, ass
 		CreatedAt:    c.TimeNow(),
 	}
 
-	match := getMatchingReasons(res, asset)
+	match := core.GetMatchingReasons(res, asset)
 	switch {
 	case match[db.OperationReasonCritical]:
 		op.Reason = db.OperationReasonCritical
-		op.NewSize = getNewSize(res, asset, true)
+		op.NewSize = core.GetNewSize(res, asset, true)
 	case match[db.OperationReasonHigh]:
 		op.Reason = db.OperationReasonHigh
-		op.NewSize = getNewSize(res, asset, true)
+		op.NewSize = core.GetNewSize(res, asset, true)
 	case match[db.OperationReasonLow]:
 		op.Reason = db.OperationReasonLow
-		op.NewSize = getNewSize(res, asset, false)
+		op.NewSize = core.GetNewSize(res, asset, false)
 	default:
 		//no threshold exceeded -> do not create an operation
 		return nil
@@ -229,7 +229,7 @@ func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, ass
 
 func (c Context) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, op db.PendingOperation) (*db.PendingOperation, error) {
 	//cancel when the threshold that triggered this operation is no longer being crossed
-	match := getMatchingReasons(res, asset)
+	match := core.GetMatchingReasons(res, asset)
 	doCancel := !match[op.Reason]
 	if op.Reason == db.OperationReasonHigh && match[db.OperationReasonCritical] {
 		//as an exception, cancel a "High" operation when we've crossed the
@@ -253,7 +253,7 @@ func (c Context) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, ass
 
 func (c Context) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, op db.PendingOperation) (*db.PendingOperation, error) {
 	//can only confirm when the corresponding threshold is still being crossed
-	if !getMatchingReasons(res, asset)[op.Reason] {
+	if !core.GetMatchingReasons(res, asset)[op.Reason] {
 		return &op, nil
 	}
 
@@ -279,57 +279,4 @@ func (c Context) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, as
 	_, err := tx.Update(&op)
 	core.CountStateTransition(res, asset.UUID, previousState, op.State())
 	return &op, err
-}
-
-func getMatchingReasons(res db.Resource, asset db.Asset) map[db.OperationReason]bool {
-	result := make(map[db.OperationReason]bool)
-	if res.LowThresholdPercent > 0 && asset.UsagePercent <= res.LowThresholdPercent {
-		if canDownsize(res, asset) {
-			result[db.OperationReasonLow] = true
-		}
-	}
-	if res.HighThresholdPercent > 0 && asset.UsagePercent >= res.HighThresholdPercent {
-		if canUpsize(res, asset) {
-			result[db.OperationReasonHigh] = true
-		}
-	}
-	if res.CriticalThresholdPercent > 0 && asset.UsagePercent >= res.CriticalThresholdPercent {
-		if canUpsize(res, asset) {
-			result[db.OperationReasonCritical] = true
-		}
-	}
-	return result
-}
-
-func canDownsize(res db.Resource, asset db.Asset) bool {
-	if res.MinimumSize == nil {
-		return true
-	}
-	return getNewSize(res, asset, false) >= *res.MinimumSize
-}
-
-func canUpsize(res db.Resource, asset db.Asset) bool {
-	if res.MaximumSize == nil {
-		return true
-	}
-	return getNewSize(res, asset, true) <= *res.MaximumSize
-}
-
-func getNewSize(res db.Resource, asset db.Asset, up bool) uint64 {
-	step := (asset.Size * uint64(res.SizeStepPercent)) / 100
-	//a small fraction of a small value (e.g. 10% of size = 6) may round down to zero
-	if step == 0 {
-		step = 1
-	}
-
-	if up {
-		return asset.Size + step
-	}
-
-	//when going down, we have to take care not to end up with zero
-	if asset.Size < 1+step {
-		//^ This condition is equal to `asset.Size - step < 1`, but cannot overflow below 0.
-		return 1
-	}
-	return asset.Size - step
 }
