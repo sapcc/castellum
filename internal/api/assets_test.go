@@ -31,44 +31,8 @@ import (
 func TestGetAssets(baseT *testing.T) {
 	t := test.T{T: baseT}
 	_, hh, validator, _, _ := setupTest(t)
-
-	//endpoint requires a token with project access
-	validator.Forbid("project:access")
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/assets/foo",
-		ExpectStatus: http.StatusForbidden,
-	}.Check(t.T, hh)
-	validator.Allow("project:access")
-
-	//expect error for unknown project or resource
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project2/assets/foo",
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/assets/doesnotexist",
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
-
-	//the "unknown" resource exists, but it should be 404 regardless because we
-	//don't have an asset manager for it
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/assets/unknown",
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
-
-	//expect error for inaccessible resource
-	validator.Forbid("project:show:foo")
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/assets/foo",
-		ExpectStatus: http.StatusForbidden,
-	}.Check(t.T, hh)
-	validator.Allow("project:show:foo")
+	testCommonEndpointBehavior(t, hh, validator,
+		"/v1/projects/%s/assets/%s")
 
 	//happy path
 	validator.Forbid("project:edit:foo") //this should not be an issue
@@ -88,49 +52,15 @@ func TestGetAssets(baseT *testing.T) {
 func TestGetAsset(baseT *testing.T) {
 	t := test.T{T: baseT}
 	h, hh, validator, _, _ := setupTest(t)
+	testCommonEndpointBehavior(t, hh, validator,
+		"/v1/projects/%s/assets/%s/fooasset1")
 
-	//endpoint requires a token with project access
-	validator.Forbid("project:access")
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/assets/foo/fooasset1",
-		ExpectStatus: http.StatusForbidden,
-	}.Check(t.T, hh)
-	validator.Allow("project:access")
-
-	//expect error for unknown project, resource or asset
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project2/assets/foo/fooasset1",
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/assets/doesnotexist/fooasset1",
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
+	//expect error for unknown asset
 	assert.HTTPRequest{
 		Method:       "GET",
 		Path:         "/v1/projects/project1/assets/foo/doesnotexist",
 		ExpectStatus: http.StatusNotFound,
 	}.Check(t.T, hh)
-
-	//the "unknown" resource exists, but it should be 404 regardless because we
-	//don't have an asset manager for it
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/assets/unknown/bogusasset",
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
-
-	//expect error for inaccessible resource
-	validator.Forbid("project:show:foo")
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/assets/foo/fooasset1",
-		ExpectStatus: http.StatusForbidden,
-	}.Check(t.T, hh)
-	validator.Allow("project:show:foo")
 
 	//happy path: just an asset without any operations
 	validator.Forbid("project:edit:foo") //this should not be an issue

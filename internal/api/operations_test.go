@@ -31,46 +31,10 @@ import (
 func TestGetPendingOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	h, hh, validator, _, _ := setupTest(t)
+	testCommonEndpointBehavior(t, hh, validator,
+		"/v1/projects/%s/resources/%s/operations/pending")
 
-	//endpoint requires a token with project access
-	validator.Forbid("project:access")
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/resources/foo/operations/pending",
-		ExpectStatus: http.StatusForbidden,
-	}.Check(t.T, hh)
-	validator.Allow("project:access")
-
-	//expect error for unknown project or resource
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project2/resources/foo/operations/pending",
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/resources/doesnotexist/operations/pending",
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
-
-	//the "unknown" resource exists, but it should be 404 regardless because we
-	//don't have an asset manager for it
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/resources/unknown/operations/pending",
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
-
-	//expect error for inaccessible resource
-	validator.Forbid("project:show:foo")
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/resources/foo/operations/pending",
-		ExpectStatus: http.StatusForbidden,
-	}.Check(t.T, hh)
-	validator.Allow("project:show:foo")
-
-	//happy path: no pending operations
+	//start-data.sql contains no pending operations
 	validator.Forbid("project:edit:foo") //this should not be an issue
 	response := []assert.JSONObject{}
 	req := assert.HTTPRequest{
@@ -130,49 +94,14 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	h, hh, validator, _, _ := setupTest(t)
-
-	//endpoint requires a token with project access
-	validator.Forbid("project:access")
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/resources/foo/operations/recently-failed",
-		ExpectStatus: http.StatusForbidden,
-	}.Check(t.T, hh)
-	validator.Allow("project:access")
-
-	//expect error for unknown project or resource
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project2/resources/foo/operations/recently-failed",
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/resources/doesnotexist/operations/recently-failed",
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
-
-	//the "unknown" resource exists, but it should be 404 regardless because we
-	//don't have an asset manager for it
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/resources/unknown/operations/recently-failed",
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
-
-	//expect error for inaccessible resource
-	validator.Forbid("project:show:foo")
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/resources/foo/operations/recently-failed",
-		ExpectStatus: http.StatusForbidden,
-	}.Check(t.T, hh)
-	validator.Allow("project:show:foo")
+	testCommonEndpointBehavior(t, hh, validator,
+		"/v1/projects/%s/resources/%s/operations/recently-failed")
 
 	//start-data.sql has a recently failed critical operation for fooasset1, but
 	//it will not be shown because fooasset1 does not have critical usage levels
 	//anymore
 	expectedOps := []assert.JSONObject{}
+	validator.Forbid("project:edit:foo") //this should not be an issue
 	assert.HTTPRequest{
 		Method:       "GET",
 		Path:         "/v1/projects/project1/resources/foo/operations/recently-failed",
