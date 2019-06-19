@@ -116,4 +116,10 @@ var SQLMigrations = map[string]string{
 		ALTER TABLE resources ADD COLUMN min_size BIGINT DEFAULT NULL;
 		ALTER TABLE resources ADD COLUMN max_size BIGINT DEFAULT NULL;
 	`,
+	"004_add_assets_scrape_error_message.down.sql": `
+		ALTER TABLE assets DROP COLUMN scrape_error_message;
+	`,
+	"004_add_assets_scrape_error_message.up.sql": `
+		ALTER TABLE assets ADD COLUMN scrape_error_message TEXT NOT NULL DEFAULT '';
+	`,
 }

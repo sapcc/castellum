@@ -106,6 +106,7 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 		//checked_at so that the next call continues with the next asset, but leave
 		//scraped_at unchanged to indicate old data
 		asset.CheckedAt = c.TimeNow()
+		asset.ScrapeErrorMessage = err.Error()
 		_, dbErr := c.DB.Update(&asset)
 		if dbErr != nil {
 			return dbErr
@@ -118,6 +119,7 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 	//this, tread very carefully.
 	asset.CheckedAt = c.TimeNow()
 	asset.ScrapedAt = asset.CheckedAt
+	asset.ScrapeErrorMessage = ""
 	canTouchPendingOperations := true
 	switch {
 	case asset.ExpectedSize == nil:

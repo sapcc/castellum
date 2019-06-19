@@ -126,6 +126,10 @@ type Asset struct {
 	//detect when the resize operation has reflected in the datastore that we're
 	//polling for GetAssetStatus().
 	ExpectedSize *uint64 `db:"expected_size"`
+
+	//If the last scrape failed, contains the error message returned by
+	//GetAssetStatus(). Contains the empty string otherwise.
+	ScrapeErrorMessage string `db:"scrape_error_message"`
 }
 
 //PendingOperation describes an ongoing resize operation for an asset.

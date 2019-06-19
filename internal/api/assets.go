@@ -39,13 +39,20 @@ type AssetInList struct {
 
 //Asset is how a db.Asset looks like in the API.
 type Asset struct {
-	UUID               string       `json:"id"`
-	Size               uint64       `json:"size"`
-	UsagePercent       uint32       `json:"usage_percent"`
-	ScrapedAtUnix      int64        `json:"scraped_at"`
-	Stale              bool         `json:"stale"`
-	PendingOperation   *Operation   `json:"pending_operation,omitempty"`
-	FinishedOperations *[]Operation `json:"finished_operations,omitempty"`
+	UUID               string        `json:"id"`
+	Size               uint64        `json:"size"`
+	UsagePercent       uint32        `json:"usage_percent"`
+	ScrapedAtUnix      int64         `json:"scraped_at"`
+	Checked            *AssetChecked `json:"checked,omitempty"`
+	Stale              bool          `json:"stale"`
+	PendingOperation   *Operation    `json:"pending_operation,omitempty"`
+	FinishedOperations *[]Operation  `json:"finished_operations,omitempty"`
+}
+
+//AssetChecked appears in type Asset.
+type AssetChecked struct {
+	AtUnix       int64  `json:"at"`
+	ErrorMessage string `json:"error,omitempty"`
 }
 
 //Operation is how a db.PendingOperation or db.FinishedOperation looks like in
@@ -101,13 +108,20 @@ func AssetListFromDB(assets []db.Asset) []AssetInList {
 
 //AssetFromDB converts a db.Asset into an api.Asset.
 func AssetFromDB(asset db.Asset) Asset {
-	return Asset{
+	a := Asset{
 		UUID:          asset.UUID,
 		Size:          asset.Size,
 		UsagePercent:  asset.UsagePercent,
 		ScrapedAtUnix: asset.ScrapedAt.Unix(),
 		Stale:         asset.ExpectedSize != nil,
 	}
+	if asset.ScrapeErrorMessage != "" {
+		a.Checked = &AssetChecked{
+			AtUnix:       asset.CheckedAt.Unix(),
+			ErrorMessage: asset.ScrapeErrorMessage,
+		}
+	}
+	return a
 }
 
 //PendingOperationFromDB converts a db.PendingOperation into an api.Operation.

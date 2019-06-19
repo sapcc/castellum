@@ -38,8 +38,8 @@ func (t T) Must(err error) {
 }
 
 //MustExec fails the test if dbi.Exec(query) returns an error.
-func (t T) MustExec(dbi *gorp.DbMap, query string) {
+func (t T) MustExec(dbi *gorp.DbMap, query string, args ...interface{}) {
 	t.Helper()
-	_, err := dbi.Exec(query)
+	_, err := dbi.Exec(query, args...)
 	t.Must(err)
 }

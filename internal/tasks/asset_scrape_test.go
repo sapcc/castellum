@@ -563,14 +563,33 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 	}
 
 	t.ExpectAssets(c.DB, db.Asset{
-		ID:           1,
-		ResourceID:   1,
-		UUID:         "asset1",
-		Size:         1000,
-		UsagePercent: 50,                                //changed usage not observed because of error
-		ScrapedAt:    c.TimeNow().Add(-5 * time.Minute), //not updated by ScrapeNextAsset!
-		CheckedAt:    c.TimeNow(),                       //but this WAS updated!
-		ExpectedSize: nil,
+		ID:                 1,
+		ResourceID:         1,
+		UUID:               "asset1",
+		Size:               1000,
+		UsagePercent:       50,                                //changed usage not observed because of error
+		ScrapedAt:          c.TimeNow().Add(-5 * time.Minute), //not updated by ScrapeNextAsset!
+		CheckedAt:          c.TimeNow(),                       //but this WAS updated!
+		ExpectedSize:       nil,
+		ScrapeErrorMessage: "GetAssetStatus failing as requested",
+	})
+
+	//when GetAssetStatus starts working again, next ScrapeNextAsset should clear
+	//the error field
+	setAsset(plugins.StaticAsset{Size: 1000, Usage: 600})
+	clock.StepBy(5 * time.Minute)
+	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+
+	t.ExpectAssets(c.DB, db.Asset{
+		ID:                 1,
+		ResourceID:         1,
+		UUID:               "asset1",
+		Size:               1000,
+		UsagePercent:       60,
+		ScrapedAt:          c.TimeNow(),
+		CheckedAt:          c.TimeNow(),
+		ExpectedSize:       nil,
+		ScrapeErrorMessage: "",
 	})
 }
 

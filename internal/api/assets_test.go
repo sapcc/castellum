@@ -121,6 +121,14 @@ func TestGetAsset(baseT *testing.T) {
 	pendingOpJSON["greenlit"] = assert.JSONObject{"at": 23, "by_user": "user1"}
 	req.Check(t.T, hh)
 
+	//check rendering of a scraping error
+	t.MustExec(h.DB, `UPDATE assets SET checked_at = UNIX(12), scrape_error_message = $1 WHERE id = 1`, "filer is on fire")
+	response["checked"] = assert.JSONObject{
+		"at":    12,
+		"error": "filer is on fire",
+	}
+	req.Check(t.T, hh)
+
 	//check rendering of finished operations in all possible states
 	response["finished_operations"] = []assert.JSONObject{
 		{
