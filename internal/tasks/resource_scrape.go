@@ -111,7 +111,9 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 		logg.Info("adding new %s asset to DB: UUID = %s, scope UUID = %s", assetType, assetUUID, res.ScopeUUID)
 		status, err := manager.GetAssetStatus(res, assetUUID, nil)
 		if err != nil {
-			logg.Error("skipping %s %s - cannot query status: %s", assetType, assetUUID, err.Error())
+			logg.Error("not adding %s %s for now: cannot query status: %s", assetType, assetUUID, err.Error())
+			labels := prometheus.Labels{"asset": string(assetType)}
+			assetScrapeFailedCounter.With(labels).Inc()
 			continue
 		}
 
