@@ -32,6 +32,7 @@ import (
 //Resource is how a db.Resource looks like in the API.
 type Resource struct {
 	ScrapedAtUnix     *int64           `json:"scraped_at,omitempty"`
+	AssetCount        int64            `json:"asset_count"`
 	LowThreshold      *Threshold       `json:"low_threshold,omitempty"`
 	HighThreshold     *Threshold       `json:"high_threshold,omitempty"`
 	CriticalThreshold *Threshold       `json:"critical_threshold,omitempty"`
@@ -60,9 +61,17 @@ type SizeConstraints struct {
 // conversion and validation methods
 
 //ResourceFromDB converts a db.Resource into an api.Resource.
-func ResourceFromDB(res db.Resource) Resource {
+func (h handler) ResourceFromDB(res db.Resource) (Resource, error) {
+	assetCount, err := h.DB.SelectInt(
+		`SELECT COUNT(*) FROM assets WHERE resource_id = $1`,
+		res.ID)
+	if err != nil {
+		return Resource{}, err
+	}
+
 	result := Resource{
 		ScrapedAtUnix: timeOrNullToUnix(res.ScrapedAt),
+		AssetCount:    assetCount,
 		SizeSteps:     SizeSteps{Percent: res.SizeStepPercent},
 	}
 	if res.LowThresholdPercent > 0 {
@@ -88,7 +97,7 @@ func ResourceFromDB(res db.Resource) Resource {
 			Maximum: res.MaximumSize,
 		}
 	}
-	return result
+	return result, nil
 }
 
 //UpdateDBResource updates the given db.Resource with the values provided in
@@ -98,6 +107,9 @@ func (r Resource) UpdateDBResource(res *db.Resource) (errors []string) {
 
 	if r.ScrapedAtUnix != nil {
 		complain("resource.scraped_at cannot be set via the API")
+	}
+	if r.AssetCount != 0 {
+		complain("resource.asset_count cannot be set via the API")
 	}
 
 	if r.LowThreshold == nil {
@@ -216,7 +228,10 @@ func (h handler) GetProject(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if token.Check(res.AssetType.PolicyRuleForRead()) {
-			result.Resources[res.AssetType] = ResourceFromDB(res)
+			result.Resources[res.AssetType], err = h.ResourceFromDB(res)
+			if respondwith.ErrorText(w, err) {
+				return
+			}
 		}
 	}
 
@@ -233,7 +248,11 @@ func (h handler) GetResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondwith.JSON(w, http.StatusOK, ResourceFromDB(*dbResource))
+	resource, err := h.ResourceFromDB(*dbResource)
+	if respondwith.ErrorText(w, err) {
+		return
+	}
+	respondwith.JSON(w, http.StatusOK, resource)
 }
 
 func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
