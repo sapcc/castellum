@@ -10,7 +10,7 @@ INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_per
 
 -- insert some assets in 'project1' that we can list
 INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message) VALUES (1, 1, 'fooasset1', 1024, 50, UNIX(11), 1200, UNIX(11), '');
-INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message) VALUES (2, 1, 'fooasset2', 512, 80, UNIX(12), NULL, UNIX(12), '');
+INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message) VALUES (2, 1, 'fooasset2', 512, 80, UNIX(12), NULL, UNIX(15), 'unexpected uptime');
 INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message) VALUES (3, 2, 'barasset1', 2000, 10, UNIX(13), NULL, UNIX(13), '');
 -- insert a bogus asset in an unknown asset type; we should not be able to list this in the API
 INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message) VALUES (4, 4, 'bogusasset', 100, 50, UNIX(14), NULL, UNIX(14), '');

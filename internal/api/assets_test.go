@@ -34,18 +34,34 @@ func TestGetAssets(baseT *testing.T) {
 	testCommonEndpointBehavior(t, hh, validator,
 		"/v1/projects/%s/assets/%s")
 
+	expectedAssets := []assert.JSONObject{
+		{
+			"id":            "fooasset1",
+			"size":          1024,
+			"usage_percent": 50,
+			"scraped_at":    11,
+			"stale":         true,
+		},
+		{
+			"id":            "fooasset2",
+			"size":          512,
+			"usage_percent": 80,
+			"scraped_at":    12,
+			"checked": assert.JSONObject{
+				"at":    15,
+				"error": "unexpected uptime",
+			},
+			"stale": false,
+		},
+	}
+
 	//happy path
 	validator.Forbid("project:edit:foo") //this should not be an issue
 	assert.HTTPRequest{
 		Method:       "GET",
 		Path:         "/v1/projects/project1/assets/foo",
 		ExpectStatus: http.StatusOK,
-		ExpectBody: assert.JSONObject{
-			"assets": []assert.JSONObject{
-				{"id": "fooasset1"},
-				{"id": "fooasset2"},
-			},
-		},
+		ExpectBody:   assert.JSONObject{"assets": expectedAssets},
 	}.Check(t.T, hh)
 }
 

@@ -125,14 +125,46 @@ Otherwise returns 200 and a JSON response body like this:
 ```json
 {
   "assets": [
-    { "id": "2535fd62-c30a-4241-8c67-a12c4fba98ad" },
-    { "id": "acc137e0-ac0f-43c4-a3de-ba728c0091fd" },
-    { "id": "b73894be-bcbc-44f0-b7e2-29b758c06ce9" }
+    {
+      "id": "2535fd62-c30a-4241-8c67-a12c4fba98ad",
+      "size": 100,
+      "usage_percent": 42,
+      "scraped_at": 1557140894,
+      "stale": true
+    },
+    {
+      "id": "acc137e0-ac0f-43c4-a3de-ba728c0091fd",
+      "size": 1000,
+      "usage_percent": 91,
+      "scraped_at": 1557140895,
+      "checked": {
+        "at": 1557141495,
+        "error": "cannot connect to OpenStack"
+      },
+      "stale": false
+    },
+    {
+      "id": "b73894be-bcbc-44f0-b7e2-29b758c06ce9",
+      "size": 20,
+      "usage_percent": 60,
+      "scraped_at": 1557140896,
+      "stale": false
+    }
   ]
 }
 ```
 
-In the future, more fields than just the ID may be reported for each asset.
+For each asset, the following fields may be returned:
+
+| Field | Type | Explanation |
+| ----- | ---- | ----------- |
+| `id` | string | UUID of asset. |
+| `size` | integer | Size of asset. The unit depends on the asset type. See [README.md](../README.md#supported-asset-types) for more information. |
+| `usage_percent` | integer | Usage of asset as percentage of size. When the asset has multiple usage types (e.g. instances have both CPU usage and RAM usage), usually the higher value is reported here. |
+| `scraped_at` | integer | When the size and usage of the asset was last retrieved by Castellum. |
+| `checked.at` | integer | When Castellum last tried to retrieve the size and usage of the asset. Only shown when different from `scraped_at`, i.e. when the last check failed. |
+| `checked.error` | string | When the last check failed (see above), this field contains the error message that was returned from the backend. |
+| `stale` | bool | This flag is set by Castellum after a resize operation to indicate that the reported size and usage are probably not accurate anymore. Will be cleared by the next scrape. |
 
 ## GET /v1/projects/:id/assets/:type/:id
 
@@ -191,17 +223,11 @@ Otherwise returns 200 and a JSON response body like this:
 }
 ```
 
-The following fields may be returned:
+Most fields on the top level have the same meaning as for `GET /v1/projects/:id/assets/:type`.
+The following additional fields may be returned:
 
 | Field | Type | Explanation |
 | ----- | ---- | ----------- |
-| `id` | string | UUID of asset. |
-| `size` | integer | Size of asset. The unit depends on the asset type. See [README.md](../README.md#supported-asset-types) for more information. |
-| `usage_percent` | integer | Usage of asset as percentage of size. When the asset has multiple usage types (e.g. instances have both CPU usage and RAM usage), usually the higher value is reported here. |
-| `scraped_at` | integer | When the size and usage of the asset was last retrieved by Castellum. |
-| `checked.at` | integer | When Castellum last tried to retrieve the size and usage of the asset. Only shown when different from `scraped_at`, i.e. when the last check failed. |
-| `checked.error` | string | When the last check failed (see above), this field contains the error message that was returned from the backend. |
-| `stale` | bool | This flag is set by Castellum after a resize operation to indicate that the reported size and usage are probably not accurate anymore. Will be cleared by the next scrape. |
 | `pending_operation` | object | Information about an automated resize operation that is currently in progress. If there is no resize operation ongoing, this field will be omitted. |
 | `finished_operations` | array of objects | Information about earlier automated resize operations. **This field is only shown on request** because it may be quite large. Add the query parameter `?history` to see it. |
 | `finished_operations[].finished.at` | timestamp | When the operation entered that final state. |

@@ -31,12 +31,6 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 // data types
 
-//AssetInList is how a db.Asset looks like in the API endpoint where assets are
-//listed.
-type AssetInList struct {
-	UUID string `json:"id"`
-}
-
 //Asset is how a db.Asset looks like in the API.
 type Asset struct {
 	UUID               string        `json:"id"`
@@ -95,16 +89,6 @@ type OperationFinish struct {
 
 ////////////////////////////////////////////////////////////////////////////////
 // conversion and validation methods
-
-//AssetListFromDB converts a []db.Asset into an []api.AssetInList.
-func AssetListFromDB(assets []db.Asset) []AssetInList {
-	result := make([]AssetInList, len(assets))
-	for idx, asset := range assets {
-		result[idx] = AssetInList{UUID: asset.UUID}
-	}
-	sort.Slice(result, func(i, j int) bool { return result[i].UUID < result[j].UUID })
-	return result
-}
 
 //AssetFromDB converts a db.Asset into an api.Asset.
 func AssetFromDB(asset db.Asset) Asset {
@@ -203,11 +187,15 @@ func (h handler) GetAssets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result := struct {
-		Assets []AssetInList `json:"assets"`
-	}{
-		Assets: AssetListFromDB(dbAssets),
+	assets := make([]Asset, len(dbAssets))
+	for idx, dbAsset := range dbAssets {
+		assets[idx] = AssetFromDB(dbAsset)
 	}
+	sort.Slice(assets, func(i, j int) bool { return assets[i].UUID < assets[j].UUID })
+
+	result := struct {
+		Assets []Asset `json:"assets"`
+	}{assets}
 	respondwith.JSON(w, http.StatusOK, result)
 }
 
