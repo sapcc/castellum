@@ -30,7 +30,7 @@ import (
 
 func TestGetAssets(baseT *testing.T) {
 	t := test.T{T: baseT}
-	_, hh, validator, _, _ := setupTest(t)
+	_, hh, validator, _, _ := setupTest(t, nil)
 	testCommonEndpointBehavior(t, hh, validator,
 		"/v1/projects/%s/assets/%s")
 
@@ -51,7 +51,7 @@ func TestGetAssets(baseT *testing.T) {
 
 func TestGetAsset(baseT *testing.T) {
 	t := test.T{T: baseT}
-	h, hh, validator, _, _ := setupTest(t)
+	h, hh, validator, _, _ := setupTest(t, nil)
 	testCommonEndpointBehavior(t, hh, validator,
 		"/v1/projects/%s/assets/%s/fooasset1")
 

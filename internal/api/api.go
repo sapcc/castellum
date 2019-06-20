@@ -21,7 +21,11 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -37,11 +41,14 @@ type handler struct {
 	DB        *gorp.DbMap
 	Team      core.AssetManagerTeam
 	Validator gopherpolicy.Validator
+
+	//dependency injection slots (filled with doubles in tests)
+	TimeNow func() time.Time
 }
 
 //NewHandler constructs the main http.Handler for this package.
 func NewHandler(dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator) http.Handler {
-	h := &handler{DB: dbi, Team: team, Validator: validator}
+	h := &handler{DB: dbi, Team: team, Validator: validator, TimeNow: time.Now}
 	return h.BuildRouter()
 }
 
@@ -74,6 +81,9 @@ func (h *handler) BuildRouter() http.Handler {
 	router.Methods("GET").
 		Path(`/v1/projects/{project_id}/resources/{asset_type}/operations/recently-failed`).
 		HandlerFunc(h.GetRecentlyFailedOperationsForResource)
+	router.Methods("GET").
+		Path(`/v1/projects/{project_id}/resources/{asset_type}/operations/recently-succeeded`).
+		HandlerFunc(h.GetRecentlySucceededOperationsForResource)
 
 	return router
 }
@@ -161,4 +171,31 @@ func timeOrNullToUnix(t *time.Time) *int64 {
 	}
 	tst := t.Unix()
 	return &tst
+}
+
+var (
+	ageRx    = regexp.MustCompile(`^(0|[1-9][0-9]*)([mhd])$`)
+	ageUnits = map[string]time.Duration{
+		"m": time.Minute,
+		"h": time.Hour,
+		"d": 24 * time.Hour,
+	}
+)
+
+//ParseAge parses a query parameter containing an age specification
+//like `30m`, `12h` or `7d`.
+func ParseAge(query url.Values, key, defaultValue string) (time.Duration, error) {
+	spec := query.Get(key)
+	if spec == "" {
+		spec = defaultValue
+	}
+	match := ageRx.FindStringSubmatch(spec)
+	if match == nil {
+		return 0, fmt.Errorf(`invalid %s: expected a value like "30m", "12h" or "7d"; got %q`, key, spec)
+	}
+	val, err := strconv.ParseUint(match[1], 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return time.Duration(val) * ageUnits[match[2]], nil
 }

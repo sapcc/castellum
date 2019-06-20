@@ -62,7 +62,7 @@ var (
 
 func TestGetProject(baseT *testing.T) {
 	t := test.T{T: baseT}
-	_, hh, validator, _, _ := setupTest(t)
+	_, hh, validator, _, _ := setupTest(t, nil)
 
 	//endpoint requires a token with project access
 	validator.Forbid("project:access")
@@ -113,7 +113,7 @@ func TestGetProject(baseT *testing.T) {
 
 func TestGetResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	_, hh, validator, _, _ := setupTest(t)
+	_, hh, validator, _, _ := setupTest(t, nil)
 
 	//endpoint requires a token with project access
 	validator.Forbid("project:access")
@@ -171,7 +171,7 @@ func TestGetResource(baseT *testing.T) {
 
 func TestPutResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	h, hh, validator, allResources, _ := setupTest(t)
+	h, hh, validator, allResources, _ := setupTest(t, nil)
 
 	//mostly like `initialFooResourceJSON`, but with some delays changed
 	newFooResourceJSON1 := assert.JSONObject{
@@ -359,7 +359,7 @@ func TestPutResource(baseT *testing.T) {
 
 func TestPutResourceValidationErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
-	h, hh, _, allResources, _ := setupTest(t)
+	h, hh, _, allResources, _ := setupTest(t, nil)
 
 	expectErrors := func(body assert.JSONObject, errors ...string) {
 		assert.HTTPRequest{
@@ -445,7 +445,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 
 func TestDeleteResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	h, hh, validator, allResources, allAssets := setupTest(t)
+	h, hh, validator, allResources, allAssets := setupTest(t, nil)
 
 	//endpoint requires a token with project access
 	validator.Forbid("project:access")

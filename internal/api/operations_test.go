@@ -30,7 +30,7 @@ import (
 
 func TestGetPendingOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	h, hh, validator, _, _ := setupTest(t)
+	h, hh, validator, _, _ := setupTest(t, nil)
 	testCommonEndpointBehavior(t, hh, validator,
 		"/v1/projects/%s/resources/%s/operations/pending")
 
@@ -93,7 +93,7 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 
 func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	h, hh, validator, _, _ := setupTest(t)
+	h, hh, validator, _, _ := setupTest(t, nil)
 	testCommonEndpointBehavior(t, hh, validator,
 		"/v1/projects/%s/resources/%s/operations/recently-failed")
 
@@ -178,5 +178,81 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 		Path:         "/v1/projects/project1/resources/foo/operations/recently-failed",
 		ExpectStatus: http.StatusOK,
 		ExpectBody:   assert.JSONObject{"recently_failed_operations": expectedOps},
+	}.Check(t.T, hh)
+}
+
+func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
+	t := test.T{T: baseT}
+	clock := test.FakeClock(3600)
+	h, hh, validator, _, _ := setupTest(t, clock.Now)
+	testCommonEndpointBehavior(t, hh, validator,
+		"/v1/projects/%s/resources/%s/operations/recently-succeeded")
+
+	//start-data.sql has a succeeded operation, but also a failed one on the same
+	//asset after that, so we should not see anything yet
+	expectedOps := []assert.JSONObject{}
+	validator.Forbid("project:edit:foo") //this should not be an issue
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/foo/operations/recently-succeeded",
+		ExpectStatus: http.StatusOK,
+		ExpectBody:   assert.JSONObject{"recently_succeeded_operations": expectedOps},
+	}.Check(t.T, hh)
+
+	//make the failed operation a cancelled one to surface the succeeded operation
+	t.MustExec(h.DB, `UPDATE finished_operations SET outcome = $1 WHERE outcome = $2`,
+		db.OperationOutcomeCancelled, db.OperationOutcomeFailed,
+	)
+	expectedOps = []assert.JSONObject{{
+		"asset_id": "fooasset1",
+		"reason":   "high",
+		"state":    "succeeded",
+		"old_size": 1023,
+		"new_size": 1024,
+		"created": assert.JSONObject{
+			"at":            41,
+			"usage_percent": 80,
+		},
+		"confirmed": assert.JSONObject{
+			"at": 42,
+		},
+		"greenlit": assert.JSONObject{
+			"at":      43,
+			"by_user": "user2",
+		},
+		"finished": assert.JSONObject{
+			"at": 44,
+		},
+	}}
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/foo/operations/recently-succeeded",
+		ExpectStatus: http.StatusOK,
+		ExpectBody:   assert.JSONObject{"recently_succeeded_operations": expectedOps},
+	}.Check(t.T, hh)
+
+	//operation should NOT disappear when there is a pending operation that has
+	//not yet finished
+	t.Must(h.DB.Insert(&db.PendingOperation{
+		AssetID:      1,
+		Reason:       db.OperationReasonHigh,
+		OldSize:      1024,
+		NewSize:      2048,
+		UsagePercent: 60,
+		CreatedAt:    time.Unix(61, 0).UTC(),
+	}))
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/foo/operations/recently-succeeded",
+		ExpectStatus: http.StatusOK,
+		ExpectBody:   assert.JSONObject{"recently_succeeded_operations": expectedOps},
+	}.Check(t.T, hh)
+
+	//check with shortened max-age
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/resources/foo/operations/recently-succeeded?max-age=10m",
+		ExpectStatus: http.StatusOK,
+		ExpectBody:   assert.JSONObject{"recently_succeeded_operations": []assert.JSONObject{}},
 	}.Check(t.T, hh)
 }

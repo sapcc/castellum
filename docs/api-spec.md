@@ -313,3 +313,18 @@ returned by `GET /v1/projects/:id/assets/:type/:id` (see above), except that the
 which asset was being worked on.
 
 For each asset in this resource, at most one failed operation will be listed (the most recent one).
+
+## GET /v1/projects/:id/resources/:type/operations/recently-succeeded
+
+Shows information about all operations on assets in the given project resource that **recently succeeded**, that is, all
+operations in state "succeeded" where there is no newer operation in state "succeeded" or "failed" for the same asset.
+
+Returns 404 if autoscaling is not enabled for this resource.
+Otherwise returns 200 and a JSON response body looking like that from the `recently-failed` endpoint above, except that
+`recently_failed_operations` is called `recently_succeeded_operations`.
+
+The following query parameters can be given to filter the result:
+
+- When `max-age` is given, only those operations will be shown that finished after `now - max_age`. The value must be an
+  integer followed by one of the units `m` (minute), `h` (hour) or `d` (day), e.g. `12h` or `7d`. The default value is
+  `1d`.

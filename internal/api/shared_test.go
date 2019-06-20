@@ -21,6 +21,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	policy "github.com/databus23/goslo.policy"
 	"github.com/sapcc/castellum/internal/core"
@@ -31,7 +32,7 @@ import (
 	"github.com/sapcc/go-bits/gopherpolicy"
 )
 
-func setupTest(t test.T) (*handler, http.Handler, *MockValidator, []db.Resource, []db.Asset) {
+func setupTest(t test.T, timeNow func() time.Time) (*handler, http.Handler, *MockValidator, []db.Resource, []db.Asset) {
 	baseline := "fixtures/start-data.sql"
 	dbi := t.PrepareDB(&baseline)
 	team := core.AssetManagerTeam{
@@ -48,7 +49,10 @@ func setupTest(t test.T) (*handler, http.Handler, *MockValidator, []db.Resource,
 	_, err = dbi.Select(&assets, `SELECT * FROM assets ORDER BY ID`)
 	t.Must(err)
 
-	h := &handler{DB: dbi, Team: team, Validator: mv}
+	if timeNow == nil {
+		timeNow = time.Now
+	}
+	h := &handler{DB: dbi, Team: team, Validator: mv, TimeNow: timeNow}
 	return h, h.BuildRouter(), mv, resources, assets
 }
 
