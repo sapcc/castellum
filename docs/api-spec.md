@@ -166,6 +166,9 @@ For each asset, the following fields may be returned:
 | `checked.error` | string | When the last check failed (see above), this field contains the error message that was returned from the backend. |
 | `stale` | bool | This flag is set by Castellum after a resize operation to indicate that the reported size and usage are probably not accurate anymore. Will be cleared by the next scrape. |
 
+When no scrape ever succeeded (e.g. because the asset is in an error state since creation), the fields `size`,
+`usage_percent` and `scraped_at` will all be missing. The `checked.error` field will always be present in this case.
+
 ## GET /v1/projects/:id/assets/:type/:id
 
 Shows information about a certain asset.

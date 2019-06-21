@@ -34,9 +34,9 @@ import (
 //Asset is how a db.Asset looks like in the API.
 type Asset struct {
 	UUID               string        `json:"id"`
-	Size               uint64        `json:"size"`
-	UsagePercent       uint32        `json:"usage_percent"`
-	ScrapedAtUnix      int64         `json:"scraped_at"`
+	Size               uint64        `json:"size,omitempty"`
+	UsagePercent       uint32        `json:"usage_percent,omitempty"`
+	ScrapedAtUnix      *int64        `json:"scraped_at,omitempty"`
 	Checked            *AssetChecked `json:"checked,omitempty"`
 	Stale              bool          `json:"stale"`
 	PendingOperation   *Operation    `json:"pending_operation,omitempty"`
@@ -96,7 +96,7 @@ func AssetFromDB(asset db.Asset) Asset {
 		UUID:          asset.UUID,
 		Size:          asset.Size,
 		UsagePercent:  asset.UsagePercent,
-		ScrapedAtUnix: asset.ScrapedAt.Unix(),
+		ScrapedAtUnix: timeOrNullToUnix(asset.ScrapedAt),
 		Stale:         asset.ExpectedSize != nil,
 	}
 	if asset.ScrapeErrorMessage != "" {

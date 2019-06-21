@@ -122,4 +122,10 @@ var SQLMigrations = map[string]string{
 	"004_add_assets_scrape_error_message.up.sql": `
 		ALTER TABLE assets ADD COLUMN scrape_error_message TEXT NOT NULL DEFAULT '';
 	`,
+	"005_make_assets_scraped_at_optional.down.sql": `
+		ALTER TABLE assets ALTER COLUMN scraped_at SET NOT NULL;
+	`,
+	"005_make_assets_scraped_at_optional.up.sql": `
+		ALTER TABLE assets ALTER COLUMN scraped_at DROP NOT NULL;
+	`,
 }

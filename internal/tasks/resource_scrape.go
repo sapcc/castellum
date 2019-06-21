@@ -109,23 +109,28 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 			continue
 		}
 		logg.Info("adding new %s asset to DB: UUID = %s, scope UUID = %s", assetType, assetUUID, res.ScopeUUID)
-		status, err := manager.GetAssetStatus(res, assetUUID, nil)
-		if err != nil {
-			logg.Error("not adding %s %s for now: cannot query status: %s", assetType, assetUUID, err.Error())
-			labels := prometheus.Labels{"asset": string(assetType)}
-			assetScrapeFailedCounter.With(labels).Inc()
-			continue
-		}
-
+		now := c.TimeNow()
 		dbAsset := db.Asset{
 			ResourceID:   res.ID,
 			UUID:         assetUUID,
-			Size:         status.Size,
-			UsagePercent: status.UsagePercent,
-			CheckedAt:    c.TimeNow(),
-			ScrapedAt:    c.TimeNow(),
+			CheckedAt:    now,
 			ExpectedSize: nil,
 		}
+
+		status, err := manager.GetAssetStatus(res, assetUUID, nil)
+		labels := prometheus.Labels{"asset": string(assetType)}
+		if err == nil {
+			assetScrapeSuccessCounter.With(labels).Inc()
+			dbAsset.Size = status.Size
+			dbAsset.UsagePercent = status.UsagePercent
+			dbAsset.ScrapedAt = &now
+		} else {
+			assetScrapeFailedCounter.With(labels).Inc()
+			dbAsset.Size = 0
+			dbAsset.UsagePercent = 0
+			dbAsset.ScrapeErrorMessage = err.Error()
+		}
+
 		err = c.DB.Insert(&dbAsset)
 		if err != nil {
 			return err

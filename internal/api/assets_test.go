@@ -203,6 +203,27 @@ func TestGetAsset(baseT *testing.T) {
 	}
 	req.Path += "?history"
 	req.Check(t.T, hh)
+
+	//check rendering of an asset that has never had a successful scrape
+	t.Must(h.DB.Insert(&db.Asset{
+		ResourceID:         1,
+		UUID:               "fooasset3",
+		CheckedAt:          time.Unix(42, 0).UTC(),
+		ScrapeErrorMessage: "filer has stranger anxiety",
+	}))
+	assert.HTTPRequest{
+		Method:       "GET",
+		Path:         "/v1/projects/project1/assets/foo/fooasset3",
+		ExpectStatus: http.StatusOK,
+		ExpectBody: assert.JSONObject{
+			"id": "fooasset3",
+			"checked": assert.JSONObject{
+				"at":    42,
+				"error": "filer has stranger anxiety",
+			},
+			"stale": false,
+		},
+	}.Check(t.T, hh)
 }
 
 func p2string(val string) *string {

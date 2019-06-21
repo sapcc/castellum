@@ -117,7 +117,7 @@ type Asset struct {
 	//When we last tried to obtain the current .Size and .UsagePercent values.
 	CheckedAt time.Time `db:"checked_at"`
 	//When the current .Size and .UsagePercent values were obtained.
-	ScrapedAt time.Time `db:"scraped_at"`
+	ScrapedAt *time.Time `db:"scraped_at"`
 	//This flag is set by a Castellum worker after a resize operation to indicate
 	//that the .Size attribute is outdated. The value is the new_size of the
 	//resize operation. We should expect this size to show in the next

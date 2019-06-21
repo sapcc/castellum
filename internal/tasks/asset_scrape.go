@@ -95,11 +95,14 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 	}
 
 	//check asset status
-	oldStatus := core.AssetStatus{
-		Size:         asset.Size,
-		UsagePercent: asset.UsagePercent,
+	var oldStatus *core.AssetStatus
+	if asset.Size > 0 {
+		oldStatus = &core.AssetStatus{
+			Size:         asset.Size,
+			UsagePercent: asset.UsagePercent,
+		}
 	}
-	status, err := manager.GetAssetStatus(res, asset.UUID, &oldStatus)
+	status, err := manager.GetAssetStatus(res, asset.UUID, oldStatus)
 	if err != nil {
 		//GetAssetStatus may fail for single assets, e.g. for Manila shares in
 		//transitional states like Creating/Deleting; in that case, update
@@ -117,8 +120,9 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 	//update asset attributes - We have four separate cases here, which
 	//correspond to the branches of the `switch` statement. When changing any of
 	//this, tread very carefully.
-	asset.CheckedAt = c.TimeNow()
-	asset.ScrapedAt = asset.CheckedAt
+	now := c.TimeNow()
+	asset.CheckedAt = now
+	asset.ScrapedAt = &now
 	asset.ScrapeErrorMessage = ""
 	canTouchPendingOperations := true
 	switch {

@@ -47,7 +47,7 @@ func setupAssetResizeTest(t test.T, c *Context, amStatic *plugins.AssetManagerSt
 			UUID:         uuid,
 			Size:         1000,
 			UsagePercent: 50,
-			ScrapedAt:    c.TimeNow(),
+			ScrapedAt:    p2time(c.TimeNow()),
 			ExpectedSize: nil,
 		}))
 
@@ -112,7 +112,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 		UUID:         "asset1",
 		Size:         1000,
 		UsagePercent: 50,
-		ScrapedAt:    c.TimeNow().Add(-15 * time.Minute),
+		ScrapedAt:    p2time(c.TimeNow().Add(-15 * time.Minute)),
 		ExpectedSize: p2uint64(1200),
 	})
 }
@@ -161,7 +161,7 @@ func TestFailingResize(tBase *testing.T) {
 		UUID:         "asset1",
 		Size:         1000,
 		UsagePercent: 50,
-		ScrapedAt:    c.TimeNow().Add(-10 * time.Minute),
+		ScrapedAt:    p2time(c.TimeNow().Add(-10 * time.Minute)),
 		ExpectedSize: nil,
 	})
 }
