@@ -21,7 +21,6 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -155,7 +154,7 @@ func (h handler) GetRecentlySucceededOperationsForResource(w http.ResponseWriter
 		DB:           h.DB,
 		ResourceID:   dbResource.ID,
 		Outcome:      db.OperationOutcomeSucceeded,
-		OverriddenBy: fmt.Sprintf(`o.outcome != '%s'`, db.OperationOutcomeCancelled),
+		OverriddenBy: fmt.Sprintf(`outcome != '%s'`, db.OperationOutcomeCancelled),
 	}.Execute()
 	if respondwith.ErrorText(w, err) {
 		return
@@ -192,51 +191,34 @@ type recentOperationQuery struct {
 	OverriddenBy string //contains a condition for an SQL WHERE clause
 }
 
+//This returns the most recent finished operation matching `outcome = $2` for
+//each asset with `resource_id = $1`, unless there is a newer finished
+//operation matching `%s`.
+var recentOperationQueryStr = `
+	WITH tmp AS (
+		SELECT asset_id, MAX(finished_at) AS max_finished_at
+		  FROM finished_operations
+		 WHERE %s
+		 GROUP BY asset_id
+	)
+	SELECT o.* FROM finished_operations o
+	  JOIN tmp ON tmp.asset_id = o.asset_id AND tmp.max_finished_at = o.finished_at
+	  JOIN assets a ON a.id = o.asset_id
+	 WHERE a.resource_id = $1 AND o.outcome = $2
+`
+
 func (q recentOperationQuery) Execute() (map[int64]db.FinishedOperation, error) {
-	//find relevant operations
+	queryStr := fmt.Sprintf(recentOperationQueryStr, q.OverriddenBy)
+
 	var matchingOps []db.FinishedOperation
-	_, err := q.DB.Select(&matchingOps, `
-		SELECT o.* FROM finished_operations o
-		  JOIN assets a ON a.id = o.asset_id
-		 WHERE a.resource_id = $1 AND o.outcome = $2
-	`, q.ResourceID, q.Outcome)
+	_, err := q.DB.Select(&matchingOps, queryStr, q.ResourceID, q.Outcome)
 	if err != nil {
 		return nil, err
 	}
 
-	//only consider the most recent operation for each asset
-	result := make(map[int64]db.FinishedOperation)
+	result := make(map[int64]db.FinishedOperation, len(matchingOps))
 	for _, op := range matchingOps {
-		otherOp, exists := result[op.AssetID]
-		if !exists || otherOp.FinishedAt.Before(op.FinishedAt) {
-			result[op.AssetID] = op
-		}
+		result[op.AssetID] = op
 	}
-
-	//do not consider operations where an overriding operation finished later
-	query := fmt.Sprintf(`
-		SELECT o.asset_id, MAX(o.finished_at) FROM finished_operations o
-		  JOIN assets a on a.id = o.asset_id
-		 WHERE a.resource_id = $1 AND %s
-		 GROUP BY o.asset_id
-	`, q.OverriddenBy)
-	rows, err := q.DB.Query(query, q.ResourceID)
-	if err != nil {
-		return nil, err
-	}
-	for rows.Next() {
-		var (
-			assetID       int64
-			maxFinishedAt time.Time
-		)
-		err := rows.Scan(&assetID, &maxFinishedAt)
-		if err != nil {
-			return nil, err
-		}
-		op, exists := result[assetID]
-		if exists && op.FinishedAt.Before(maxFinishedAt) {
-			delete(result, assetID)
-		}
-	}
-	return result, rows.Err()
+	return result, nil
 }
