@@ -25,7 +25,7 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
-//AssetStatus shows the current state of an asset. It is returned by AssetManager.GetProjectAssetStatus().
+//AssetStatus shows the current state of an asset. It is returned by AssetManager.GetAssetStatus().
 type AssetStatus struct {
 	Size         uint64
 	UsagePercent uint32
