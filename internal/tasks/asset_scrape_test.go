@@ -628,3 +628,36 @@ func TestSkipUpsizeBecauseOfMaximumSize(baseT *testing.T) {
 	t.ExpectPendingOperations(c.DB /*, nothing */)
 	t.ExpectFinishedOperations(c.DB /*, nothing */)
 }
+
+func TestExternalResizeWhileOperationPending(baseT *testing.T) {
+	t := test.T{T: baseT}
+	c, setAsset, clock := setupAssetScrapeTest(t)
+
+	//create a "High" operation
+	clock.StepBy(10 * time.Minute)
+	setAsset(plugins.StaticAsset{Size: 1000, Usage: 900})
+	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+
+	expectedOp := db.PendingOperation{
+		ID:           1,
+		AssetID:      1,
+		Reason:       db.OperationReasonHigh,
+		OldSize:      1000,
+		NewSize:      1200,
+		UsagePercent: 90,
+		CreatedAt:    c.TimeNow(),
+	}
+	t.ExpectPendingOperations(c.DB, expectedOp)
+	t.ExpectFinishedOperations(c.DB /*, nothing */)
+
+	//while it is not greenlit yet, simulate a resize operation
+	//being performed by an unrelated user
+	clock.StepBy(10 * time.Minute)
+	setAsset(plugins.StaticAsset{Size: 1100, Usage: 900}) // bigger, but still >80% usage
+	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+
+	//ScrapeNextAsset should have adjusted the NewSize to CurrentSize + SizeStep
+	expectedOp.NewSize = 1320
+	t.ExpectPendingOperations(c.DB, expectedOp)
+	t.ExpectFinishedOperations(c.DB /*, nothing */)
+}

@@ -176,11 +176,18 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 		}
 	}
 	if pendingOp != nil {
+		pendingOp, err = c.maybeUpdateOperation(tx, res, asset, *pendingOp)
+		if err != nil {
+			return fmt.Errorf("cannot update operation on %s %s: %s", assetType, asset.UUID, err.Error())
+		}
+	}
+	if pendingOp != nil {
 		pendingOp, err = c.maybeConfirmOperation(tx, res, asset, *pendingOp)
 		if err != nil {
 			return fmt.Errorf("cannot confirm operation on %s %s: %s", assetType, asset.UUID, err.Error())
 		}
 	}
+
 	//if there is no pending operation (or if we just cancelled it), see if we can start one
 	if pendingOp == nil {
 		err = c.maybeCreateOperation(tx, res, asset)
@@ -255,6 +262,25 @@ func (c Context) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, ass
 		return nil, err
 	}
 	return nil, tx.Insert(&finishedOp)
+}
+
+func (c Context) maybeUpdateOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, op db.PendingOperation) (*db.PendingOperation, error) {
+	//do not touch `op` unless the corresponding threshold is still being crossed
+	if !core.GetMatchingReasons(res, asset)[op.Reason] {
+		return &op, nil
+	}
+
+	//if the asset size has changed since the operation has been created
+	//(because of resizes not performed by Castellum), calculate a new target size
+	newSize := core.GetNewSize(res, asset, op.Reason != db.OperationReasonLow)
+	if op.NewSize == newSize {
+		//nothing to do
+		return &op, nil
+	}
+
+	op.NewSize = newSize
+	_, err := tx.Update(&op)
+	return &op, err
 }
 
 func (c Context) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, op db.PendingOperation) (*db.PendingOperation, error) {
