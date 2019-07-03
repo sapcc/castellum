@@ -105,7 +105,15 @@ func (c Context) ExecuteNextResize() (targetAssetType db.AssetType, returnedErro
 	outcome := db.OperationOutcomeSucceeded
 	errorMessage := ""
 	if err != nil {
-		logg.Error("cannot resize %s %s to size %d: %s", res.AssetType, asset.UUID, op.NewSize, err.Error())
+		e := setAssetSizeError{
+			scopeUUID: res.ScopeUUID,
+			assetType: string(res.AssetType),
+			assetUUID: asset.UUID,
+			newSize:   op.NewSize,
+			inner:     err,
+		}
+		captureSentryException(e)
+		logg.Error(e.Error())
 		outcome = db.OperationOutcomeFailed
 		errorMessage = err.Error()
 	}

@@ -114,7 +114,14 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 		if dbErr != nil {
 			return dbErr
 		}
-		return fmt.Errorf("cannot query status of %s %s: %s", assetType, asset.UUID, err.Error())
+		e := getAssetStatusError{
+			scopeUUID: res.ScopeUUID,
+			assetType: string(assetType),
+			assetUUID: asset.UUID,
+			inner:     err,
+		}
+		captureSentryException(e)
+		return e
 	}
 
 	//update asset attributes - We have four separate cases here, which
