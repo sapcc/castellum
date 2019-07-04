@@ -62,6 +62,7 @@ All components receive configuration via environment variables. The following va
 | `CASTELLUM_DB_URI` | *(required)* | A [libpq connection URI][pq-uri] that locates the Castellum database. The non-URI "connection string" format is not allowed; it must be a URI. |
 | `CASTELLUM_HTTP_LISTEN_ADDRESS` | `:8080` | Listen address for the internal HTTP server. For `castellum observer/worker`, this just exposes Prometheus metrics on `/metrics`. For `castelum api`, this also exposes [the REST API](./docs/api-spec.md). |
 | `CASTELLUM_OSLO_POLICY_PATH` | *(required)* | Path to the `policy.json` file for this service. See [*Oslo policy*](#oslo-policy) for details. |
+| `CASTELLUM_SENTRY_DSN` | *(optional)* | DSN for your Sentry project. If this variable is configured then Castellum will report failed backend operations to Sentry. |
 | `OS_...` | *(required)* | A full set of OpenStack auth environment variables for Castellum's service user. See [documentation for openstackclient][os-env] for details. |
 
 ### Oslo policy
