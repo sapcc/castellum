@@ -112,8 +112,12 @@ func (c Context) ExecuteNextResize() (targetAssetType db.AssetType, returnedErro
 			newSize:   op.NewSize,
 			inner:     err,
 		}
-		captureSentryException(e)
 		logg.Error(e.Error())
+
+		if c.SentryHub != nil {
+			captureSentryException(c.SentryHub, e)
+		}
+
 		outcome = db.OperationOutcomeFailed
 		errorMessage = err.Error()
 	}

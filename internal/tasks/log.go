@@ -26,6 +26,7 @@ import (
 	"github.com/sapcc/go-bits/logg"
 )
 
+//sendEventsToSentry tells whether events should be sent to a Sentry server.
 var sendEventsToSentry bool
 
 func init() {
@@ -47,19 +48,13 @@ type sentryException interface {
 }
 
 //captureSentryException is a convenient wrapper around sentry.CaptureException().
-//It generates the relevant tags for the custom error type and modifies the scope
-//before sending the event to a Sentry server.
-//
-//This function is safe to use from multiple goroutines since a local isolated
-//*sentry.Hub is used instead of the global.
-func captureSentryException(se sentryException) {
-	if sendEventsToSentry {
-		localHub := sentry.CurrentHub().Clone()
-		localHub.ConfigureScope(func(scope *sentry.Scope) {
-			scope.SetTags(se.generateTags())
-		})
-		localHub.CaptureException(se)
-	}
+//It takes a local *sentry.Hub and generates the relevant tags for the
+//custom error type before sending the event to a Sentry server.
+func captureSentryException(hub *sentry.Hub, se sentryException) {
+	hub.WithScope(func(scope *sentry.Scope) {
+		scope.SetTags(se.generateTags())
+		hub.CaptureException(se)
+	})
 }
 
 //listAssetsError contains parameters for creating the respective Sentry event.

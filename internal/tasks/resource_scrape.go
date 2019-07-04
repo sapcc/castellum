@@ -78,7 +78,9 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 			assetType: string(assetType),
 			inner:     err,
 		}
-		captureSentryException(e)
+		if c.SentryHub != nil {
+			captureSentryException(c.SentryHub, e)
+		}
 		return e
 	}
 	logg.Debug("scraped %d assets for %s resource for project %s", len(assetUUIDs), assetType, res.ScopeUUID)
@@ -145,7 +147,9 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 				assetUUID: assetUUID,
 				inner:     err,
 			}
-			captureSentryException(e)
+			if c.SentryHub != nil {
+				captureSentryException(c.SentryHub, e)
+			}
 			return err
 		}
 	}

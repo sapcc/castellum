@@ -120,7 +120,9 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 			assetUUID: asset.UUID,
 			inner:     err,
 		}
-		captureSentryException(e)
+		if c.SentryHub != nil {
+			captureSentryException(c.SentryHub, e)
+		}
 		return e
 	}
 
