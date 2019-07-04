@@ -190,11 +190,13 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 
 	for _, manager := range team {
 		for _, assetType := range manager.AssetTypes() {
+			c1 := c.CloneForNewGoroutine()
 			go jobLoop(func() error {
-				return c.ScrapeNextResource(assetType, time.Now().Add(-30*time.Minute))
+				return c1.ScrapeNextResource(assetType, time.Now().Add(-30*time.Minute))
 			})
+			c2 := c.CloneForNewGoroutine()
 			go jobLoop(func() error {
-				return c.ScrapeNextAsset(assetType, time.Now().Add(-5*time.Minute))
+				return c2.ScrapeNextAsset(assetType, time.Now().Add(-5*time.Minute))
 			})
 		}
 	}
@@ -240,6 +242,7 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 	c := tasks.Context{DB: dbi, Team: team}
 	c.ApplyDefaults()
 	c.InitializeResizingCounters()
+	c = c.CloneForNewGoroutine()
 
 	go jobLoop(func() error {
 		_, err := c.ExecuteNextResize()

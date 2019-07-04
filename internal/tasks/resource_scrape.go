@@ -73,7 +73,15 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 	//check which assets exist in this resource in OpenStack
 	assetUUIDs, err := manager.ListAssets(res)
 	if err != nil {
-		return fmt.Errorf("cannot list %s assets in project %s: %s", assetType, res.ScopeUUID, err.Error())
+		e := listAssetsError{
+			scopeUUID: res.ScopeUUID,
+			assetType: string(assetType),
+			inner:     err,
+		}
+		if c.SentryHub != nil {
+			captureSentryException(c.SentryHub, e)
+		}
+		return e
 	}
 	logg.Debug("scraped %d assets for %s resource for project %s", len(assetUUIDs), assetType, res.ScopeUUID)
 	isExistingAsset := make(map[string]bool, len(assetUUIDs))
@@ -133,6 +141,15 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 
 		err = c.DB.Insert(&dbAsset)
 		if err != nil {
+			e := getAssetStatusError{
+				scopeUUID: res.ScopeUUID,
+				assetType: string(assetType),
+				assetUUID: assetUUID,
+				inner:     err,
+			}
+			if c.SentryHub != nil {
+				captureSentryException(c.SentryHub, e)
+			}
 			return err
 		}
 	}
