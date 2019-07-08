@@ -2,9 +2,9 @@
 
 Castellum's API looks like a conventional OpenStack REST API.
 
+- Castellum's service URL can be found in the Keystone service catalog under the service type `castellum`.
 - All endpoints require a Keystone token to be present in the `X-Auth-Token` header.
   Only Keystone v3 is supported.
-
 - All timestamps are formatted as UNIX timestamps, i.e. seconds since the UNIX epoch.
 
 This document uses the terminology defined in the [README.md](../README.md#terminology).
