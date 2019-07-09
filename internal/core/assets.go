@@ -27,8 +27,15 @@ import (
 
 //AssetStatus shows the current state of an asset. It is returned by AssetManager.GetAssetStatus().
 type AssetStatus struct {
-	Size         uint64
-	UsagePercent uint32
+	Size          uint64
+	AbsoluteUsage *uint64 //only set when ReportsAbsoluteUsage = true
+	UsagePercent  uint32
+}
+
+//AssetTypeInfo describes an AssetType supported by an AssetManager.
+type AssetTypeInfo struct {
+	AssetType            db.AssetType
+	ReportsAbsoluteUsage bool
 }
 
 //AssetManager is the main modularization interface in Castellum. It
@@ -37,7 +44,7 @@ type AssetStatus struct {
 //It is created by CreateAssetManagers() using AssetManagerFactory.
 type AssetManager interface {
 	//Returns the list of all asset types supported by this asset manager.
-	AssetTypes() []db.AssetType
+	AssetTypes() []AssetTypeInfo
 
 	ListAssets(res db.Resource) ([]string, error)
 	SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) error
@@ -99,14 +106,13 @@ func CreateAssetManagers(factoryIDs []string, provider *gophercloud.ProviderClie
 
 //ForAssetType returns the asset manager for the given asset type, or nil if
 //the asset type is not supported.
-func (team AssetManagerTeam) ForAssetType(assetType db.AssetType) AssetManager {
+func (team AssetManagerTeam) ForAssetType(assetType db.AssetType) (AssetManager, AssetTypeInfo) {
 	for _, manager := range team {
-		types := manager.AssetTypes()
-		for _, t := range types {
-			if assetType == t {
-				return manager
+		for _, i := range manager.AssetTypes() {
+			if assetType == i.AssetType {
+				return manager, i
 			}
 		}
 	}
-	return nil
+	return nil, AssetTypeInfo{}
 }

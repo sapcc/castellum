@@ -80,8 +80,8 @@ func init() {
 //all relevant timeseries exist.
 func (c Context) InitializeScrapingCounters() {
 	for _, manager := range c.Team {
-		for _, assetType := range manager.AssetTypes() {
-			labels := prometheus.Labels{"asset": string(assetType)}
+		for _, info := range manager.AssetTypes() {
+			labels := prometheus.Labels{"asset": string(info.AssetType)}
 			resourceScrapeSuccessCounter.With(labels).Add(0)
 			resourceScrapeFailedCounter.With(labels).Add(0)
 			assetScrapeSuccessCounter.With(labels).Add(0)
@@ -94,8 +94,8 @@ func (c Context) InitializeScrapingCounters() {
 //all relevant timeseries exist.
 func (c Context) InitializeResizingCounters() {
 	for _, manager := range c.Team {
-		for _, assetType := range manager.AssetTypes() {
-			labels := prometheus.Labels{"asset": string(assetType)}
+		for _, info := range manager.AssetTypes() {
+			labels := prometheus.Labels{"asset": string(info.AssetType)}
 			assetResizeCounter.With(labels).Add(0)
 			assetResizeErroredCounter.With(labels).Add(0)
 		}

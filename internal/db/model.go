@@ -114,6 +114,10 @@ type Asset struct {
 	//The asset's current utilization as a percentage of its size. This must
 	//always be between 0 and 100.
 	UsagePercent uint32 `db:"usage_percent"`
+	//The asset's current utilization, in the same unit as .Size. This is only
+	//set when the asset manager reports absolute usages.
+	AbsoluteUsage *uint64 `db:"absolute_usage"`
+
 	//When we last tried to obtain the current .Size and .UsagePercent values.
 	CheckedAt time.Time `db:"checked_at"`
 	//When the current .Size and .UsagePercent values were obtained.

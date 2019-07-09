@@ -51,13 +51,14 @@ func setupAssetScrapeTest(t test.T) (*Context, func(plugins.StaticAsset), *test.
 		SizeStepPercent:          20,
 	}))
 	t.Must(c.DB.Insert(&db.Asset{
-		ResourceID:   1,
-		UUID:         "asset1",
-		Size:         1000,
-		UsagePercent: 50,
-		CheckedAt:    c.TimeNow(),
-		ScrapedAt:    p2time(c.TimeNow()),
-		ExpectedSize: nil,
+		ResourceID:    1,
+		UUID:          "asset1",
+		Size:          1000,
+		AbsoluteUsage: p2uint64(500),
+		UsagePercent:  50,
+		CheckedAt:     c.TimeNow(),
+		ScrapedAt:     p2time(c.TimeNow()),
+		ExpectedSize:  nil,
 	}))
 
 	//setup asset with configurable size
@@ -410,6 +411,9 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 	assets[0].CheckedAt = c.TimeNow().Add(-2 * time.Minute)
 	assets[1].CheckedAt = c.TimeNow().Add(-time.Minute)
 	assets[2].CheckedAt = c.TimeNow()
+	assets[0].AbsoluteUsage = p2uint64(510)
+	assets[1].AbsoluteUsage = p2uint64(520)
+	assets[2].AbsoluteUsage = p2uint64(530)
 	assets[0].UsagePercent = 51
 	assets[1].UsagePercent = 52
 	assets[2].UsagePercent = 53
@@ -464,14 +468,15 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 		RemainingDelay: 2,
 	})
 	asset := db.Asset{
-		ID:           1,
-		ResourceID:   1,
-		UUID:         "asset1",
-		Size:         1000,
-		UsagePercent: 50,
-		CheckedAt:    c.TimeNow(),
-		ScrapedAt:    p2time(c.TimeNow()),
-		ExpectedSize: p2uint64(1100),
+		ID:            1,
+		ResourceID:    1,
+		UUID:          "asset1",
+		Size:          1000,
+		AbsoluteUsage: p2uint64(500),
+		UsagePercent:  50,
+		CheckedAt:     c.TimeNow(),
+		ScrapedAt:     p2time(c.TimeNow()),
+		ExpectedSize:  p2uint64(1100),
 	}
 
 	//first scrape will not touch anything about the asset, and also not create
@@ -493,6 +498,7 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
 
 	asset.Size = 1100
+	asset.AbsoluteUsage = p2uint64(1000)
 	asset.UsagePercent = 90
 	asset.CheckedAt = c.TimeNow()
 	asset.ScrapedAt = p2time(c.TimeNow())
@@ -528,14 +534,15 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
 	clock.StepBy(5 * time.Minute)
 	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
 	t.ExpectAssets(c.DB, db.Asset{
-		ID:           1,
-		ResourceID:   1,
-		UUID:         "asset1",
-		Size:         1200,
-		UsagePercent: 50,
-		CheckedAt:    c.TimeNow(),
-		ScrapedAt:    p2time(c.TimeNow()),
-		ExpectedSize: nil,
+		ID:            1,
+		ResourceID:    1,
+		UUID:          "asset1",
+		Size:          1200,
+		AbsoluteUsage: p2uint64(600),
+		UsagePercent:  50,
+		CheckedAt:     c.TimeNow(),
+		ScrapedAt:     p2time(c.TimeNow()),
+		ExpectedSize:  nil,
 	})
 }
 
@@ -567,6 +574,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 		ResourceID:         1,
 		UUID:               "asset1",
 		Size:               1000,
+		AbsoluteUsage:      p2uint64(500),
 		UsagePercent:       50,                                        //changed usage not observed because of error
 		ScrapedAt:          p2time(c.TimeNow().Add(-5 * time.Minute)), //not updated by ScrapeNextAsset!
 		CheckedAt:          c.TimeNow(),                               //but this WAS updated!
@@ -585,6 +593,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 		ResourceID:         1,
 		UUID:               "asset1",
 		Size:               1000,
+		AbsoluteUsage:      p2uint64(600),
 		UsagePercent:       60,
 		ScrapedAt:          p2time(c.TimeNow()),
 		CheckedAt:          c.TimeNow(),

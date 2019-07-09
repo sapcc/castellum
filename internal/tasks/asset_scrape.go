@@ -55,7 +55,7 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 		}
 	}()
 
-	manager := c.Team.ForAssetType(assetType)
+	manager, _ := c.Team.ForAssetType(assetType)
 	if manager == nil {
 		panic(fmt.Sprintf("no asset manager for asset type %q", assetType))
 	}
@@ -150,6 +150,7 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 		//in parallel and take that new value as the actual size
 		asset.Size = status.Size
 		asset.UsagePercent = status.UsagePercent
+		asset.AbsoluteUsage = status.AbsoluteUsage
 		asset.ExpectedSize = nil
 	default:
 		//we are waiting for a resize operation to reflect in the backend, but

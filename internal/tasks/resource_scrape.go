@@ -53,7 +53,7 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 		}
 	}()
 
-	manager := c.Team.ForAssetType(assetType)
+	manager, _ := c.Team.ForAssetType(assetType)
 	if manager == nil {
 		panic(fmt.Sprintf("no asset manager for asset type %q", assetType))
 	}
@@ -131,11 +131,13 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 			assetScrapeSuccessCounter.With(labels).Inc()
 			dbAsset.Size = status.Size
 			dbAsset.UsagePercent = status.UsagePercent
+			dbAsset.AbsoluteUsage = status.AbsoluteUsage
 			dbAsset.ScrapedAt = &now
 		} else {
 			assetScrapeFailedCounter.With(labels).Inc()
 			dbAsset.Size = 0
 			dbAsset.UsagePercent = 0
+			dbAsset.AbsoluteUsage = nil
 			dbAsset.ScrapeErrorMessage = err.Error()
 		}
 

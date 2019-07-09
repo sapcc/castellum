@@ -65,8 +65,11 @@ func init() {
 }
 
 //AssetTypes implements the core.AssetManager interface.
-func (m *assetManagerNFS) AssetTypes() []db.AssetType {
-	return []db.AssetType{"nfs-shares"}
+func (m *assetManagerNFS) AssetTypes() []core.AssetTypeInfo {
+	return []core.AssetTypeInfo{{
+		AssetType:            "nfs-shares",
+		ReportsAbsoluteUsage: true,
+	}}
 }
 
 //ListAssets implements the core.AssetManager interface.
@@ -135,8 +138,9 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 	sizeBytes := bytesTotal + bytesReservedBySnapshots
 	usageBytes := bytesUsed + bytesReservedBySnapshots
 	status := core.AssetStatus{
-		Size:         uint64(math.Round(sizeBytes / 1024 / 1024 / 1024)),
-		UsagePercent: uint32(math.Round(100 * usageBytes / sizeBytes)),
+		Size:          uint64(math.Round(sizeBytes / 1024 / 1024 / 1024)),
+		AbsoluteUsage: p2u64(uint64(math.Round(usageBytes / 1024 / 1024 / 1024))),
+		UsagePercent:  uint32(math.Round(100 * usageBytes / sizeBytes)),
 	}
 	if usageBytes <= 0 {
 		status.UsagePercent = 0
@@ -189,4 +193,8 @@ func prometheusGetSingleValue(api prom_v1.API, queryStr string) (float64, error)
 	case 1:
 		return float64(resultVector[0].Value), nil
 	}
+}
+
+func p2u64(val uint64) *uint64 {
+	return &val
 }

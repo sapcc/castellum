@@ -128,4 +128,10 @@ var SQLMigrations = map[string]string{
 	"005_make_assets_scraped_at_optional.up.sql": `
 		ALTER TABLE assets ALTER COLUMN scraped_at DROP NOT NULL;
 	`,
+	"006_add_assets_absolute_usage.down.sql": `
+		ALTER TABLE assets DROP COLUMN absolute_usage;
+	`,
+	"006_add_assets_absolute_usage.up.sql": `
+		ALTER TABLE assets ADD COLUMN absolute_usage BIGINT DEFAULT NULL;
+	`,
 }

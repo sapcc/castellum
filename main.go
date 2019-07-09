@@ -189,14 +189,14 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	c.InitializeScrapingCounters()
 
 	for _, manager := range team {
-		for _, assetType := range manager.AssetTypes() {
+		for _, info := range manager.AssetTypes() {
 			c1 := c.CloneForNewGoroutine()
 			go jobLoop(func() error {
-				return c1.ScrapeNextResource(assetType, time.Now().Add(-30*time.Minute))
+				return c1.ScrapeNextResource(info.AssetType, time.Now().Add(-30*time.Minute))
 			})
 			c2 := c.CloneForNewGoroutine()
 			go jobLoop(func() error {
-				return c2.ScrapeNextAsset(assetType, time.Now().Add(-5*time.Minute))
+				return c2.ScrapeNextAsset(info.AssetType, time.Now().Add(-5*time.Minute))
 			})
 		}
 	}
@@ -260,7 +260,7 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 // task: test-asset-type
 
 func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetType db.AssetType) {
-	manager := team.ForAssetType(assetType)
+	manager, _ := team.ForAssetType(assetType)
 	if manager == nil {
 		logg.Fatal("no manager configured for asset type: %q", assetType)
 	}

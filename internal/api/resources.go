@@ -224,7 +224,8 @@ func (h handler) GetProject(w http.ResponseWriter, r *http.Request) {
 	}
 	result.Resources = make(map[db.AssetType]Resource)
 	for _, res := range dbResources {
-		if h.Team.ForAssetType(res.AssetType) == nil {
+		manager, _ := h.Team.ForAssetType(res.AssetType)
+		if manager == nil {
 			continue
 		}
 		if token.Check(res.AssetType.PolicyRuleForRead()) {

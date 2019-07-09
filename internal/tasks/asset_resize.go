@@ -88,7 +88,7 @@ func (c Context) ExecuteNextResize() (targetAssetType db.AssetType, returnedErro
 	if err != nil {
 		return "", err
 	}
-	manager := c.Team.ForAssetType(res.AssetType)
+	manager, _ := c.Team.ForAssetType(res.AssetType)
 	if manager == nil {
 		return res.AssetType, fmt.Errorf("no asset manager for asset type %q", res.AssetType)
 	}

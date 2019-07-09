@@ -53,8 +53,11 @@ type AssetManagerStatic struct {
 }
 
 //AssetTypes implements the core.AssetManager interface.
-func (m AssetManagerStatic) AssetTypes() []db.AssetType {
-	return []db.AssetType{m.AssetType}
+func (m AssetManagerStatic) AssetTypes() []core.AssetTypeInfo {
+	return []core.AssetTypeInfo{{
+		AssetType:            m.AssetType,
+		ReportsAbsoluteUsage: true,
+	}}
 }
 
 var (
@@ -110,8 +113,9 @@ func (m AssetManagerStatic) GetAssetStatus(res db.Resource, assetUUID string, pr
 	}
 
 	return core.AssetStatus{
-		Size:         asset.Size,
-		UsagePercent: uint32(asset.Usage * 100 / asset.Size),
+		Size:          asset.Size,
+		AbsoluteUsage: p2u64(asset.Usage),
+		UsagePercent:  uint32(asset.Usage * 100 / asset.Size),
 	}, nil
 }
 
