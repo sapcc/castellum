@@ -64,6 +64,7 @@ The following fields may be returned:
 | `resources.$type.low_threshold.usage_percent`<br>`resources.$type.high_threshold.usage_percent`<br>`resources.$type.critical_threshold.usage_percent` | integer | Automated operations will be triggered when usage crosses these thresholds, i.e. `usage <= threshold` for the low threshold and `usage >= threshold` for the high and critical thresholds. |
 | `resources.$type.low_threshold.delay_seconds`<br>`resources.$type.high_threshold.delay_seconds` | integer | How long usage must cross the threshold before the operation is confirmed. Critical operations don't have a delay; they are always confirmed immediately. |
 | `resources.$type.size_constraints.minimum`<br>`resources.$type.size_constraints.maximum` | integer | If set, resize operations will only be scheduled when the target size fits into these constraints. |
+| `resources.$type.size_constraints.minimum_free` | integer | If set, downsize operations will be inhibited when `newSize - absoluteUsage` would be smaller than this. |
 | `resources.$type.size_steps.percent` | integer | How much the size changes in each resize operation, as a percentage of the previous size. |
 
 ## GET /v1/projects/:id/resources/:type

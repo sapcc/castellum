@@ -48,15 +48,16 @@ type StaticAsset struct {
 //
 //Attempts to resize assets will succeed if and only if `newSize > usage`.
 type AssetManagerStatic struct {
-	AssetType db.AssetType
-	Assets    map[string]map[string]StaticAsset
+	AssetType            db.AssetType
+	Assets               map[string]map[string]StaticAsset
+	ReportsAbsoluteUsage bool
 }
 
 //AssetTypes implements the core.AssetManager interface.
 func (m AssetManagerStatic) AssetTypes() []core.AssetTypeInfo {
 	return []core.AssetTypeInfo{{
 		AssetType:            m.AssetType,
-		ReportsAbsoluteUsage: true,
+		ReportsAbsoluteUsage: m.ReportsAbsoluteUsage,
 	}}
 }
 

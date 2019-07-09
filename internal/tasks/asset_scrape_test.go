@@ -670,3 +670,46 @@ func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 	t.ExpectPendingOperations(c.DB, expectedOp)
 	t.ExpectFinishedOperations(c.DB /*, nothing */)
 }
+
+func TestDownsizeAllowedByMinimumFreeSize(baseT *testing.T) {
+	t := test.T{T: baseT}
+	c, setAsset, clock := setupAssetScrapeTest(t)
+
+	//set a very low usage that permits downsizing
+	setAsset(plugins.StaticAsset{Size: 1000, Usage: 100})
+
+	//configure a MinimumFreeSize such that the downsizing operation is still
+	//permitted by it (see next testcase for the opposite behavior)
+	t.MustExec(c.DB, `UPDATE resources SET min_free_size = 600`)
+
+	//ScrapeNextAsset should create a downsize operation
+	clock.StepBy(10 * time.Minute)
+	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+	t.ExpectPendingOperations(c.DB, db.PendingOperation{
+		ID:           1,
+		AssetID:      1,
+		Reason:       db.OperationReasonLow,
+		OldSize:      1000,
+		NewSize:      800,
+		UsagePercent: 10,
+		CreatedAt:    c.TimeNow(),
+	})
+}
+
+func TestDownsizeForbiddenByMinimumFreeSize(baseT *testing.T) {
+	t := test.T{T: baseT}
+	c, setAsset, clock := setupAssetScrapeTest(t)
+
+	//set a very low usage that permits downsizing
+	setAsset(plugins.StaticAsset{Size: 1000, Usage: 100})
+
+	//configure a MinimumFreeSize that inhibits this downsizing operation (note
+	//that while the *current* free size is larger than 800, the *new* free size
+	//would be lower, and that's the crucial point)
+	t.MustExec(c.DB, `UPDATE resources SET min_free_size = 800`)
+
+	//ScrapeNextAsset should NOT create a downsize operation
+	clock.StepBy(10 * time.Minute)
+	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+	t.ExpectPendingOperations(c.DB /*, nothing */)
+}

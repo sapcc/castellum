@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/respondwith"
 )
@@ -53,8 +54,9 @@ type SizeSteps struct {
 
 //SizeConstraints appears in type Resource.
 type SizeConstraints struct {
-	Minimum *uint64 `json:"minimum,omitempty"`
-	Maximum *uint64 `json:"maximum,omitempty"`
+	Minimum     *uint64 `json:"minimum,omitempty"`
+	Maximum     *uint64 `json:"maximum,omitempty"`
+	MinimumFree *uint64 `json:"minimum_free,omitempty"`
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -91,10 +93,11 @@ func (h handler) ResourceFromDB(res db.Resource) (Resource, error) {
 			UsagePercent: res.CriticalThresholdPercent,
 		}
 	}
-	if res.MinimumSize != nil || res.MaximumSize != nil {
+	if res.MinimumSize != nil || res.MaximumSize != nil || res.MinimumFreeSize != nil {
 		result.SizeConstraints = &SizeConstraints{
-			Minimum: res.MinimumSize,
-			Maximum: res.MaximumSize,
+			Minimum:     res.MinimumSize,
+			Maximum:     res.MaximumSize,
+			MinimumFree: res.MinimumFreeSize,
 		}
 	}
 	return result, nil
@@ -102,7 +105,7 @@ func (h handler) ResourceFromDB(res db.Resource) (Resource, error) {
 
 //UpdateDBResource updates the given db.Resource with the values provided in
 //this api.Resource.
-func (r Resource) UpdateDBResource(res *db.Resource) (errors []string) {
+func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo) (errors []string) {
 	complain := func(msg string) { errors = append(errors, msg) }
 
 	if r.ScrapedAtUnix != nil {
@@ -180,6 +183,7 @@ func (r Resource) UpdateDBResource(res *db.Resource) (errors []string) {
 	if r.SizeConstraints == nil {
 		res.MinimumSize = nil
 		res.MaximumSize = nil
+		res.MinimumFreeSize = nil
 	} else {
 		res.MinimumSize = r.SizeConstraints.Minimum
 		if res.MinimumSize != nil && *res.MinimumSize == 0 {
@@ -195,6 +199,14 @@ func (r Resource) UpdateDBResource(res *db.Resource) (errors []string) {
 			if *res.MaximumSize <= min {
 				complain("maximum size must be greater than minimum size")
 			}
+		}
+
+		res.MinimumFreeSize = r.SizeConstraints.MinimumFree
+		if res.MinimumFreeSize != nil && *res.MinimumFreeSize == 0 {
+			res.MinimumFreeSize = nil
+		}
+		if res.MinimumFreeSize != nil && !info.ReportsAbsoluteUsage {
+			complain("cannot use minimum free size constraint: asset type does not report absolute usage")
 		}
 	}
 
@@ -274,7 +286,8 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	errs := input.UpdateDBResource(dbResource)
+	_, info := h.Team.ForAssetType(dbResource.AssetType)
+	errs := input.UpdateDBResource(dbResource, info)
 	if len(errs) > 0 {
 		http.Error(w, strings.Join(errs, "\n"), http.StatusUnprocessableEntity)
 		return

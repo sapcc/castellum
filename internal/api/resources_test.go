@@ -265,6 +265,9 @@ func TestPutResource(baseT *testing.T) {
 		"size_steps": assert.JSONObject{
 			"percent": 15,
 		},
+		"size_constraints": assert.JSONObject{
+			"minimum_free": 23,
+		},
 	}
 	assert.HTTPRequest{
 		Method:       "PUT",
@@ -284,6 +287,7 @@ func TestPutResource(baseT *testing.T) {
 				ScrapedAt:                res.ScrapedAt,
 				CriticalThresholdPercent: 98,
 				SizeStepPercent:          15,
+				MinimumFreeSize:          p2uint64(23),
 			})
 		} else {
 			newResources2 = append(newResources2, res)
@@ -313,6 +317,7 @@ func TestPutResource(baseT *testing.T) {
 		AssetType:                "foo",
 		CriticalThresholdPercent: 98,
 		SizeStepPercent:          15,
+		MinimumFreeSize:          p2uint64(23),
 	})
 	t.ExpectResources(h.DB, allResources...)
 
@@ -325,8 +330,9 @@ func TestPutResource(baseT *testing.T) {
 			"percent": 15,
 		},
 		"size_constraints": assert.JSONObject{
-			"minimum": 0,
-			"maximum": 42000,
+			"minimum":      0,
+			"maximum":      42000,
+			"minimum_free": 0,
 		},
 	}
 	assert.HTTPRequest{
@@ -349,6 +355,7 @@ func TestPutResource(baseT *testing.T) {
 				SizeStepPercent:          15,
 				MinimumSize:              nil, //0 gets normalized to NULL
 				MaximumSize:              p2uint64(42000),
+				MinimumFreeSize:          nil, //0 gets normalized to NULL
 			})
 		} else {
 			newResources3 = append(newResources3, res)
@@ -438,6 +445,20 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 		},
 		"low threshold must be below critical threshold",
 	)
+
+	//there's one thing we can only test with a "bar" resource since "bar" has
+	//ReportsAbsoluteUsage = false
+	assert.HTTPRequest{
+		Method: "PUT",
+		Path:   "/v1/projects/project1/resources/bar",
+		Body: assert.JSONObject{
+			"critical_threshold": assert.JSONObject{"usage_percent": 90},
+			"size_steps":         assert.JSONObject{"percent": 10},
+			"size_constraints":   assert.JSONObject{"minimum_free": 10},
+		},
+		ExpectStatus: http.StatusUnprocessableEntity,
+		ExpectBody:   assert.StringData("cannot use minimum free size constraint: asset type does not report absolute usage\n"),
+	}.Check(t.T, hh)
 
 	//none of this should have touched the DB
 	t.ExpectResources(h.DB, allResources...)

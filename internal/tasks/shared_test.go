@@ -29,7 +29,8 @@ import (
 func setupContext(t test.T) (*Context, *plugins.AssetManagerStatic, *test.FakeClock) {
 	dbi := t.PrepareDB(nil)
 	amStatic := &plugins.AssetManagerStatic{
-		AssetType: "foo",
+		AssetType:            "foo",
+		ReportsAbsoluteUsage: true,
 	}
 	//clock starts at an easily recognizable value
 	clockVar := test.FakeClock(99990)

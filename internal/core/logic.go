@@ -43,10 +43,20 @@ func GetMatchingReasons(res db.Resource, asset db.Asset) map[db.OperationReason]
 }
 
 func canDownsize(res db.Resource, asset db.Asset) bool {
-	if res.MinimumSize == nil {
-		return true
+	if res.MinimumSize != nil {
+		if GetNewSize(res, asset, false) < *res.MinimumSize {
+			return false
+		}
 	}
-	return GetNewSize(res, asset, false) >= *res.MinimumSize
+	if res.MinimumFreeSize != nil && asset.AbsoluteUsage != nil {
+		newSize := GetNewSize(res, asset, false)
+		if newSize < *asset.AbsoluteUsage+*res.MinimumFreeSize {
+			//^ This condition is equal to `newSize - absUsage < minFreeSize`, but
+			//cannot overflow below 0.
+			return false
+		}
+	}
+	return true
 }
 
 func canUpsize(res db.Resource, asset db.Asset) bool {

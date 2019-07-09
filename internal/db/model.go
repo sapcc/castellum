@@ -70,6 +70,9 @@ type Resource struct {
 	//operations will never move to a size outside this range.
 	MinimumSize *uint64 `db:"min_size"`
 	MaximumSize *uint64 `db:"max_size"`
+	//If configured, downsize operations will be inhibited when `newSize -
+	//absoluteUsage` would be smaller than this.
+	MinimumFreeSize *uint64 `db:"min_free_size"`
 }
 
 //AssetType is the type of Resource.AssetType. It extends type string with some

@@ -134,4 +134,10 @@ var SQLMigrations = map[string]string{
 	"006_add_assets_absolute_usage.up.sql": `
 		ALTER TABLE assets ADD COLUMN absolute_usage BIGINT DEFAULT NULL;
 	`,
+	"007_add_resources_min_free_size.down.sql": `
+		ALTER TABLE resources DROP COLUMN min_free_size;
+	`,
+	"007_add_resources_min_free_size.up.sql": `
+		ALTER TABLE resources ADD COLUMN min_free_size BIGINT DEFAULT NULL;
+	`,
 }
