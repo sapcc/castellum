@@ -39,6 +39,19 @@ func GetMatchingReasons(res db.Resource, asset db.Asset) map[db.OperationReason]
 			result[db.OperationReasonCritical] = true
 		}
 	}
+
+	//even if the high threshold is not surpassed, we still want to upsize when it is necessary to ensure res.MinimumFreeSize
+	if res.MinimumFreeSize != nil && asset.AbsoluteUsage != nil {
+		freeSize := asset.Size - *asset.AbsoluteUsage
+		if asset.Size < *asset.AbsoluteUsage {
+			//avoid overflow below 0
+			freeSize = 0
+		}
+		if freeSize < *res.MinimumFreeSize {
+			result[db.OperationReasonHigh] = true
+		}
+	}
+
 	return result
 }
 

@@ -713,3 +713,34 @@ func TestDownsizeForbiddenByMinimumFreeSize(baseT *testing.T) {
 	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
 	t.ExpectPendingOperations(c.DB /*, nothing */)
 }
+
+func TestUpsizeForcedByMinimumFreeSize(baseT *testing.T) {
+	t := test.T{T: baseT}
+	c, _, clock := setupAssetScrapeTest(t)
+
+	//the asset starts out at size = 1000, usage = 500, which wouldn't warrant an
+	//upsize; set a MinimumFreeSize larger than the current free size to force
+	//upsizing
+	t.MustExec(c.DB, `UPDATE resources SET min_free_size = 600`)
+
+	//ScrapeNextAsset should therefore create an upsize operation
+	clock.StepBy(10 * time.Minute)
+	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+	t.ExpectPendingOperations(c.DB, db.PendingOperation{
+		ID:           1,
+		AssetID:      1,
+		Reason:       db.OperationReasonHigh,
+		OldSize:      1000,
+		NewSize:      1200,
+		UsagePercent: 50,
+		CreatedAt:    c.TimeNow(),
+	})
+
+	//to double-check, remove the reason for the upsize operation
+	t.MustExec(c.DB, `UPDATE resources SET min_free_size = 500`)
+
+	//ScrapeNextAsset should cancel the operation
+	clock.StepBy(10 * time.Minute)
+	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+	t.ExpectPendingOperations(c.DB /*, nothing */)
+}
