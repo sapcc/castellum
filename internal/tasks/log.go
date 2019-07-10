@@ -50,9 +50,15 @@ type sentryException interface {
 //captureSentryException is a convenient wrapper around sentry.CaptureException().
 //It takes a local *sentry.Hub and generates the relevant tags for the
 //custom error type before sending the event to a Sentry server.
+//
+//Events are grouped by asset_uuid, if that tag is available.
 func captureSentryException(hub *sentry.Hub, se sentryException) {
 	hub.WithScope(func(scope *sentry.Scope) {
-		scope.SetTags(se.generateTags())
+		t := se.generateTags()
+		if _, ok := t["asset_uuid"]; ok {
+			scope.SetFingerprint([]string{t["asset_uuid"]})
+		}
+		scope.SetTags(t)
 		hub.CaptureException(se)
 	})
 }
