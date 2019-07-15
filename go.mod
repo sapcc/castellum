@@ -16,6 +16,8 @@ require (
 	github.com/prometheus/common v0.0.0-20181126121408-4724e9255275
 	github.com/rs/cors v1.6.0
 	github.com/sapcc/go-bits v0.0.0-20190522121402-dabab492e20b
+	github.com/sapcc/gophercloud-limes v0.0.0-20190319123021-2ed8e1224541
+	github.com/sapcc/limes v0.0.0-20190311092800-fb212143c5f5
 	golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5 // indirect
 	golang.org/x/net v0.0.0-20190607181551-461777fb6f67 // indirect
 	golang.org/x/sys v0.0.0-20190610200419-93c9922d18ae // indirect

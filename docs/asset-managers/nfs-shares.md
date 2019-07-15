@@ -10,3 +10,12 @@ metrics emitted by the [netapp-api-exporter](https://github.com/sapcc/netapp-api
 | Variable | Default | Explanation |
 | -------- | ------- | ----------- |
 | `CASTELLUM_NFS_PROMETHEUS_URL` | *(required)* | The URL of the Prometheus instance providing usage metrics to this asset manager, e.g. `https://prometheus.example.org:9090`. |
+
+## Required permissions
+
+The Castellum service user must be able to list, extend and shrink Manila shares in all projects.
+
+## Policy considerations
+
+- `project:show:nfs-shares` can usually be given to everyone who can interact with Manila shares.
+- `project:edit:nfs-shares` should only be given to users who can extend and shrink Manila shares.

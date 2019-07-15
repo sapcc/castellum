@@ -15,9 +15,10 @@ github.com/golang/protobuf/proto
 # github.com/gophercloud/gophercloud v0.1.0
 github.com/gophercloud/gophercloud
 github.com/gophercloud/gophercloud/openstack
+github.com/gophercloud/gophercloud/openstack/identity/v3/projects
+github.com/gophercloud/gophercloud/openstack/identity/v3/tokens
 github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares
 github.com/gophercloud/gophercloud/openstack/identity/v2/tokens
-github.com/gophercloud/gophercloud/openstack/identity/v3/tokens
 github.com/gophercloud/gophercloud/openstack/utils
 github.com/gophercloud/gophercloud/pagination
 github.com/gophercloud/gophercloud/openstack/identity/v2/tenants
@@ -58,6 +59,11 @@ github.com/sapcc/go-bits/logg
 github.com/sapcc/go-bits/respondwith
 github.com/sapcc/go-bits/easypg
 github.com/sapcc/go-bits/assert
+# github.com/sapcc/gophercloud-limes v0.0.0-20190319123021-2ed8e1224541
+github.com/sapcc/gophercloud-limes/resources
+github.com/sapcc/gophercloud-limes/resources/v1/projects
+# github.com/sapcc/limes v0.0.0-20190311092800-fb212143c5f5
+github.com/sapcc/limes
 # gopkg.in/gorp.v2 v2.0.0
 gopkg.in/gorp.v2
 # gopkg.in/yaml.v2 v2.2.2

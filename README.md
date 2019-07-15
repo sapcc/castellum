@@ -77,8 +77,8 @@ Castellum understands access rules in the [`oslo.policy` JSON format][os-pol]. A
 All project-level policy rules can use the object attribute `%(project_id)s`.
 
 When policy rule names reference the asset type, only the part of the asset type up until the first colon is used. For
-example, access to project resources with asset type `quota:compute:instances` would be gated by the rules
-`project:show:quota` and `project:edit:quota`.
+example, access to project resources with asset type `project-quota:compute:instances` would be gated by the rules
+`project:show:project-quota` and `project:edit:project-quota`.
 
 See also: [List of available API attributes](https://github.com/sapcc/go-bits/blob/53eeb20fde03c3d0a35e76cf9c9a06b63a415e6b/gopherpolicy/pkg.go#L151-L164)
 
