@@ -68,10 +68,10 @@ func main() {
 	//initialize OpenStack connection
 	ao, err := clientconfig.AuthOptions(nil)
 	if err != nil {
-		logg.Fatal("cannot connect to OpenStack: " + err.Error())
+		logg.Fatal("cannot find OpenStack credentials: " + err.Error())
 	}
 	ao.AllowReauth = true
-	providerClient, err := openstack.AuthenticatedClient(*ao)
+	baseProvider, err := openstack.AuthenticatedClient(*ao)
 	if err != nil {
 		logg.Fatal("cannot connect to OpenStack: " + err.Error())
 	}
@@ -79,6 +79,10 @@ func main() {
 		//note that empty values are acceptable in both fields
 		Region:       os.Getenv("OS_REGION_NAME"),
 		Availability: gophercloud.Availability(os.Getenv("OS_INTERFACE")),
+	}
+	providerClient, err := core.WrapProviderClient(baseProvider, eo)
+	if err != nil {
+		logg.Fatal("cannot find Keystone V3 API: " + err.Error())
 	}
 
 	//get HTTP listen address
@@ -136,13 +140,9 @@ func mustGetenv(key string) string {
 ////////////////////////////////////////////////////////////////////////////////
 // task: API
 
-func runAPI(dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient *gophercloud.ProviderClient, eo gophercloud.EndpointOpts, httpListenAddr string) {
-	identityV3, err := openstack.NewIdentityV3(providerClient, eo)
-	if err != nil {
-		logg.Fatal("cannot find Keystone v3 API: " + err.Error())
-	}
-	tv := gopherpolicy.TokenValidator{IdentityV3: identityV3}
-	err = tv.LoadPolicyFile(mustGetenv("CASTELLUM_OSLO_POLICY_PATH"))
+func runAPI(dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient *core.ProviderClient, eo gophercloud.EndpointOpts, httpListenAddr string) {
+	tv := gopherpolicy.TokenValidator{IdentityV3: providerClient.KeystoneV3}
+	err := tv.LoadPolicyFile(mustGetenv("CASTELLUM_OSLO_POLICY_PATH"))
 	if err != nil {
 		logg.Fatal("cannot load oslo.policy: " + err.Error())
 	}

@@ -43,8 +43,8 @@ type assetManagerNFS struct {
 }
 
 func init() {
-	core.RegisterAssetManagerFactory("nfs-shares", func(provider *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (core.AssetManager, error) {
-		manila, err := openstack.NewSharedFileSystemV2(provider, eo)
+	core.RegisterAssetManagerFactory("nfs-shares", func(provider *core.ProviderClient, eo gophercloud.EndpointOpts) (core.AssetManager, error) {
+		manila, err := openstack.NewSharedFileSystemV2(provider.ProviderClient, eo)
 		if err != nil {
 			return nil, err
 		}

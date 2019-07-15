@@ -22,8 +22,6 @@ import (
 	"fmt"
 
 	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack"
-	keystone_projects "github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -38,10 +36,9 @@ import (
 //for each project resource, exactly one asset is reported, the project itself
 //(i.e. `asset.UUID == resource.ScopeUUID`).
 type assetManagerProjectQuota struct {
-	KeystoneV3     *gophercloud.ServiceClient
+	Provider       *core.ProviderClient
 	Limes          *gophercloud.ServiceClient
 	KnownResources []limesResourceInfo
-	DomainIDCache  map[string]string //maps project ID -> domain ID
 }
 
 type limesResourceInfo struct {
@@ -55,12 +52,8 @@ func (info limesResourceInfo) AssetType() db.AssetType {
 }
 
 func init() {
-	core.RegisterAssetManagerFactory("project-quota", func(provider *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (core.AssetManager, error) {
-		keystoneV3, err := openstack.NewIdentityV3(provider, eo)
-		if err != nil {
-			return nil, err
-		}
-		limes, err := resources.NewLimesV1(provider, eo)
+	core.RegisterAssetManagerFactory("project-quota", func(provider *core.ProviderClient, eo gophercloud.EndpointOpts) (core.AssetManager, error) {
+		limes, err := resources.NewLimesV1(provider.ProviderClient, eo)
 		if err != nil {
 			return nil, err
 		}
@@ -95,12 +88,7 @@ func init() {
 			}
 		}
 
-		return &assetManagerProjectQuota{
-			KeystoneV3:     keystoneV3,
-			Limes:          limes,
-			KnownResources: knownResources,
-			DomainIDCache:  make(map[string]string),
-		}, nil
+		return &assetManagerProjectQuota{provider, limes, knownResources}, nil
 	})
 }
 
@@ -128,7 +116,7 @@ func (m *assetManagerProjectQuota) SetAssetSize(res db.Resource, projectID strin
 	if err != nil {
 		return err
 	}
-	domainID, err := m.getDomainIDForProjectID(projectID)
+	project, err := m.Provider.GetProject(projectID)
 	if err != nil {
 		return err
 	}
@@ -138,7 +126,7 @@ func (m *assetManagerProjectQuota) SetAssetSize(res db.Resource, projectID strin
 	quotaReq := limes.QuotaRequest{}
 	quotaReq[info.ServiceType] = srvQuotaReq
 
-	respBytes, err := projects.Update(m.Limes, domainID, projectID, projects.UpdateOpts{Services: quotaReq})
+	respBytes, err := projects.Update(m.Limes, project.DomainID, projectID, projects.UpdateOpts{Services: quotaReq})
 	if len(respBytes) > 0 {
 		logg.Info("encountered non-critical error while setting %s/%s quota on project %s: %q",
 			info.ServiceType, info.ResourceName, projectID, string(respBytes))
@@ -152,13 +140,13 @@ func (m *assetManagerProjectQuota) GetAssetStatus(res db.Resource, projectID str
 	if err != nil {
 		return core.AssetStatus{}, err
 	}
-	domainID, err := m.getDomainIDForProjectID(projectID)
+	project, err := m.Provider.GetProject(projectID)
 	if err != nil {
 		return core.AssetStatus{}, err
 	}
 
 	opts := projects.GetOpts{Service: info.ServiceType, Resource: info.ResourceName}
-	report, err := projects.Get(m.Limes, domainID, projectID, opts).Extract()
+	report, err := projects.Get(m.Limes, project.DomainID, projectID, opts).Extract()
 	if err != nil {
 		return core.AssetStatus{}, err
 	}
@@ -173,18 +161,6 @@ func (m *assetManagerProjectQuota) GetAssetStatus(res db.Resource, projectID str
 	}
 	return core.AssetStatus{}, fmt.Errorf("Limes does not report %s/%s quota for project %s",
 		info.ServiceType, info.ResourceName, projectID)
-}
-
-func (m *assetManagerProjectQuota) getDomainIDForProjectID(projectID string) (string, error) {
-	if id, ok := m.DomainIDCache[projectID]; ok {
-		return id, nil
-	}
-	project, err := keystone_projects.Get(m.KeystoneV3, projectID).Extract()
-	if err != nil {
-		return "", err
-	}
-	m.DomainIDCache[projectID] = project.DomainID
-	return project.DomainID, nil
 }
 
 func (m *assetManagerProjectQuota) parseAssetType(res db.Resource) (limesResourceInfo, error) {
