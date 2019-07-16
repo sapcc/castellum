@@ -150,7 +150,7 @@ func runAPI(dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient *core.Pr
 	//wrap the main API handler in several layers of middleware (CORS is
 	//deliberately the outermost middleware, to exclude preflight checks from
 	//logging)
-	handler := api.NewHandler(dbi, team, &tv)
+	handler := api.NewHandler(dbi, team, &tv, providerClient)
 	handler = logg.Middleware{}.Wrap(handler)
 	handler = prometheus.InstrumentHandler("castellum-api", handler)
 	handler = cors.New(cors.Options{

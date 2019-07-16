@@ -41,14 +41,15 @@ type handler struct {
 	DB        *gorp.DbMap
 	Team      core.AssetManagerTeam
 	Validator gopherpolicy.Validator
+	Provider  core.ProviderClientInterface
 
 	//dependency injection slots (filled with doubles in tests)
 	TimeNow func() time.Time
 }
 
 //NewHandler constructs the main http.Handler for this package.
-func NewHandler(dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator) http.Handler {
-	h := &handler{DB: dbi, Team: team, Validator: validator, TimeNow: time.Now}
+func NewHandler(dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClientInterface) http.Handler {
+	h := &handler{DB: dbi, Team: team, Validator: validator, Provider: provider, TimeNow: time.Now}
 	return h.BuildRouter()
 }
 
@@ -115,13 +116,35 @@ func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *go
 		return "", nil
 	}
 
+	//collect object attributes for policy check
+	objectAttrs := map[string]string{
+		"project_id":        projectUUID,
+		"target.project.id": projectUUID,
+	}
+	project, err := h.Provider.GetProject(projectUUID)
+	if respondwith.ErrorText(w, err) {
+		return "", nil
+	}
+	if project != nil {
+		objectAttrs["target.project.name"] = project.Name
+		objectAttrs["target.project.domain.id"] = project.DomainID
+		domain, err := h.Provider.GetDomain(project.DomainID)
+		if respondwith.ErrorText(w, err) {
+			return "", nil
+		}
+		if domain != nil {
+			objectAttrs["target.project.domain.name"] = domain.Name
+		}
+	}
+
 	//all endpoints are project-scoped, so we require the user to have access to
 	//the selected project
 	token := h.Validator.CheckToken(r)
 	token.Context.Logger = logg.Debug
-	token.Context.Request = mux.Vars(r)
+	token.Context.Request = objectAttrs
 	logg.Debug("token has auth = %v", token.Context.Auth)
 	logg.Debug("token has roles = %v", token.Context.Roles)
+	logg.Debug("token has object attributes = %v", token.Context.Request)
 	if !token.Require(w, "project:access") {
 		return "", nil
 	}

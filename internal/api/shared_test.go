@@ -52,7 +52,7 @@ func setupTest(t test.T, timeNow func() time.Time) (*handler, http.Handler, *Moc
 	if timeNow == nil {
 		timeNow = time.Now
 	}
-	h := &handler{DB: dbi, Team: team, Validator: mv, TimeNow: timeNow}
+	h := &handler{DB: dbi, Team: team, Validator: mv, Provider: MockProviderClient{}, TimeNow: timeNow}
 	return h, h.BuildRouter(), mv, resources, assets
 }
 
@@ -85,6 +85,29 @@ func (mv *MockValidator) CheckToken(r *http.Request) *gopherpolicy.Token {
 
 func (mv *MockValidator) Enforce(rule string, ctx policy.Context) bool {
 	return !mv.ForbiddenRules[rule]
+}
+
+//MockProviderClient implements the core.ProviderClientInterface.
+type MockProviderClient struct{}
+
+func (c MockProviderClient) GetProject(projectID string) (*core.CachedProject, error) {
+	switch projectID {
+	case "project1":
+		return &core.CachedProject{Name: "First Project", DomainID: "domain1"}, nil
+	case "project2":
+		return &core.CachedProject{Name: "Second Project", DomainID: "domain1"}, nil
+	default:
+		return nil, nil
+	}
+}
+
+func (c MockProviderClient) GetDomain(domainID string) (*core.CachedDomain, error) {
+	switch domainID {
+	case "domain1":
+		return &core.CachedDomain{Name: "First Domain"}, nil
+	default:
+		return nil, nil
+	}
 }
 
 func p2uint64(x uint64) *uint64 {

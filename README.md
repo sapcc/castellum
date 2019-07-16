@@ -74,7 +74,15 @@ Castellum understands access rules in the [`oslo.policy` JSON format][os-pol]. A
 - `project:show:<asset_type_shortened>` gates access to all endpoints relating to a project resource.
 - `project:edit:<asset_type_shortened>` gates access to the PUT and DELETE endpoints relating to a project resource.
 
-All project-level policy rules can use the object attribute `%(project_id)s`.
+All project-level policy rules can use the following object attributes:
+
+```
+%(project_id)s           <- deprecated, use the next one instead
+%(target.project.id)s
+%(target.project.name)s
+%(target.project.domain.id)s
+%(target.project.domain.name)s
+```
 
 When policy rule names reference the asset type, only the part of the asset type up until the first colon is used. For
 example, access to project resources with asset type `project-quota:compute:instances` would be gated by the rules

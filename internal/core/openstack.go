@@ -25,6 +25,13 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 )
 
+//ProviderClientInterface is implemented by ProviderClient. Use this type to
+//allow for test doubles.
+type ProviderClientInterface interface {
+	GetProject(projectID string) (*CachedProject, error)
+	GetDomain(domainID string) (*CachedDomain, error)
+}
+
 //ProviderClient extends gophercloud.ProviderClient with some caching.
 type ProviderClient struct {
 	*gophercloud.ProviderClient
