@@ -144,6 +144,9 @@ func (m *assetManagerProjectQuota) GetAssetStatus(res db.Resource, projectID str
 	if err != nil {
 		return core.AssetStatus{}, err
 	}
+	if project == nil {
+		return core.AssetStatus{}, fmt.Errorf("project not found in Keystone: %s", projectID)
+	}
 
 	opts := projects.GetOpts{Service: info.ServiceType, Resource: info.ResourceName}
 	report, err := projects.Get(m.Limes, project.DomainID, projectID, opts).Extract()

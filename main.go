@@ -336,6 +336,9 @@ func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetTyp
 				continue
 			}
 			logg.Info("size = %d, usage = %d%%", result.Size, result.UsagePercent)
+			if result.AbsoluteUsage != nil {
+				logg.Info("absolute usage = %d", *result.AbsoluteUsage)
+			}
 
 		case "resize":
 			if len(fields) != 5 {
