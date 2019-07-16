@@ -96,6 +96,8 @@ func (c MockProviderClient) GetProject(projectID string) (*core.CachedProject, e
 		return &core.CachedProject{Name: "First Project", DomainID: "domain1"}, nil
 	case "project2":
 		return &core.CachedProject{Name: "Second Project", DomainID: "domain1"}, nil
+	case "project3":
+		return &core.CachedProject{Name: "Third Project", DomainID: "domain1"}, nil
 	default:
 		return nil, nil
 	}

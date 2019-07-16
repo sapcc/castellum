@@ -125,6 +125,7 @@ func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *go
 	if respondwith.ErrorText(w, err) {
 		return "", nil
 	}
+	scopeNotFound := project == nil
 	if project != nil {
 		objectAttrs["target.project.name"] = project.Name
 		objectAttrs["target.project.domain.id"] = project.DomainID
@@ -132,7 +133,9 @@ func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *go
 		if respondwith.ErrorText(w, err) {
 			return "", nil
 		}
-		if domain != nil {
+		if domain == nil {
+			scopeNotFound = true
+		} else {
 			objectAttrs["target.project.domain.name"] = domain.Name
 		}
 	}
@@ -148,6 +151,14 @@ func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *go
 	if !token.Require(w, "project:access") {
 		return "", nil
 	}
+
+	//only report 404 after having checked access rules, otherwise we might leak
+	//information about which projects exist to unauthorized users
+	if scopeNotFound {
+		respondWithNotFound(w)
+		return "", nil
+	}
+
 	return projectUUID, token
 }
 
