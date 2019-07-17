@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/sapcc/castellum/internal/db"
+	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
 	"github.com/sapcc/go-bits/assert"
 )
@@ -233,6 +234,18 @@ func TestPutResource(baseT *testing.T) {
 		ExpectStatus: http.StatusForbidden,
 	}.Check(t.T, hh)
 	validator.Allow("project:edit:foo")
+
+	//expect error when CheckResourceAllowed fails
+	m, _ := h.Team.ForAssetType("foo")
+	m.(*plugins.AssetManagerStatic).CheckResourceAllowedFails = true
+	assert.HTTPRequest{
+		Method:       "PUT",
+		Path:         "/v1/projects/project1/resources/foo",
+		Body:         newFooResourceJSON1,
+		ExpectStatus: http.StatusUnprocessableEntity,
+		ExpectBody:   assert.StringData("CheckResourceAllowed failing as requested\n"),
+	}.Check(t.T, hh)
+	m.(*plugins.AssetManagerStatic).CheckResourceAllowedFails = false
 
 	//since all tests above were error cases, expect the DB to be unchanged
 	t.ExpectResources(h.DB, allResources...)

@@ -281,18 +281,23 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	manager, info := h.Team.ForAssetType(dbResource.AssetType)
+	err := manager.CheckResourceAllowed(dbResource.AssetType, dbResource.ScopeUUID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
 	var input Resource
 	if !RequireJSON(w, r, &input) {
 		return
 	}
 
-	_, info := h.Team.ForAssetType(dbResource.AssetType)
 	errs := input.UpdateDBResource(dbResource, info)
 	if len(errs) > 0 {
 		http.Error(w, strings.Join(errs, "\n"), http.StatusUnprocessableEntity)
 		return
 	}
-	var err error
 	if dbResource.ID == 0 {
 		err = h.DB.Insert(dbResource)
 	} else {

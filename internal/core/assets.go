@@ -46,6 +46,11 @@ type AssetManager interface {
 	//Returns the list of all asset types supported by this asset manager.
 	AssetTypes() []AssetTypeInfo
 
+	//Simple implementations can return nil unconditionally. A non-nil return value
+	//makes the API deny any attempts to create a resource with that scope and
+	//asset type with that error.
+	CheckResourceAllowed(assetType db.AssetType, scopeUUID string) error
+
 	ListAssets(res db.Resource) ([]string, error)
 	SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) error
 	//previousStatus will be nil when this function is called for the first time

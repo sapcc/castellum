@@ -48,9 +48,10 @@ type StaticAsset struct {
 //
 //Attempts to resize assets will succeed if and only if `newSize > usage`.
 type AssetManagerStatic struct {
-	AssetType            db.AssetType
-	Assets               map[string]map[string]StaticAsset
-	ReportsAbsoluteUsage bool
+	AssetType                 db.AssetType
+	Assets                    map[string]map[string]StaticAsset
+	ReportsAbsoluteUsage      bool
+	CheckResourceAllowedFails bool
 }
 
 //AssetTypes implements the core.AssetManager interface.
@@ -61,13 +62,22 @@ func (m AssetManagerStatic) AssetTypes() []core.AssetTypeInfo {
 	}}
 }
 
+//CheckResourceAllowed implements the core.AssetManager interface.
+func (m AssetManagerStatic) CheckResourceAllowed(assetType db.AssetType, scopeUUID string) error {
+	if m.CheckResourceAllowedFails {
+		return errSimulatedRejection
+	}
+	return nil
+}
+
 var (
-	errWrongAssetType   = errors.New("wrong asset type for this asset manager")
-	errUnknownProject   = errors.New("no such project")
-	errUnknownAsset     = errors.New("no such asset")
-	errOldSizeMismatch  = errors.New("asset has different size than expected")
-	errTooSmall         = errors.New("cannot set size smaller than current usage")
-	errSimulatedFailure = errors.New("GetAssetStatus failing as requested")
+	errWrongAssetType     = errors.New("wrong asset type for this asset manager")
+	errUnknownProject     = errors.New("no such project")
+	errUnknownAsset       = errors.New("no such asset")
+	errOldSizeMismatch    = errors.New("asset has different size than expected")
+	errTooSmall           = errors.New("cannot set size smaller than current usage")
+	errSimulatedRejection = errors.New("CheckResourceAllowed failing as requested")
+	errSimulatedFailure   = errors.New("GetAssetStatus failing as requested")
 )
 
 //ListAssets implements the core.AssetManager interface.

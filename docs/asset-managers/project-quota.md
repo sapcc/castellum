@@ -12,6 +12,12 @@ etc.
 
 Each such project resource contains exactly one asset, the project itself. The asset UUID is the project ID.
 
+Project resources will only be allowed when the corresponding project resource in Limes has the annotation
+`can_autoscale` with a value of `true`. Refer to [this section of the Limes documentation][limes-doc] for how to add
+those annotations.
+
+[limes-doc]: https://github.com/sapcc/limes/blob/master/docs/operators/config.md#resource-behavior
+
 ## Required permissions
 
 The Castellum service user must be able to:

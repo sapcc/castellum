@@ -19,6 +19,7 @@
 package plugins
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/gophercloud/gophercloud"
@@ -104,6 +105,27 @@ func (m *assetManagerProjectQuota) AssetTypes() []core.AssetTypeInfo {
 	return result
 }
 
+var errNotAllowedForThisProject = errors.New("resource is not whitelisted for autoscaling")
+
+//CheckResourceAllowed implements the core.AssetManager interface.
+func (m *assetManagerProjectQuota) CheckResourceAllowed(assetType db.AssetType, projectID string) error {
+	resource, err := m.getQuotaStatus(assetType, projectID)
+	if err != nil {
+		return err
+	}
+	switch val := resource.Annotations["can_autoscale"].(type) {
+	case string:
+		if val == "true" {
+			return nil
+		}
+	case bool:
+		if val {
+			return nil
+		}
+	}
+	return errNotAllowedForThisProject
+}
+
 //ListAssets implements the core.AssetManager interface.
 func (m *assetManagerProjectQuota) ListAssets(res db.Resource) ([]string, error) {
 	//see notes on type declaration above
@@ -112,7 +134,7 @@ func (m *assetManagerProjectQuota) ListAssets(res db.Resource) ([]string, error)
 
 //SetAssetSize implements the core.AssetManager interface.
 func (m *assetManagerProjectQuota) SetAssetSize(res db.Resource, projectID string, oldSize, newSize uint64) error {
-	info, err := m.parseAssetType(res)
+	info, err := m.parseAssetType(res.AssetType)
 	if err != nil {
 		return err
 	}
@@ -136,41 +158,49 @@ func (m *assetManagerProjectQuota) SetAssetSize(res db.Resource, projectID strin
 
 //GetAssetStatus implements the core.AssetManager interface.
 func (m *assetManagerProjectQuota) GetAssetStatus(res db.Resource, projectID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
-	info, err := m.parseAssetType(res)
+	resource, err := m.getQuotaStatus(res.AssetType, projectID)
 	if err != nil {
 		return core.AssetStatus{}, err
+	}
+	return core.AssetStatus{
+		Size:          resource.Quota,
+		AbsoluteUsage: p2u64(resource.Usage),
+		UsagePercent:  uint32(100 * resource.Usage / resource.Quota),
+	}, nil
+}
+
+func (m *assetManagerProjectQuota) getQuotaStatus(assetType db.AssetType, projectID string) (*limes.ProjectResourceReport, error) {
+	info, err := m.parseAssetType(assetType)
+	if err != nil {
+		return nil, err
 	}
 	project, err := m.Provider.GetProject(projectID)
 	if err != nil {
-		return core.AssetStatus{}, err
+		return nil, err
 	}
 	if project == nil {
-		return core.AssetStatus{}, fmt.Errorf("project not found in Keystone: %s", projectID)
+		return nil, fmt.Errorf("project not found in Keystone: %s", projectID)
 	}
 
 	opts := projects.GetOpts{Service: info.ServiceType, Resource: info.ResourceName}
 	report, err := projects.Get(m.Limes, project.DomainID, projectID, opts).Extract()
 	if err != nil {
-		return core.AssetStatus{}, err
+		return nil, err
 	}
 	for _, srv := range report.Services {
 		for _, res := range srv.Resources {
-			return core.AssetStatus{
-				Size:          res.Quota,
-				AbsoluteUsage: p2u64(res.Usage),
-				UsagePercent:  uint32(100 * res.Usage / res.Quota),
-			}, nil
+			return res, nil
 		}
 	}
-	return core.AssetStatus{}, fmt.Errorf("Limes does not report %s/%s quota for project %s",
+	return nil, fmt.Errorf("Limes does not report %s/%s quota for project %s",
 		info.ServiceType, info.ResourceName, projectID)
 }
 
-func (m *assetManagerProjectQuota) parseAssetType(res db.Resource) (limesResourceInfo, error) {
+func (m *assetManagerProjectQuota) parseAssetType(assetType db.AssetType) (limesResourceInfo, error) {
 	for _, info := range m.KnownResources {
-		if info.AssetType() == res.AssetType {
+		if info.AssetType() == assetType {
 			return info, nil
 		}
 	}
-	return limesResourceInfo{}, fmt.Errorf("unknown asset type: %s", res.AssetType)
+	return limesResourceInfo{}, fmt.Errorf("unknown asset type: %s", assetType)
 }

@@ -72,6 +72,11 @@ func (m *assetManagerNFS) AssetTypes() []core.AssetTypeInfo {
 	}}
 }
 
+//CheckResourceAllowed implements the core.AssetManager interface.
+func (m *assetManagerNFS) CheckResourceAllowed(assetType db.AssetType, scopeUUID string) error {
+	return nil
+}
+
 //ListAssets implements the core.AssetManager interface.
 func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 	page := 0
