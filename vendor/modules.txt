@@ -12,7 +12,7 @@ github.com/golang-migrate/migrate/source/go_bindata
 github.com/golang-migrate/migrate/source
 # github.com/golang/protobuf v1.2.0
 github.com/golang/protobuf/proto
-# github.com/gophercloud/gophercloud v0.1.0
+# github.com/gophercloud/gophercloud v0.2.0
 github.com/gophercloud/gophercloud
 github.com/gophercloud/gophercloud/openstack
 github.com/gophercloud/gophercloud/openstack/identity/v3/domains
@@ -25,9 +25,9 @@ github.com/gophercloud/gophercloud/pagination
 github.com/gophercloud/gophercloud/openstack/identity/v2/tenants
 # github.com/gophercloud/utils v0.0.0-20190313033024-0bcc8e728cb5
 github.com/gophercloud/utils/openstack/clientconfig
-# github.com/gorilla/mux v1.7.1
+# github.com/gorilla/mux v1.7.3
 github.com/gorilla/mux
-# github.com/lib/pq v1.1.0
+# github.com/lib/pq v1.2.0
 github.com/lib/pq
 github.com/lib/pq/oid
 github.com/lib/pq/scram
@@ -63,7 +63,7 @@ github.com/sapcc/go-bits/assert
 # github.com/sapcc/gophercloud-limes v0.0.0-20190319123021-2ed8e1224541
 github.com/sapcc/gophercloud-limes/resources
 github.com/sapcc/gophercloud-limes/resources/v1/projects
-# github.com/sapcc/limes v0.0.0-20190311092800-fb212143c5f5
+# github.com/sapcc/limes v0.0.0-20190717102825-38fa8ff99ef5
 github.com/sapcc/limes
 # gopkg.in/gorp.v2 v2.0.0
 gopkg.in/gorp.v2
