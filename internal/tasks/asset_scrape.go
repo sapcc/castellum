@@ -77,7 +77,7 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 	if err != nil {
 		return err
 	}
-	logg.Debug("scraping %s asset %s in project %s", assetType, asset.UUID, res.ScopeUUID)
+	logg.Debug("scraping %s asset %s in project %s using manager %v", assetType, asset.UUID, res.ScopeUUID, manager)
 
 	//get pending operation for this asset
 	var pendingOps []db.PendingOperation
