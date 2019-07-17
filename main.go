@@ -190,13 +190,14 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 
 	for _, manager := range team {
 		for _, info := range manager.AssetTypes() {
+			assetType := info.AssetType
 			c1 := c.CloneForNewGoroutine()
 			go jobLoop(func() error {
-				return c1.ScrapeNextResource(info.AssetType, time.Now().Add(-30*time.Minute))
+				return c1.ScrapeNextResource(assetType, time.Now().Add(-30*time.Minute))
 			})
 			c2 := c.CloneForNewGoroutine()
 			go jobLoop(func() error {
-				return c2.ScrapeNextAsset(info.AssetType, time.Now().Add(-5*time.Minute))
+				return c2.ScrapeNextAsset(assetType, time.Now().Add(-5*time.Minute))
 			})
 		}
 	}
