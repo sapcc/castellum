@@ -32,7 +32,7 @@ import (
 
 //query that finds the next resource that needs to be scraped
 var scrapeAssetSearchQuery = `
-	SELECT a.* FROM assets a JOIN resources r ON r.asset_type = $1
+	SELECT a.* FROM assets a JOIN resources r ON r.id = a.resource_id AND r.asset_type = $1
 	WHERE a.checked_at < $2
 	-- order by update priority (first outdated assets, then by ID for deterministic test behavior)
 	ORDER BY a.checked_at ASC, a.id ASC
