@@ -239,7 +239,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	if wantsFinishedOps {
 		var dbFinishedOps []db.FinishedOperation
 		_, err = h.DB.Select(&dbFinishedOps,
-			`SELECT * FROM finished_operations WHERE asset_id = $1`,
+			`SELECT * FROM finished_operations WHERE asset_id = $1 ORDER BY finished_at`,
 			dbAsset.ID)
 		if respondwith.ErrorText(w, err) {
 			return
