@@ -205,7 +205,20 @@ func prometheusGetSingleValue(api prom_v1.API, queryStr string) (float64, error)
 	case 0:
 		return 0, fmt.Errorf("Prometheus query returned empty result: %s", queryStr)
 	default:
-		logg.Info("Prometheus query returned more than one result: %s (only the first value will be used)", queryStr)
+		//suppress the log message when all values are the same (this can happen
+		//when an adventurous Prometheus configuration causes the NetApp exporter
+		//to be scraped twice)
+		firstValue := resultVector[0].Value
+		allTheSame := true
+		for _, entry := range resultVector {
+			if firstValue != entry.Value {
+				allTheSame = false
+				break
+			}
+		}
+		if !allTheSame {
+			logg.Info("Prometheus query returned more than one result: %s (only the first value will be used)", queryStr)
+		}
 		fallthrough
 	case 1:
 		return float64(resultVector[0].Value), nil
