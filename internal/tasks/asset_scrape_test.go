@@ -744,3 +744,36 @@ func TestUpsizeForcedByMinimumFreeSize(baseT *testing.T) {
 	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
 	t.ExpectPendingOperations(c.DB /*, nothing */)
 }
+
+func TestCriticalUpsizeTakingMultipleStepsAtOnce(baseT *testing.T) {
+	t := test.T{T: baseT}
+	c, setAsset, clock := setupAssetScrapeTest(t)
+
+	//set a very small step size
+	t.MustExec(c.DB, `UPDATE resources SET size_step_percent = 1`)
+
+	//set usage way above the critical threshold
+	setAsset(plugins.StaticAsset{Size: 1380, Usage: 1350})
+
+	//ScrapeNextAsset should create a "critical" operation taking three steps at
+	//once (1380 -> 1393 -> 1406 -> 1420)
+	//
+	//This example is manufactured specifically such that the step size changes
+	//between steps, to validate that a new step size is calculated each time,
+	//same as if multiple steps had been taken in successive operations.
+	clock.StepBy(10 * time.Minute)
+	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+
+	t.ExpectPendingOperations(c.DB, db.PendingOperation{
+		ID:           1,
+		AssetID:      1,
+		Reason:       db.OperationReasonCritical,
+		OldSize:      1380,
+		NewSize:      1420,
+		UsagePercent: 97,
+		CreatedAt:    c.TimeNow(),
+		ConfirmedAt:  p2time(c.TimeNow()),
+		GreenlitAt:   p2time(c.TimeNow()),
+	})
+	t.ExpectFinishedOperations(c.DB /*, nothing */)
+}

@@ -221,17 +221,15 @@ func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, ass
 	switch {
 	case match[db.OperationReasonCritical]:
 		op.Reason = db.OperationReasonCritical
-		op.NewSize = core.GetNewSize(res, asset, true)
 	case match[db.OperationReasonHigh]:
 		op.Reason = db.OperationReasonHigh
-		op.NewSize = core.GetNewSize(res, asset, true)
 	case match[db.OperationReasonLow]:
 		op.Reason = db.OperationReasonLow
-		op.NewSize = core.GetNewSize(res, asset, false)
 	default:
 		//no threshold exceeded -> do not create an operation
 		return nil
 	}
+	op.NewSize = core.GetNewSize(res, asset, op.Reason)
 
 	//skip the operation if the size would not change (this is especially true
 	//for reason "low" and oldSize = 1)
@@ -282,7 +280,7 @@ func (c Context) maybeUpdateOperation(tx *gorp.Transaction, res db.Resource, ass
 
 	//if the asset size has changed since the operation has been created
 	//(because of resizes not performed by Castellum), calculate a new target size
-	newSize := core.GetNewSize(res, asset, op.Reason != db.OperationReasonLow)
+	newSize := core.GetNewSize(res, asset, op.Reason)
 	if op.NewSize == newSize {
 		//nothing to do
 		return &op, nil

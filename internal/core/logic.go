@@ -30,12 +30,12 @@ func GetMatchingReasons(res db.Resource, asset db.Asset) map[db.OperationReason]
 		}
 	}
 	if res.HighThresholdPercent > 0 && asset.UsagePercent >= res.HighThresholdPercent {
-		if canUpsize(res, asset) {
+		if canUpsize(res, asset, db.OperationReasonHigh) {
 			result[db.OperationReasonHigh] = true
 		}
 	}
 	if res.CriticalThresholdPercent > 0 && asset.UsagePercent >= res.CriticalThresholdPercent {
-		if canUpsize(res, asset) {
+		if canUpsize(res, asset, db.OperationReasonCritical) {
 			result[db.OperationReasonCritical] = true
 		}
 	}
@@ -57,12 +57,12 @@ func GetMatchingReasons(res db.Resource, asset db.Asset) map[db.OperationReason]
 
 func canDownsize(res db.Resource, asset db.Asset) bool {
 	if res.MinimumSize != nil {
-		if GetNewSize(res, asset, false) < *res.MinimumSize {
+		if GetNewSize(res, asset, db.OperationReasonLow) < *res.MinimumSize {
 			return false
 		}
 	}
 	if res.MinimumFreeSize != nil && asset.AbsoluteUsage != nil {
-		newSize := GetNewSize(res, asset, false)
+		newSize := GetNewSize(res, asset, db.OperationReasonLow)
 		if newSize < *asset.AbsoluteUsage+*res.MinimumFreeSize {
 			//^ This condition is equal to `newSize - absUsage < minFreeSize`, but
 			//cannot overflow below 0.
@@ -72,30 +72,50 @@ func canDownsize(res db.Resource, asset db.Asset) bool {
 	return true
 }
 
-func canUpsize(res db.Resource, asset db.Asset) bool {
+func canUpsize(res db.Resource, asset db.Asset, reason db.OperationReason) bool {
 	if res.MaximumSize == nil {
 		return true
 	}
-	return GetNewSize(res, asset, true) <= *res.MaximumSize
+	return GetNewSize(res, asset, reason) <= *res.MaximumSize
 }
 
 //GetNewSize returns the target size for this asset (within this resource)
-//after upsizing (for `up = true`) or downsizing (for `up = false`).
-func GetNewSize(res db.Resource, asset db.Asset, up bool) uint64 {
-	step := (asset.Size * uint64(res.SizeStepPercent)) / 100
+//after resizing for the given reason.
+func GetNewSize(res db.Resource, asset db.Asset, reason db.OperationReason) uint64 {
+	return getNewSize(res, asset, reason, asset.Size)
+}
+
+func getNewSize(res db.Resource, asset db.Asset, reason db.OperationReason, assetSize uint64) uint64 {
+	step := (assetSize * uint64(res.SizeStepPercent)) / 100
 	//a small fraction of a small value (e.g. 10% of size = 6) may round down to zero
 	if step == 0 {
 		step = 1
 	}
 
-	if up {
-		return asset.Size + step
+	switch reason {
+	case db.OperationReasonCritical:
+		newSize := assetSize + step
+		//for assets reporting absolute usage, we can estimate the new usage-%
+		//immediately and take multiple steps if usage would still be crossing the
+		//critical threshold otherwise
+		if asset.AbsoluteUsage != nil {
+			newUsagePercent := uint32(100 * *asset.AbsoluteUsage / newSize)
+			if newUsagePercent > res.CriticalThresholdPercent {
+				//restart call with newSize as old size to calculate the next step
+				return getNewSize(res, asset, reason, newSize)
+			}
+		}
+		return newSize
+	case db.OperationReasonHigh:
+		return assetSize + step
+	case db.OperationReasonLow:
+		//when going down, we have to take care not to end up with zero
+		if assetSize < 1+step {
+			//^ This condition is equal to `assetSize - step < 1`, but cannot overflow below 0.
+			return 1
+		}
+		return assetSize - step
+	default:
+		panic("unexpected reason: " + string(reason))
 	}
-
-	//when going down, we have to take care not to end up with zero
-	if asset.Size < 1+step {
-		//^ This condition is equal to `asset.Size - step < 1`, but cannot overflow below 0.
-		return 1
-	}
-	return asset.Size - step
 }
