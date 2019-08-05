@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/gophercloud/gophercloud"
@@ -115,9 +116,27 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 	}
 }
 
+var sizeInconsistencyErrorRx = regexp.MustCompile(`New size for (?:extend must be greater|shrink must be less) than current size`)
+
 //SetAssetSize implements the core.AssetManager interface.
 func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) error {
-	if oldSize < newSize {
+	err := m.resize(assetUUID, oldSize, newSize /* useReverseOperation = */, false)
+	if err != nil && sizeInconsistencyErrorRx.MatchString(err.Error()) {
+		//We only rely on sizes reported by NetApp. But bugs in the Manila API may
+		//cause it to have a different expection how big the share is, therefore
+		//rejecting shrink/extend requests because it thinks they go in the wrong
+		//direction. In this case, we try the opposite direction to see if it helps.
+		err2 := m.resize(assetUUID, oldSize, newSize /* useReverseOperation = */, true)
+		if err2 == nil {
+			return nil
+		}
+		//If not successful, still return the original error (to avoid confusion).
+	}
+	return err
+}
+
+func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useReverseOperation bool) error {
+	if (oldSize < newSize && !useReverseOperation) || (oldSize >= newSize && useReverseOperation) {
 		return shares.Extend(m.Manila, assetUUID, shares.ExtendOpts{NewSize: int(newSize)}).ExtractErr()
 	}
 	return shares.Shrink(m.Manila, assetUUID, shares.ShrinkOpts{NewSize: int(newSize)}).ExtractErr()
