@@ -140,4 +140,22 @@ var SQLMigrations = map[string]string{
 	"007_add_resources_min_free_size.up.sql": `
 		ALTER TABLE resources ADD COLUMN min_free_size BIGINT DEFAULT NULL;
 	`,
+	"008_floating_point_usage_percent.down.sql": `
+		ALTER TABLE resources ALTER COLUMN low_threshold_percent TYPE INTEGER;
+		ALTER TABLE resources ALTER COLUMN high_threshold_percent TYPE INTEGER;
+		ALTER TABLE resources ALTER COLUMN critical_threshold_percent TYPE INTEGER;
+		ALTER TABLE resources ALTER COLUMN size_step_percent TYPE BIGINT;
+		ALTER TABLE assets ALTER COLUMN usage_percent TYPE INTEGER;
+		ALTER TABLE pending_operations ALTER COLUMN usage_percent TYPE INTEGER;
+		ALTER TABLE finished_operations ALTER COLUMN usage_percent TYPE INTEGER;
+	`,
+	"008_floating_point_usage_percent.up.sql": `
+		ALTER TABLE resources ALTER COLUMN low_threshold_percent TYPE DOUBLE PRECISION;
+		ALTER TABLE resources ALTER COLUMN high_threshold_percent TYPE DOUBLE PRECISION;
+		ALTER TABLE resources ALTER COLUMN critical_threshold_percent TYPE DOUBLE PRECISION;
+		ALTER TABLE resources ALTER COLUMN size_step_percent TYPE DOUBLE PRECISION;
+		ALTER TABLE assets ALTER COLUMN usage_percent TYPE DOUBLE PRECISION;
+		ALTER TABLE pending_operations ALTER COLUMN usage_percent TYPE DOUBLE PRECISION;
+		ALTER TABLE finished_operations ALTER COLUMN usage_percent TYPE DOUBLE PRECISION;
+	`,
 }

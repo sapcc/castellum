@@ -43,13 +43,13 @@ type Resource struct {
 
 //Threshold appears in type Resource.
 type Threshold struct {
-	UsagePercent uint32 `json:"usage_percent"`
-	DelaySeconds uint32 `json:"delay_seconds,omitempty"`
+	UsagePercent float64 `json:"usage_percent"`
+	DelaySeconds uint32  `json:"delay_seconds,omitempty"`
 }
 
 //SizeSteps appears in type Resource.
 type SizeSteps struct {
-	Percent uint32 `json:"percent"`
+	Percent float64 `json:"percent"`
 }
 
 //SizeConstraints appears in type Resource.

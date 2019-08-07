@@ -321,12 +321,12 @@ func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetTyp
 					logg.Error(err.Error())
 					continue
 				}
-				usagePerc, err := strconv.ParseUint(fields[4], 10, 32)
+				usagePerc, err := strconv.ParseFloat(fields[4], 64)
 				if err != nil {
 					logg.Error(err.Error())
 					continue
 				}
-				previousStatus = &core.AssetStatus{Size: size, UsagePercent: uint32(usagePerc)}
+				previousStatus = &core.AssetStatus{Size: size, UsagePercent: usagePerc}
 			default:
 				logg.Error("wrong number of arguments")
 				continue

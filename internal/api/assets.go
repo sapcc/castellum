@@ -35,7 +35,7 @@ import (
 type Asset struct {
 	UUID               string        `json:"id"`
 	Size               uint64        `json:"size,omitempty"`
-	UsagePercent       uint32        `json:"usage_percent,omitempty"`
+	UsagePercent       float64       `json:"usage_percent,omitempty"`
 	ScrapedAtUnix      *int64        `json:"scraped_at,omitempty"`
 	Checked            *AssetChecked `json:"checked,omitempty"`
 	Stale              bool          `json:"stale"`
@@ -66,8 +66,8 @@ type Operation struct {
 
 //OperationCreation appears in type Operation.
 type OperationCreation struct {
-	AtUnix       int64  `json:"at"`
-	UsagePercent uint32 `json:"usage_percent"`
+	AtUnix       int64   `json:"at"`
+	UsagePercent float64 `json:"usage_percent"`
 }
 
 //OperationConfirmation appears in type Operation.

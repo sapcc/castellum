@@ -175,7 +175,7 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 	status := core.AssetStatus{
 		Size:          uint64(math.Round(sizeBytes / 1024 / 1024 / 1024)),
 		AbsoluteUsage: p2u64(uint64(math.Round(usageBytes / 1024 / 1024 / 1024))),
-		UsagePercent:  uint32(math.Round(100 * usageBytes / sizeBytes)),
+		UsagePercent:  100 * usageBytes / sizeBytes,
 	}
 	if usageBytes <= 0 {
 		status.AbsoluteUsage = p2u64(0)

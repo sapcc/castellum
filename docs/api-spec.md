@@ -6,6 +6,7 @@ Castellum's API looks like a conventional OpenStack REST API.
 - All endpoints require a Keystone token to be present in the `X-Auth-Token` header.
   Only Keystone v3 is supported.
 - All timestamps are formatted as UNIX timestamps, i.e. seconds since the UNIX epoch.
+- All percent values are floating-point numbers, although we only show integers in the examples below.
 
 This document uses the terminology defined in the [README.md](../README.md#terminology).
 

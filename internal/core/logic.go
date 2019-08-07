@@ -18,7 +18,11 @@
 
 package core
 
-import "github.com/sapcc/castellum/internal/db"
+import (
+	"math"
+
+	"github.com/sapcc/castellum/internal/db"
+)
 
 //GetMatchingReasons returns a map that indicates for which resizing operations
 //the given asset (within the given resource) is eligible.
@@ -86,7 +90,7 @@ func GetNewSize(res db.Resource, asset db.Asset, reason db.OperationReason) uint
 }
 
 func getNewSize(res db.Resource, asset db.Asset, reason db.OperationReason, assetSize uint64) uint64 {
-	step := (assetSize * uint64(res.SizeStepPercent)) / 100
+	step := uint64(math.Floor((float64(assetSize) * res.SizeStepPercent) / 100))
 	//a small fraction of a small value (e.g. 10% of size = 6) may round down to zero
 	if step == 0 {
 		step = 1
@@ -99,7 +103,7 @@ func getNewSize(res db.Resource, asset db.Asset, reason db.OperationReason, asse
 		//immediately and take multiple steps if usage would still be crossing the
 		//critical threshold otherwise
 		if asset.AbsoluteUsage != nil {
-			newUsagePercent := uint32(100 * *asset.AbsoluteUsage / newSize)
+			newUsagePercent := 100 * float64(*asset.AbsoluteUsage) / float64(newSize)
 			if newUsagePercent >= res.CriticalThresholdPercent {
 				//restart call with newSize as old size to calculate the next step
 				return getNewSize(res, asset, reason, newSize)

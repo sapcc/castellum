@@ -29,7 +29,7 @@ import (
 type AssetStatus struct {
 	Size          uint64
 	AbsoluteUsage *uint64 //only set when ReportsAbsoluteUsage = true
-	UsagePercent  uint32
+	UsagePercent  float64
 }
 
 //AssetTypeInfo describes an AssetType supported by an AssetManager.

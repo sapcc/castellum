@@ -54,17 +54,17 @@ type Resource struct {
 	//time. Those thresholds (in percent of usage) and delays (in seconds) are
 	//defined here. The "critical" threshold will cause immediate upscaling, so
 	//it does not have a configurable delay.
-	LowThresholdPercent      uint32 `db:"low_threshold_percent"`
-	LowDelaySeconds          uint32 `db:"low_delay_seconds"`
-	HighThresholdPercent     uint32 `db:"high_threshold_percent"`
-	HighDelaySeconds         uint32 `db:"high_delay_seconds"`
-	CriticalThresholdPercent uint32 `db:"critical_threshold_percent"`
+	LowThresholdPercent      float64 `db:"low_threshold_percent"`
+	LowDelaySeconds          uint32  `db:"low_delay_seconds"`
+	HighThresholdPercent     float64 `db:"high_threshold_percent"`
+	HighDelaySeconds         uint32  `db:"high_delay_seconds"`
+	CriticalThresholdPercent float64 `db:"critical_threshold_percent"`
 
 	//This defines how much the the asset's size changes per
 	//downscaling/upscaling operation (in % of previous size). This can be NULL
 	//when the asset type defines size steps differently. For example, for the
 	//asset type "instance", we will have a list of allowed flavors somewhere else.
-	SizeStepPercent uint32 `db:"size_step_percent"`
+	SizeStepPercent float64 `db:"size_step_percent"`
 
 	//This defines absolute boundaries for the asset size. If configured, resize
 	//operations will never move to a size outside this range.
@@ -116,7 +116,7 @@ type Asset struct {
 	Size uint64 `db:"size"`
 	//The asset's current utilization as a percentage of its size. This must
 	//always be between 0 and 100.
-	UsagePercent uint32 `db:"usage_percent"`
+	UsagePercent float64 `db:"usage_percent"`
 	//The asset's current utilization, in the same unit as .Size. This is only
 	//set when the asset manager reports absolute usages.
 	AbsoluteUsage *uint64 `db:"absolute_usage"`
@@ -147,9 +147,9 @@ type PendingOperation struct {
 
 	//.OldSize and .UsagePercent mirror the state of the asset when the operation
 	//was created, and .NewSize defines the target size.
-	OldSize      uint64 `db:"old_size"`
-	NewSize      uint64 `db:"new_size"`
-	UsagePercent uint32 `db:"usage_percent"`
+	OldSize      uint64  `db:"old_size"`
+	NewSize      uint64  `db:"new_size"`
+	UsagePercent float64 `db:"usage_percent"`
 
 	//This sequence of timestamps represent the various states that an operation enters in its lifecycle.
 
@@ -195,9 +195,9 @@ type FinishedOperation struct {
 	Reason  OperationReason  `db:"reason"`
 	Outcome OperationOutcome `db:"outcome"`
 
-	OldSize      uint64 `db:"old_size"`
-	NewSize      uint64 `db:"new_size"`
-	UsagePercent uint32 `db:"usage_percent"`
+	OldSize      uint64  `db:"old_size"`
+	NewSize      uint64  `db:"new_size"`
+	UsagePercent float64 `db:"usage_percent"`
 
 	CreatedAt   time.Time  `db:"created_at"`
 	ConfirmedAt *time.Time `db:"confirmed_at"`

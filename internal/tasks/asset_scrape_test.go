@@ -499,7 +499,7 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 
 	asset.Size = 1100
 	asset.AbsoluteUsage = p2uint64(1000)
-	asset.UsagePercent = 90
+	asset.UsagePercent = 1000. / 11.
 	asset.CheckedAt = c.TimeNow()
 	asset.ScrapedAt = p2time(c.TimeNow())
 	asset.ExpectedSize = nil
@@ -511,7 +511,7 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 		Reason:       db.OperationReasonHigh,
 		OldSize:      1100,
 		NewSize:      1320,
-		UsagePercent: 90,
+		UsagePercent: 1000. / 11.,
 		CreatedAt:    c.TimeNow(),
 	})
 }
@@ -774,7 +774,7 @@ func TestCriticalUpsizeTakingMultipleStepsAtOnce(baseT *testing.T) {
 		Reason:       db.OperationReasonCritical,
 		OldSize:      1380,
 		NewSize:      1434,
-		UsagePercent: 97,
+		UsagePercent: 13500. / 138.,
 		CreatedAt:    c.TimeNow(),
 		ConfirmedAt:  p2time(c.TimeNow()),
 		GreenlitAt:   p2time(c.TimeNow()),
