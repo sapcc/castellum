@@ -756,11 +756,15 @@ func TestCriticalUpsizeTakingMultipleStepsAtOnce(baseT *testing.T) {
 	setAsset(plugins.StaticAsset{Size: 1380, Usage: 1350})
 
 	//ScrapeNextAsset should create a "critical" operation taking three steps at
-	//once (1380 -> 1393 -> 1406 -> 1420)
+	//once (1380 -> 1393 -> 1406 -> 1420 -> 1434)
 	//
 	//This example is manufactured specifically such that the step size changes
 	//between steps, to validate that a new step size is calculated each time,
 	//same as if multiple steps had been taken in successive operations.
+	//
+	//NOTE: This testcase used to require a target size of 1420, but that was wrong.
+	//A size of 1420 would lead to 95% usage (or rather, 95.07%) which is still
+	//above the critical threshold.
 	clock.StepBy(10 * time.Minute)
 	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
 
@@ -769,7 +773,7 @@ func TestCriticalUpsizeTakingMultipleStepsAtOnce(baseT *testing.T) {
 		AssetID:      1,
 		Reason:       db.OperationReasonCritical,
 		OldSize:      1380,
-		NewSize:      1420,
+		NewSize:      1434,
 		UsagePercent: 97,
 		CreatedAt:    c.TimeNow(),
 		ConfirmedAt:  p2time(c.TimeNow()),

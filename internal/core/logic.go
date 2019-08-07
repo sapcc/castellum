@@ -100,7 +100,7 @@ func getNewSize(res db.Resource, asset db.Asset, reason db.OperationReason, asse
 		//critical threshold otherwise
 		if asset.AbsoluteUsage != nil {
 			newUsagePercent := uint32(100 * *asset.AbsoluteUsage / newSize)
-			if newUsagePercent > res.CriticalThresholdPercent {
+			if newUsagePercent >= res.CriticalThresholdPercent {
 				//restart call with newSize as old size to calculate the next step
 				return getNewSize(res, asset, reason, newSize)
 			}
