@@ -86,6 +86,9 @@ func canUpsize(res db.Resource, asset db.Asset, reason db.OperationReason) bool 
 //GetNewSize returns the target size for this asset (within this resource)
 //after resizing for the given reason.
 func GetNewSize(res db.Resource, asset db.Asset, reason db.OperationReason) uint64 {
+	if res.SingleStep {
+		return getNewSizeSingleStep(res, asset, reason)
+	}
 	return getNewSize(res, asset, reason, asset.Size)
 }
 
@@ -122,4 +125,29 @@ func getNewSize(res db.Resource, asset db.Asset, reason db.OperationReason, asse
 	default:
 		panic("unexpected reason: " + string(reason))
 	}
+}
+
+func getNewSizeSingleStep(res db.Resource, asset db.Asset, reason db.OperationReason) uint64 {
+	//NOTE: Single-step resizing is only allowed for resources that report
+	//absolute usage, so we are going to assum that asset.AbsoluteUsage != nil.
+
+	var thresholdPerc float64
+	switch reason {
+	case db.OperationReasonCritical:
+		thresholdPerc = res.CriticalThresholdPercent
+	case db.OperationReasonHigh:
+		thresholdPerc = res.HighThresholdPercent
+	case db.OperationReasonLow:
+		thresholdPerc = res.LowThresholdPercent
+	default:
+		panic("unreachable")
+	}
+
+	newSizeFloat := 100 * float64(*asset.AbsoluteUsage) / thresholdPerc
+	if reason == db.OperationReasonLow {
+		//for "low", round size down to ensure usage-% comes out above the threshold
+		return uint64(math.Floor(newSizeFloat))
+	}
+	//for "high"/"critical", round size up to ensure usage-% comes out below the threshold
+	return uint64(math.Ceil(newSizeFloat))
 }

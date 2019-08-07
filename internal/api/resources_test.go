@@ -174,7 +174,8 @@ func TestPutResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	h, hh, validator, allResources, _ := setupTest(t, nil)
 
-	//mostly like `initialFooResourceJSON`, but with some delays changed
+	//mostly like `initialFooResourceJSON`, but with some delays changed and
+	//single-step resizing instead of percentage-based resizing
 	newFooResourceJSON1 := assert.JSONObject{
 		"low_threshold": assert.JSONObject{
 			"usage_percent": 20,
@@ -185,7 +186,7 @@ func TestPutResource(baseT *testing.T) {
 			"delay_seconds": 900,
 		},
 		"size_steps": assert.JSONObject{
-			"percent": 20,
+			"single": true,
 		},
 	}
 
@@ -265,6 +266,8 @@ func TestPutResource(baseT *testing.T) {
 		if res.ScopeUUID == "project1" && res.AssetType == "foo" {
 			cloned.LowDelaySeconds = 1800
 			cloned.HighDelaySeconds = 900
+			cloned.SizeStepPercent = 0
+			cloned.SingleStep = true
 		}
 		newResources1 = append(newResources1, cloned)
 	}
@@ -366,6 +369,7 @@ func TestPutResource(baseT *testing.T) {
 				ScrapedAt:                res.ScrapedAt,
 				CriticalThresholdPercent: 98,
 				SizeStepPercent:          15,
+				SingleStep:               false,
 				MinimumSize:              nil, //0 gets normalized to NULL
 				MaximumSize:              p2uint64(42000),
 				MinimumFreeSize:          nil, //0 gets normalized to NULL
@@ -410,13 +414,14 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 			"asset_count":      500,
 			"low_threshold":    assert.JSONObject{"usage_percent": 20},
 			"high_threshold":   assert.JSONObject{"usage_percent": 80},
-			"size_steps":       assert.JSONObject{"percent": 10},
+			"size_steps":       assert.JSONObject{"percent": 10, "single": true},
 			"size_constraints": assert.JSONObject{"minimum": 30, "maximum": 20},
 		},
 		"resource.scraped_at cannot be set via the API",
 		"resource.asset_count cannot be set via the API",
 		"delay for low threshold is missing",
 		"delay for high threshold is missing",
+		"percentage-based step may not be configured when single-step resizing is used",
 		"maximum size must be greater than minimum size",
 	)
 
@@ -466,11 +471,11 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 		Path:   "/v1/projects/project1/resources/bar",
 		Body: assert.JSONObject{
 			"critical_threshold": assert.JSONObject{"usage_percent": 90},
-			"size_steps":         assert.JSONObject{"percent": 10},
+			"size_steps":         assert.JSONObject{"single": true},
 			"size_constraints":   assert.JSONObject{"minimum_free": 10},
 		},
 		ExpectStatus: http.StatusUnprocessableEntity,
-		ExpectBody:   assert.StringData("cannot use minimum free size constraint: asset type does not report absolute usage\n"),
+		ExpectBody:   assert.StringData("cannot use single-step resizing: asset type does not report absolute usage\ncannot use minimum free size constraint: asset type does not report absolute usage\n"),
 	}.Check(t.T, hh)
 
 	//none of this should have touched the DB
