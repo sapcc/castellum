@@ -131,22 +131,41 @@ func getNewSizeSingleStep(res db.Resource, asset db.Asset, reason db.OperationRe
 	//NOTE: Single-step resizing is only allowed for resources that report
 	//absolute usage, so we are going to assum that asset.AbsoluteUsage != nil.
 
-	var thresholdPerc float64
+	var (
+		thresholdPerc float64
+		delta         float64
+	)
 	switch reason {
 	case db.OperationReasonCritical:
+		//A "critical" resize should also leave the "high" threshold if there is
+		//one. Otherwise we would have to do a "high" resize directly afterwards
+		//which contradicts the whole "single-step" business.
 		thresholdPerc = res.CriticalThresholdPercent
+		if res.HighThresholdPercent > 0 {
+			thresholdPerc = res.HighThresholdPercent
+		}
+		delta = -0.0001
 	case db.OperationReasonHigh:
 		thresholdPerc = res.HighThresholdPercent
+		delta = -0.0001
 	case db.OperationReasonLow:
 		thresholdPerc = res.LowThresholdPercent
+		delta = +0.0001
 	default:
 		panic("unreachable")
 	}
 
-	newSizeFloat := 100 * float64(*asset.AbsoluteUsage) / thresholdPerc
+	//the new size should be close to the threshold, but with a small delta to
+	//avoid hitting the threshold exactly
+	newSizeFloat := 100 * float64(*asset.AbsoluteUsage) / (thresholdPerc + delta)
 	if reason == db.OperationReasonLow {
 		//for "low", round size down to ensure usage-% comes out above the threshold
-		return uint64(math.Floor(newSizeFloat))
+		newSizeRounded := math.Floor(newSizeFloat)
+		//make sure that we don't resize to or below 0
+		if newSizeRounded < 1.5 {
+			return 1
+		}
+		return uint64(newSizeRounded)
 	}
 	//for "high"/"critical", round size up to ensure usage-% comes out below the threshold
 	return uint64(math.Ceil(newSizeFloat))
