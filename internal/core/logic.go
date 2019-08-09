@@ -20,79 +20,92 @@ package core
 
 import (
 	"math"
+	"sort"
 
 	"github.com/sapcc/castellum/internal/db"
 )
 
-//GetMatchingReasons returns a map that indicates for which resizing operations
-//the given asset (within the given resource) is eligible.
-func GetMatchingReasons(res db.Resource, asset db.Asset) map[db.OperationReason]bool {
-	result := make(map[db.OperationReason]bool)
-	if res.LowThresholdPercent > 0 && asset.UsagePercent <= res.LowThresholdPercent {
-		if canDownsize(res, asset) {
-			result[db.OperationReasonLow] = true
-		}
+//GetEligibleOperations calculates which resizing operations the given asset
+//(within the given resource) is eligible for. In the result, each key-value
+//pair means that the asset has crossed the threshold `key` and thus should be
+//resized to `value`.
+func GetEligibleOperations(res db.Resource, asset db.Asset) map[db.OperationReason]uint64 {
+	result := make(map[db.OperationReason]uint64)
+	if val := checkReason(res, asset, db.OperationReasonLow); val != nil {
+		result[db.OperationReasonLow] = *val
 	}
-	if res.HighThresholdPercent > 0 && asset.UsagePercent >= res.HighThresholdPercent {
-		if canUpsize(res, asset, db.OperationReasonHigh) {
-			result[db.OperationReasonHigh] = true
-		}
+	if val := checkReason(res, asset, db.OperationReasonHigh); val != nil {
+		result[db.OperationReasonHigh] = *val
 	}
-	if res.CriticalThresholdPercent > 0 && asset.UsagePercent >= res.CriticalThresholdPercent {
-		if canUpsize(res, asset, db.OperationReasonCritical) {
-			result[db.OperationReasonCritical] = true
-		}
+	if val := checkReason(res, asset, db.OperationReasonCritical); val != nil {
+		result[db.OperationReasonCritical] = *val
 	}
-
-	//even if the high threshold is not surpassed, we still want to upsize when it is necessary to ensure res.MinimumFreeSize
-	if res.MinimumFreeSize != nil && asset.AbsoluteUsage != nil {
-		freeSize := asset.Size - *asset.AbsoluteUsage
-		if asset.Size < *asset.AbsoluteUsage {
-			//avoid overflow below 0
-			freeSize = 0
-		}
-		if freeSize < *res.MinimumFreeSize {
-			result[db.OperationReasonHigh] = true
-		}
-	}
-
 	return result
 }
 
-func canDownsize(res db.Resource, asset db.Asset) bool {
-	if res.MinimumSize != nil {
-		if GetNewSize(res, asset, db.OperationReasonLow) < *res.MinimumSize {
-			return false
-		}
+func checkReason(res db.Resource, asset db.Asset, reason db.OperationReason) *uint64 {
+	//phase 1: generate global constraints
+	//
+	//NOTE: We only add MinimumSize as a constraint for downsizing. For upsizing,
+	//it's okay if the target is below MinimumSize. It just means we're inching
+	//closer *towards* the happy area. (And vice versa for MaximumSize.)
+	c := emptyConstraints()
+	if reason == db.OperationReasonLow && res.MinimumSize != nil {
+		c.forbidBelow(*res.MinimumSize)
 	}
+	if reason != db.OperationReasonLow && res.MaximumSize == nil {
+		c.forbidAbove(*res.MaximumSize)
+	}
+
+	//MinimumFreeSize is a constraint, but can also cause action, so it
+	//technically falls in both phase 1 and phase 2
+	var a actions
 	if res.MinimumFreeSize != nil && asset.AbsoluteUsage != nil {
-		newSize := GetNewSize(res, asset, db.OperationReasonLow)
-		if newSize < *asset.AbsoluteUsage+*res.MinimumFreeSize {
-			//^ This condition is equal to `newSize - absUsage < minFreeSize`, but
-			//cannot overflow below 0.
-			return false
+		minSize := *res.MinimumFreeSize + *asset.AbsoluteUsage
+		switch reason {
+		case db.OperationReasonLow:
+			c.forbidBelow(minSize)
+		case db.OperationReasonHigh:
+			if asset.Size < minSize {
+				a.AddAction(action{Min: minSize, Desired: minSize}, *c)
+			}
 		}
 	}
-	return true
-}
 
-func canUpsize(res db.Resource, asset db.Asset, reason db.OperationReason) bool {
-	if res.MaximumSize == nil {
-		return true
+	//phase 2: generate an action when the corresponding threshold is passed
+	var takeAction bool
+	switch reason {
+	case db.OperationReasonLow:
+		takeAction = res.LowThresholdPercent > 0 && asset.UsagePercent <= res.LowThresholdPercent
+	case db.OperationReasonHigh:
+		takeAction = res.HighThresholdPercent > 0 && asset.UsagePercent >= res.HighThresholdPercent
+	case db.OperationReasonCritical:
+		takeAction = res.CriticalThresholdPercent > 0 && asset.UsagePercent >= res.CriticalThresholdPercent
 	}
-	return GetNewSize(res, asset, reason) <= *res.MaximumSize
-}
-
-//GetNewSize returns the target size for this asset (within this resource)
-//after resizing for the given reason.
-func GetNewSize(res db.Resource, asset db.Asset, reason db.OperationReason) uint64 {
-	if res.SingleStep {
-		return getNewSizeSingleStep(res, asset, reason)
+	if takeAction {
+		if res.SingleStep {
+			a.AddAction(getActionSingleStep(res, asset, reason), *c)
+		} else {
+			a.AddAction(getActionPercentageStep(res, asset, reason), *c)
+		}
 	}
-	return getNewSize(res, asset, reason, asset.Size)
+
+	//phase 3: take the boldest action that satifies the constraints
+	if reason == db.OperationReasonLow {
+		return a.Min()
+	}
+	return a.Max()
 }
 
-func getNewSize(res db.Resource, asset db.Asset, reason db.OperationReason, assetSize uint64) uint64 {
+func getActionPercentageStep(res db.Resource, asset db.Asset, reason db.OperationReason) action {
+	newSize := getNewSizePercentageStep(res, asset, reason, asset.Size)
+	if reason == db.OperationReasonLow {
+		return action{Min: newSize, Desired: newSize, Max: asset.Size}
+	}
+	return action{Min: asset.Size, Desired: newSize, Max: newSize}
+}
+
+func getNewSizePercentageStep(res db.Resource, asset db.Asset, reason db.OperationReason, assetSize uint64) uint64 {
 	step := uint64(math.Floor((float64(assetSize) * res.SizeStepPercent) / 100))
 	//a small fraction of a small value (e.g. 10% of size = 6) may round down to zero
 	if step == 0 {
@@ -109,7 +122,7 @@ func getNewSize(res db.Resource, asset db.Asset, reason db.OperationReason, asse
 			newUsagePercent := 100 * float64(*asset.AbsoluteUsage) / float64(newSize)
 			if newUsagePercent >= res.CriticalThresholdPercent {
 				//restart call with newSize as old size to calculate the next step
-				return getNewSize(res, asset, reason, newSize)
+				return getNewSizePercentageStep(res, asset, reason, newSize)
 			}
 		}
 		return newSize
@@ -127,7 +140,7 @@ func getNewSize(res db.Resource, asset db.Asset, reason db.OperationReason, asse
 	}
 }
 
-func getNewSizeSingleStep(res db.Resource, asset db.Asset, reason db.OperationReason) uint64 {
+func getActionSingleStep(res db.Resource, asset db.Asset, reason db.OperationReason) action {
 	//NOTE: Single-step resizing is only allowed for resources that report
 	//absolute usage, so we are going to assum that asset.AbsoluteUsage != nil.
 
@@ -163,10 +176,91 @@ func getNewSizeSingleStep(res db.Resource, asset db.Asset, reason db.OperationRe
 		newSizeRounded := math.Floor(newSizeFloat)
 		//make sure that we don't resize to or below 0
 		if newSizeRounded < 1.5 {
-			return 1
+			return action{Max: 1, Desired: asset.Size}
 		}
-		return uint64(newSizeRounded)
+		newSize := uint64(newSizeRounded)
+		return action{Max: newSize, Desired: asset.Size}
 	}
 	//for "high"/"critical", round size up to ensure usage-% comes out below the threshold
-	return uint64(math.Ceil(newSizeFloat))
+	newSize := uint64(math.Ceil(newSizeFloat))
+	return action{Min: newSize, Desired: asset.Size}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// type constraints
+
+type constraints struct {
+	Min uint64
+	Max uint64
+}
+
+func emptyConstraints() *constraints {
+	//Min starts at 1 because we never want to resize to 0
+	return &constraints{1, math.MaxUint64}
+}
+
+func (c *constraints) forbidBelow(val uint64) {
+	if c.Min < val {
+		c.Min = val
+	}
+}
+
+func (c *constraints) forbidAbove(val uint64) {
+	if c.Max > val {
+		c.Max = val
+	}
+}
+
+func (c *constraints) isSatisfiable() bool {
+	return c.Min <= c.Max
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// type action(s)
+
+type action struct {
+	Min     uint64
+	Max     uint64 //can be 0 to signify absence
+	Desired uint64
+}
+
+type actions []uint64
+
+func (as *actions) AddAction(a action, c constraints) {
+	if a.Min != 0 {
+		c.forbidBelow(a.Min)
+	}
+	if a.Max != 0 {
+		c.forbidAbove(a.Max)
+	}
+	if !c.isSatisfiable() {
+		return
+	}
+
+	val := a.Desired
+	if val < c.Min {
+		val = c.Min
+	}
+	if val > c.Max {
+		val = c.Max
+	}
+	*as = append(*as, val)
+}
+
+func (as actions) Min() *uint64 {
+	if len(as) == 0 {
+		return nil
+	}
+	sort.Slice(as, func(i, j int) bool { return as[i] < as[j] })
+	val := as[0]
+	return &val
+}
+
+func (as actions) Max() *uint64 {
+	if len(as) == 0 {
+		return nil
+	}
+	sort.Slice(as, func(i, j int) bool { return as[i] < as[j] })
+	val := as[len(as)-1]
+	return &val
 }
