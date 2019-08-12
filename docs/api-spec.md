@@ -76,6 +76,7 @@ There are two mutually-exclusive ways in which resize steps (the size change in 
 - **Percentage-step resizing**: Enabled by setting the `size_steps.percent` attribute on the resource to a number. For each resize operation, the size change is that many percent of the previous size, except when constraints permit only a partial step. Exceptions:
   - When the critical threshold has been crossed, percentage-step resizing will take multiple steps at once if this is necessary to leave the critical threshold.
 - **Single-step resizing**: Enabled by setting `size_steps.single` to true. For each resize operation, the size change is the smallest step that moves usage back into normal areas, except when constraints permit only a partial step.
+  - When the critical threshold has been crossed, and a high threshold is also configured, single-step resizing will calculate a new size that also leaves the high threshold.
 
 Single-step resizing is a good idea when usage changes infrequently, but possibly in large steps at once (e.g. for project quota). But when usage changes constantly (e.g. for an NFS share that gets written to constantly), single-step resizing could lead to a fast succession of tiny size changes instead of a single large step. In these cases, percentage-step resizing is recommended.
 
