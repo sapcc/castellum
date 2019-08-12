@@ -22,6 +22,8 @@ github.com/gophercloud/gophercloud v0.1.0 h1:P/nh25+rzXouhytV2pUHBb65fnds26Ghl8/
 github.com/gophercloud/gophercloud v0.1.0/go.mod h1:vxM41WHh5uqHVBMZHzuwNOHh8XEoIEcSTewFxm1c5g8=
 github.com/gophercloud/gophercloud v0.2.0 h1:lD2Bce2xBAMNNcFZ0dObTpXkGLlVIb33RPVUNVpw6ic=
 github.com/gophercloud/gophercloud v0.2.0/go.mod h1:vxM41WHh5uqHVBMZHzuwNOHh8XEoIEcSTewFxm1c5g8=
+github.com/gophercloud/gophercloud v0.3.0 h1:6sjpKIpVwRIIwmcEGp+WwNovNsem+c+2vm6oxshRpL8=
+github.com/gophercloud/gophercloud v0.3.0/go.mod h1:vxM41WHh5uqHVBMZHzuwNOHh8XEoIEcSTewFxm1c5g8=
 github.com/gophercloud/utils v0.0.0-20190313033024-0bcc8e728cb5 h1:8USoe8m65WcTOYy+MUu+EtLJJysSODnoNDNCEWhDMso=
 github.com/gophercloud/utils v0.0.0-20190313033024-0bcc8e728cb5/go.mod h1:SZ9FTKibIotDtCrxAU/evccoyu1yhKST6hgBvwTB5Eg=
 github.com/gorilla/context v1.1.1/go.mod h1:kBGZzfjB9CEq2AlWe17Uuf7NDRt0dE0s8S51q0aT7Yg=
@@ -69,6 +71,8 @@ github.com/rs/cors v1.6.0/go.mod h1:gFx+x8UowdsKA9AchylcLynDq+nNFfI8FkUZdN/jGCU=
 github.com/sapcc/go-bits v0.0.0-20180828115508-ed29938ce01c/go.mod h1:KeP5OOqQIgrauiDb/8shKWOq1YoplBALYNvpV4jizPo=
 github.com/sapcc/go-bits v0.0.0-20190522121402-dabab492e20b h1:uNHlkQrn6OfRnZA7C/UBDJsD0QLsThgpLur3BVlRmdQ=
 github.com/sapcc/go-bits v0.0.0-20190522121402-dabab492e20b/go.mod h1:KeP5OOqQIgrauiDb/8shKWOq1YoplBALYNvpV4jizPo=
+github.com/sapcc/go-bits v0.0.0-20190812112942-8284c87bb311 h1:0LOr6lII5IEyupWfdu7UE5jMVVY86P27RIZOk1KdAj0=
+github.com/sapcc/go-bits v0.0.0-20190812112942-8284c87bb311/go.mod h1:8FpGeW8UtyHhnoVVFkicxva48n1XHh/S04Xe0/n6Wv4=
 github.com/sapcc/gophercloud-limes v0.0.0-20190319123021-2ed8e1224541 h1:rWKMPSjDiQdSulbB32lYwZUuN6zZLvTt8aQafl1rTjk=
 github.com/sapcc/gophercloud-limes v0.0.0-20190319123021-2ed8e1224541/go.mod h1:+CE/Fj6tEVycQJBEKxDTAJdwTpFRAJpX1+yd2+fISUo=
 github.com/sapcc/hermes v0.0.0-20190722215605-d772f40f9fc6 h1:iI+ew9JUORCqP+8pElkSayI/smvdiYoPRX6J4DmkVTI=

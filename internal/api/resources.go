@@ -323,10 +323,8 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 
 	errs := input.UpdateDBResource(dbResource, info)
 	if len(errs) > 0 {
-		if eventSink != nil {
-			eventParams.reasonCode = http.StatusUnprocessableEntity
-			eventSink <- newAuditEvent(eventParams)
-		}
+		eventParams.reasonCode = http.StatusUnprocessableEntity
+		logAndPublishEvent(newAuditEvent(eventParams))
 		http.Error(w, strings.Join(errs, "\n"), http.StatusUnprocessableEntity)
 		return
 	}
@@ -336,16 +334,12 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 		_, err = h.DB.Update(dbResource)
 	}
 	if respondwith.ErrorText(w, err) {
-		if eventSink != nil {
-			eventParams.reasonCode = http.StatusInternalServerError
-			eventSink <- newAuditEvent(eventParams)
-		}
+		eventParams.reasonCode = http.StatusInternalServerError
+		logAndPublishEvent(newAuditEvent(eventParams))
 		return
 	}
 
-	if eventSink != nil {
-		eventSink <- newAuditEvent(eventParams)
-	}
+	logAndPublishEvent(newAuditEvent(eventParams))
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -374,15 +368,11 @@ func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
 
 	_, err := h.DB.Exec(`DELETE FROM resources WHERE id = $1`, dbResource.ID)
 	if respondwith.ErrorText(w, err) {
-		if eventSink != nil {
-			eventParams.reasonCode = http.StatusInternalServerError
-			eventSink <- newAuditEvent(eventParams)
-		}
+		eventParams.reasonCode = http.StatusInternalServerError
+		logAndPublishEvent(newAuditEvent(eventParams))
 		return
 	}
 
-	if eventSink != nil {
-		eventSink <- newAuditEvent(eventParams)
-	}
+	logAndPublishEvent(newAuditEvent(eventParams))
 	w.WriteHeader(http.StatusNoContent)
 }

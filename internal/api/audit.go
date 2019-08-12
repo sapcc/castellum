@@ -20,7 +20,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -29,11 +28,10 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/hermes/pkg/cadf"
-	"github.com/sapcc/hermes/pkg/rabbit"
-	"github.com/streadway/amqp"
 )
 
 var eventPublishSuccessCounter = prometheus.NewCounter(
@@ -76,77 +74,36 @@ func init() {
 		sendAuditToRabbitMQ = true
 	}
 
-	s := make(chan cadf.Event, 20)
-	eventSink = s
-	go commitAuditTrail(s)
+	if sendAuditToRabbitMQ {
+		eventPublishSuccessCounter.Add(0)
+		eventPublishFailedCounter.Add(0)
+
+		onSuccessFunc := func() {
+			eventPublishSuccessCounter.Inc()
+		}
+		onFailFunc := func() {
+			eventPublishFailedCounter.Inc()
+		}
+		s := make(chan cadf.Event, 20)
+		eventSink = s
+
+		go audittools.AuditTrail{
+			EventSink:           s,
+			OnSuccessfulPublish: onSuccessFunc,
+			OnFailedPublish:     onFailFunc,
+		}.Commit(rabbitURI, rabbitQueueName)
+	}
 }
 
-//commitAuditTrail receives the audit events from an event sink channel
-//and sends them to a RabbitMQ server.
-func commitAuditTrail(eventSink <-chan cadf.Event) {
-	rc := &rabbitConnection{}
-	connect := func() {
-		if !rc.isConnected {
-			err := rc.connect(rabbitURI, rabbitQueueName)
-			if err != nil {
-				logg.Error(err.Error())
-			}
-		}
-	}
-	sendEvent := func(e *cadf.Event) bool {
-		if !rc.isConnected {
-			return false
-		}
-		err := rabbit.PublishEvent(rc.ch, rc.q.Name, e)
-		if err != nil {
-			eventPublishFailedCounter.Inc()
-			logg.Error("RabbitMQ: failed to publish audit event with ID %q: %s", e.ID, err.Error())
-			return false
-		}
-		eventPublishSuccessCounter.Inc()
-		return true
+//logAndPublishEvent logs the audit event to stdout and publishes it to a RabbitMQ server.
+func logAndPublishEvent(event cadf.Event) {
+	if showAuditOnStdout {
+		msg, _ := json.Marshal(event)
+		logg.Other("AUDIT", string(msg))
 	}
 
-	var pendingEvents []cadf.Event
-
-	ticker := time.Tick(1 * time.Minute)
-	for {
-		select {
-		case e := <-eventSink:
-			if showAuditOnStdout {
-				msg, _ := json.Marshal(e)
-				logg.Other("AUDIT", string(msg))
-			}
-			if sendAuditToRabbitMQ {
-				connect()
-				if successful := sendEvent(&e); !successful {
-					pendingEvents = append(pendingEvents, e)
-				}
-			}
-		case <-ticker:
-			if sendAuditToRabbitMQ {
-				for len(pendingEvents) > 0 {
-					connect()
-					successful := false //until proven otherwise
-					nextEvent := pendingEvents[0]
-					if successful = sendEvent(&nextEvent); !successful {
-						//refresh connection, if old
-						if time.Since(rc.connectedAt) > (5 * time.Minute) {
-							rc.disconnect()
-							connect()
-						}
-						time.Sleep(5 * time.Second)
-						successful = sendEvent(&nextEvent) //one more try before giving up
-					}
-
-					if successful {
-						pendingEvents = pendingEvents[1:]
-					} else {
-						break
-					}
-				}
-			}
-		}
+	if eventSink != nil {
+		eventSink <- event
 	}
 }
 
@@ -242,9 +199,6 @@ func newAuditEvent(p auditEventParams) cadf.Event {
 	}
 }
 
-///////////////////////////////////////////////////////////////////////////////
-//Helper functions
-
 func generateUUID() string {
 	u, err := uuid.NewV4()
 	if err != nil {
@@ -260,48 +214,4 @@ func tryStripPort(hostPort string) string {
 		return host
 	}
 	return hostPort
-}
-
-//rabbitConnection represents a unique connection to some RabbitMQ server with
-//an open Channel and a declared Queue.
-type rabbitConnection struct {
-	conn *amqp.Connection
-	ch   *amqp.Channel
-	q    amqp.Queue
-
-	isConnected bool
-	connectedAt time.Time
-}
-
-func (r *rabbitConnection) connect(uri, queueName string) error {
-	var err error
-
-	//establish a connection with the RabbitMQ server
-	r.conn, err = amqp.Dial(uri)
-	if err != nil {
-		return fmt.Errorf("RabbitMQ: failed to establish a connection with the server: %s", err.Error())
-	}
-	r.connectedAt = time.Now()
-
-	//open a unique, concurrent server channel to process the bulk of AMQP messages
-	r.ch, err = r.conn.Channel()
-	if err != nil {
-		return fmt.Errorf("RabbitMQ: failed to open a channel: %s", err.Error())
-	}
-
-	//declare a queue to hold and deliver messages to consumers
-	r.q, err = rabbit.DeclareQueue(r.ch, queueName)
-	if err != nil {
-		return fmt.Errorf("RabbitMQ: failed to declare a queue: %s", err.Error())
-	}
-
-	r.isConnected = true
-
-	return nil
-}
-
-func (r *rabbitConnection) disconnect() {
-	r.ch.Close()
-	r.conn.Close()
-	r.isConnected = false
 }
