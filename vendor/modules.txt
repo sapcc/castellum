@@ -4,6 +4,8 @@ github.com/beorn7/perks/quantile
 github.com/databus23/goslo.policy
 # github.com/getsentry/sentry-go v0.1.1
 github.com/getsentry/sentry-go
+# github.com/gofrs/uuid v3.2.0+incompatible
+github.com/gofrs/uuid
 # github.com/golang-migrate/migrate v3.5.4+incompatible
 github.com/golang-migrate/migrate
 github.com/golang-migrate/migrate/database
@@ -63,8 +65,13 @@ github.com/sapcc/go-bits/assert
 # github.com/sapcc/gophercloud-limes v0.0.0-20190319123021-2ed8e1224541
 github.com/sapcc/gophercloud-limes/resources
 github.com/sapcc/gophercloud-limes/resources/v1/projects
+# github.com/sapcc/hermes v0.0.0-20190722215605-d772f40f9fc6
+github.com/sapcc/hermes/pkg/cadf
+github.com/sapcc/hermes/pkg/rabbit
 # github.com/sapcc/limes v0.0.0-20190717102825-38fa8ff99ef5
 github.com/sapcc/limes
+# github.com/streadway/amqp v0.0.0-20190404075320-75d898a42a94
+github.com/streadway/amqp
 # gopkg.in/gorp.v2 v2.0.0
 gopkg.in/gorp.v2
 # gopkg.in/yaml.v2 v2.2.2
