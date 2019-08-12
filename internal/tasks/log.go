@@ -31,11 +31,12 @@ var sendEventsToSentry bool
 
 func init() {
 	dsn := os.Getenv("CASTELLUM_SENTRY_DSN")
-	sendEventsToSentry = (dsn != "")
-	if sendEventsToSentry {
+	if dsn != "" {
 		err := sentry.Init(sentry.ClientOptions{Dsn: dsn})
 		if err != nil {
 			logg.Error("Sentry initialization failed: %s", err.Error())
+		} else {
+			sendEventsToSentry = true
 		}
 	}
 }

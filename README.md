@@ -54,6 +54,8 @@ components that you all need to run for a complete installation:
 The API and worker components can be scaled horizontally at will. **The observer cannot be scaled**. Do not run more
 than one instance of it at a time.
 
+The API component has audit trail support and can be configured to send audit events to a RabbitMQ server.
+
 All components receive configuration via environment variables. The following variables are recognized:
 
 | Variable | Default | Explanation |
@@ -63,6 +65,9 @@ All components receive configuration via environment variables. The following va
 | `CASTELLUM_HTTP_LISTEN_ADDRESS` | `:8080` | Listen address for the internal HTTP server. For `castellum observer/worker`, this just exposes Prometheus metrics on `/metrics`. For `castelum api`, this also exposes [the REST API](./docs/api-spec.md). |
 | `CASTELLUM_OSLO_POLICY_PATH` | *(required)* | Path to the `policy.json` file for this service. See [*Oslo policy*](#oslo-policy) for details. |
 | `CASTELLUM_SENTRY_DSN` | *(optional)* | DSN for your Sentry project. If this variable is configured then Castellum will report failed backend operations to Sentry. |
+| `CASTELLUM_RABBITMQ_URI` | *(optional)* | RabbitMQ URI as per the [AMQP URI format](https://www.rabbitmq.com/uri-spec.html). If this variable is configured then Castellum will send audit events to the respective RabbitMQ server. |
+| `CASTELLUM_RABBITMQ_QUEUE_NAME` | *(required if `CASTELLUM_RABBITMQ_URI` is configured)* | Name for the queue that will hold the audit events. The events are published to the default exchange. |
+| `CASTELLUM_AUDIT_SILENT` | *(optional)* | Disable audit event logging to standard output. |
 | `OS_...` | *(required)* | A full set of OpenStack auth environment variables for Castellum's service user. See [documentation for openstackclient][os-env] for details. |
 
 ### Oslo policy
