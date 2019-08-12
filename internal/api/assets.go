@@ -175,7 +175,7 @@ func (h handler) GetAssets(w http.ResponseWriter, r *http.Request) {
 	if token == nil {
 		return
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token, false)
+	dbResource, _ := h.LoadResource(w, r, projectUUID, token, false)
 	if dbResource == nil {
 		return
 	}
@@ -204,7 +204,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	if token == nil {
 		return
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token, false)
+	dbResource, _ := h.LoadResource(w, r, projectUUID, token, false)
 	if dbResource == nil {
 		return
 	}

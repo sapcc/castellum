@@ -33,7 +33,7 @@ func (h handler) GetPendingOperationsForResource(w http.ResponseWriter, r *http.
 	if token == nil {
 		return
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token, false)
+	dbResource, _ := h.LoadResource(w, r, projectUUID, token, false)
 	if dbResource == nil {
 		return
 	}
@@ -92,7 +92,7 @@ func (h handler) GetRecentlyFailedOperationsForResource(w http.ResponseWriter, r
 	if token == nil {
 		return
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token, false)
+	dbResource, _ := h.LoadResource(w, r, projectUUID, token, false)
 	if dbResource == nil {
 		return
 	}
@@ -138,7 +138,7 @@ func (h handler) GetRecentlySucceededOperationsForResource(w http.ResponseWriter
 	if token == nil {
 		return
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token, false)
+	dbResource, _ := h.LoadResource(w, r, projectUUID, token, false)
 	if dbResource == nil {
 		return
 	}

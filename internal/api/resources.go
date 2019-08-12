@@ -21,6 +21,7 @@ package api
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -267,7 +268,7 @@ func (h handler) GetResource(w http.ResponseWriter, r *http.Request) {
 	if token == nil {
 		return
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token, false)
+	dbResource, _ := h.LoadResource(w, r, projectUUID, token, false)
 	if dbResource == nil {
 		return
 	}
@@ -280,11 +281,12 @@ func (h handler) GetResource(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
+	requestTime := time.Now()
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
 		return
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token, true)
+	dbResource, newlyCreatedResource := h.LoadResource(w, r, projectUUID, token, true)
 	if dbResource == nil {
 		return
 	}
@@ -304,8 +306,27 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	action := updateAction
+	if newlyCreatedResource {
+		action = enableAction
+	}
+	eventParams := auditEventParams{
+		token:             token,
+		request:           r,
+		time:              requestTime,
+		reasonCode:        http.StatusAccepted,
+		action:            action,
+		projectID:         projectUUID,
+		resourceType:      string(dbResource.AssetType),
+		attachmentContent: attachmentContent{resource: input},
+	}
+
 	errs := input.UpdateDBResource(dbResource, info)
 	if len(errs) > 0 {
+		if eventSink != nil {
+			eventParams.reasonCode = http.StatusUnprocessableEntity
+			eventSink <- newAuditEvent(eventParams)
+		}
 		http.Error(w, strings.Join(errs, "\n"), http.StatusUnprocessableEntity)
 		return
 	}
@@ -315,28 +336,53 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 		_, err = h.DB.Update(dbResource)
 	}
 	if respondwith.ErrorText(w, err) {
+		if eventSink != nil {
+			eventParams.reasonCode = http.StatusInternalServerError
+			eventSink <- newAuditEvent(eventParams)
+		}
 		return
 	}
 
+	if eventSink != nil {
+		eventSink <- newAuditEvent(eventParams)
+	}
 	w.WriteHeader(http.StatusAccepted)
 }
 
 func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
+	requestTime := time.Now()
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
 		return
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token, false)
+	dbResource, _ := h.LoadResource(w, r, projectUUID, token, false)
 	if dbResource == nil {
 		return
 	}
 	if !token.Require(w, dbResource.AssetType.PolicyRuleForWrite()) {
 		return
 	}
+	eventParams := auditEventParams{
+		token:        token,
+		request:      r,
+		time:         requestTime,
+		reasonCode:   http.StatusNoContent,
+		action:       disableAction,
+		projectID:    projectUUID,
+		resourceType: string(dbResource.AssetType),
+	}
 
 	_, err := h.DB.Exec(`DELETE FROM resources WHERE id = $1`, dbResource.ID)
 	if respondwith.ErrorText(w, err) {
+		if eventSink != nil {
+			eventParams.reasonCode = http.StatusInternalServerError
+			eventSink <- newAuditEvent(eventParams)
+		}
 		return
+	}
+
+	if eventSink != nil {
+		eventSink <- newAuditEvent(eventParams)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
