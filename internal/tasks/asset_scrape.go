@@ -217,19 +217,20 @@ func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, ass
 		CreatedAt:    c.TimeNow(),
 	}
 
-	match := core.GetMatchingReasons(res, asset)
-	switch {
-	case match[db.OperationReasonCritical]:
+	eligibleFor := core.GetEligibleOperations(res, asset)
+	if val, exists := eligibleFor[db.OperationReasonCritical]; exists {
 		op.Reason = db.OperationReasonCritical
-	case match[db.OperationReasonHigh]:
+		op.NewSize = val
+	} else if val, exists := eligibleFor[db.OperationReasonHigh]; exists {
 		op.Reason = db.OperationReasonHigh
-	case match[db.OperationReasonLow]:
+		op.NewSize = val
+	} else if val, exists := eligibleFor[db.OperationReasonLow]; exists {
 		op.Reason = db.OperationReasonLow
-	default:
+		op.NewSize = val
+	} else {
 		//no threshold exceeded -> do not create an operation
 		return nil
 	}
-	op.NewSize = core.GetNewSize(res, asset, op.Reason)
 
 	//skip the operation if the size would not change (this is especially true
 	//for reason "low" and oldSize = 1)
@@ -250,16 +251,18 @@ func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, ass
 
 func (c Context) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, op db.PendingOperation) (*db.PendingOperation, error) {
 	//cancel when the threshold that triggered this operation is no longer being crossed
-	match := core.GetMatchingReasons(res, asset)
-	doCancel := !match[op.Reason]
-	if op.Reason == db.OperationReasonHigh && match[db.OperationReasonCritical] {
-		//as an exception, cancel a "High" operation when we've crossed the
-		//"Critical" threshold in the meantime - when we get to
-		//maybeCreateOperation() next, a new operation with reason "Critical" will
-		//be created instead
-		doCancel = true
+	eligibleFor := core.GetEligibleOperations(res, asset)
+	_, isEligible := eligibleFor[op.Reason]
+	if op.Reason == db.OperationReasonHigh {
+		if _, canBeUpgraded := eligibleFor[db.OperationReasonCritical]; canBeUpgraded {
+			//as an exception, cancel a "High" operation when we've crossed the
+			//"Critical" threshold in the meantime - when we get to
+			//maybeCreateOperation() next, a new operation with reason "Critical" will
+			//be created instead
+			isEligible = false
+		}
 	}
-	if !doCancel {
+	if isEligible {
 		return &op, nil
 	}
 
@@ -274,18 +277,18 @@ func (c Context) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, ass
 
 func (c Context) maybeUpdateOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, op db.PendingOperation) (*db.PendingOperation, error) {
 	//do not touch `op` unless the corresponding threshold is still being crossed
-	if !core.GetMatchingReasons(res, asset)[op.Reason] {
+	eligibleFor := core.GetEligibleOperations(res, asset)
+	newSize, exists := eligibleFor[op.Reason]
+	if !exists {
 		return &op, nil
 	}
 
 	//if the asset size has changed since the operation has been created
 	//(because of resizes not performed by Castellum), calculate a new target size
-	newSize := core.GetNewSize(res, asset, op.Reason)
 	if op.NewSize == newSize {
 		//nothing to do
 		return &op, nil
 	}
-
 	op.NewSize = newSize
 	_, err := tx.Update(&op)
 	return &op, err
@@ -293,7 +296,7 @@ func (c Context) maybeUpdateOperation(tx *gorp.Transaction, res db.Resource, ass
 
 func (c Context) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, op db.PendingOperation) (*db.PendingOperation, error) {
 	//can only confirm when the corresponding threshold is still being crossed
-	if !core.GetMatchingReasons(res, asset)[op.Reason] {
+	if _, exists := core.GetEligibleOperations(res, asset)[op.Reason]; !exists {
 		return &op, nil
 	}
 

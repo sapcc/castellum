@@ -65,6 +65,9 @@ type Resource struct {
 	//when the asset type defines size steps differently. For example, for the
 	//asset type "instance", we will have a list of allowed flavors somewhere else.
 	SizeStepPercent float64 `db:"size_step_percent"`
+	//When true, ignore SizeStepPercent and always resize by the smallest step
+	//that will move usage back into normal areas.
+	SingleStep bool `db:"single_step"`
 
 	//This defines absolute boundaries for the asset size. If configured, resize
 	//operations will never move to a size outside this range.

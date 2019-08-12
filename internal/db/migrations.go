@@ -158,4 +158,10 @@ var SQLMigrations = map[string]string{
 		ALTER TABLE pending_operations ALTER COLUMN usage_percent TYPE DOUBLE PRECISION;
 		ALTER TABLE finished_operations ALTER COLUMN usage_percent TYPE DOUBLE PRECISION;
 	`,
+	"009_add_resources_single_step.down.sql": `
+		ALTER TABLE resources DROP COLUMN single_step;
+	`,
+	"009_add_resources_single_step.up.sql": `
+		ALTER TABLE resources ADD COLUMN single_step BOOLEAN NOT NULL DEFAULT FALSE;
+	`,
 }

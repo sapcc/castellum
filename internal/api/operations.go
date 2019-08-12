@@ -120,7 +120,7 @@ func (h handler) GetRecentlyFailedOperationsForResource(w http.ResponseWriter, r
 		if !exists {
 			continue
 		}
-		if core.GetMatchingReasons(*dbResource, asset)[op.Reason] {
+		if _, exists := core.GetEligibleOperations(*dbResource, asset)[op.Reason]; exists {
 			relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID))
 		}
 	}

@@ -67,6 +67,7 @@ The following fields may be returned:
 | `resources.$type.size_constraints.minimum`<br>`resources.$type.size_constraints.maximum` | integer | If set, resize operations will only be scheduled when the target size fits into these constraints. |
 | `resources.$type.size_constraints.minimum_free` | integer | If set, downsize operations will be inhibited and upsize operations will be scheduled to ensure that `size - absoluteUsage` is always `>=` this value. |
 | `resources.$type.size_steps.percent` | integer | How much the size changes in each resize operation, as a percentage of the previous size. |
+| `resources.$type.size_steps.single` | boolean | When true, ignore `size_steps.percent` and always resize by the smallest step that will move usage back into normal areas. This is a good idea when usage changes in seldom, but large steps. But when usage changes constantly (e.g. for an NFS share that gets written to constantly), this option should be avoided because it could lead to a fast succession of tiny size changes instead of a single large step. |
 
 ## GET /v1/projects/:id/resources/:type
 

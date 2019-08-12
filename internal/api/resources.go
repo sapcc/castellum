@@ -49,7 +49,8 @@ type Threshold struct {
 
 //SizeSteps appears in type Resource.
 type SizeSteps struct {
-	Percent float64 `json:"percent"`
+	Percent float64 `json:"percent,omitempty"`
+	Single  bool    `json:"single,omitempty"`
 }
 
 //SizeConstraints appears in type Resource.
@@ -74,7 +75,7 @@ func (h handler) ResourceFromDB(res db.Resource) (Resource, error) {
 	result := Resource{
 		ScrapedAtUnix: timeOrNullToUnix(res.ScrapedAt),
 		AssetCount:    assetCount,
-		SizeSteps:     SizeSteps{Percent: res.SizeStepPercent},
+		SizeSteps:     SizeSteps{Percent: res.SizeStepPercent, Single: res.SingleStep},
 	}
 	if res.LowThresholdPercent > 0 {
 		result.LowThreshold = &Threshold{
@@ -176,8 +177,18 @@ func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo) (e
 	}
 
 	res.SizeStepPercent = r.SizeSteps.Percent
-	if res.SizeStepPercent == 0 {
-		complain("size step must be greater than 0%")
+	res.SingleStep = r.SizeSteps.Single
+	if res.SingleStep {
+		if !info.ReportsAbsoluteUsage {
+			complain("cannot use single-step resizing: asset type does not report absolute usage")
+		}
+		if res.SizeStepPercent != 0 {
+			complain("percentage-based step may not be configured when single-step resizing is used")
+		}
+	} else {
+		if res.SizeStepPercent == 0 {
+			complain("size step must be greater than 0%")
+		}
 	}
 
 	if r.SizeConstraints == nil {
