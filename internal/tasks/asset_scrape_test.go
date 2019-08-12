@@ -660,7 +660,7 @@ func TestSkipDownsizeBecauseOfMinimumSize(baseT *testing.T) {
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
 
 		//configure a minimum size on the resource
-		t.MustExec(c.DB, `UPDATE resources SET min_size = 900`)
+		t.MustExec(c.DB, `UPDATE resources SET min_size = 1000`)
 
 		//set a usage that is ripe for downsizing
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 100})
@@ -675,12 +675,40 @@ func TestSkipDownsizeBecauseOfMinimumSize(baseT *testing.T) {
 	})
 }
 
+func TestRestrictDownsizeBecauseOfMinimumSize(baseT *testing.T) {
+	t := test.T{T: baseT}
+	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
+
+		//configure a minimum size on the resource
+		t.MustExec(c.DB, `UPDATE resources SET min_size = 900`)
+
+		//set a usage that is ripe for downsizing
+		setAsset(plugins.StaticAsset{Size: 1000, Usage: 100})
+
+		//ScrapeNextAsset should create a downsize operation with new size 900,
+		//even though percentage-step resizing would like to go to 800
+		clock.StepBy(5 * time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+			ID:           1,
+			AssetID:      1,
+			Reason:       db.OperationReasonLow,
+			OldSize:      1000,
+			NewSize:      900,
+			UsagePercent: 10,
+			CreatedAt:    c.TimeNow(),
+		})
+		t.ExpectFinishedOperations(c.DB /*, nothing */)
+
+	})
+}
+
 func TestSkipUpsizeBecauseOfMaximumSize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
 
 		//configure a maximum size on the resource
-		t.MustExec(c.DB, `UPDATE resources SET max_size = 1100`)
+		t.MustExec(c.DB, `UPDATE resources SET max_size = 1000`)
 
 		//set a usage that is ripe for upsizing, even for critical upsizing
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 999})
@@ -690,6 +718,37 @@ func TestSkipUpsizeBecauseOfMaximumSize(baseT *testing.T) {
 		clock.StepBy(5 * time.Minute)
 		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
+		t.ExpectFinishedOperations(c.DB /*, nothing */)
+
+	})
+}
+
+func TestRestrictUpsizeBecauseOfMaximumSize(baseT *testing.T) {
+	t := test.T{T: baseT}
+	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
+
+		//configure a maximum size on the resource
+		t.MustExec(c.DB, `UPDATE resources SET max_size = 1100`)
+
+		//set a usage that is ripe for upsizing, even for critical upsizing
+		setAsset(plugins.StaticAsset{Size: 1000, Usage: 999})
+
+		//ScrapeNextAsset should create a critical upsize operation: With either
+		//stepping strategy, the desired target size is greater than the max_size,
+		//so the max_size is chosen instead.
+		clock.StepBy(5 * time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+			ID:           1,
+			AssetID:      1,
+			Reason:       db.OperationReasonCritical,
+			OldSize:      1000,
+			NewSize:      1100,
+			UsagePercent: 99.9,
+			CreatedAt:    c.TimeNow(),
+			ConfirmedAt:  p2time(c.TimeNow()),
+			GreenlitAt:   p2time(c.TimeNow()),
+		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
 	})
@@ -732,80 +791,114 @@ func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 
 func TestDownsizeAllowedByMinimumFreeSize(baseT *testing.T) {
 	t := test.T{T: baseT}
-	c, setAsset, clock := setupAssetScrapeTest(t, false)
+	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
 
-	//set a very low usage that permits downsizing
-	setAsset(plugins.StaticAsset{Size: 1000, Usage: 100})
+		//set a very low usage that permits downsizing
+		setAsset(plugins.StaticAsset{Size: 1000, Usage: 100})
 
-	//configure a MinimumFreeSize such that the downsizing operation is still
-	//permitted by it (see next testcase for the opposite behavior)
-	t.MustExec(c.DB, `UPDATE resources SET min_free_size = 600`)
+		//configure a MinimumFreeSize such that the downsizing operation is still
+		//permitted by it (see next testcase for the opposite behavior)
+		t.MustExec(c.DB, `UPDATE resources SET min_free_size = 600`)
 
-	//ScrapeNextAsset should create a downsize operation
-	clock.StepBy(10 * time.Minute)
-	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
-	t.ExpectPendingOperations(c.DB, db.PendingOperation{
-		ID:           1,
-		AssetID:      1,
-		Reason:       db.OperationReasonLow,
-		OldSize:      1000,
-		NewSize:      800,
-		UsagePercent: 10,
-		CreatedAt:    c.TimeNow(),
+		//ScrapeNextAsset should create a downsize operation
+		clock.StepBy(10 * time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+			ID:           1,
+			AssetID:      1,
+			Reason:       db.OperationReasonLow,
+			OldSize:      1000,
+			NewSize:      ifthenelseU64(res.SingleStep, 700, 800),
+			UsagePercent: 10,
+			CreatedAt:    c.TimeNow(),
+		})
+
+	})
+}
+
+func TestDownsizeRestrictedByMinimumFreeSize(baseT *testing.T) {
+	t := test.T{T: baseT}
+	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
+
+		//set a very low usage that permits downsizing
+		setAsset(plugins.StaticAsset{Size: 1000, Usage: 100})
+
+		//configure a MinimumFreeSize that restricts this downsizing operation to
+		//only go to 900 instead of 800 (for percentage-step resizing) or 500 (for
+		//single-step resizing)
+		t.MustExec(c.DB, `UPDATE resources SET min_free_size = 800`)
+
+		//ScrapeNextAsset should NOT create a downsize operation
+		clock.StepBy(10 * time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+			ID:           1,
+			AssetID:      1,
+			Reason:       db.OperationReasonLow,
+			OldSize:      1000,
+			NewSize:      900,
+			UsagePercent: 10,
+			CreatedAt:    c.TimeNow(),
+		})
+
 	})
 }
 
 func TestDownsizeForbiddenByMinimumFreeSize(baseT *testing.T) {
 	t := test.T{T: baseT}
-	c, setAsset, clock := setupAssetScrapeTest(t, false)
+	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
 
-	//set a very low usage that permits downsizing
-	setAsset(plugins.StaticAsset{Size: 1000, Usage: 100})
+		//set a very low usage that permits downsizing
+		setAsset(plugins.StaticAsset{Size: 1000, Usage: 200})
 
-	//configure a MinimumFreeSize that inhibits this downsizing operation (note
-	//that while the *current* free size is larger than 800, the *new* free size
-	//would be lower, and that's the crucial point)
-	t.MustExec(c.DB, `UPDATE resources SET min_free_size = 800`)
+		//configure a MinimumFreeSize that inhibits this downsizing operation
+		t.MustExec(c.DB, `UPDATE resources SET min_free_size = 800`)
 
-	//ScrapeNextAsset should NOT create a downsize operation
-	clock.StepBy(10 * time.Minute)
-	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
-	t.ExpectPendingOperations(c.DB /*, nothing */)
+		//ScrapeNextAsset should NOT create a downsize operation
+		clock.StepBy(10 * time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+		t.ExpectPendingOperations(c.DB /*, nothing */)
+
+	})
 }
 
 func TestUpsizeForcedByMinimumFreeSize(baseT *testing.T) {
 	t := test.T{T: baseT}
-	c, _, clock := setupAssetScrapeTest(t, false)
+	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
 
-	//the asset starts out at size = 1000, usage = 500, which wouldn't warrant an
-	//upsize; set a MinimumFreeSize larger than the current free size to force
-	//upsizing
-	t.MustExec(c.DB, `UPDATE resources SET min_free_size = 600`)
+		//the asset starts out at size = 1000, usage = 500, which wouldn't warrant an
+		//upsize; set a MinimumFreeSize larger than the current free size to force
+		//upsizing
+		t.MustExec(c.DB, `UPDATE resources SET min_free_size = 600`)
 
-	//ScrapeNextAsset should therefore create an upsize operation
-	clock.StepBy(10 * time.Minute)
-	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
-	t.ExpectPendingOperations(c.DB, db.PendingOperation{
-		ID:           1,
-		AssetID:      1,
-		Reason:       db.OperationReasonHigh,
-		OldSize:      1000,
-		NewSize:      1200,
-		UsagePercent: 50,
-		CreatedAt:    c.TimeNow(),
+		//ScrapeNextAsset should therefore create an upsize operation
+		clock.StepBy(10 * time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+			ID:           1,
+			AssetID:      1,
+			Reason:       db.OperationReasonHigh,
+			OldSize:      1000,
+			NewSize:      ifthenelseU64(res.SingleStep, 1100, 1200),
+			UsagePercent: 50,
+			CreatedAt:    c.TimeNow(),
+		})
+
+		//to double-check, remove the reason for the upsize operation
+		t.MustExec(c.DB, `UPDATE resources SET min_free_size = 500`)
+
+		//ScrapeNextAsset should cancel the operation
+		clock.StepBy(10 * time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+		t.ExpectPendingOperations(c.DB /*, nothing */)
+
 	})
-
-	//to double-check, remove the reason for the upsize operation
-	t.MustExec(c.DB, `UPDATE resources SET min_free_size = 500`)
-
-	//ScrapeNextAsset should cancel the operation
-	clock.StepBy(10 * time.Minute)
-	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
-	t.ExpectPendingOperations(c.DB /*, nothing */)
 }
 
 func TestCriticalUpsizeTakingMultipleStepsAtOnce(baseT *testing.T) {
 	t := test.T{T: baseT}
+	//This test is specific to percentage-step resizing because single-step
+	//resizing has no concept of "taking multiple steps at once".
 	c, setAsset, clock := setupAssetScrapeTest(t, false)
 
 	//set a very small step size
@@ -814,7 +907,7 @@ func TestCriticalUpsizeTakingMultipleStepsAtOnce(baseT *testing.T) {
 	//set usage way above the critical threshold
 	setAsset(plugins.StaticAsset{Size: 1380, Usage: 1350})
 
-	//ScrapeNextAsset should create a "critical" operation taking three steps at
+	//ScrapeNextAsset should create a "critical" operation taking four steps at
 	//once (1380 -> 1393 -> 1406 -> 1420 -> 1434)
 	//
 	//This example is manufactured specifically such that the step size changes
