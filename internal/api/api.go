@@ -186,9 +186,14 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 	)
 	if err == sql.ErrNoRows {
 		if createIfMissing {
+			proj, err := h.Provider.GetProject(projectUUID)
+			if respondwith.ErrorText(w, err) {
+				return nil
+			}
 			return &db.Resource{
-				ScopeUUID: projectUUID,
-				AssetType: assetType,
+				ScopeUUID:  projectUUID,
+				DomainUUID: proj.DomainID,
+				AssetType:  assetType,
 			}
 		}
 		respondWithNotFound(w)

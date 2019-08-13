@@ -164,4 +164,10 @@ var SQLMigrations = map[string]string{
 	"009_add_resources_single_step.up.sql": `
 		ALTER TABLE resources ADD COLUMN single_step BOOLEAN NOT NULL DEFAULT FALSE;
 	`,
+	"010_add_resources_domain_uuid.down.sql": `
+		ALTER TABLE resources DROP COLUMN domain_uuid;
+	`,
+	"010_add_resources_domain_uuid.up.sql": `
+		ALTER TABLE resources ADD COLUMN domain_uuid TEXT NOT NULL DEFAULT 'unknown';
+	`,
 }

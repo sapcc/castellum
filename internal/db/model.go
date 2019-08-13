@@ -43,9 +43,10 @@ type Resource struct {
 	//The pair of (.ScopeUUID, .AssetType) uniquely identifies a Resource on
 	//the API level. Internally, other tables reference Resource by the numeric
 	//.ID field.
-	ID        int64     `db:"id"`
-	ScopeUUID string    `db:"scope_uuid"` //either project UUID or domain UUID
-	AssetType AssetType `db:"asset_type"`
+	ID         int64     `db:"id"`
+	ScopeUUID  string    `db:"scope_uuid"`  //either project UUID or domain UUID
+	DomainUUID string    `db:"domain_uuid"` //for domain resources: equal to .ScopeUUID
+	AssetType  AssetType `db:"asset_type"`
 
 	//When we last checked this Resource for new or deleted assets.
 	ScrapedAt *time.Time `db:"scraped_at"`
