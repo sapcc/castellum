@@ -77,6 +77,23 @@ func checkReason(res db.Resource, asset db.Asset, reason db.OperationReason) *ui
 		c.forbidAbove(*res.MaximumSize)
 	}
 
+	if asset.AbsoluteUsage != nil {
+		absUsage := float64(*asset.AbsoluteUsage)
+
+		//do not allow downsize operations to cross above the high/critical thresholds
+		if reason == db.OperationReasonLow && res.HighThresholdPercent != 0 {
+			c.forbidBelow(uint64(math.Floor(100*absUsage/res.HighThresholdPercent)) + 1)
+		}
+		if reason == db.OperationReasonLow && res.CriticalThresholdPercent != 0 {
+			c.forbidBelow(uint64(math.Floor(100*absUsage/res.CriticalThresholdPercent)) + 1)
+		}
+
+		//do not allow upsize operations to cross below the low threshold
+		if reason != db.OperationReasonLow && res.LowThresholdPercent != 0 {
+			c.forbidAbove(uint64(math.Floor(100*absUsage/res.LowThresholdPercent)) - 1)
+		}
+	}
+
 	//MinimumFreeSize is a constraint, but can also cause action, so it
 	//technically falls in both phase 1 and phase 2
 	var a actions

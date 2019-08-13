@@ -80,12 +80,14 @@ func forAllSteppingStrategies(t test.T, action func(*Context, db.Resource, func(
 	runAssetScrapeTest(t, false, func(c *Context, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
 		var res db.Resource
 		t.Must(c.DB.SelectOne(&res, `SELECT * FROM resources WHERE id = 1`))
+		t.Log("running testcase with percentage-step resizing")
 		action(c, res, setAsset, clock)
 	})
 
 	runAssetScrapeTest(t, true, func(c *Context, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
 		var res db.Resource
 		t.Must(c.DB.SelectOne(&res, `SELECT * FROM resources WHERE id = 1`))
+		t.Log("running testcase with single-step resizing")
 		action(c, res, setAsset, clock)
 	})
 }
@@ -1005,6 +1007,91 @@ func TestZeroSizedAssetWithUsage(baseT *testing.T) {
 			CreatedAt:    c.TimeNow(),
 			ConfirmedAt:  p2time(c.TimeNow()),
 			GreenlitAt:   p2time(c.TimeNow()),
+		})
+		t.ExpectFinishedOperations(c.DB /*, nothing */)
+
+	})
+}
+
+func TestDownsizeShouldNotGoIntoHighThreshold(baseT *testing.T) {
+	t := test.T{T: baseT}
+	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
+
+		t.MustExec(c.DB, `UPDATE resources SET low_threshold_percent = 75`)
+		setAsset(plugins.StaticAsset{Size: 1000, Usage: 700})
+
+		clock.StepBy(10 * time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+
+		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+			ID:      1,
+			AssetID: 1,
+			Reason:  db.OperationReasonLow,
+			OldSize: 1000,
+			//single-step resizing targets just above the low threshold and thus does
+			//not come near the high threshold, but percentage-step resizing would
+			//(if it ignored the high threshold) go down to size 800 which is too far
+			NewSize:      ifthenelseU64(res.SingleStep, 933, 876),
+			UsagePercent: 70,
+			CreatedAt:    c.TimeNow(),
+		})
+		t.ExpectFinishedOperations(c.DB /*, nothing */)
+
+	})
+}
+
+func TestDownsizeShouldNotGoIntoCriticalThreshold(baseT *testing.T) {
+	t := test.T{T: baseT}
+	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
+
+		//same as above, but test without high threshold
+		t.MustExec(c.DB, `UPDATE resources SET low_threshold_percent = 90, high_threshold_percent = 0, high_delay_seconds = 0`)
+		setAsset(plugins.StaticAsset{Size: 1000, Usage: 800})
+
+		clock.StepBy(10 * time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+
+		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+			ID:      1,
+			AssetID: 1,
+			Reason:  db.OperationReasonLow,
+			OldSize: 1000,
+			//single-step resizing targets just above the low threshold and thus does
+			//not come near the critical threshold, but percentage-step resizing
+			//would (if it ignored the critical threshold) go down to size 800 which
+			//is too far
+			NewSize:      ifthenelseU64(res.SingleStep, 888, 843),
+			UsagePercent: 80,
+			CreatedAt:    c.TimeNow(),
+		})
+		t.ExpectFinishedOperations(c.DB /*, nothing */)
+
+	})
+}
+
+func TestUpsizeShouldNotGoIntoHighThreshold(baseT *testing.T) {
+	t := test.T{T: baseT}
+	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
+
+		//same as above, but in the opposite direction
+		t.MustExec(c.DB, `UPDATE resources SET high_threshold_percent = 22`)
+		setAsset(plugins.StaticAsset{Size: 1000, Usage: 230})
+
+		clock.StepBy(10 * time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+
+		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+			ID:      1,
+			AssetID: 1,
+			Reason:  db.OperationReasonHigh,
+			OldSize: 1000,
+			//single-step resizing targets just below the high threshold and thus
+			//does not come near the low threshold, but percentage-step resizing
+			//would (if it ignored the low threshold) go up to size 1200 which is too
+			//far
+			NewSize:      ifthenelseU64(res.SingleStep, 1046, 1149),
+			UsagePercent: 23,
+			CreatedAt:    c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
