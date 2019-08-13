@@ -25,11 +25,31 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
+//GetUsagePercent calculates `100 * usage / size`, but has additional logic for
+//some corner cases like size = 0.
+func GetUsagePercent(size, usage uint64) float64 {
+	if size == 0 {
+		if usage == 0 {
+			return 0
+		}
+		//This value is a somewhat arbitrary choice, but it should be above 100%
+		//because `usage > size`.
+		return 200
+	}
+
+	return 100 * float64(usage) / float64(size)
+}
+
 //GetEligibleOperations calculates which resizing operations the given asset
 //(within the given resource) is eligible for. In the result, each key-value
 //pair means that the asset has crossed the threshold `key` and thus should be
 //resized to `value`.
 func GetEligibleOperations(res db.Resource, asset db.Asset) map[db.OperationReason]uint64 {
+	//never touch a zero-sized asset unless it has non-zero usage
+	if asset.Size == 0 && asset.UsagePercent == 0 {
+		return nil
+	}
+
 	result := make(map[db.OperationReason]uint64)
 	if val := checkReason(res, asset, db.OperationReasonLow); val != nil {
 		result[db.OperationReasonLow] = *val
@@ -125,7 +145,7 @@ func getNewSizePercentageStep(res db.Resource, asset db.Asset, reason db.Operati
 		//immediately and take multiple steps if usage would still be crossing the
 		//critical threshold otherwise
 		if asset.AbsoluteUsage != nil {
-			newUsagePercent := 100 * float64(*asset.AbsoluteUsage) / float64(newSize)
+			newUsagePercent := GetUsagePercent(newSize, *asset.AbsoluteUsage)
 			if newUsagePercent >= res.CriticalThresholdPercent {
 				//restart call with newSize as old size to calculate the next step
 				return getNewSizePercentageStep(res, asset, reason, newSize)

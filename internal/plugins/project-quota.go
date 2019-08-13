@@ -165,7 +165,7 @@ func (m *assetManagerProjectQuota) GetAssetStatus(res db.Resource, projectID str
 	return core.AssetStatus{
 		Size:          resource.Quota,
 		AbsoluteUsage: p2u64(resource.Usage),
-		UsagePercent:  100 * float64(resource.Usage) / float64(resource.Quota),
+		UsagePercent:  core.GetUsagePercent(resource.Quota, resource.Usage),
 	}, nil
 }
 

@@ -126,7 +126,7 @@ func (m AssetManagerStatic) GetAssetStatus(res db.Resource, assetUUID string, pr
 	return core.AssetStatus{
 		Size:          asset.Size,
 		AbsoluteUsage: p2u64(asset.Usage),
-		UsagePercent:  100 * float64(asset.Usage) / float64(asset.Size),
+		UsagePercent:  core.GetUsagePercent(asset.Size, asset.Usage),
 	}, nil
 }
 

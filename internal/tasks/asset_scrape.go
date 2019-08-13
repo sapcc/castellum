@@ -96,7 +96,7 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 
 	//check asset status
 	var oldStatus *core.AssetStatus
-	if asset.Size > 0 {
+	if asset.ScrapedAt != nil {
 		oldStatus = &core.AssetStatus{
 			Size:         asset.Size,
 			UsagePercent: asset.UsagePercent,

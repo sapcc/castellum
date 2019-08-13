@@ -934,6 +934,76 @@ func TestCriticalUpsizeTakingMultipleStepsAtOnce(baseT *testing.T) {
 	t.ExpectFinishedOperations(c.DB /*, nothing */)
 }
 
+func TestZeroSizedAssetWithoutUsage(baseT *testing.T) {
+	t := test.T{T: baseT}
+	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
+
+		//This may occur e.g. in the project-quota asset manager, when the project
+		//in question has no quota at all. We expect Castellum to leave assets
+		//with 0 size and 0 usage alone. And more importantly, we expect Castellum
+		//to not crash on divide-by-zero while doing so. :)
+		setAsset(plugins.StaticAsset{Size: 0, Usage: 0})
+
+		clock.StepBy(10 * time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+
+		t.ExpectAssets(c.DB, db.Asset{
+			ID:            1,
+			ResourceID:    1,
+			UUID:          "asset1",
+			Size:          0,
+			AbsoluteUsage: p2uint64(0),
+			UsagePercent:  0,
+			CheckedAt:     c.TimeNow(),
+			ScrapedAt:     p2time(c.TimeNow()),
+			ExpectedSize:  nil,
+		})
+		t.ExpectPendingOperations(c.DB /*, nothing */)
+		t.ExpectFinishedOperations(c.DB /*, nothing */)
+
+	})
+}
+
+func TestZeroSizedAssetWithUsage(baseT *testing.T) {
+	t := test.T{T: baseT}
+	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
+
+		//This may occur e.g. in the project-quota asset manager when the quota
+		//setup is broken and there is usage without the requisite quota.
+		setAsset(plugins.StaticAsset{Size: 0, Usage: 5})
+
+		clock.StepBy(10 * time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+
+		t.ExpectAssets(c.DB, db.Asset{
+			ID:            1,
+			ResourceID:    1,
+			UUID:          "asset1",
+			Size:          0,
+			AbsoluteUsage: p2uint64(5),
+			UsagePercent:  200, //arbitrary value that represents non-zero usage on zero size
+			CheckedAt:     c.TimeNow(),
+			ScrapedAt:     p2time(c.TimeNow()),
+			ExpectedSize:  nil,
+		})
+		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+			ID:      1,
+			AssetID: 1,
+			Reason:  db.OperationReasonCritical,
+			OldSize: 0,
+			//single-step resizing will end up one higher than percentage-step
+			//resizing because it also wants to leave the high threshold
+			NewSize:      ifthenelseU64(res.SingleStep, 7, 6),
+			UsagePercent: 200,
+			CreatedAt:    c.TimeNow(),
+			ConfirmedAt:  p2time(c.TimeNow()),
+			GreenlitAt:   p2time(c.TimeNow()),
+		})
+		t.ExpectFinishedOperations(c.DB /*, nothing */)
+
+	})
+}
+
 func ifthenelseF64(cond bool, thenValue float64, elseValue float64) float64 {
 	if cond {
 		return thenValue

@@ -175,14 +175,11 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 	status := core.AssetStatus{
 		Size:          uint64(math.Round(sizeBytes / 1024 / 1024 / 1024)),
 		AbsoluteUsage: p2u64(uint64(math.Round(usageBytes / 1024 / 1024 / 1024))),
-		UsagePercent:  100 * usageBytes / sizeBytes,
+		UsagePercent:  core.GetUsagePercent(uint64(sizeBytes), uint64(usageBytes)),
 	}
 	if usageBytes <= 0 {
 		status.AbsoluteUsage = p2u64(0)
 		status.UsagePercent = 0
-	}
-	if usageBytes > sizeBytes {
-		status.UsagePercent = 100
 	}
 
 	//when size has changed compared to last time, double-check with the Manila
