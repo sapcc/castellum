@@ -30,82 +30,84 @@ import (
 
 func TestResourceScraping(baseT *testing.T) {
 	t := test.T{T: baseT}
-	c, amStatic, clock := setupContext(t)
+	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock) {
 
-	//ScrapeNextResource() without any resources just does nothing
-	err := c.ScrapeNextResource("foo", c.TimeNow())
-	if err != sql.ErrNoRows {
-		t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
-	}
-	easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-0.sql")
+		//ScrapeNextResource() without any resources just does nothing
+		err := c.ScrapeNextResource("foo", c.TimeNow())
+		if err != sql.ErrNoRows {
+			t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
+		}
+		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-0.sql")
 
-	//create some project resources for testing
-	t.Must(c.DB.Insert(&db.Resource{
-		ScopeUUID: "project1",
-		AssetType: "foo",
-	}))
-	t.Must(c.DB.Insert(&db.Resource{
-		ScopeUUID: "project2",
-		AssetType: "bar", //note: different asset type
-	}))
-	t.Must(c.DB.Insert(&db.Resource{
-		ScopeUUID: "project3",
-		AssetType: "foo",
-	}))
+		//create some project resources for testing
+		t.Must(c.DB.Insert(&db.Resource{
+			ScopeUUID: "project1",
+			AssetType: "foo",
+		}))
+		t.Must(c.DB.Insert(&db.Resource{
+			ScopeUUID: "project2",
+			AssetType: "bar", //note: different asset type
+		}))
+		t.Must(c.DB.Insert(&db.Resource{
+			ScopeUUID: "project3",
+			AssetType: "foo",
+		}))
 
-	//create some mock assets that ScrapeNextResource() can find
-	amStatic.Assets = map[string]map[string]plugins.StaticAsset{
-		"project1": {
-			"asset1": {Size: 1000, Usage: 400},
-			"asset2": {Size: 2000, Usage: 1000},
-		},
-		"project2": {
-			"asset3": {Size: 3000, Usage: 500},
-			"asset4": {Size: 4000, Usage: 800},
-		},
-		"project3": {
-			"asset5": {Size: 5000, Usage: 2500},
-			"asset6": {Size: 6000, Usage: 2520},
-		},
-	}
+		//create some mock assets that ScrapeNextResource() can find
+		amStatic.Assets = map[string]map[string]plugins.StaticAsset{
+			"project1": {
+				"asset1": {Size: 1000, Usage: 400},
+				"asset2": {Size: 2000, Usage: 1000},
+			},
+			"project2": {
+				"asset3": {Size: 3000, Usage: 500},
+				"asset4": {Size: 4000, Usage: 800},
+			},
+			"project3": {
+				"asset5": {Size: 5000, Usage: 2500},
+				"asset6": {Size: 6000, Usage: 2520},
+			},
+		}
 
-	//first ScrapeNextResource() should scrape project1/foo
-	clock.Step()
-	t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
-	easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-1.sql")
+		//first ScrapeNextResource() should scrape project1/foo
+		clock.Step()
+		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-1.sql")
 
-	//first ScrapeNextResource() should scrape project3/foo
-	//(NOT project2 because its resource has a different asset type)
-	clock.Step()
-	t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
-	easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-2.sql")
+		//first ScrapeNextResource() should scrape project3/foo
+		//(NOT project2 because its resource has a different asset type)
+		clock.Step()
+		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-2.sql")
 
-	//next ScrapeNextResource() should scrape project1/foo again because its
-	//scraped_at timestamp is the smallest; there should be no changes except for
-	//resources.scraped_at
-	clock.Step()
-	t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
-	easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-3.sql")
+		//next ScrapeNextResource() should scrape project1/foo again because its
+		//scraped_at timestamp is the smallest; there should be no changes except for
+		//resources.scraped_at
+		clock.Step()
+		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-3.sql")
 
-	//simulate deletion of an asset
-	delete(amStatic.Assets["project3"], "asset6")
-	clock.Step()
-	t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
-	easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-4.sql")
+		//simulate deletion of an asset
+		delete(amStatic.Assets["project3"], "asset6")
+		clock.Step()
+		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-4.sql")
 
-	//simulate addition of a new asset
-	amStatic.Assets["project1"]["asset7"] = plugins.StaticAsset{Size: 10, Usage: 3}
-	clock.Step()
-	t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
-	easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-5.sql")
+		//simulate addition of a new asset
+		amStatic.Assets["project1"]["asset7"] = plugins.StaticAsset{Size: 10, Usage: 3}
+		clock.Step()
+		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-5.sql")
 
-	//check behavior on a resource without assets
-	t.Must(c.DB.Insert(&db.Resource{
-		ScopeUUID: "project4",
-		AssetType: "foo",
-	}))
-	amStatic.Assets["project4"] = nil
-	clock.Step()
-	t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
-	easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-6.sql")
+		//check behavior on a resource without assets
+		t.Must(c.DB.Insert(&db.Resource{
+			ScopeUUID: "project4",
+			AssetType: "foo",
+		}))
+		amStatic.Assets["project4"] = nil
+		clock.Step()
+		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-6.sql")
+
+	})
 }

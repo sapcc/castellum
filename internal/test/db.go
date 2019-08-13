@@ -28,9 +28,9 @@ import (
 	"gopkg.in/gorp.v2"
 )
 
-//PrepareDB prepares a DB reference for this test, or fails the test if the DB
+//WithDB prepares a DB reference for this test, or fails the test if the DB
 //is not ready.
-func (t T) PrepareDB(fixtureFile *string) *gorp.DbMap {
+func (t T) WithDB(fixtureFile *string, action func(dbi *gorp.DbMap)) {
 	var postgresURL string
 	if os.Getenv("TRAVIS") == "true" {
 		//cf. https://docs.travis-ci.com/user/database-setup/#postgresql
@@ -68,7 +68,9 @@ func (t T) PrepareDB(fixtureFile *string) *gorp.DbMap {
 		t.MustExec(dbi, fmt.Sprintf(`ALTER SEQUENCE %s_id_seq RESTART WITH %d`, tableName, nextID))
 	}
 
-	return dbi
+	action(dbi)
+
+	t.Must(dbi.Db.Close())
 }
 
 //MustUpdate aborts the test if dbi.Update(row) throws an error.

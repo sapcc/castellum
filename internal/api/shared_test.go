@@ -30,30 +30,32 @@ import (
 	"github.com/sapcc/castellum/internal/test"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/gopherpolicy"
+	"gopkg.in/gorp.v2"
 )
 
-func setupTest(t test.T, timeNow func() time.Time) (*handler, http.Handler, *MockValidator, []db.Resource, []db.Asset) {
+func withHandler(t test.T, timeNow func() time.Time, action func(*handler, http.Handler, *MockValidator, []db.Resource, []db.Asset)) {
 	baseline := "fixtures/start-data.sql"
-	dbi := t.PrepareDB(&baseline)
-	team := core.AssetManagerTeam{
-		&plugins.AssetManagerStatic{AssetType: "foo", ReportsAbsoluteUsage: true},
-		&plugins.AssetManagerStatic{AssetType: "bar", ReportsAbsoluteUsage: false},
-	}
-	mv := &MockValidator{}
+	t.WithDB(&baseline, func(dbi *gorp.DbMap) {
+		team := core.AssetManagerTeam{
+			&plugins.AssetManagerStatic{AssetType: "foo", ReportsAbsoluteUsage: true},
+			&plugins.AssetManagerStatic{AssetType: "bar", ReportsAbsoluteUsage: false},
+		}
+		mv := &MockValidator{}
 
-	var resources []db.Resource
-	_, err := dbi.Select(&resources, `SELECT * FROM resources ORDER BY ID`)
-	t.Must(err)
+		var resources []db.Resource
+		_, err := dbi.Select(&resources, `SELECT * FROM resources ORDER BY ID`)
+		t.Must(err)
 
-	var assets []db.Asset
-	_, err = dbi.Select(&assets, `SELECT * FROM assets ORDER BY ID`)
-	t.Must(err)
+		var assets []db.Asset
+		_, err = dbi.Select(&assets, `SELECT * FROM assets ORDER BY ID`)
+		t.Must(err)
 
-	if timeNow == nil {
-		timeNow = time.Now
-	}
-	h := &handler{DB: dbi, Team: team, Validator: mv, Provider: MockProviderClient{}, TimeNow: timeNow}
-	return h, h.BuildRouter(), mv, resources, assets
+		if timeNow == nil {
+			timeNow = time.Now
+		}
+		h := &handler{DB: dbi, Team: team, Validator: mv, Provider: MockProviderClient{}, TimeNow: timeNow}
+		action(h, h.BuildRouter(), mv, resources, assets)
+	})
 }
 
 //MockValidator implements the gopherpolicy.Enforcer and gopherpolicy.Validator

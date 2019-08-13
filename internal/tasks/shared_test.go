@@ -24,23 +24,25 @@ import (
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
+	"gopkg.in/gorp.v2"
 )
 
-func setupContext(t test.T) (*Context, *plugins.AssetManagerStatic, *test.FakeClock) {
-	dbi := t.PrepareDB(nil)
-	amStatic := &plugins.AssetManagerStatic{
-		AssetType:            "foo",
-		ReportsAbsoluteUsage: true,
-	}
-	//clock starts at an easily recognizable value
-	clockVar := test.FakeClock(99990)
-	clock := &clockVar
+func withContext(t test.T, action func(*Context, *plugins.AssetManagerStatic, *test.FakeClock)) {
+	t.WithDB(nil, func(dbi *gorp.DbMap) {
+		amStatic := &plugins.AssetManagerStatic{
+			AssetType:            "foo",
+			ReportsAbsoluteUsage: true,
+		}
+		//clock starts at an easily recognizable value
+		clockVar := test.FakeClock(99990)
+		clock := &clockVar
 
-	return &Context{
-		DB:      dbi,
-		Team:    core.AssetManagerTeam{amStatic},
-		TimeNow: clock.Now,
-	}, amStatic, clock
+		action(&Context{
+			DB:      dbi,
+			Team:    core.AssetManagerTeam{amStatic},
+			TimeNow: clock.Now,
+		}, amStatic, clock)
+	})
 }
 
 //Take pointer to time.Time expression.

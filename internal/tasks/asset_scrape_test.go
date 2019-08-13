@@ -29,62 +29,65 @@ import (
 	"github.com/sapcc/go-bits/easypg"
 )
 
-func setupAssetScrapeTest(t test.T, resourceIsSingleStep bool) (*Context, func(plugins.StaticAsset), *test.FakeClock) {
-	c, amStatic, clock := setupContext(t)
+func runAssetScrapeTest(t test.T, resourceIsSingleStep bool, action func(*Context, func(plugins.StaticAsset), *test.FakeClock)) {
+	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock) {
 
-	//ScrapeNextAsset() without any resources just does nothing
-	err := c.ScrapeNextAsset("foo", c.TimeNow())
-	if err != sql.ErrNoRows {
-		t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
-	}
-	easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-0.sql")
+		//ScrapeNextAsset() without any resources just does nothing
+		err := c.ScrapeNextAsset("foo", c.TimeNow())
+		if err != sql.ErrNoRows {
+			t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
+		}
+		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-0.sql")
 
-	//create a resource and asset to test with
-	t.Must(c.DB.Insert(&db.Resource{
-		ScopeUUID:                "project1",
-		AssetType:                "foo",
-		LowThresholdPercent:      20,
-		LowDelaySeconds:          3600,
-		HighThresholdPercent:     80,
-		HighDelaySeconds:         3600,
-		CriticalThresholdPercent: 95,
-		SizeStepPercent:          ifthenelseF64(resourceIsSingleStep, 0, 20),
-		SingleStep:               resourceIsSingleStep,
-	}))
-	t.Must(c.DB.Insert(&db.Asset{
-		ResourceID:    1,
-		UUID:          "asset1",
-		Size:          1000,
-		AbsoluteUsage: p2uint64(500),
-		UsagePercent:  50,
-		CheckedAt:     c.TimeNow(),
-		ScrapedAt:     p2time(c.TimeNow()),
-		ExpectedSize:  nil,
-	}))
+		//create a resource and asset to test with
+		t.Must(c.DB.Insert(&db.Resource{
+			ScopeUUID:                "project1",
+			AssetType:                "foo",
+			LowThresholdPercent:      20,
+			LowDelaySeconds:          3600,
+			HighThresholdPercent:     80,
+			HighDelaySeconds:         3600,
+			CriticalThresholdPercent: 95,
+			SizeStepPercent:          ifthenelseF64(resourceIsSingleStep, 0, 20),
+			SingleStep:               resourceIsSingleStep,
+		}))
+		t.Must(c.DB.Insert(&db.Asset{
+			ResourceID:    1,
+			UUID:          "asset1",
+			Size:          1000,
+			AbsoluteUsage: p2uint64(500),
+			UsagePercent:  50,
+			CheckedAt:     c.TimeNow(),
+			ScrapedAt:     p2time(c.TimeNow()),
+			ExpectedSize:  nil,
+		}))
 
-	//setup asset with configurable size
-	amStatic.Assets = map[string]map[string]plugins.StaticAsset{
-		"project1": {
-			"asset1": {Size: 1000, Usage: 500},
-		},
-	}
-	setAsset := func(a plugins.StaticAsset) {
-		amStatic.Assets["project1"]["asset1"] = a
-	}
+		//setup asset with configurable size
+		amStatic.Assets = map[string]map[string]plugins.StaticAsset{
+			"project1": {
+				"asset1": {Size: 1000, Usage: 500},
+			},
+		}
+		setAsset := func(a plugins.StaticAsset) {
+			amStatic.Assets["project1"]["asset1"] = a
+		}
 
-	return c, setAsset, clock
+		action(c, setAsset, clock)
+	})
 }
 
 func forAllSteppingStrategies(t test.T, action func(*Context, db.Resource, func(plugins.StaticAsset), *test.FakeClock)) {
-	var res db.Resource
+	runAssetScrapeTest(t, false, func(c *Context, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
+		var res db.Resource
+		t.Must(c.DB.SelectOne(&res, `SELECT * FROM resources WHERE id = 1`))
+		action(c, res, setAsset, clock)
+	})
 
-	c, setAsset, clock := setupAssetScrapeTest(t, false)
-	t.Must(c.DB.SelectOne(&res, `SELECT * FROM resources WHERE id = 1`))
-	action(c, res, setAsset, clock)
-
-	c, setAsset, clock = setupAssetScrapeTest(t, true)
-	t.Must(c.DB.SelectOne(&res, `SELECT * FROM resources WHERE id = 1`))
-	action(c, res, setAsset, clock)
+	runAssetScrapeTest(t, true, func(c *Context, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
+		var res db.Resource
+		t.Must(c.DB.SelectOne(&res, `SELECT * FROM resources WHERE id = 1`))
+		action(c, res, setAsset, clock)
+	})
 }
 
 func TestNoOperationWhenNoThreshold(baseT *testing.T) {
@@ -390,101 +393,103 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 
 func TestAssetScrapeOrdering(baseT *testing.T) {
 	t := test.T{T: baseT}
-	c, amStatic, clock := setupContext(t)
+	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock) {
 
-	//create a resource and multiple assets to test with
-	t.Must(c.DB.Insert(&db.Resource{
-		ScopeUUID:                "project1",
-		AssetType:                "foo",
-		LowThresholdPercent:      20,
-		LowDelaySeconds:          3600,
-		HighThresholdPercent:     80,
-		HighDelaySeconds:         3600,
-		CriticalThresholdPercent: 95,
-		SizeStepPercent:          20,
-	}))
-	assets := []db.Asset{
-		{
-			ResourceID:   1,
-			UUID:         "asset1",
-			Size:         1000,
-			UsagePercent: 50,
-			CheckedAt:    c.TimeNow(),
-			ScrapedAt:    p2time(c.TimeNow()),
-			ExpectedSize: nil,
-		},
-		{
-			ResourceID:   1,
-			UUID:         "asset2",
-			Size:         1000,
-			UsagePercent: 50,
-			CheckedAt:    c.TimeNow(),
-			ScrapedAt:    p2time(c.TimeNow()),
-			ExpectedSize: nil,
-		},
-		{
-			ResourceID:   1,
-			UUID:         "asset3",
-			Size:         1000,
-			UsagePercent: 50,
-			CheckedAt:    c.TimeNow(),
-			ScrapedAt:    p2time(c.TimeNow()),
-			ExpectedSize: nil,
-		},
-	}
-	t.Must(c.DB.Insert(&assets[0]))
-	t.Must(c.DB.Insert(&assets[1]))
-	t.Must(c.DB.Insert(&assets[2]))
+		//create a resource and multiple assets to test with
+		t.Must(c.DB.Insert(&db.Resource{
+			ScopeUUID:                "project1",
+			AssetType:                "foo",
+			LowThresholdPercent:      20,
+			LowDelaySeconds:          3600,
+			HighThresholdPercent:     80,
+			HighDelaySeconds:         3600,
+			CriticalThresholdPercent: 95,
+			SizeStepPercent:          20,
+		}))
+		assets := []db.Asset{
+			{
+				ResourceID:   1,
+				UUID:         "asset1",
+				Size:         1000,
+				UsagePercent: 50,
+				CheckedAt:    c.TimeNow(),
+				ScrapedAt:    p2time(c.TimeNow()),
+				ExpectedSize: nil,
+			},
+			{
+				ResourceID:   1,
+				UUID:         "asset2",
+				Size:         1000,
+				UsagePercent: 50,
+				CheckedAt:    c.TimeNow(),
+				ScrapedAt:    p2time(c.TimeNow()),
+				ExpectedSize: nil,
+			},
+			{
+				ResourceID:   1,
+				UUID:         "asset3",
+				Size:         1000,
+				UsagePercent: 50,
+				CheckedAt:    c.TimeNow(),
+				ScrapedAt:    p2time(c.TimeNow()),
+				ExpectedSize: nil,
+			},
+		}
+		t.Must(c.DB.Insert(&assets[0]))
+		t.Must(c.DB.Insert(&assets[1]))
+		t.Must(c.DB.Insert(&assets[2]))
 
-	amStatic.Assets = map[string]map[string]plugins.StaticAsset{
-		"project1": {
-			"asset1": {Size: 1000, Usage: 510},
-			"asset2": {Size: 1000, Usage: 520},
-			"asset3": {Size: 1000, Usage: 530},
-		},
-	}
+		amStatic.Assets = map[string]map[string]plugins.StaticAsset{
+			"project1": {
+				"asset1": {Size: 1000, Usage: 510},
+				"asset2": {Size: 1000, Usage: 520},
+				"asset3": {Size: 1000, Usage: 530},
+			},
+		}
 
-	//this should scrape each asset once, in order
-	clock.StepBy(time.Minute)
-	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
-	clock.StepBy(time.Minute)
-	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
-	clock.StepBy(time.Minute)
-	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+		//this should scrape each asset once, in order
+		clock.StepBy(time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+		clock.StepBy(time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+		clock.StepBy(time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
 
-	//so the asset table should look like this now
-	assets[0].CheckedAt = c.TimeNow().Add(-2 * time.Minute)
-	assets[1].CheckedAt = c.TimeNow().Add(-time.Minute)
-	assets[2].CheckedAt = c.TimeNow()
-	assets[0].AbsoluteUsage = p2uint64(510)
-	assets[1].AbsoluteUsage = p2uint64(520)
-	assets[2].AbsoluteUsage = p2uint64(530)
-	assets[0].UsagePercent = 51
-	assets[1].UsagePercent = 52
-	assets[2].UsagePercent = 53
-	for idx := 0; idx < len(assets); idx++ {
-		assets[idx].ScrapedAt = p2time(assets[idx].CheckedAt)
-	}
-	t.ExpectAssets(c.DB, assets...)
+		//so the asset table should look like this now
+		assets[0].CheckedAt = c.TimeNow().Add(-2 * time.Minute)
+		assets[1].CheckedAt = c.TimeNow().Add(-time.Minute)
+		assets[2].CheckedAt = c.TimeNow()
+		assets[0].AbsoluteUsage = p2uint64(510)
+		assets[1].AbsoluteUsage = p2uint64(520)
+		assets[2].AbsoluteUsage = p2uint64(530)
+		assets[0].UsagePercent = 51
+		assets[1].UsagePercent = 52
+		assets[2].UsagePercent = 53
+		for idx := 0; idx < len(assets); idx++ {
+			assets[idx].ScrapedAt = p2time(assets[idx].CheckedAt)
+		}
+		t.ExpectAssets(c.DB, assets...)
 
-	//next scrape should work identically
-	clock.StepBy(time.Minute)
-	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
-	clock.StepBy(time.Minute)
-	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
-	clock.StepBy(time.Minute)
-	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
-	assets[0].CheckedAt = c.TimeNow().Add(-2 * time.Minute)
-	assets[1].CheckedAt = c.TimeNow().Add(-time.Minute)
-	assets[2].CheckedAt = c.TimeNow()
-	for idx := 0; idx < len(assets); idx++ {
-		assets[idx].ScrapedAt = p2time(assets[idx].CheckedAt)
-	}
-	t.ExpectAssets(c.DB, assets...)
+		//next scrape should work identically
+		clock.StepBy(time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+		clock.StepBy(time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+		clock.StepBy(time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+		assets[0].CheckedAt = c.TimeNow().Add(-2 * time.Minute)
+		assets[1].CheckedAt = c.TimeNow().Add(-time.Minute)
+		assets[2].CheckedAt = c.TimeNow()
+		for idx := 0; idx < len(assets); idx++ {
+			assets[idx].ScrapedAt = p2time(assets[idx].CheckedAt)
+		}
+		t.ExpectAssets(c.DB, assets...)
 
-	//and all of this should not have created any operations
-	t.ExpectPendingOperations(c.DB /*, nothing */)
-	t.ExpectFinishedOperations(c.DB /*, nothing */)
+		//and all of this should not have created any operations
+		t.ExpectPendingOperations(c.DB /*, nothing */)
+		t.ExpectFinishedOperations(c.DB /*, nothing */)
+
+	})
 }
 
 func TestNoOperationWhenNoSizeChange(baseT *testing.T) {
@@ -899,39 +904,41 @@ func TestCriticalUpsizeTakingMultipleStepsAtOnce(baseT *testing.T) {
 	t := test.T{T: baseT}
 	//This test is specific to percentage-step resizing because single-step
 	//resizing has no concept of "taking multiple steps at once".
-	c, setAsset, clock := setupAssetScrapeTest(t, false)
+	runAssetScrapeTest(t, false, func(c *Context, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
 
-	//set a very small step size
-	t.MustExec(c.DB, `UPDATE resources SET size_step_percent = 1`)
+		//set a very small step size
+		t.MustExec(c.DB, `UPDATE resources SET size_step_percent = 1`)
 
-	//set usage way above the critical threshold
-	setAsset(plugins.StaticAsset{Size: 1380, Usage: 1350})
+		//set usage way above the critical threshold
+		setAsset(plugins.StaticAsset{Size: 1380, Usage: 1350})
 
-	//ScrapeNextAsset should create a "critical" operation taking four steps at
-	//once (1380 -> 1393 -> 1406 -> 1420 -> 1434)
-	//
-	//This example is manufactured specifically such that the step size changes
-	//between steps, to validate that a new step size is calculated each time,
-	//same as if multiple steps had been taken in successive operations.
-	//
-	//NOTE: This testcase used to require a target size of 1420, but that was wrong.
-	//A size of 1420 would lead to 95% usage (or rather, 95.07%) which is still
-	//above the critical threshold.
-	clock.StepBy(10 * time.Minute)
-	t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+		//ScrapeNextAsset should create a "critical" operation taking four steps at
+		//once (1380 -> 1393 -> 1406 -> 1420 -> 1434)
+		//
+		//This example is manufactured specifically such that the step size changes
+		//between steps, to validate that a new step size is calculated each time,
+		//same as if multiple steps had been taken in successive operations.
+		//
+		//NOTE: This testcase used to require a target size of 1420, but that was wrong.
+		//A size of 1420 would lead to 95% usage (or rather, 95.07%) which is still
+		//above the critical threshold.
+		clock.StepBy(10 * time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
 
-	t.ExpectPendingOperations(c.DB, db.PendingOperation{
-		ID:           1,
-		AssetID:      1,
-		Reason:       db.OperationReasonCritical,
-		OldSize:      1380,
-		NewSize:      1434,
-		UsagePercent: 13500. / 138.,
-		CreatedAt:    c.TimeNow(),
-		ConfirmedAt:  p2time(c.TimeNow()),
-		GreenlitAt:   p2time(c.TimeNow()),
+		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+			ID:           1,
+			AssetID:      1,
+			Reason:       db.OperationReasonCritical,
+			OldSize:      1380,
+			NewSize:      1434,
+			UsagePercent: 13500. / 138.,
+			CreatedAt:    c.TimeNow(),
+			ConfirmedAt:  p2time(c.TimeNow()),
+			GreenlitAt:   p2time(c.TimeNow()),
+		})
+		t.ExpectFinishedOperations(c.DB /*, nothing */)
+
 	})
-	t.ExpectFinishedOperations(c.DB /*, nothing */)
 }
 
 func TestZeroSizedAssetWithoutUsage(baseT *testing.T) {

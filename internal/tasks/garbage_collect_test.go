@@ -23,68 +23,72 @@ import (
 	"time"
 
 	"github.com/sapcc/castellum/internal/db"
+	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
 )
 
 func TestCollectGarbage(baseT *testing.T) {
 	t := test.T{T: baseT}
-	c, _, _ := setupContext(t)
-	fakeNow := time.Unix(0, 0).UTC()
+	withContext(t, func(c *Context, _ *plugins.AssetManagerStatic, _ *test.FakeClock) {
 
-	//setup some minimal scaffolding (we can only insert finished_operations
-	//with valid asset IDs into the DB)
-	t.Must(c.DB.Insert(&db.Resource{
-		ScopeUUID: "project1",
-		AssetType: "foo",
-	}))
-	t.Must(c.DB.Insert(&db.Asset{
-		ResourceID: 1,
-		UUID:       "asset1",
-	}))
-	t.Must(c.DB.Insert(&db.Asset{
-		ResourceID: 1,
-		UUID:       "asset2",
-	}))
+		fakeNow := time.Unix(0, 0).UTC()
 
-	ops := []db.FinishedOperation{
-		{
-			AssetID:      1,
-			Reason:       db.OperationReasonHigh,
-			Outcome:      db.OperationOutcomeCancelled,
-			OldSize:      1000,
-			NewSize:      1200,
-			UsagePercent: 80,
-			CreatedAt:    fakeNow.Add(-40 * time.Minute),
-			FinishedAt:   fakeNow.Add(-30 * time.Minute),
-		},
-		{
-			AssetID:      2,
-			Reason:       db.OperationReasonHigh,
-			Outcome:      db.OperationOutcomeCancelled,
-			OldSize:      1000,
-			NewSize:      1200,
-			UsagePercent: 80,
-			CreatedAt:    fakeNow.Add(-25 * time.Minute),
-			FinishedAt:   fakeNow.Add(-20 * time.Minute),
-		},
-		{
-			AssetID:      2,
-			Reason:       db.OperationReasonCritical,
-			Outcome:      db.OperationOutcomeSucceeded,
-			OldSize:      1000,
-			NewSize:      1200,
-			UsagePercent: 80,
-			CreatedAt:    fakeNow.Add(-20 * time.Minute),
-			ConfirmedAt:  p2time(fakeNow.Add(-20 * time.Minute)),
-			GreenlitAt:   p2time(fakeNow.Add(-20 * time.Minute)),
-			FinishedAt:   fakeNow.Add(-10 * time.Minute),
-		},
-	}
-	for _, op := range ops {
-		t.Must(c.DB.Insert(&op))
-	}
+		//setup some minimal scaffolding (we can only insert finished_operations
+		//with valid asset IDs into the DB)
+		t.Must(c.DB.Insert(&db.Resource{
+			ScopeUUID: "project1",
+			AssetType: "foo",
+		}))
+		t.Must(c.DB.Insert(&db.Asset{
+			ResourceID: 1,
+			UUID:       "asset1",
+		}))
+		t.Must(c.DB.Insert(&db.Asset{
+			ResourceID: 1,
+			UUID:       "asset2",
+		}))
 
-	t.ExpectFinishedOperations(c.DB, ops...)
-	t.Must(CollectGarbage(c.DB, fakeNow.Add(-15*time.Minute)))
-	t.ExpectFinishedOperations(c.DB, ops[2])
+		ops := []db.FinishedOperation{
+			{
+				AssetID:      1,
+				Reason:       db.OperationReasonHigh,
+				Outcome:      db.OperationOutcomeCancelled,
+				OldSize:      1000,
+				NewSize:      1200,
+				UsagePercent: 80,
+				CreatedAt:    fakeNow.Add(-40 * time.Minute),
+				FinishedAt:   fakeNow.Add(-30 * time.Minute),
+			},
+			{
+				AssetID:      2,
+				Reason:       db.OperationReasonHigh,
+				Outcome:      db.OperationOutcomeCancelled,
+				OldSize:      1000,
+				NewSize:      1200,
+				UsagePercent: 80,
+				CreatedAt:    fakeNow.Add(-25 * time.Minute),
+				FinishedAt:   fakeNow.Add(-20 * time.Minute),
+			},
+			{
+				AssetID:      2,
+				Reason:       db.OperationReasonCritical,
+				Outcome:      db.OperationOutcomeSucceeded,
+				OldSize:      1000,
+				NewSize:      1200,
+				UsagePercent: 80,
+				CreatedAt:    fakeNow.Add(-20 * time.Minute),
+				ConfirmedAt:  p2time(fakeNow.Add(-20 * time.Minute)),
+				GreenlitAt:   p2time(fakeNow.Add(-20 * time.Minute)),
+				FinishedAt:   fakeNow.Add(-10 * time.Minute),
+			},
+		}
+		for _, op := range ops {
+			t.Must(c.DB.Insert(&op))
+		}
+
+		t.ExpectFinishedOperations(c.DB, ops...)
+		t.Must(CollectGarbage(c.DB, fakeNow.Add(-15*time.Minute)))
+		t.ExpectFinishedOperations(c.DB, ops[2])
+
+	})
 }
