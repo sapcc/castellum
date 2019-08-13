@@ -162,21 +162,21 @@ func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *go
 	return projectUUID, token
 }
 
-func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUID string, token *gopherpolicy.Token, createIfMissing bool) (resource *db.Resource, newlyCreated bool) {
+func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUID string, token *gopherpolicy.Token, createIfMissing bool) *db.Resource {
 	assetType := db.AssetType(mux.Vars(r)["asset_type"])
 	if assetType == "" {
 		respondWithNotFound(w)
-		return nil, false
+		return nil
 	}
 	manager, _ := h.Team.ForAssetType(assetType)
 	if manager == nil {
 		//only report resources when we have an asset manager configured
 		respondWithNotFound(w)
-		return nil, false
+		return nil
 	}
 
 	if !token.Require(w, assetType.PolicyRuleForRead()) {
-		return nil, false
+		return nil
 	}
 
 	var res db.Resource
@@ -189,15 +189,15 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 			return &db.Resource{
 				ScopeUUID: projectUUID,
 				AssetType: assetType,
-			}, true
+			}
 		}
 		respondWithNotFound(w)
-		return nil, false
+		return nil
 	}
 	if respondwith.ErrorText(w, err) {
-		return nil, false
+		return nil
 	}
-	return &res, false
+	return &res
 }
 
 func timeOrNullToUnix(t *time.Time) *int64 {

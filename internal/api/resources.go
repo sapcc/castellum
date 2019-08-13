@@ -268,7 +268,7 @@ func (h handler) GetResource(w http.ResponseWriter, r *http.Request) {
 	if token == nil {
 		return
 	}
-	dbResource, _ := h.LoadResource(w, r, projectUUID, token, false)
+	dbResource := h.LoadResource(w, r, projectUUID, token, false)
 	if dbResource == nil {
 		return
 	}
@@ -286,7 +286,7 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	if token == nil {
 		return
 	}
-	dbResource, newlyCreatedResource := h.LoadResource(w, r, projectUUID, token, true)
+	dbResource := h.LoadResource(w, r, projectUUID, token, true)
 	if dbResource == nil {
 		return
 	}
@@ -307,7 +307,7 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	}
 
 	action := updateAction
-	if newlyCreatedResource {
+	if dbResource.ID == 0 {
 		action = enableAction
 	}
 	eventParams := auditEventParams{
@@ -349,7 +349,7 @@ func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
 	if token == nil {
 		return
 	}
-	dbResource, _ := h.LoadResource(w, r, projectUUID, token, false)
+	dbResource := h.LoadResource(w, r, projectUUID, token, false)
 	if dbResource == nil {
 		return
 	}
