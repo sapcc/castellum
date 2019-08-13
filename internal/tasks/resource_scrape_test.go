@@ -41,16 +41,19 @@ func TestResourceScraping(baseT *testing.T) {
 
 		//create some project resources for testing
 		t.Must(c.DB.Insert(&db.Resource{
-			ScopeUUID: "project1",
-			AssetType: "foo",
+			ScopeUUID:  "project1",
+			DomainUUID: "domain1",
+			AssetType:  "foo",
 		}))
 		t.Must(c.DB.Insert(&db.Resource{
-			ScopeUUID: "project2",
-			AssetType: "bar", //note: different asset type
+			ScopeUUID:  "project2",
+			DomainUUID: "domain1",
+			AssetType:  "bar", //note: different asset type
 		}))
 		t.Must(c.DB.Insert(&db.Resource{
-			ScopeUUID: "project3",
-			AssetType: "foo",
+			ScopeUUID:  "project3",
+			DomainUUID: "domain1",
+			AssetType:  "foo",
 		}))
 
 		//create some mock assets that ScrapeNextResource() can find
@@ -101,8 +104,9 @@ func TestResourceScraping(baseT *testing.T) {
 
 		//check behavior on a resource without assets
 		t.Must(c.DB.Insert(&db.Resource{
-			ScopeUUID: "project4",
-			AssetType: "foo",
+			ScopeUUID:  "project4",
+			DomainUUID: "domain1",
+			AssetType:  "foo",
 		}))
 		amStatic.Assets["project4"] = nil
 		clock.Step()

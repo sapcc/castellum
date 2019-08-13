@@ -51,7 +51,7 @@ static-check: FORCE
 # detailed unit test run (incl. test coverage)
 build/%.cover.out: FORCE
 	@printf "\e[1;36m>> go test $(subst _,/,$*)\e[0m\n"
-	$(GO) test $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' -coverprofile=$@ -covermode=count -coverpkg=$(subst $(space),$(comma),$(GO_COVERPKGS)) $(subst _,/,$*)
+	@env CASTELLUM_AUDIT_SILENT=true $(GO) test $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' -coverprofile=$@ -covermode=count -coverpkg=$(subst $(space),$(comma),$(GO_COVERPKGS)) $(subst _,/,$*)
 build/cover.out: $(GO_COVERFILES)
 	$(GO) run $(GO_BUILDFLAGS) utils/gocovcat.go $(GO_COVERFILES) > $@
 build/cover.html: build/cover.out
@@ -61,7 +61,7 @@ build/cover.html: build/cover.out
 quick-check: all static-check $(addprefix quick-check-,$(subst /,_,$(GO_TESTPKGS))) FORCE
 quick-check-%:
 	@printf "\e[1;36m>> go test $(subst _,/,$*)\e[0m\n"
-	$(GO) test $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' $(subst _,/,$*)
+	@env CASTELLUM_AUDIT_SILENT=true $(GO) test $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' $(subst _,/,$*)
 
 vendor: FORCE
 	$(GO) mod vendor

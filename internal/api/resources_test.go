@@ -303,6 +303,7 @@ func TestPutResource(baseT *testing.T) {
 				newResources2 = append(newResources2, db.Resource{
 					ID:                       res.ID,
 					ScopeUUID:                "project1",
+					DomainUUID:               "domain1",
 					AssetType:                "foo",
 					ScrapedAt:                res.ScrapedAt,
 					CriticalThresholdPercent: 98,
@@ -334,6 +335,7 @@ func TestPutResource(baseT *testing.T) {
 		allResources = append(newResources1, db.Resource{
 			ID:                       5,
 			ScopeUUID:                "project3",
+			DomainUUID:               "domain1",
 			AssetType:                "foo",
 			CriticalThresholdPercent: 98,
 			SizeStepPercent:          15,
@@ -369,6 +371,7 @@ func TestPutResource(baseT *testing.T) {
 				newResources3 = append(newResources3, db.Resource{
 					ID:                       res.ID,
 					ScopeUUID:                "project1",
+					DomainUUID:               "domain1",
 					AssetType:                "foo",
 					ScrapedAt:                res.ScrapedAt,
 					CriticalThresholdPercent: 98,
