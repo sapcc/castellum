@@ -18,6 +18,7 @@ This document uses the terminology defined in the [README.md](../README.md#termi
 * [GET /v1/projects/:id/assets/:type/:id](#get-v1projectsidassetstypeid)
 * [GET /v1/projects/:id/resources/:type/operations/pending](#get-v1projectsidresourcestypeoperationspending)
 * [GET /v1/projects/:id/resources/:type/operations/recently-failed](#get-v1projectsidresourcestypeoperationsrecently-failed)
+* [GET /v1/projects/:id/resources/:type/operations/recently-succeeded](#get-v1projectsidresourcestypeoperationsrecently-succeeded)
 
 ## GET /v1/projects/:id
 
