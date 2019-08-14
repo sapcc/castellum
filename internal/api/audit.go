@@ -20,31 +20,15 @@ package api
 
 import (
 	"encoding/json"
-	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/gofrs/uuid"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/hermes/pkg/cadf"
-)
-
-var eventPublishSuccessCounter = prometheus.NewCounter(
-	prometheus.CounterOpts{
-		Name: "castellum_successful_auditevent_publish",
-		Help: "Counter for successful audit event publish to RabbitMQ server.",
-	},
-)
-var eventPublishFailedCounter = prometheus.NewCounter(
-	prometheus.CounterOpts{
-		Name: "castellum_failed_auditevent_publish",
-		Help: "Counter for failed audit event publish to RabbitMQ server.",
-	},
 )
 
 //eventSink is a channel that receives audit events.
@@ -55,13 +39,9 @@ var (
 	sendAuditToRabbitMQ bool
 	rabbitURI           string
 	rabbitQueueName     string
-	observerUUID        = generateUUID()
 )
 
 func init() {
-	prometheus.MustRegister(eventPublishSuccessCounter)
-	prometheus.MustRegister(eventPublishFailedCounter)
-
 	silenceAuditLogging, _ := strconv.ParseBool(os.Getenv("CASTELLUM_AUDIT_SILENT"))
 	showAuditOnStdout = !silenceAuditLogging
 
@@ -75,14 +55,14 @@ func init() {
 	}
 
 	if sendAuditToRabbitMQ {
-		eventPublishSuccessCounter.Add(0)
-		eventPublishFailedCounter.Add(0)
+		auditEventPublishSuccessCounter.Add(0)
+		auditEventPublishFailedCounter.Add(0)
 
 		onSuccessFunc := func() {
-			eventPublishSuccessCounter.Inc()
+			auditEventPublishSuccessCounter.Inc()
 		}
 		onFailFunc := func() {
-			eventPublishFailedCounter.Inc()
+			auditEventPublishFailedCounter.Inc()
 		}
 		s := make(chan cadf.Event, 20)
 		eventSink = s
@@ -95,8 +75,33 @@ func init() {
 	}
 }
 
+var observerUUID = audittools.GenerateUUID()
+
 //logAndPublishEvent logs the audit event to stdout and publishes it to a RabbitMQ server.
-func logAndPublishEvent(event cadf.Event) {
+func logAndPublishEvent(time time.Time, req *http.Request, token *gopherpolicy.Token, reasonCode int, target audittools.TargetRenderer) {
+	action := "update"
+	if v, ok := target.(scalingEventTarget); ok {
+		action = string(v.action) + "/" + v.resourceType
+	}
+	p := audittools.EventParameters{
+		Time:       time,
+		Request:    req,
+		Token:      token,
+		ReasonCode: reasonCode,
+		Action:     action,
+		Observer: struct {
+			TypeURI string
+			Name    string
+			ID      string
+		}{
+			TypeURI: "service/autoscaling",
+			Name:    "castellum",
+			ID:      observerUUID,
+		},
+		Target: target,
+	}
+	event := audittools.NewEvent(p)
+
 	if showAuditOnStdout {
 		msg, _ := json.Marshal(event)
 		logg.Other("AUDIT", string(msg))
@@ -118,23 +123,32 @@ const (
 )
 
 //EventParams contains parameters for creating an audit event.
-type auditEventParams struct {
-	token             *gopherpolicy.Token
-	request           *http.Request
-	time              time.Time
-	reasonCode        int
+type scalingEventTarget struct {
 	action            auditAction
 	projectID         string
 	resourceType      string
-	attachmentContent attachmentContent //only used for enable/update action events
+	attachmentContent targetAttachmentContent //only used for enable/update action events
 }
 
-type attachmentContent struct {
+func (t scalingEventTarget) Render() cadf.Resource {
+	return cadf.Resource{
+		TypeURI:   "data/security/project",
+		ID:        t.projectID,
+		ProjectID: t.projectID,
+		Attachments: []cadf.Attachment{{
+			Name:    "payload",
+			TypeURI: "mime:application/json",
+			Content: t.attachmentContent,
+		}},
+	}
+}
+
+type targetAttachmentContent struct {
 	resource Resource
 }
 
 //MarshalJSON implements the json.Marshaler interface.
-func (a attachmentContent) MarshalJSON() ([]byte, error) {
+func (a targetAttachmentContent) MarshalJSON() ([]byte, error) {
 	//copy resource data into a struct that does not have a custom MarshalJSON
 	data := a.resource
 
@@ -146,72 +160,4 @@ func (a attachmentContent) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(string(bytes))
-}
-
-//newAuditEvent takes the necessary parameters and returns a new audit event.
-func newAuditEvent(p auditEventParams) cadf.Event {
-	outcome := "failure"
-	if p.reasonCode >= 200 && p.reasonCode < 300 {
-		outcome = "success"
-	}
-
-	action := string(p.action) + "/" + p.resourceType
-
-	return cadf.Event{
-		TypeURI:   "http://schemas.dmtf.org/cloud/audit/1.0/event",
-		ID:        generateUUID(),
-		EventTime: p.time.Format("2006-01-02T15:04:05.999999+00:00"),
-		EventType: "activity",
-		Action:    action,
-		Outcome:   outcome,
-		Reason: cadf.Reason{
-			ReasonType: "HTTP",
-			ReasonCode: strconv.Itoa(p.reasonCode),
-		},
-		Initiator: cadf.Resource{
-			TypeURI:   "service/security/account/user",
-			Name:      p.token.Context.Auth["user_name"],
-			ID:        p.token.Context.Auth["user_id"],
-			Domain:    p.token.Context.Auth["domain_name"],
-			DomainID:  p.token.Context.Auth["domain_id"],
-			ProjectID: p.token.Context.Auth["project_id"],
-			Host: &cadf.Host{
-				Address: tryStripPort(p.request.RemoteAddr),
-				Agent:   p.request.Header.Get("User-Agent"),
-			},
-		},
-		Target: cadf.Resource{
-			TypeURI:   "data/security/project",
-			ID:        p.projectID,
-			ProjectID: p.projectID,
-			Attachments: []cadf.Attachment{{
-				Name:    "payload",
-				TypeURI: "mime:application/json",
-				Content: p.attachmentContent,
-			}},
-		},
-		Observer: cadf.Resource{
-			TypeURI: "service/autoscaling",
-			Name:    "castellum",
-			ID:      observerUUID,
-		},
-		RequestPath: p.request.URL.String(),
-	}
-}
-
-func generateUUID() string {
-	u, err := uuid.NewV4()
-	if err != nil {
-		logg.Fatal(err.Error())
-	}
-
-	return u.String()
-}
-
-func tryStripPort(hostPort string) string {
-	host, _, err := net.SplitHostPort(hostPort)
-	if err == nil {
-		return host
-	}
-	return hostPort
 }

@@ -310,21 +310,20 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	if dbResource.ID == 0 {
 		action = enableAction
 	}
-	eventParams := auditEventParams{
-		token:             token,
-		request:           r,
-		time:              requestTime,
-		reasonCode:        http.StatusAccepted,
-		action:            action,
-		projectID:         projectUUID,
-		resourceType:      string(dbResource.AssetType),
-		attachmentContent: attachmentContent{resource: input},
+	// this allows to reuse the logAndPublishEvent() with same parameters except reasonCode
+	doAudit := func(statusCode int) {
+		logAndPublishEvent(requestTime, r, token, statusCode,
+			scalingEventTarget{
+				action:            action,
+				projectID:         projectUUID,
+				resourceType:      string(dbResource.AssetType),
+				attachmentContent: targetAttachmentContent{resource: input},
+			})
 	}
 
 	errs := input.UpdateDBResource(dbResource, info)
 	if len(errs) > 0 {
-		eventParams.reasonCode = http.StatusUnprocessableEntity
-		logAndPublishEvent(newAuditEvent(eventParams))
+		doAudit(http.StatusUnprocessableEntity)
 		http.Error(w, strings.Join(errs, "\n"), http.StatusUnprocessableEntity)
 		return
 	}
@@ -334,12 +333,11 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 		_, err = h.DB.Update(dbResource)
 	}
 	if respondwith.ErrorText(w, err) {
-		eventParams.reasonCode = http.StatusInternalServerError
-		logAndPublishEvent(newAuditEvent(eventParams))
+		doAudit(http.StatusInternalServerError)
 		return
 	}
 
-	logAndPublishEvent(newAuditEvent(eventParams))
+	doAudit(http.StatusAccepted)
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -356,23 +354,22 @@ func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
 	if !token.Require(w, dbResource.AssetType.PolicyRuleForWrite()) {
 		return
 	}
-	eventParams := auditEventParams{
-		token:        token,
-		request:      r,
-		time:         requestTime,
-		reasonCode:   http.StatusNoContent,
-		action:       disableAction,
-		projectID:    projectUUID,
-		resourceType: string(dbResource.AssetType),
+	// this allows to reuse the logAndPublishEvent() with same parameters except reasonCode
+	doAudit := func(statusCode int) {
+		logAndPublishEvent(requestTime, r, token, statusCode,
+			scalingEventTarget{
+				action:       disableAction,
+				projectID:    projectUUID,
+				resourceType: string(dbResource.AssetType),
+			})
 	}
 
 	_, err := h.DB.Exec(`DELETE FROM resources WHERE id = $1`, dbResource.ID)
 	if respondwith.ErrorText(w, err) {
-		eventParams.reasonCode = http.StatusInternalServerError
-		logAndPublishEvent(newAuditEvent(eventParams))
+		doAudit(http.StatusInternalServerError)
 		return
 	}
 
-	logAndPublishEvent(newAuditEvent(eventParams))
+	doAudit(http.StatusNoContent)
 	w.WriteHeader(http.StatusNoContent)
 }
