@@ -19,6 +19,9 @@ This document uses the terminology defined in the [README.md](../README.md#termi
 * [GET /v1/projects/:id/resources/:type/operations/pending](#get-v1projectsidresourcestypeoperationspending)
 * [GET /v1/projects/:id/resources/:type/operations/recently-failed](#get-v1projectsidresourcestypeoperationsrecently-failed)
 * [GET /v1/projects/:id/resources/:type/operations/recently-succeeded](#get-v1projectsidresourcestypeoperationsrecently-succeeded)
+* [GET /v1/operations/pending](#get-v1operationspending)
+* [GET /v1/operations/recently-failed](#get-v1operationsrecently-failed)
+* [GET /v1/operations/recently-succeeded](#get-v1operationsrecently-succeeded)
 
 ## GET /v1/projects/:id
 
@@ -268,16 +271,34 @@ The following fields may be returned for each operation, both below `pending_ope
 The previous table contains a lot of rules like "this field is not shown for operations in state X". When this is confusing to you, have a look at the state machine diagram in [README.md](../README.md#terminology). The reason why many fields are optional is that they only have values when the respective state was entered in the operation's lifecycle.
 
 ## GET /v1/projects/:id/resources/:type/operations/pending
+## GET /v1/projects/:id/resources/:type/operations/recently-failed
+## GET /v1/projects/:id/resources/:type/operations/recently-succeeded
 
-Shows information about all pending operations for assets in the given project resource.
+For backwards-compatibility, these three endpoints are respectively synonymous to:
 
-Returns 404 if autoscaling is not enabled for this resource.
+* `GET /v1/operations/pending?project=$id&asset-type=$type`
+* `GET /v1/operations/recently-failed?project=$id&asset-type=$type`
+* `GET /v1/operations/recently-succeeded?project=$id&asset-type=$type`
+
+## GET /v1/operations/pending
+
+Shows information about all pending operations for assets in resources accessible to the authenticated user.
+
+The following query parameters can be given to filter the result:
+
+- When `project` is given, it is interpreted as a project ID. Only resources in that project will be considered.
+- When `domain` is given, it is interpreted as a domain ID. Only resources in project in that domain will be considered.
+- When `asset-type` is given, only resources with this asset type are considered.
+
+Returns 404 if autoscaling is not enabled for any resource matching the query.
 Otherwise returns 200 and a JSON response body like this:
 
 ```json
 {
   "pending_operations": [
     {
+      "project_id": "0181e612-fcad-438d-a1a4-2a21fc0a2442",
+      "asset_type": "nfs-shares",
       "asset_id": "acc137e0-ac0f-43c4-a3de-ba728c0091fd",
       "state": "greenlit",
       "reason": "high",
@@ -301,16 +322,18 @@ Otherwise returns 200 and a JSON response body like this:
 ```
 
 Each pending operation has the same format as the `.pending_operation` field in the JSON response returned by
-`GET /v1/projects/:id/assets/:type/:id` (see above), except that the additional field `asset_id` indicates which asset
-is being worked on.
+`GET /v1/projects/:id/assets/:type/:id` (see above), except for the following additional fields:
 
-For each asset in this resource, at most one pending operation will be listed.
+- `asset_id` indicates which asset is being worked on.
+- `project_id` and `asset_type` identify the resource to which this asset belongs.
 
-## GET /v1/projects/:id/resources/:type/operations/recently-failed
+For each asset, at most one pending operation will be listed.
 
-Shows information about all operations on assets in the given project resource that **recently failed**. This is
-intended to give operators a view of all assets in a resource where manual intervention may be required because
-autoscaling is not working properly. Recent failure is defined as follows:
+## GET /v1/operations/recently-failed
+
+Shows information about all operations on assets in resources accessible to the authenticated user that **recently
+failed**. This is intended to give operators a view of all assets in a resource where manual intervention may be
+required because autoscaling is not working properly. Recent failure is defined as follows:
 
 1. There is an operation in state "failed".
 2. There is no newer operation for the same asset which *finished* after the failed operation.
@@ -319,6 +342,9 @@ autoscaling is not working properly. Recent failure is defined as follows:
 Point 2 ensures that we don't see failures where the next attempt succeeded. Point 3 ensures that we don't see failures
 for assets where the usage returned to normal levels in the meantime.
 
+The query parameters `domain`, `project` and `asset-type` are recognized with the same semantics as for
+`GET /v1/operations/pending`.
+
 Returns 404 if autoscaling is not enabled for this resource.
 Otherwise returns 200 and a JSON response body like this:
 
@@ -326,6 +352,8 @@ Otherwise returns 200 and a JSON response body like this:
 {
   "recently_failed_operations": [
     {
+      "project_id": "0181e612-fcad-438d-a1a4-2a21fc0a2442",
+      "asset_type": "nfs-shares",
       "asset_id": "acc137e0-ac0f-43c4-a3de-ba728c0091fd",
       "state": "failed",
       "reason": "high",
@@ -353,21 +381,25 @@ Otherwise returns 200 and a JSON response body like this:
 ```
 
 Each failed operation has the same format as the entries in the `.finished_operations` field in the JSON response
-returned by `GET /v1/projects/:id/assets/:type/:id` (see above), except that the additional field `asset_id` indicates
-which asset was being worked on.
+returned by `GET /v1/projects/:id/assets/:type/:id` (see above), except for the following additional fields:
 
-For each asset in this resource, at most one failed operation will be listed (the most recent one).
+- `asset_id` indicates which asset is being worked on.
+- `project_id` and `asset_type` identify the resource to which this asset belongs.
 
-## GET /v1/projects/:id/resources/:type/operations/recently-succeeded
+For each asset, at most one failed operation will be listed (the most recent one).
 
-Shows information about all operations on assets in the given project resource that **recently succeeded**, that is, all
-operations in state "succeeded" where there is no newer operation in state "succeeded" or "failed" for the same asset.
+## GET /v1/operations/recently-succeeded
+
+Shows information about all operations on assets in resources accessible to the authenticated user that **recently
+succeeded**, that is, all operations in state "succeeded" where there is no newer operation in state "succeeded" or
+"failed" for the same asset.
 
 Returns 404 if autoscaling is not enabled for this resource.
 Otherwise returns 200 and a JSON response body looking like that from the `recently-failed` endpoint above, except that
 `recently_failed_operations` is called `recently_succeeded_operations`.
 
-The following query parameters can be given to filter the result:
+The query parameters `domain`, `project` and `asset-type` are recognized with the same semantics as for
+`GET /v1/operations/pending`. The following additional query parameters can be given to filter the result further:
 
 - When `max-age` is given, only those operations will be shown that finished after `now - max_age`. The value must be an
   integer followed by one of the units `m` (minute), `h` (hour) or `d` (day), e.g. `12h` or `7d`. The default value is

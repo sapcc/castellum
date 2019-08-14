@@ -78,13 +78,23 @@ func (h *handler) BuildRouter() http.Handler {
 
 	router.Methods("GET").
 		Path(`/v1/projects/{project_id}/resources/{asset_type}/operations/pending`).
-		HandlerFunc(h.GetPendingOperationsForResource)
+		HandlerFunc(h.GetPendingOperations)
 	router.Methods("GET").
 		Path(`/v1/projects/{project_id}/resources/{asset_type}/operations/recently-failed`).
-		HandlerFunc(h.GetRecentlyFailedOperationsForResource)
+		HandlerFunc(h.GetRecentlyFailedOperations)
 	router.Methods("GET").
 		Path(`/v1/projects/{project_id}/resources/{asset_type}/operations/recently-succeeded`).
-		HandlerFunc(h.GetRecentlySucceededOperationsForResource)
+		HandlerFunc(h.GetRecentlySucceededOperations)
+
+	router.Methods("GET").
+		Path(`/v1/operations/pending`).
+		HandlerFunc(h.GetPendingOperations)
+	router.Methods("GET").
+		Path(`/v1/operations/recently-failed`).
+		HandlerFunc(h.GetRecentlyFailedOperations)
+	router.Methods("GET").
+		Path(`/v1/operations/recently-succeeded`).
+		HandlerFunc(h.GetRecentlySucceededOperations)
 
 	return router
 }
@@ -102,6 +112,12 @@ func RequireJSON(w http.ResponseWriter, r *http.Request, data interface{}) bool 
 	return true
 }
 
+func respondWithForbidden(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusForbidden)
+	w.Write([]byte("403 Forbidden"))
+}
+
 func respondWithNotFound(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusNotFound)
@@ -109,57 +125,72 @@ func respondWithNotFound(w http.ResponseWriter) {
 }
 
 func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *gopherpolicy.Token) {
-	//all endpoints include the `project_id` variable, so it must definitely be there
-	projectUUID := mux.Vars(r)["project_id"]
-	if projectUUID == "" {
+	//for endpoints requiring the `project_id` variable, check that it's not empty
+	projectUUID, projectScoped := mux.Vars(r)["project_id"]
+	if projectScoped && projectUUID == "" {
 		respondWithNotFound(w)
 		return "", nil
 	}
+	//other endpoints might have a project ID in the `project` query argument instead
+	if !projectScoped {
+		if id := r.URL.Query().Get("project"); id != "" {
+			projectScoped = true
+			projectUUID = id
+		}
+	}
 
-	//collect object attributes for policy check
+	token := h.Validator.CheckToken(r)
+	token.Context.Logger = logg.Debug
+	logg.Debug("token has auth = %v", token.Context.Auth)
+	logg.Debug("token has roles = %v", token.Context.Roles)
+	//all project-scoped endpoints require the user to have access to the
+	//selected project
+	if projectScoped {
+		projectExists, err := h.SetTokenToProjectScope(token, projectUUID)
+		if respondwith.ErrorText(w, err) || !token.Require(w, "project:access") {
+			return "", nil
+		}
+
+		//only report 404 after having checked access rules, otherwise we might leak
+		//information about which projects exist to unauthorized users
+		if !projectExists {
+			respondWithNotFound(w)
+			return "", nil
+		}
+	}
+
+	return projectUUID, token
+}
+
+func (h handler) SetTokenToProjectScope(token *gopherpolicy.Token, projectUUID string) (projectExists bool, err error) {
 	objectAttrs := map[string]string{
 		"project_id":        projectUUID,
 		"target.project.id": projectUUID,
 	}
+
 	project, err := h.Provider.GetProject(projectUUID)
-	if respondwith.ErrorText(w, err) {
-		return "", nil
+	if err != nil {
+		return false, err
 	}
-	scopeNotFound := project == nil
+	projectExists = project != nil
 	if project != nil {
 		objectAttrs["target.project.name"] = project.Name
 		objectAttrs["target.project.domain.id"] = project.DomainID
+
 		domain, err := h.Provider.GetDomain(project.DomainID)
-		if respondwith.ErrorText(w, err) {
-			return "", nil
+		if err != nil {
+			return false, err
 		}
 		if domain == nil {
-			scopeNotFound = true
+			projectExists = false
 		} else {
 			objectAttrs["target.project.domain.name"] = domain.Name
 		}
 	}
 
-	//all endpoints are project-scoped, so we require the user to have access to
-	//the selected project
-	token := h.Validator.CheckToken(r)
-	token.Context.Logger = logg.Debug
 	token.Context.Request = objectAttrs
-	logg.Debug("token has auth = %v", token.Context.Auth)
-	logg.Debug("token has roles = %v", token.Context.Roles)
 	logg.Debug("token has object attributes = %v", token.Context.Request)
-	if !token.Require(w, "project:access") {
-		return "", nil
-	}
-
-	//only report 404 after having checked access rules, otherwise we might leak
-	//information about which projects exist to unauthorized users
-	if scopeNotFound {
-		respondWithNotFound(w)
-		return "", nil
-	}
-
-	return projectUUID, token
+	return projectExists, nil
 }
 
 func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUID string, token *gopherpolicy.Token, createIfMissing bool) *db.Resource {

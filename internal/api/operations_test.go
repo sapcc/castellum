@@ -57,11 +57,13 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 		}
 		t.Must(h.DB.Insert(&pendingOp))
 		pendingOpJSON := assert.JSONObject{
-			"asset_id": "fooasset1",
-			"state":    "created",
-			"reason":   "high",
-			"old_size": 1024,
-			"new_size": 2048,
+			"project_id": "project1",
+			"asset_type": "foo",
+			"asset_id":   "fooasset1",
+			"state":      "created",
+			"reason":     "high",
+			"old_size":   1024,
+			"new_size":   2048,
 			"created": assert.JSONObject{
 				"at":            21,
 				"usage_percent": 60,
@@ -91,6 +93,22 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 		pendingOpJSON["greenlit"] = assert.JSONObject{"at": 23, "by_user": "user1"}
 		req.Check(t.T, hh)
 
+		//check querying by domain
+		req.Path = "/v1/operations/pending?domain=domain1"
+		req.Check(t.T, hh)
+		req.Path = "/v1/operations/pending?domain=domain1&asset-type=foo"
+		req.Check(t.T, hh)
+
+		//check queries with URL arguments where nothing matches
+		req.ExpectStatus = http.StatusNotFound
+		req.ExpectBody = nil
+		req.Path = "/v1/operations/pending?domain=unknown"
+		req.Check(t.T, hh)
+		req.Path = "/v1/operations/pending?domain=domain1&project=unknown"
+		req.Check(t.T, hh)
+		req.Path = "/v1/operations/pending?domain=domain1&asset-type=unknown"
+		req.Check(t.T, hh)
+
 	})
 }
 
@@ -118,11 +136,13 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 		t.MustExec(h.DB, `UPDATE resources SET critical_threshold_percent = 95 WHERE id = 1`)
 		t.MustExec(h.DB, `UPDATE assets SET usage_percent = 97 WHERE id = 1`)
 		expectedOps = []assert.JSONObject{{
-			"asset_id": "fooasset1",
-			"reason":   "critical",
-			"state":    "failed",
-			"old_size": 1024,
-			"new_size": 1025,
+			"project_id": "project1",
+			"asset_type": "foo",
+			"asset_id":   "fooasset1",
+			"reason":     "critical",
+			"state":      "failed",
+			"old_size":   1024,
+			"new_size":   1025,
 			"created": assert.JSONObject{
 				"at":            51,
 				"usage_percent": 97,
@@ -177,12 +197,29 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 			FinishedAt:   time.Unix(61, 0).UTC(),
 		}))
 		expectedOps = []assert.JSONObject{}
-		assert.HTTPRequest{
+		req := assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/projects/project1/resources/foo/operations/recently-failed",
 			ExpectStatus: http.StatusOK,
 			ExpectBody:   assert.JSONObject{"recently_failed_operations": expectedOps},
-		}.Check(t.T, hh)
+		}
+		req.Check(t.T, hh)
+
+		//check querying by domain
+		req.Path = "/v1/operations/recently-failed?domain=domain1"
+		req.Check(t.T, hh)
+		req.Path = "/v1/operations/recently-failed?domain=domain1&asset-type=foo"
+		req.Check(t.T, hh)
+
+		//check queries with URL arguments where nothing matches
+		req.ExpectStatus = http.StatusNotFound
+		req.ExpectBody = nil
+		req.Path = "/v1/operations/recently-failed?domain=unknown"
+		req.Check(t.T, hh)
+		req.Path = "/v1/operations/recently-failed?domain=domain1&project=unknown"
+		req.Check(t.T, hh)
+		req.Path = "/v1/operations/recently-failed?domain=domain1&asset-type=unknown"
+		req.Check(t.T, hh)
 
 	})
 }
@@ -211,11 +248,13 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 			db.OperationOutcomeCancelled, db.OperationOutcomeFailed,
 		)
 		expectedOps = []assert.JSONObject{{
-			"asset_id": "fooasset1",
-			"reason":   "high",
-			"state":    "succeeded",
-			"old_size": 1023,
-			"new_size": 1024,
+			"project_id": "project1",
+			"asset_type": "foo",
+			"asset_id":   "fooasset1",
+			"reason":     "high",
+			"state":      "succeeded",
+			"old_size":   1023,
+			"new_size":   1024,
 			"created": assert.JSONObject{
 				"at":            41,
 				"usage_percent": 80,
@@ -248,12 +287,29 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 			UsagePercent: 60,
 			CreatedAt:    time.Unix(61, 0).UTC(),
 		}))
-		assert.HTTPRequest{
+		req := assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/projects/project1/resources/foo/operations/recently-succeeded",
 			ExpectStatus: http.StatusOK,
 			ExpectBody:   assert.JSONObject{"recently_succeeded_operations": expectedOps},
-		}.Check(t.T, hh)
+		}
+		req.Check(t.T, hh)
+
+		//check querying by domain
+		req.Path = "/v1/operations/recently-succeeded?domain=domain1"
+		req.Check(t.T, hh)
+		req.Path = "/v1/operations/recently-succeeded?domain=domain1&asset-type=foo"
+		req.Check(t.T, hh)
+
+		//check queries with URL arguments where nothing matches
+		req.ExpectStatus = http.StatusNotFound
+		req.ExpectBody = nil
+		req.Path = "/v1/operations/recently-succeeded?domain=unknown"
+		req.Check(t.T, hh)
+		req.Path = "/v1/operations/recently-succeeded?domain=domain1&project=unknown"
+		req.Check(t.T, hh)
+		req.Path = "/v1/operations/recently-succeeded?domain=domain1&asset-type=unknown"
+		req.Check(t.T, hh)
 
 		//check with shortened max-age
 		assert.HTTPRequest{
