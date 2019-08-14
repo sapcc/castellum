@@ -52,8 +52,10 @@ type AssetChecked struct {
 //Operation is how a db.PendingOperation or db.FinishedOperation looks like in
 //the API.
 type Operation struct {
-	AssetID string `json:"asset_id,omitempty"`
-	//^ AssetID is left empty when Operation appears inside type Asset.
+	ProjectUUID string       `json:"project_id,omitempty"`
+	AssetType   db.AssetType `json:"asset_type,omitempty"`
+	AssetID     string       `json:"asset_id,omitempty"`
+	//^ These fields are left empty when Operation appears inside type Asset.
 	State     db.OperationState      `json:"state"`
 	Reason    db.OperationReason     `json:"reason"`
 	OldSize   uint64                 `json:"old_size"`
@@ -109,7 +111,7 @@ func AssetFromDB(asset db.Asset) Asset {
 }
 
 //PendingOperationFromDB converts a db.PendingOperation into an api.Operation.
-func PendingOperationFromDB(dbOp db.PendingOperation, assetID string) Operation {
+func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, res *db.Resource) Operation {
 	op := Operation{
 		AssetID: assetID,
 		State:   dbOp.State(),
@@ -121,6 +123,10 @@ func PendingOperationFromDB(dbOp db.PendingOperation, assetID string) Operation 
 			UsagePercent: dbOp.UsagePercent,
 		},
 		Finished: nil,
+	}
+	if res != nil {
+		op.ProjectUUID = res.ScopeUUID
+		op.AssetType = res.AssetType
 	}
 	if dbOp.ConfirmedAt != nil {
 		op.Confirmed = &OperationConfirmation{
@@ -137,7 +143,7 @@ func PendingOperationFromDB(dbOp db.PendingOperation, assetID string) Operation 
 }
 
 //FinishedOperationFromDB converts a db.FinishedOperation into an api.Operation.
-func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string) Operation {
+func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string, res *db.Resource) Operation {
 	op := Operation{
 		AssetID: assetID,
 		State:   dbOp.State(),
@@ -152,6 +158,10 @@ func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string) Operatio
 			AtUnix:       dbOp.FinishedAt.Unix(),
 			ErrorMessage: dbOp.ErrorMessage,
 		},
+	}
+	if res != nil {
+		op.ProjectUUID = res.ScopeUUID
+		op.AssetType = res.AssetType
 	}
 	if dbOp.ConfirmedAt != nil {
 		op.Confirmed = &OperationConfirmation{
@@ -231,7 +241,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	} else if respondwith.ErrorText(w, err) {
 		return
 	} else {
-		op := PendingOperationFromDB(dbPendingOp, "")
+		op := PendingOperationFromDB(dbPendingOp, "", nil)
 		asset.PendingOperation = &op
 	}
 
@@ -246,7 +256,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		}
 		finishedOps := make([]Operation, len(dbFinishedOps))
 		for idx, op := range dbFinishedOps {
-			finishedOps[idx] = FinishedOperationFromDB(op, "")
+			finishedOps[idx] = FinishedOperationFromDB(op, "", nil)
 		}
 		asset.FinishedOperations = &finishedOps
 	}

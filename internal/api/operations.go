@@ -21,49 +21,139 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
+	"github.com/gorilla/mux"
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
+	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/respondwith"
 	"gopkg.in/gorp.v2"
 )
 
-func (h handler) GetPendingOperationsForResource(w http.ResponseWriter, r *http.Request) {
+func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (map[int64]db.Resource, bool) {
+	//CheckToken discovers project ID in both URL path and query
+	var token *gopherpolicy.Token
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
-		return
+		return nil, false
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token, false)
-	if dbResource == nil {
-		return
+	domainUUID := r.URL.Query().Get("domain")
+
+	//get asset type from URL path or query
+	assetTypeStr, exists := mux.Vars(r)["asset_type"]
+	if exists {
+		if assetTypeStr == "" {
+			respondWithNotFound(w)
+			return nil, false
+		}
+	} else {
+		assetTypeStr = r.URL.Query().Get("asset-type")
+	}
+	if assetTypeStr != "" {
+		manager, _ := h.Team.ForAssetType(db.AssetType(assetTypeStr))
+		if manager == nil {
+			//only report resources when we have an asset manager configured
+			respondWithNotFound(w)
+			return nil, false
+		}
 	}
 
-	//find operations
-	var ops []db.PendingOperation
-	_, err := h.DB.Select(&ops, `
-		SELECT o.* FROM pending_operations o
-		  JOIN assets a ON a.id = o.asset_id
-		 WHERE a.resource_id = $1
-	`, dbResource.ID)
+	//find all matching resources
+	var (
+		sqlConditions []string
+		sqlBindValues []interface{}
+	)
+	addSQLCondition := func(key string, value interface{}) {
+		cond := fmt.Sprintf("%s = $%d", key, len(sqlBindValues)+1)
+		sqlConditions = append(sqlConditions, cond)
+		sqlBindValues = append(sqlBindValues, value)
+	}
+	if projectUUID != "" {
+		addSQLCondition("scope_uuid", projectUUID)
+	}
+	if domainUUID != "" {
+		addSQLCondition("domain_uuid", domainUUID)
+	}
+	if assetTypeStr != "" {
+		addSQLCondition("asset_type", assetTypeStr)
+	}
+	if len(sqlConditions) == 0 {
+		sqlConditions = []string{"TRUE"}
+	}
+	queryStr := `SELECT * FROM resources WHERE ` + strings.Join(sqlConditions, " AND ")
+	var allResources []db.Resource
+	_, err := h.DB.Select(&allResources, queryStr, sqlBindValues...)
 	if respondwith.ErrorText(w, err) {
+		return nil, false
+	}
+
+	//check if user has access to all these resources
+	allowedResources := make(map[int64]db.Resource)
+	canAccessAnyMatchingProject := false
+	for _, res := range allResources {
+		projectExists, err := h.SetTokenToProjectScope(token, res.ScopeUUID)
+		if respondwith.ErrorText(w, err) {
+			return nil, false
+		}
+		if !projectExists || !token.Check("project:access") {
+			continue
+		}
+		canAccessAnyMatchingProject = true
+		if token.Check(res.AssetType.PolicyRuleForRead()) {
+			allowedResources[res.ID] = res
+		}
+	}
+
+	//if there are no allowed resources, generate 4xx response
+	if len(allowedResources) == 0 {
+		if canAccessAnyMatchingProject {
+			respondWithForbidden(w)
+		} else {
+			//do not leak information about project/resource existence to unauthorized users
+			respondWithNotFound(w)
+		}
+		return nil, false
+	}
+
+	return allowedResources, true
+}
+
+func (h handler) GetPendingOperations(w http.ResponseWriter, r *http.Request) {
+	dbResources, ok := h.LoadMatchingResources(w, r)
+	if !ok {
 		return
 	}
 
-	//find asset UUIDs
-	assetUUIDs, err := h.getAssetUUIDMap(*dbResource)
-	if respondwith.ErrorText(w, err) {
-		return
+	allOps := []Operation{}
+	for _, dbResource := range dbResources {
+
+		//find operations
+		var ops []db.PendingOperation
+		_, err := h.DB.Select(&ops, `
+			SELECT o.* FROM pending_operations o
+				JOIN assets a ON a.id = o.asset_id
+			 WHERE a.resource_id = $1
+		`, dbResource.ID)
+		if respondwith.ErrorText(w, err) {
+			return
+		}
+
+		//find asset UUIDs
+		assetUUIDs, err := h.getAssetUUIDMap(dbResource)
+		if respondwith.ErrorText(w, err) {
+			return
+		}
+
+		//prepare for response body
+		for _, op := range ops {
+			allOps = append(allOps, PendingOperationFromDB(op, assetUUIDs[op.AssetID], &dbResource))
+		}
 	}
 
-	//render response body
-	var response struct {
+	respondwith.JSON(w, http.StatusOK, struct {
 		PendingOperations []Operation `json:"pending_operations,keepempty"`
-	}
-	response.PendingOperations = make([]Operation, len(ops))
-	for idx, op := range ops {
-		response.PendingOperations[idx] = PendingOperationFromDB(op, assetUUIDs[op.AssetID])
-	}
-	respondwith.JSON(w, http.StatusOK, response)
+	}{allOps})
 }
 
 func (h handler) getAssetUUIDMap(res db.Resource) (map[int64]string, error) {
@@ -87,59 +177,51 @@ func (h handler) getAssetUUIDMap(res db.Resource) (map[int64]string, error) {
 	return assetUUIDs, rows.Err()
 }
 
-func (h handler) GetRecentlyFailedOperationsForResource(w http.ResponseWriter, r *http.Request) {
-	projectUUID, token := h.CheckToken(w, r)
-	if token == nil {
-		return
-	}
-	dbResource := h.LoadResource(w, r, projectUUID, token, false)
-	if dbResource == nil {
+func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Request) {
+	dbResources, ok := h.LoadMatchingResources(w, r)
+	if !ok {
 		return
 	}
 
-	failedOpsByAssetID, err := recentOperationQuery{
-		DB:           h.DB,
-		ResourceID:   dbResource.ID,
-		Outcome:      db.OperationOutcomeFailed,
-		OverriddenBy: `TRUE`,
-	}.Execute()
-	if respondwith.ErrorText(w, err) {
-		return
-	}
-
-	//check if the assets in question are still eligible for resizing
-	var assets []db.Asset
-	_, err = h.DB.Select(&assets,
-		`SELECT * FROM assets WHERE resource_id = $1 ORDER BY uuid`, dbResource.ID)
-	if respondwith.ErrorText(w, err) {
-		return
-	}
 	relevantOps := []Operation{}
-	for _, asset := range assets {
-		op, exists := failedOpsByAssetID[asset.ID]
-		if !exists {
-			continue
+	for _, dbResource := range dbResources {
+
+		failedOpsByAssetID, err := recentOperationQuery{
+			DB:           h.DB,
+			ResourceID:   dbResource.ID,
+			Outcome:      db.OperationOutcomeFailed,
+			OverriddenBy: `TRUE`,
+		}.Execute()
+		if respondwith.ErrorText(w, err) {
+			return
 		}
-		if _, exists := core.GetEligibleOperations(*dbResource, asset)[op.Reason]; exists {
-			relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID))
+
+		//check if the assets in question are still eligible for resizing
+		var assets []db.Asset
+		_, err = h.DB.Select(&assets,
+			`SELECT * FROM assets WHERE resource_id = $1 ORDER BY uuid`, dbResource.ID)
+		if respondwith.ErrorText(w, err) {
+			return
+		}
+		for _, asset := range assets {
+			op, exists := failedOpsByAssetID[asset.ID]
+			if !exists {
+				continue
+			}
+			if _, exists := core.GetEligibleOperations(dbResource, asset)[op.Reason]; exists {
+				relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &dbResource))
+			}
 		}
 	}
 
-	//render response body
-	var response struct {
+	respondwith.JSON(w, http.StatusOK, struct {
 		Operations []Operation `json:"recently_failed_operations,keepempty"`
-	}
-	response.Operations = relevantOps
-	respondwith.JSON(w, http.StatusOK, response)
+	}{relevantOps})
 }
 
-func (h handler) GetRecentlySucceededOperationsForResource(w http.ResponseWriter, r *http.Request) {
-	projectUUID, token := h.CheckToken(w, r)
-	if token == nil {
-		return
-	}
-	dbResource := h.LoadResource(w, r, projectUUID, token, false)
-	if dbResource == nil {
+func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.Request) {
+	dbResources, ok := h.LoadMatchingResources(w, r)
+	if !ok {
 		return
 	}
 	maxAge, err := ParseAge(r.URL.Query(), "max-age", "1d")
@@ -149,39 +231,38 @@ func (h handler) GetRecentlySucceededOperationsForResource(w http.ResponseWriter
 	}
 	maxFinishedAt := h.TimeNow().Add(-maxAge)
 
-	//find succeeded operations
-	succeededOpsByAssetID, err := recentOperationQuery{
-		DB:           h.DB,
-		ResourceID:   dbResource.ID,
-		Outcome:      db.OperationOutcomeSucceeded,
-		OverriddenBy: fmt.Sprintf(`outcome != '%s'`, db.OperationOutcomeCancelled),
-	}.Execute()
-	if respondwith.ErrorText(w, err) {
-		return
-	}
-
-	//apply filters and collect response data
-	var assets []db.Asset
-	_, err = h.DB.Select(&assets,
-		`SELECT * FROM assets WHERE resource_id = $1 ORDER BY uuid`, dbResource.ID)
-	if respondwith.ErrorText(w, err) {
-		return
-	}
 	relevantOps := []Operation{}
-	for _, asset := range assets {
-		op, exists := succeededOpsByAssetID[asset.ID]
-		if !exists || op.FinishedAt.Before(maxFinishedAt) {
-			continue
+	for _, dbResource := range dbResources {
+		//find succeeded operations
+		succeededOpsByAssetID, err := recentOperationQuery{
+			DB:           h.DB,
+			ResourceID:   dbResource.ID,
+			Outcome:      db.OperationOutcomeSucceeded,
+			OverriddenBy: fmt.Sprintf(`outcome != '%s'`, db.OperationOutcomeCancelled),
+		}.Execute()
+		if respondwith.ErrorText(w, err) {
+			return
 		}
-		relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID))
+
+		//apply filters and collect response data
+		var assets []db.Asset
+		_, err = h.DB.Select(&assets,
+			`SELECT * FROM assets WHERE resource_id = $1 ORDER BY uuid`, dbResource.ID)
+		if respondwith.ErrorText(w, err) {
+			return
+		}
+		for _, asset := range assets {
+			op, exists := succeededOpsByAssetID[asset.ID]
+			if !exists || op.FinishedAt.Before(maxFinishedAt) {
+				continue
+			}
+			relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &dbResource))
+		}
 	}
 
-	//render response body
-	var response struct {
+	respondwith.JSON(w, http.StatusOK, struct {
 		Operations []Operation `json:"recently_succeeded_operations,keepempty"`
-	}
-	response.Operations = relevantOps
-	respondwith.JSON(w, http.StatusOK, response)
+	}{relevantOps})
 }
 
 type recentOperationQuery struct {

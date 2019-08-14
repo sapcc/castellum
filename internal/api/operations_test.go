@@ -57,11 +57,13 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 		}
 		t.Must(h.DB.Insert(&pendingOp))
 		pendingOpJSON := assert.JSONObject{
-			"asset_id": "fooasset1",
-			"state":    "created",
-			"reason":   "high",
-			"old_size": 1024,
-			"new_size": 2048,
+			"project_id": "project1",
+			"asset_type": "foo",
+			"asset_id":   "fooasset1",
+			"state":      "created",
+			"reason":     "high",
+			"old_size":   1024,
+			"new_size":   2048,
 			"created": assert.JSONObject{
 				"at":            21,
 				"usage_percent": 60,
@@ -118,11 +120,13 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 		t.MustExec(h.DB, `UPDATE resources SET critical_threshold_percent = 95 WHERE id = 1`)
 		t.MustExec(h.DB, `UPDATE assets SET usage_percent = 97 WHERE id = 1`)
 		expectedOps = []assert.JSONObject{{
-			"asset_id": "fooasset1",
-			"reason":   "critical",
-			"state":    "failed",
-			"old_size": 1024,
-			"new_size": 1025,
+			"project_id": "project1",
+			"asset_type": "foo",
+			"asset_id":   "fooasset1",
+			"reason":     "critical",
+			"state":      "failed",
+			"old_size":   1024,
+			"new_size":   1025,
 			"created": assert.JSONObject{
 				"at":            51,
 				"usage_percent": 97,
@@ -211,11 +215,13 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 			db.OperationOutcomeCancelled, db.OperationOutcomeFailed,
 		)
 		expectedOps = []assert.JSONObject{{
-			"asset_id": "fooasset1",
-			"reason":   "high",
-			"state":    "succeeded",
-			"old_size": 1023,
-			"new_size": 1024,
+			"project_id": "project1",
+			"asset_type": "foo",
+			"asset_id":   "fooasset1",
+			"reason":     "high",
+			"state":      "succeeded",
+			"old_size":   1023,
+			"new_size":   1024,
 			"created": assert.JSONObject{
 				"at":            41,
 				"usage_percent": 80,
