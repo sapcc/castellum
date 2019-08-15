@@ -90,7 +90,25 @@ func checkReason(res db.Resource, asset db.Asset, reason db.OperationReason) *ui
 
 		//do not allow upsize operations to cross below the low threshold
 		if reason != db.OperationReasonLow && res.LowThresholdPercent != 0 {
-			c.forbidAbove(uint64(math.Floor(100*absUsage/res.LowThresholdPercent)) - 1)
+			lowSize := uint64(math.Floor(100*absUsage/res.LowThresholdPercent)) - 1
+
+			//BUT ensure that this threshold does not prevent us from taking action
+			//at all (if in doubt, the high or critical threshold is more important
+			//than the low threshold; it's better to have an asset slightly too large
+			//than slightly too small)
+			highThresholdPerc := res.HighThresholdPercent
+			if highThresholdPerc == 0 {
+				highThresholdPerc = res.CriticalThresholdPercent
+			}
+			if highThresholdPerc != 0 {
+				for lowSize > 0 && (100*absUsage/float64(lowSize)) >= highThresholdPerc {
+					lowSize++
+				}
+			}
+
+			if lowSize > 0 {
+				c.forbidAbove(lowSize)
+			}
 		}
 	}
 

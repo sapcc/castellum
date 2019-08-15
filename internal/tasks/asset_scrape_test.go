@@ -1098,6 +1098,49 @@ func TestUpsizeShouldNotGoIntoHighThreshold(baseT *testing.T) {
 	})
 }
 
+func TestResizesEndingUpInLowThreshold(baseT *testing.T) {
+	t := test.T{T: baseT}
+	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
+
+		//set thresholds very close to each other (this is what we recommend for
+		//quota autoscaling, e.g. low = 99% and critical = 100%) -- this is usually
+		//not a problem for large asset sizes because there is always a size value
+		//that satisfies both constraints
+		t.MustExec(c.DB, `UPDATE resources SET low_threshold_percent = 98, high_threshold_percent = 99, critical_threshold_percent = 100`)
+
+		//BUT now we also choose a really small asset size, and a usage such that
+		//there is no size value in the acceptable range of 98%-99% usage
+		setAsset(plugins.StaticAsset{Size: 15, Usage: 14})
+
+		//we are now below the low threshold, but no downsize should be generated
+		//because downizing would put us above the high and critical thresholds
+		clock.StepBy(10 * time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+		t.ExpectPendingOperations(c.DB /*, nothing */)
+		t.ExpectFinishedOperations(c.DB /*, nothing */)
+
+		//BUT when we're inside the high/critical threshold, a downsize should be
+		//generated even though upsizing puts us below the low threshold -- the
+		//idea being that it's better to be slightly too large than slightly too
+		//small
+		setAsset(plugins.StaticAsset{Size: 14, Usage: 14})
+		clock.StepBy(10 * time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+			ID:           1,
+			AssetID:      1,
+			Reason:       db.OperationReasonCritical,
+			OldSize:      14,
+			NewSize:      15,
+			UsagePercent: 100,
+			CreatedAt:    c.TimeNow(),
+			ConfirmedAt:  p2time(c.TimeNow()),
+			GreenlitAt:   p2time(c.TimeNow()),
+		})
+		t.ExpectFinishedOperations(c.DB /*, nothing */)
+	})
+}
+
 func ifthenelseF64(cond bool, thenValue float64, elseValue float64) float64 {
 	if cond {
 		return thenValue
