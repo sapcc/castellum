@@ -52,6 +52,7 @@ type AssetManagerStatic struct {
 	Assets                    map[string]map[string]StaticAsset
 	ReportsAbsoluteUsage      bool
 	CheckResourceAllowedFails bool
+	SetAssetSizeFails         bool
 }
 
 //AssetTypes implements the core.AssetManager interface.
@@ -71,13 +72,14 @@ func (m AssetManagerStatic) CheckResourceAllowed(assetType db.AssetType, scopeUU
 }
 
 var (
-	errWrongAssetType     = errors.New("wrong asset type for this asset manager")
-	errUnknownProject     = errors.New("no such project")
-	errUnknownAsset       = errors.New("no such asset")
-	errOldSizeMismatch    = errors.New("asset has different size than expected")
-	errTooSmall           = errors.New("cannot set size smaller than current usage")
-	errSimulatedRejection = errors.New("CheckResourceAllowed failing as requested")
-	errSimulatedFailure   = errors.New("GetAssetStatus failing as requested")
+	errWrongAssetType      = errors.New("wrong asset type for this asset manager")
+	errUnknownProject      = errors.New("no such project")
+	errUnknownAsset        = errors.New("no such asset")
+	errOldSizeMismatch     = errors.New("asset has different size than expected")
+	errTooSmall            = errors.New("cannot set size smaller than current usage")
+	errSimulatedRejection  = errors.New("CheckResourceAllowed failing as requested")
+	errSimulatedGetFailure = errors.New("GetAssetStatus failing as requested")
+	errSimulatedSetFailure = errors.New("SetAssetSize failing as requested")
 )
 
 //ListAssets implements the core.AssetManager interface.
@@ -112,7 +114,7 @@ func (m AssetManagerStatic) GetAssetStatus(res db.Resource, assetUUID string, pr
 	}
 
 	if asset.CannotGetAssetStatus {
-		return core.AssetStatus{}, errSimulatedFailure
+		return core.AssetStatus{}, errSimulatedGetFailure
 	}
 
 	if asset.NewSize != 0 {
@@ -131,24 +133,27 @@ func (m AssetManagerStatic) GetAssetStatus(res db.Resource, assetUUID string, pr
 }
 
 //SetAssetSize implements the core.AssetManager interface.
-func (m AssetManagerStatic) SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) error {
+func (m AssetManagerStatic) SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (db.OperationOutcome, error) {
 	if res.AssetType != m.AssetType {
-		return errWrongAssetType
+		return db.OperationOutcomeErrored, errWrongAssetType
 	}
 	assets, exists := m.Assets[res.ScopeUUID]
 	if !exists {
-		return errUnknownProject
+		return db.OperationOutcomeErrored, errUnknownProject
 	}
 	asset, exists := assets[assetUUID]
 	if !exists {
-		return errUnknownAsset
+		return db.OperationOutcomeErrored, errUnknownAsset
 	}
 	if asset.Size != oldSize {
-		return errOldSizeMismatch
+		return db.OperationOutcomeErrored, errOldSizeMismatch
 	}
 	if asset.Usage > newSize {
-		return errTooSmall
+		return db.OperationOutcomeErrored, errTooSmall
+	}
+	if m.SetAssetSizeFails {
+		return db.OperationOutcomeFailed, errSimulatedSetFailure
 	}
 	assets[assetUUID] = StaticAsset{Size: newSize, Usage: asset.Usage}
-	return nil
+	return db.OperationOutcomeSucceeded, nil
 }

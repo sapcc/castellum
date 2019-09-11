@@ -40,7 +40,11 @@ Operations move through the following states:
   "confirmed" into "greenlit" automatically.)
 - *Cancelled*: While an operation was not yet greenlit, the asset's usage moved back to normal levels.
 - *Succeeded*: The resize operation was completed successfully.
-- *Failed*: The resize operation was attempted, but failed.
+- *Failed*/*Errored*: The resize operation was attempted, but failed or errored.
+
+Problems with resizing fall into two categories: **Failures** need to be addressed by the project/domain administrators
+(e.g. upsize failed because of insufficient quota), while **errors** are unexpected backend errors that the OpenStack
+administrator needs to take care of (e.g. outage of an API used by Castellum).
 
 ## Building and running
 

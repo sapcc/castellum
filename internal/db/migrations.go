@@ -18,6 +18,14 @@
 
 package db
 
+//WARNING: The value 'errored' was added to op_outcome at schema version 10.
+//However, I could not add it using ALTER TYPE because ALTER TYPE cannot run
+//inside a transaction, and golang-migrate/migrate *insists* on running
+//everything in a transaction. Databases that don't have the 'errored' value in
+//type op_outcome must be upgraded manually with:
+//
+//  ALTER TYPE op_outcome ADD VALUE IF NOT EXISTS 'errored' AFTER 'failed';
+
 //SQLMigrations must be public because it's also used by tests.
 var SQLMigrations = map[string]string{
 	"001_initial.down.sql": `
@@ -62,7 +70,7 @@ var SQLMigrations = map[string]string{
 
 		-- NOTE: order of op_reason is important because we "ORDER BY reason" in some queries
 		CREATE TYPE op_reason  AS ENUM ('critical', 'high', 'low');
-		CREATE TYPE op_outcome AS ENUM ('succeeded', 'failed', 'cancelled');
+		CREATE TYPE op_outcome AS ENUM ('succeeded', 'failed', 'errored', 'cancelled');
 
 		CREATE TABLE pending_operations (
 			id       BIGSERIAL NOT NULL PRIMARY KEY,

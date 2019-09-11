@@ -252,13 +252,13 @@ The following additional fields may be returned:
 | `pending_operation` | object | Information about an automated resize operation that is currently in progress. If there is no resize operation ongoing, this field will be omitted. |
 | `finished_operations` | array of objects | Information about earlier automated resize operations. **This field is only shown on request** because it may be quite large. Add the query parameter `?history` to see it. |
 | `finished_operations[].finished.at` | timestamp | When the operation entered its final state. |
-| `finished_operations[].finished.error` | string | The backend error that caused this operation to fail. Only present when `state` is `failed.` |
+| `finished_operations[].finished.error` | string | The backend error that caused this operation to fail. Only present when `state` is `failed` or `errored`. |
 
 The following fields may be returned for each operation, both below `pending_operation` and below `finished_operations[]`:
 
 | Field | Type | Explanation |
 | ----- | ---- | ----------- |
-| `.state` | string | The current state of this operation. For pending operations, this is one of "created", "confirmed" or "greenlit". For finished operations, this is one of "cancelled", "succeeded" or "failed". See [README.md](../README.md#terminology) for details. |
+| `.state` | string | The current state of this operation. For pending operations, this is one of "created", "confirmed" or "greenlit". For finished operations, this is one of "cancelled", "succeeded", "failed" or "errored". See [README.md](../README.md#terminology) for details. |
 | `.reason` | string | One of "low", "high" or "critical". Identifies which threshold being crossed triggered this operation. |
 | `.old_size` | integer | The asset's size before this resize operation. |
 | `.new_size` | integer | The (projected) asset's size after the successful completion of the resize operation. |
@@ -335,7 +335,7 @@ Shows information about all operations on assets in resources accessible to the 
 failed**. This is intended to give operators a view of all assets in a resource where manual intervention may be
 required because autoscaling is not working properly. Recent failure is defined as follows:
 
-1. There is an operation in state "failed".
+1. There is an operation in state "failed" or "errored".
 2. There is no newer operation for the same asset which *finished* after the failed operation.
 3. The asset is still eligible for resizing for the same reason as stated in the failed operation.
 
@@ -386,13 +386,13 @@ returned by `GET /v1/projects/:id/assets/:type/:id` (see above), except for the 
 - `asset_id` indicates which asset is being worked on.
 - `project_id` and `asset_type` identify the resource to which this asset belongs.
 
-For each asset, at most one failed operation will be listed (the most recent one).
+For each asset, at most one failed or errored operation will be listed (the most recent one).
 
 ## GET /v1/operations/recently-succeeded
 
 Shows information about all operations on assets in resources accessible to the authenticated user that **recently
-succeeded**, that is, all operations in state "succeeded" where there is no newer operation in state "succeeded" or
-"failed" for the same asset.
+succeeded**, that is, all operations in state "succeeded" where there is no newer operation in state "succeeded",
+"failed" or "errored" for the same asset.
 
 Returns 404 if autoscaling is not enabled for this resource.
 Otherwise returns 200 and a JSON response body looking like that from the `recently-failed` endpoint above, except that

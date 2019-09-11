@@ -39,7 +39,7 @@ var selectAndDeleteNextResizeQuery = `
 `
 
 //ExecuteNextResize finds the next pending operation and executes it, i.e.
-//moves it from status "greenlit" to either "succeeded" or "failed".
+//moves it from status "greenlit" to either "succeeded", "failed" or "errored".
 //
 //Returns sql.ErrNoRows when no operation was in the queue, to indicate to the
 //caller to slow down.
@@ -101,8 +101,7 @@ func (c Context) ExecuteNextResize() (targetAssetType db.AssetType, returnedErro
 
 	//perform the resize operation (we give asset.Size instead of op.OldSize
 	//since this is the most up-to-date asset size that we have)
-	err = manager.SetAssetSize(res, asset.UUID, asset.Size, op.NewSize)
-	outcome := db.OperationOutcomeSucceeded
+	outcome, err := manager.SetAssetSize(res, asset.UUID, asset.Size, op.NewSize)
 	errorMessage := ""
 	if err != nil {
 		e := setAssetSizeError{
@@ -114,11 +113,12 @@ func (c Context) ExecuteNextResize() (targetAssetType db.AssetType, returnedErro
 		}
 		logg.Error(e.Error())
 
-		if c.SentryHub != nil {
+		//do not log "failed" operations to Sentry: fixing them is not within the
+		//responsibility of the Castellum operator
+		if c.SentryHub != nil && outcome == db.OperationOutcomeErrored {
 			captureSentryException(c.SentryHub, e)
 		}
 
-		outcome = db.OperationOutcomeFailed
 		errorMessage = err.Error()
 	}
 

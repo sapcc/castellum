@@ -52,7 +52,9 @@ type AssetManager interface {
 	CheckResourceAllowed(assetType db.AssetType, scopeUUID string) error
 
 	ListAssets(res db.Resource) ([]string, error)
-	SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) error
+	//The returned Outcome should be either Succeeded, Failed or Errored, but not Cancelled.
+	//The returned error should be nil if and only if the outcome is Succeeded.
+	SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (db.OperationOutcome, error)
 	//previousStatus will be nil when this function is called for the first time
 	//for the given asset.
 	GetAssetStatus(res db.Resource, assetUUID string, previousStatus *AssetStatus) (AssetStatus, error)

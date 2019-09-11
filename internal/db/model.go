@@ -206,7 +206,7 @@ type FinishedOperation struct {
 	CreatedAt   time.Time  `db:"created_at"`
 	ConfirmedAt *time.Time `db:"confirmed_at"`
 	GreenlitAt  *time.Time `db:"greenlit_at"`
-	//When the resize operation succeeded, failed, or was cancelled.
+	//When the resize operation succeeded, failed, errored, or was cancelled.
 	FinishedAt time.Time `db:"finished_at"`
 
 	GreenlitByUserUUID *string `db:"greenlit_by_user_uuid"`
@@ -222,10 +222,10 @@ const (
 	OperationReasonCritical OperationReason = "critical"
 	//OperationReasonHigh indicates that the resize operation was triggered
 	//because the asset's usage exceeded the high threshold.
-	OperationReasonHigh = "high"
+	OperationReasonHigh OperationReason = "high"
 	//OperationReasonLow indicates that the resize operation was triggered
 	//because the asset's usage deceeded the low threshold.
-	OperationReasonLow = "low"
+	OperationReasonLow OperationReason = "low"
 )
 
 //OperationOutcome is an enumeration type for possible outcomes for a resize operation.
@@ -235,10 +235,12 @@ const (
 	//OperationOutcomeSucceeded indicates that a resize operation was completed
 	//successfully.
 	OperationOutcomeSucceeded OperationOutcome = "succeeded"
-	//OperationOutcomeFailed indicates that a resize operation failed because of an error in OpenStack.
-	OperationOutcomeFailed = "failed"
+	//OperationOutcomeFailed indicates that a resize operation failed because of a problem on the side of the user (e.g. insufficient quota).
+	OperationOutcomeFailed OperationOutcome = "failed"
+	//OperationOutcomeErrored indicates that a resize operation errored because of a problem in OpenStack.
+	OperationOutcomeErrored OperationOutcome = "errored"
 	//OperationOutcomeCancelled indicates that a resize operation was cancelled. This happens when usage falls back into normal
-	OperationOutcomeCancelled = "cancelled"
+	OperationOutcomeCancelled OperationOutcome = "cancelled"
 )
 
 //OperationState is an enumeration type for all possible states of an operation.
@@ -249,17 +251,19 @@ const (
 	//previous state.
 	OperationStateDidNotExist OperationState = "none"
 	//OperationStateCreated is a PendingOperation with ConfirmedAt == nil.
-	OperationStateCreated = "created"
+	OperationStateCreated OperationState = "created"
 	//OperationStateConfirmed is a PendingOperation with ConfirmedAt != nil && GreenlitAt == nil.
-	OperationStateConfirmed = "confirmed"
+	OperationStateConfirmed OperationState = "confirmed"
 	//OperationStateGreenlit is a PendingOperation with ConfirmedAt != nil && GreenlitAt != nil.
-	OperationStateGreenlit = "greenlit"
+	OperationStateGreenlit OperationState = "greenlit"
 	//OperationStateCancelled is a FinishedOperation with OperationOutcomeCancelled.
 	OperationStateCancelled = OperationState(OperationOutcomeCancelled)
 	//OperationStateSucceeded is a FinishedOperation with OperationOutcomeSucceeded.
 	OperationStateSucceeded = OperationState(OperationOutcomeSucceeded)
 	//OperationStateFailed is a FinishedOperation with OperationOutcomeFailed.
 	OperationStateFailed = OperationState(OperationOutcomeFailed)
+	//OperationStateErrored is a FinishedOperation with OperationOutcomeErrored.
+	OperationStateErrored = OperationState(OperationOutcomeErrored)
 )
 
 //State returns the operation's state as a word.

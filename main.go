@@ -356,7 +356,8 @@ func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetTyp
 				logg.Error(err.Error())
 				continue
 			}
-			err = manager.SetAssetSize(res, fields[2], oldSize, newSize)
+			outcome, err := manager.SetAssetSize(res, fields[2], oldSize, newSize)
+			logg.Info("outcome: %s", outcome)
 			if err != nil {
 				logg.Error(err.Error())
 				continue

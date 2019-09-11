@@ -189,7 +189,7 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 		failedOpsByAssetID, err := recentOperationQuery{
 			DB:           h.DB,
 			ResourceID:   dbResource.ID,
-			Outcome:      db.OperationOutcomeFailed,
+			Outcomes:     []db.OperationOutcome{db.OperationOutcomeFailed, db.OperationOutcomeErrored},
 			OverriddenBy: `TRUE`,
 		}.Execute()
 		if respondwith.ErrorText(w, err) {
@@ -237,7 +237,7 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 		succeededOpsByAssetID, err := recentOperationQuery{
 			DB:           h.DB,
 			ResourceID:   dbResource.ID,
-			Outcome:      db.OperationOutcomeSucceeded,
+			Outcomes:     []db.OperationOutcome{db.OperationOutcomeSucceeded},
 			OverriddenBy: fmt.Sprintf(`outcome != '%s'`, db.OperationOutcomeCancelled),
 		}.Execute()
 		if respondwith.ErrorText(w, err) {
@@ -268,13 +268,13 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 type recentOperationQuery struct {
 	DB           *gorp.DbMap
 	ResourceID   int64
-	Outcome      db.OperationOutcome
+	Outcomes     []db.OperationOutcome
 	OverriddenBy string //contains a condition for an SQL WHERE clause
 }
 
-//This returns the most recent finished operation matching `outcome = $2` for
+//This returns the most recent finished operation with the outcomes `%[2]s` for
 //each asset with `resource_id = $1`, unless there is a newer finished
-//operation matching `%s`.
+//operation matching `%[1]s`.
 var recentOperationQueryStr = `
 	WITH tmp AS (
 		SELECT asset_id, MAX(finished_at) AS max_finished_at
@@ -285,14 +285,22 @@ var recentOperationQueryStr = `
 	SELECT o.* FROM finished_operations o
 	  JOIN tmp ON tmp.asset_id = o.asset_id AND tmp.max_finished_at = o.finished_at
 	  JOIN assets a ON a.id = o.asset_id
-	 WHERE a.resource_id = $1 AND o.outcome = $2
+	 WHERE a.resource_id = $1 AND o.outcome IN ('%s')
 `
 
 func (q recentOperationQuery) Execute() (map[int64]db.FinishedOperation, error) {
-	queryStr := fmt.Sprintf(recentOperationQueryStr, q.OverriddenBy)
+	outcomes := make([]string, len(q.Outcomes))
+	for idx, o := range q.Outcomes {
+		outcomes[idx] = string(o)
+	}
+
+	queryStr := fmt.Sprintf(recentOperationQueryStr,
+		q.OverriddenBy,
+		strings.Join(outcomes, "', '"), //interpolating string constants into the query is safe here because q.Outcomes is always hardcoded
+	)
 
 	var matchingOps []db.FinishedOperation
-	_, err := q.DB.Select(&matchingOps, queryStr, q.ResourceID, q.Outcome)
+	_, err := q.DB.Select(&matchingOps, queryStr, q.ResourceID)
 	if err != nil {
 		return nil, err
 	}

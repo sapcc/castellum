@@ -21,6 +21,7 @@ package plugins
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
@@ -133,14 +134,14 @@ func (m *assetManagerProjectQuota) ListAssets(res db.Resource) ([]string, error)
 }
 
 //SetAssetSize implements the core.AssetManager interface.
-func (m *assetManagerProjectQuota) SetAssetSize(res db.Resource, projectID string, oldSize, newSize uint64) error {
+func (m *assetManagerProjectQuota) SetAssetSize(res db.Resource, projectID string, oldSize, newSize uint64) (db.OperationOutcome, error) {
 	info, err := m.parseAssetType(res.AssetType)
 	if err != nil {
-		return err
+		return db.OperationOutcomeErrored, err
 	}
 	project, err := m.Provider.GetProject(projectID)
 	if err != nil {
-		return err
+		return db.OperationOutcomeErrored, err
 	}
 
 	srvQuotaReq := limes.ServiceQuotaRequest{}
@@ -153,7 +154,18 @@ func (m *assetManagerProjectQuota) SetAssetSize(res db.Resource, projectID strin
 		logg.Info("encountered non-critical error while setting %s/%s quota on project %s: %q",
 			info.ServiceType, info.ResourceName, projectID, string(respBytes))
 	}
-	return err
+	if err != nil {
+		if isUserError(err) {
+			return db.OperationOutcomeFailed, err
+		}
+		return db.OperationOutcomeErrored, err
+	}
+	return db.OperationOutcomeSucceeded, nil
+}
+
+func isUserError(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "got 409 instead") && strings.Contains(msg, "domain quota exceeded")
 }
 
 //GetAssetStatus implements the core.AssetManager interface.

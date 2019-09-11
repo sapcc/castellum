@@ -123,13 +123,13 @@ func TestFailingResize(tBase *testing.T) {
 	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock) {
 		setupAssetResizeTest(t, c, amStatic, 1)
 
-		//add a greenlit PendingOperation that will fail in SetAssetSize()
+		//add a greenlit PendingOperation
 		clock.StepBy(10 * time.Minute)
 		pendingOp := db.PendingOperation{
 			AssetID:      1,
 			Reason:       db.OperationReasonLow,
 			OldSize:      1000,
-			NewSize:      400, //will fail because `new_size < usage` (usage = 500, see above)
+			NewSize:      600,
 			UsagePercent: 50,
 			CreatedAt:    c.TimeNow().Add(-10 * time.Minute),
 			ConfirmedAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
@@ -137,7 +137,59 @@ func TestFailingResize(tBase *testing.T) {
 		}
 		t.Must(c.DB.Insert(&pendingOp))
 
+		amStatic.SetAssetSizeFails = true
+		_, err := c.ExecuteNextResize()
+		t.Must(err)
+
 		//check that resizing fails as expected
+		t.ExpectPendingOperations(c.DB /*, nothing */)
+		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
+			AssetID:      1,
+			Reason:       db.OperationReasonLow,
+			OldSize:      1000,
+			NewSize:      600,
+			UsagePercent: 50,
+			CreatedAt:    c.TimeNow().Add(-10 * time.Minute),
+			ConfirmedAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
+			GreenlitAt:   p2time(c.TimeNow().Add(-5 * time.Minute)),
+			FinishedAt:   c.TimeNow(),
+			Outcome:      db.OperationOutcomeFailed,
+			ErrorMessage: "SetAssetSize failing as requested",
+		})
+
+		//check that asset does not have an ExpectedSize
+		t.ExpectAssets(c.DB, db.Asset{
+			ID:           1,
+			ResourceID:   1,
+			UUID:         "asset1",
+			Size:         1000,
+			UsagePercent: 50,
+			ScrapedAt:    p2time(c.TimeNow().Add(-10 * time.Minute)),
+			ExpectedSize: nil,
+		})
+	})
+}
+
+func TestErroringResize(tBase *testing.T) {
+	t := test.T{T: tBase}
+	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock) {
+		setupAssetResizeTest(t, c, amStatic, 1)
+
+		//add a greenlit PendingOperation that will error in SetAssetSize()
+		clock.StepBy(10 * time.Minute)
+		pendingOp := db.PendingOperation{
+			AssetID:      1,
+			Reason:       db.OperationReasonLow,
+			OldSize:      1000,
+			NewSize:      400, //will error because `new_size < usage` (usage = 500, see above)
+			UsagePercent: 50,
+			CreatedAt:    c.TimeNow().Add(-10 * time.Minute),
+			ConfirmedAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
+			GreenlitAt:   p2time(c.TimeNow().Add(-5 * time.Minute)),
+		}
+		t.Must(c.DB.Insert(&pendingOp))
+
+		//check that resizing errors as expected
 		_, err := c.ExecuteNextResize()
 		t.Must(err)
 		t.ExpectPendingOperations(c.DB /*, nothing */)
@@ -151,7 +203,7 @@ func TestFailingResize(tBase *testing.T) {
 			ConfirmedAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
 			GreenlitAt:   p2time(c.TimeNow().Add(-5 * time.Minute)),
 			FinishedAt:   c.TimeNow(),
-			Outcome:      db.OperationOutcomeFailed,
+			Outcome:      db.OperationOutcomeErrored,
 			ErrorMessage: "cannot set size smaller than current usage",
 		})
 
