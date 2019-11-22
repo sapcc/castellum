@@ -187,6 +187,7 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	c := tasks.Context{DB: dbi, Team: team}
 	c.ApplyDefaults()
 	c.InitializeScrapingCounters()
+	prometheus.MustRegister(tasks.StateMetricsCollector{Context: c})
 
 	for _, manager := range team {
 		for _, info := range manager.AssetTypes() {

@@ -106,6 +106,7 @@ Each component (API, observer and worker) exposes Prometheus metrics via HTTP, o
 | Metric/Component | Description |
 | ---------------- | ----------- |
 | `castellum_operation_state_transitions`<br/>(API, observer, worker) | Counter for state transitions of operations.<br/>Labels: `project_id`, `asset` (asset type), `from_state` and `to_state`. |
+| `castellum_has_project_resource`<br/>(observer) | Constant value of 1 for each existing project resource. This can be used in alert expressions to distinguish resources with autoscaling from resources without autoscaling.<br/>Labels: `project_id`, `asset` (asset type). |
 | `castellum_successful_resource_scrapes`<br/>(observer) | Counter for successful resource scrape operations.<br/>Labels: `asset` (asset type). |
 | `castellum_failed_resource_scrapes`<br/>(observer) | Counter for failed resource scrape operations.<br/>Labels: `asset` (asset type). |
 | `castellum_successful_asset_scrapes`<br/>(observer) | Counter for successful asset scrape operations.<br/>Labels: `asset` (asset type). |
