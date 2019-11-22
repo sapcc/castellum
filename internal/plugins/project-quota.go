@@ -144,8 +144,10 @@ func (m *assetManagerProjectQuota) SetAssetSize(res db.Resource, projectID strin
 		return db.OperationOutcomeErrored, err
 	}
 
-	srvQuotaReq := limes.ServiceQuotaRequest{}
-	srvQuotaReq[info.ResourceName] = limes.ValueWithUnit{Value: newSize, Unit: info.Unit}
+	srvQuotaReq := limes.ServiceQuotaRequest{
+		Resources: make(limes.ResourceQuotaRequest),
+	}
+	srvQuotaReq.Resources[info.ResourceName] = limes.ValueWithUnit{Value: newSize, Unit: info.Unit}
 	quotaReq := limes.QuotaRequest{}
 	quotaReq[info.ServiceType] = srvQuotaReq
 

@@ -47,7 +47,7 @@ type ClientOptions struct {
 	// Configures whether SDK should generate and attach stacktraces to pure capture message calls.
 	AttachStacktrace bool
 	// The sample rate for event submission (0.0 - 1.0, defaults to 1.0).
-	SampleRate float32
+	SampleRate float64
 	// List of regexp strings that will be used to match against event's message
 	// and if applicable, caught errors type and value.
 	// If the match is found, then a whole event will be dropped.
@@ -84,7 +84,7 @@ type ClientOptions struct {
 	// This will default to the `HTTPS_PROXY` environment variable
 	// or `http_proxy` if that one exists.
 	HTTPSProxy string
-	// An optionsl CaCerts to use.
+	// An optional CaCerts to use.
 	// Defaults to `gocertifi.CACerts()`.
 	CaCerts *x509.CertPool
 }
@@ -120,14 +120,13 @@ func NewClient(options ClientOptions) (*Client, error) {
 		options.Environment = os.Getenv("SENTRY_ENVIRONMENT")
 	}
 
-	dsn, err := NewDsn(options.Dsn)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if dsn == nil {
-		Logger.Println("Sentry client initialized with an empty DSN")
+	var dsn *Dsn
+	if options.Dsn != "" {
+		var err error
+		dsn, err = NewDsn(options.Dsn)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	client := Client{
@@ -145,7 +144,11 @@ func (client *Client) setupTransport() {
 	transport := client.options.Transport
 
 	if transport == nil {
-		transport = NewHTTPTransport()
+		if client.options.Dsn == "" {
+			transport = new(noopTransport)
+		} else {
+			transport = NewHTTPTransport()
+		}
 	}
 
 	transport.Configure(client.options)
@@ -154,6 +157,7 @@ func (client *Client) setupTransport() {
 
 func (client *Client) setupIntegrations() {
 	integrations := []Integration{
+		new(contextifyFramesIntegration),
 		new(environmentIntegration),
 		new(modulesIntegration),
 		new(ignoreErrorsIntegration),
@@ -312,9 +316,9 @@ func (client *Client) processEvent(event *Event, hint *EventHint, scope EventMod
 	// which means that if someone uses ClientOptions{} struct directly
 	// and we would not check for 0 here, we'd skip all events by default
 	if options.SampleRate != 0.0 {
-		randomFloat := rand.New(rand.NewSource(time.Now().UnixNano())).Float32()
+		randomFloat := rand.New(rand.NewSource(time.Now().UnixNano())).Float64()
 		if randomFloat > options.SampleRate {
-			Logger.Println("Event dropped due to SampleRate hit")
+			Logger.Println("Event dropped due to SampleRate hit.")
 			return nil
 		}
 	}
@@ -329,7 +333,7 @@ func (client *Client) processEvent(event *Event, hint *EventHint, scope EventMod
 			h = hint
 		}
 		if event = options.BeforeSend(event, h); event == nil {
-			Logger.Println("Event dropped due to BeforeSend callback")
+			Logger.Println("Event dropped due to BeforeSend callback.")
 			return nil
 		}
 	}

@@ -1,8 +1,77 @@
 # Changelog
 
+## Unreleased
+
+- "I am running away from my responsibilities. And it feels good." – Michael Scott, Season 4, "Money"
+
+## v0.3.1
+
+- feat: Send extra information exposed by the Go runtime (#76)
+- fix: Handle new lines in module integration (#65)
+- fix: Make sure that cache is locked when updating for contextifyFramesIntegration
+- ref: Update Iris integration and example to version 12
+- misc: Remove indirect dependencies in order to move them to separate go.mod files
+
+## v0.3.0
+
+- feat: Retry event marshalling without contextual data if the first pass fails
+- fix: Include `url.Parse` error in `DsnParseError`
+- fix: Make more `Scope` methods safe for concurrency
+- fix: Synchronize concurrent access to `Hub.client`
+- ref: Remove mutex from `Scope` exported API
+- ref: Remove mutex from `Hub` exported API
+- ref: Compile regexps for `filterFrames` only once
+- ref: Change `SampleRate` type to `float64`
+- doc: `Scope.Clear` not safe for concurrent use
+- ci: Test sentry-go with `go1.13`, drop `go1.10`
+
+_NOTE:_
+This version removes some of the internal APIs that landed publicly (namely `Hub/Scope` mutex structs) and may require (but shouldn't) some changes to your code.
+It's not done through major version update, as we are still in `0.x` stage.
+
+## v0.2.1
+
+- fix: Run `Contextify` integration on `Threads` as well
+
+## v0.2.0
+
+- feat: Add `SetTransaction()` method on the `Scope`
+- feat: `fasthttp` framework support with `sentryfasthttp` package
+- fix: Add `RWMutex` locks to internal `Hub` and `Scope` changes
+
+## v0.1.3
+
+- feat: Move frames context reading into `contextifyFramesIntegration` (#28)
+
+_NOTE:_
+In case of any performance issues due to source contexts IO, you can let us know and turn off the integration in the meantime with:
+
+```go
+sentry.Init(sentry.ClientOptions{
+	Integrations: func(integrations []sentry.Integration) []sentry.Integration {
+		var filteredIntegrations []sentry.Integration
+		for _, integration := range integrations {
+			if integration.Name() == "ContextifyFrames" {
+				continue
+			}
+			filteredIntegrations = append(filteredIntegrations, integration)
+		}
+		return filteredIntegrations
+	},
+})
+```
+
+## v0.1.2
+
+- feat: Better source code location resolution and more useful inapp frames (#26)
+- feat: Use `noopTransport` when no `Dsn` provided (#27)
+- ref: Allow empty `Dsn` instead of returning an error (#22)
+- fix: Use `NewScope` instead of literal struct inside a `scope.Clear` call (#24)
+- fix: Add to `WaitGroup` before the request is put inside a buffer (#25)
+
 ## v0.1.1
 
-- fix: Check for initialized Client in AddBreadcrumbs (#20)
+- fix: Check for initialized `Client` in `AddBreadcrumbs` (#20)
 - build: Bump version when releasing with Craft (#19)
 
 ## v0.1.0

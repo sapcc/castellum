@@ -64,6 +64,34 @@ func retryAfter(now time.Time, r *http.Response) time.Duration {
 	return defaultRetryAfter
 }
 
+func getRequestBodyFromEvent(event *Event) []byte {
+	body, err := json.Marshal(event)
+	if err == nil {
+		return body
+	}
+
+	partialMarshallMessage := "Original event couldn't be marshalled. Succeeded by stripping the data " +
+		"that uses interface{} type. Please verify that the data you attach to the scope is serializable."
+	// Try to serialize the event, with all the contextual data that allows for interface{} stripped.
+	event.Breadcrumbs = nil
+	event.Contexts = nil
+	event.Extra = map[string]interface{}{
+		"info": partialMarshallMessage,
+	}
+	body, err = json.Marshal(event)
+	if err == nil {
+		Logger.Println(partialMarshallMessage)
+		return body
+	}
+
+	// This should _only_ happen when Event.Exception[0].Stacktrace.Frames[0].Vars is unserializable
+	// Which won't ever happen, as we don't use it now (although it's the part of public interface accepted by Sentry)
+	// Juuust in case something, somehow goes utterly wrong.
+	Logger.Println("Event couldn't be marshalled, even with stripped contextual data. Skipping delivery. " +
+		"Please notify the SDK owners with possibly broken payload.")
+	return nil
+}
+
 // ================================
 // HTTPTransport
 // ================================
@@ -131,7 +159,10 @@ func (t *HTTPTransport) SendEvent(event *Event) {
 		return
 	}
 
-	body, _ := json.Marshal(event)
+	body := getRequestBodyFromEvent(event)
+	if body == nil {
+		return
+	}
 
 	request, _ := http.NewRequest(
 		http.MethodPost,
@@ -143,6 +174,8 @@ func (t *HTTPTransport) SendEvent(event *Event) {
 		request.Header.Set(headerKey, headerValue)
 	}
 
+	t.wg.Add(1)
+
 	select {
 	case t.buffer <- request:
 		Logger.Printf(
@@ -152,9 +185,9 @@ func (t *HTTPTransport) SendEvent(event *Event) {
 			t.dsn.host,
 			t.dsn.projectID,
 		)
-		t.wg.Add(1)
 	default:
-		Logger.Println("Event dropped due to transport buffer being full")
+		t.wg.Done()
+		Logger.Println("Event dropped due to transport buffer being full.")
 		// worker would block, drop the packet
 	}
 }
@@ -171,10 +204,10 @@ func (t *HTTPTransport) Flush(timeout time.Duration) bool {
 
 	select {
 	case <-c:
-		Logger.Println("Buffer flushed successfully")
+		Logger.Println("Buffer flushed successfully.")
 		return true
 	case <-time.After(timeout):
-		Logger.Println("Buffer flushing reached the timeout")
+		Logger.Println("Buffer flushing reached the timeout.")
 		return false
 	}
 }
@@ -255,7 +288,10 @@ func (t *HTTPSyncTransport) SendEvent(event *Event) {
 		return
 	}
 
-	body, _ := json.Marshal(event)
+	body := getRequestBodyFromEvent(event)
+	if body == nil {
+		return
+	}
 
 	request, _ := http.NewRequest(
 		http.MethodPost,
@@ -290,5 +326,25 @@ func (t *HTTPSyncTransport) SendEvent(event *Event) {
 // Flush notifies when all the buffered events have been sent by returning `true`
 // or `false` if timeout was reached. No-op for HTTPSyncTransport.
 func (t *HTTPSyncTransport) Flush(_ time.Duration) bool {
+	return true
+}
+
+// ================================
+// noopTransport
+// ================================
+
+// noopTransport is an implementation of `Transport` interface which drops all the events.
+// Only used internally when an empty DSN is provided, which effectively disables the SDK.
+type noopTransport struct{}
+
+func (t *noopTransport) Configure(options ClientOptions) {
+	Logger.Println("Sentry client initialized with an empty DSN. Using noopTransport. No events will be delivered.")
+}
+
+func (t *noopTransport) SendEvent(event *Event) {
+	Logger.Println("Event dropped due to noopTransport usage.")
+}
+
+func (t *noopTransport) Flush(_ time.Duration) bool {
 	return true
 }

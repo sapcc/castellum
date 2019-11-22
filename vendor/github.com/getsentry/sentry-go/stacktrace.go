@@ -1,6 +1,7 @@
 package sentry
 
 import (
+	"go/build"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -9,7 +10,12 @@ import (
 )
 
 const unknown string = "unknown"
-const contextLines int = 5
+
+// nolint: gochecknoglobals
+var (
+	isTestFileRegexp    = regexp.MustCompile(`getsentry/sentry-go/.+_test.go`)
+	isExampleFileRegexp = regexp.MustCompile(`getsentry/sentry-go/example/`)
+)
 
 // The module download is split into two parts: downloading the go.mod and downloading the actual code.
 // If you have dependencies only needed for tests, then they will show up in your go.mod,
@@ -35,7 +41,6 @@ func NewStacktrace() *Stacktrace {
 
 	frames := extractFrames(pcs[:n])
 	frames = filterFrames(frames)
-	frames = contextifyFrames(frames)
 
 	stacktrace := Stacktrace{
 		Frames: frames,
@@ -62,7 +67,6 @@ func ExtractStacktrace(err error) *Stacktrace {
 
 	frames := extractFrames(pcs)
 	frames = filterFrames(frames)
-	frames = contextifyFrames(frames)
 
 	stacktrace := Stacktrace{
 		Frames: frames,
@@ -201,8 +205,6 @@ func extractFrames(pcs []uintptr) []Frame {
 }
 
 func filterFrames(frames []Frame) []Frame {
-	isTestFileRegexp := regexp.MustCompile(`getsentry/sentry-go/.+_test.go`)
-	isExampleFileRegexp := regexp.MustCompile(`getsentry/sentry-go/example/`)
 	filteredFrames := make([]Frame, 0, len(frames))
 
 	for _, frame := range frames {
@@ -224,60 +226,19 @@ func filterFrames(frames []Frame) []Frame {
 	return filteredFrames
 }
 
-var sr = newSourceReader() // nolint: gochecknoglobals
-
-func contextifyFrames(frames []Frame) []Frame {
-	contextifiedFrames := make([]Frame, 0, len(frames))
-
-	for _, frame := range frames {
-		var path string
-
-		// If we are not able to read the source code from either absolute or relative path (root dir only)
-		// Skip this part and return the original frame
-		switch {
-		case fileExists(frame.AbsPath):
-			path = frame.AbsPath
-		case fileExists(frame.Filename):
-			path = frame.Filename
-		default:
-			contextifiedFrames = append(contextifiedFrames, frame)
-			continue
-		}
-
-		lines, initial := sr.readContextLines(path, frame.Lineno, contextLines)
-
-		for i, line := range lines {
-			switch {
-			case i < initial:
-				frame.PreContext = append(frame.PreContext, string(line))
-			case i == initial:
-				frame.ContextLine = string(line)
-			default:
-				frame.PostContext = append(frame.PostContext, string(line))
-			}
-		}
-
-		contextifiedFrames = append(contextifiedFrames, frame)
-	}
-
-	return contextifiedFrames
-}
-
 func extractFilename(path string) string {
 	_, file := filepath.Split(path)
 	return file
 }
 
 func isInAppFrame(frame Frame) bool {
-	if frame.Module == "main" {
-		return true
+	if strings.HasPrefix(frame.AbsPath, build.Default.GOROOT) ||
+		strings.Contains(frame.Module, "vendor") ||
+		strings.Contains(frame.Module, "third_party") {
+		return false
 	}
 
-	if !strings.Contains(frame.Module, "vendor") && !strings.Contains(frame.Module, "third_party") {
-		return true
-	}
-
-	return false
+	return true
 }
 
 // Transform `runtime/debug.*T·ptrmethod` into `{ module: runtime/debug, function: *T.ptrmethod }`

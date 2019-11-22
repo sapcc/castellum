@@ -9,6 +9,7 @@
 
 [![Build Status](https://travis-ci.com/getsentry/sentry-go.svg?branch=master)](https://travis-ci.com/getsentry/sentry-go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/getsentry/sentry-go)](https://goreportcard.com/report/github.com/getsentry/sentry-go)
+[![Discord](https://img.shields.io/discord/621778831602221064)](https://discord.gg/Ww9hbqr)
 
 `sentry-go` provides a Sentry client implementation for the Go programming language. This is the next line of the Go SDK for [Sentry](https://sentry.io/), intended to replace the `raven-go` package.
 
@@ -17,11 +18,11 @@
 
 ## Requirements
 
-We verify this package against N-2 recent versions of Go compiler. As of June 2019, those versions are:
+We verify this package against N-2 recent versions of Go compiler. As of September 2019, those versions are:
 
-* 1.10
 * 1.11
 * 1.12
+* 1.13
 
 ## Installation
 
@@ -34,7 +35,7 @@ $ go get github.com/getsentry/sentry-go
 Or, if you are already using Go Modules, specify a version number as well:
 
 ```bash
-$ go get github.com/getsentry/sentry-go@v0.1.0
+$ go get github.com/getsentry/sentry-go@v0.3.0
 ```
 
 ## Configuration
@@ -84,6 +85,7 @@ For more detailed information about how to get the most out of `sentry-go` there
 - [Integrations](https://docs.sentry.io/platforms/go/integrations)
   - [net/http](https://docs.sentry.io/platforms/go/http)
   - [echo](https://docs.sentry.io/platforms/go/echo)
+  - [fasthttp](https://docs.sentry.io/platforms/go/fasthttp)
   - [gin](https://docs.sentry.io/platforms/go/gin)
   - [iris](https://docs.sentry.io/platforms/go/iris)
   - [martini](https://docs.sentry.io/platforms/go/martini)
@@ -104,4 +106,4 @@ Licensed under the BSD license, see `LICENSE`
 
 Want to join our Sentry's `community-golang` channel, get involved and help us improve the SDK?
 
-Do not hesistate to shoot me up an email at [kamil@sentry.io](mailto:kamil@sentry.io) for Slack invite!
+Do not hesitate to shoot me up an email at [kamil@sentry.io](mailto:kamil@sentry.io) for Slack invite!

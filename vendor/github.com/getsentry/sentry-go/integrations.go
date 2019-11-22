@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 )
 
 // ================================
@@ -18,6 +19,7 @@ import (
 type modulesIntegration struct{}
 
 var _modulesCache map[string]string // nolint: gochecknoglobals
+var _modulesCached bool             // nolint: gochecknoglobals
 
 func (mi *modulesIntegration) Name() string {
 	return "Modules"
@@ -28,7 +30,7 @@ func (mi *modulesIntegration) SetupOnce(client *Client) {
 }
 
 func (mi *modulesIntegration) processor(event *Event, hint *EventHint) *Event {
-	if event.Modules == nil {
+	if len(event.Modules) == 0 {
 		event.Modules = extractModules()
 	}
 
@@ -36,10 +38,11 @@ func (mi *modulesIntegration) processor(event *Event, hint *EventHint) *Event {
 }
 
 func extractModules() map[string]string {
-	if _modulesCache != nil {
+	if _modulesCached {
 		return _modulesCache
 	}
 
+	_modulesCached = true
 	extractedModules, err := getModules()
 	if err != nil {
 		Logger.Printf("ModuleIntegration wasn't able to extract modules: %v\n", err)
@@ -94,7 +97,7 @@ func getModulesFromMod() (map[string]string, error) {
 				modules[strings.TrimSpace(splits[1])] = splits[2]
 				return modules, nil
 			}
-		} else if areModulesPresent && splits[0] != ")" {
+		} else if areModulesPresent && splits[0] != ")" && splits[0] != "" {
 			modules[strings.TrimSpace(splits[0])] = splits[1]
 		}
 	}
@@ -193,8 +196,11 @@ func (ei *environmentIntegration) processor(event *Event, hint *EventHint) *Even
 	}
 
 	event.Contexts["runtime"] = map[string]interface{}{
-		"name":    "go",
-		"version": runtime.Version(),
+		"name":           "go",
+		"version":        runtime.Version(),
+		"go_numroutines": runtime.NumGoroutine(),
+		"go_maxprocs":    runtime.GOMAXPROCS(0),
+		"go_numcgocalls": runtime.NumCgoCall(),
 	}
 
 	return event
@@ -259,4 +265,119 @@ func getIgnoreErrorsSuspects(event *Event) []string {
 	}
 
 	return suspects
+}
+
+// ================================
+// Contextify Frames Integration
+// ================================
+
+type contextifyFramesIntegration struct {
+	sr              sourceReader
+	contextLines    int
+	cachedLocations sync.Map
+}
+
+func (cfi *contextifyFramesIntegration) Name() string {
+	return "ContextifyFrames"
+}
+
+func (cfi *contextifyFramesIntegration) SetupOnce(client *Client) {
+	cfi.sr = newSourceReader()
+	cfi.contextLines = 5
+
+	client.AddEventProcessor(cfi.processor)
+}
+
+func (cfi *contextifyFramesIntegration) processor(event *Event, hint *EventHint) *Event {
+	// Range over all exceptions
+	for _, ex := range event.Exception {
+		// If it has no stacktrace, just bail out
+		if ex.Stacktrace == nil {
+			continue
+		}
+
+		// If it does, it should have frames, so try to contextify them
+		ex.Stacktrace.Frames = cfi.contextify(ex.Stacktrace.Frames)
+	}
+
+	// Range over all threads
+	for _, th := range event.Threads {
+		// If it has no stacktrace, just bail out
+		if th.Stacktrace == nil {
+			continue
+		}
+
+		// If it does, it should have frames, so try to contextify them
+		th.Stacktrace.Frames = cfi.contextify(th.Stacktrace.Frames)
+	}
+
+	return event
+}
+
+func (cfi *contextifyFramesIntegration) contextify(frames []Frame) []Frame {
+	contextifiedFrames := make([]Frame, 0, len(frames))
+
+	for _, frame := range frames {
+		if !frame.InApp {
+			contextifiedFrames = append(contextifiedFrames, frame)
+			continue
+		}
+
+		var path string
+
+		if cachedPath, ok := cfi.cachedLocations.Load(frame.AbsPath); ok {
+			if p, ok := cachedPath.(string); ok {
+				path = p
+			}
+		} else {
+			// Optimize for happy path here
+			if fileExists(frame.AbsPath) {
+				path = frame.AbsPath
+			} else {
+				path = cfi.findNearbySourceCodeLocation(frame.AbsPath)
+			}
+		}
+
+		if path == "" {
+			contextifiedFrames = append(contextifiedFrames, frame)
+			continue
+		}
+
+		lines, contextLine := cfi.sr.readContextLines(path, frame.Lineno, cfi.contextLines)
+		contextifiedFrames = append(contextifiedFrames, cfi.addContextLinesToFrame(frame, lines, contextLine))
+	}
+
+	return contextifiedFrames
+}
+
+func (cfi *contextifyFramesIntegration) findNearbySourceCodeLocation(originalPath string) string {
+	trimmedPath := strings.TrimPrefix(originalPath, "/")
+	components := strings.Split(trimmedPath, "/")
+
+	for len(components) > 0 {
+		components = components[1:]
+		possibleLocation := strings.Join(components, "/")
+
+		if fileExists(possibleLocation) {
+			cfi.cachedLocations.Store(originalPath, possibleLocation)
+			return possibleLocation
+		}
+	}
+
+	cfi.cachedLocations.Store(originalPath, "")
+	return ""
+}
+
+func (cfi *contextifyFramesIntegration) addContextLinesToFrame(frame Frame, lines [][]byte, contextLine int) Frame {
+	for i, line := range lines {
+		switch {
+		case i < contextLine:
+			frame.PreContext = append(frame.PreContext, string(line))
+		case i == contextLine:
+			frame.ContextLine = string(line)
+		default:
+			frame.PostContext = append(frame.PostContext, string(line))
+		}
+	}
+	return frame
 }
