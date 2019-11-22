@@ -18,7 +18,10 @@
 
 package api
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sapcc/go-bits/sre"
+)
 
 var (
 	auditEventPublishSuccessCounter = prometheus.NewCounter(
@@ -33,7 +36,24 @@ var (
 		})
 )
 
+var (
+	//taken from <https://github.com/sapcc/helm-charts/blob/20f70f7071fcc03c3cee3f053ddc7e3989a05ae8/openstack/swift/etc/statsd-exporter.yaml#L23>
+	httpDurationBuckets = []float64{0.025, 0.1, 0.25, 1, 2.5}
+
+	//1024 and 8192 indicate that the request/response probably fits inside a single
+	//ethernet frame or jumboframe, respectively
+	httpBodySizeBuckets = []float64{1024, 8192, 1000000, 10000000}
+)
+
 func init() {
 	prometheus.MustRegister(auditEventPublishSuccessCounter)
 	prometheus.MustRegister(auditEventPublishFailedCounter)
+
+	sre.Init(sre.Config{
+		AppName:                  "castellum-api",
+		FirstByteDurationBuckets: httpDurationBuckets,
+		ResponseDurationBuckets:  httpDurationBuckets,
+		RequestBodySizeBuckets:   httpBodySizeBuckets,
+		ResponseBodySizeBuckets:  httpBodySizeBuckets,
+	})
 }

@@ -15,15 +15,14 @@ require (
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/onsi/ginkgo v1.10.1 // indirect
 	github.com/onsi/gomega v1.7.0 // indirect
-	github.com/prometheus/client_golang v0.9.2
-	github.com/prometheus/common v0.0.0-20181126121408-4724e9255275
+	github.com/prometheus/client_golang v1.2.1
+	github.com/prometheus/common v0.7.0
 	github.com/rs/cors v1.6.0
-	github.com/sapcc/go-bits v0.0.0-20190910095551-3863bd6b4943
+	github.com/sapcc/go-bits v0.0.0-20191122123627-1aca436e94ad
 	github.com/sapcc/gophercloud-limes v0.0.0-20190319123021-2ed8e1224541
 	github.com/sapcc/hermes v0.0.0-20190722215605-d772f40f9fc6
 	github.com/sapcc/limes v0.0.0-20190717102825-38fa8ff99ef5
 	github.com/ziutek/mymysql v1.5.4 // indirect
-	golang.org/x/sys v0.0.0-20190610200419-93c9922d18ae // indirect
 	google.golang.org/appengine v1.6.2 // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 	gopkg.in/gorp.v2 v2.0.0

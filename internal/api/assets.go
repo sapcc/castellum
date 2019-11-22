@@ -26,6 +26,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/respondwith"
+	"github.com/sapcc/go-bits/sre"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -181,6 +182,7 @@ func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string, res *db.
 // HTTP handlers
 
 func (h handler) GetAssets(w http.ResponseWriter, r *http.Request) {
+	sre.IdentifyEndpoint(r, "/v1/projects/:id/assets/:type")
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
 		return
@@ -210,6 +212,7 @@ func (h handler) GetAssets(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
+	sre.IdentifyEndpoint(r, "/v1/projects/:id/assets/:type/:uuid")
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
 		return

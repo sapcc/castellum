@@ -152,7 +152,6 @@ func runAPI(dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient *core.Pr
 	//logging)
 	handler := api.NewHandler(dbi, team, &tv, providerClient)
 	handler = logg.Middleware{}.Wrap(handler)
-	handler = prometheus.InstrumentHandler("castellum-api", handler)
 	handler = cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{"HEAD", "GET", "POST", "PUT", "DELETE"},

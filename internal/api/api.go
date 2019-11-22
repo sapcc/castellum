@@ -34,6 +34,7 @@ import (
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/respondwith"
+	"github.com/sapcc/go-bits/sre"
 	"gopkg.in/gorp.v2"
 )
 
@@ -96,7 +97,7 @@ func (h *handler) BuildRouter() http.Handler {
 		Path(`/v1/operations/recently-succeeded`).
 		HandlerFunc(h.GetRecentlySucceededOperations)
 
-	return router
+	return sre.Instrument(router)
 }
 
 //RequireJSON will parse the request body into the given data structure, or

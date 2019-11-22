@@ -211,7 +211,10 @@ func (m *assetManagerNFS) getMetricForShare(projectUUID, shareUUID, metric strin
 }
 
 func prometheusGetSingleValue(api prom_v1.API, queryStr string) (float64, error) {
-	value, err := api.Query(context.Background(), queryStr, time.Now())
+	value, warnings, err := api.Query(context.Background(), queryStr, time.Now())
+	for _, warning := range warnings {
+		logg.Info("Prometheus query produced warning: %s", warning)
+	}
 	if err != nil {
 		return 0, fmt.Errorf("Prometheus query failed: %s: %s", queryStr, err.Error())
 	}
