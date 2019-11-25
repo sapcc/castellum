@@ -21,6 +21,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -41,6 +42,7 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/tasks"
 	"github.com/sapcc/go-bits/gopherpolicy"
+	"github.com/sapcc/go-bits/httpee"
 	"github.com/sapcc/go-bits/logg"
 	"gopkg.in/gorp.v2"
 
@@ -165,7 +167,10 @@ func runAPI(dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient *core.Pr
 	http.Handle("/healthcheck", http.HandlerFunc(healthCheckHandler))
 
 	logg.Info("listening on " + httpListenAddr)
-	logg.Error(http.ListenAndServe(httpListenAddr, nil).Error())
+	err = httpee.ListenAndServeContext(httpee.ContextWithSIGINT(context.Background()), httpListenAddr, nil)
+	if err != nil {
+		logg.Error(err.Error())
+	}
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
@@ -215,7 +220,10 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/healthcheck", http.HandlerFunc(healthCheckHandler))
 	logg.Info("listening on " + httpListenAddr)
-	logg.Error(http.ListenAndServe(httpListenAddr, nil).Error())
+	err := httpee.ListenAndServeContext(httpee.ContextWithSIGINT(context.Background()), httpListenAddr, nil)
+	if err != nil {
+		logg.Error(err.Error())
+	}
 }
 
 //Execute a task repeatedly, but slow down when sql.ErrNoRows is returned by it.
@@ -254,7 +262,10 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/healthcheck", http.HandlerFunc(healthCheckHandler))
 	logg.Info("listening on " + httpListenAddr)
-	logg.Error(http.ListenAndServe(httpListenAddr, nil).Error())
+	err := httpee.ListenAndServeContext(httpee.ContextWithSIGINT(context.Background()), httpListenAddr, nil)
+	if err != nil {
+		logg.Error(err.Error())
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////

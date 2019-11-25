@@ -64,6 +64,7 @@ quick-check-%:
 	@env CASTELLUM_AUDIT_SILENT=true $(GO) test $(GO_BUILDFLAGS) -ldflags '$(GO_LDFLAGS)' $(subst _,/,$*)
 
 vendor: FORCE
+	$(GO) mod tidy
 	$(GO) mod vendor
 
 .PHONY: FORCE
