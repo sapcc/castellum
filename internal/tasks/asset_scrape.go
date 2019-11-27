@@ -139,12 +139,12 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 
 	if logScrapes {
 		if status.AbsoluteUsage == nil {
-			logg.Info("observed %s %s at size = %d, usage = %g%%",
+			logg.Info("observed %s %s at size = %d, usage = %.3f%%",
 				assetType, asset.UUID,
 				status.Size, status.UsagePercent,
 			)
 		} else {
-			logg.Info("observed %s %s at size = %d, usage = %d (%g%%)",
+			logg.Info("observed %s %s at size = %d, usage = %d (%.3f%%)",
 				assetType, asset.UUID,
 				status.Size, *status.AbsoluteUsage, status.UsagePercent,
 			)
