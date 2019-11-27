@@ -124,7 +124,7 @@ func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo) (e
 	} else {
 		res.LowThresholdPercent = r.LowThreshold.UsagePercent
 		res.LowDelaySeconds = r.LowThreshold.DelaySeconds
-		if res.LowThresholdPercent > 100 {
+		if res.LowThresholdPercent < 0 || res.LowThresholdPercent > 100 {
 			complain("low threshold must be between 0% and 100% of usage")
 		}
 		if res.LowDelaySeconds == 0 {
@@ -138,7 +138,7 @@ func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo) (e
 	} else {
 		res.HighThresholdPercent = r.HighThreshold.UsagePercent
 		res.HighDelaySeconds = r.HighThreshold.DelaySeconds
-		if res.HighThresholdPercent > 100 {
+		if res.HighThresholdPercent < 0 || res.HighThresholdPercent > 100 {
 			complain("high threshold must be between 0% and 100% of usage")
 		}
 		if res.HighDelaySeconds == 0 {
@@ -150,7 +150,7 @@ func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo) (e
 		res.CriticalThresholdPercent = 0
 	} else {
 		res.CriticalThresholdPercent = r.CriticalThreshold.UsagePercent
-		if res.CriticalThresholdPercent > 100 {
+		if res.CriticalThresholdPercent < 0 || res.CriticalThresholdPercent > 100 {
 			complain("critical threshold must be between 0% and 100% of usage")
 		}
 		if r.CriticalThreshold.DelaySeconds != 0 {

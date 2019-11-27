@@ -473,6 +473,18 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 			"low threshold must be below critical threshold",
 		)
 
+		expectErrors(
+			assert.JSONObject{
+				"low_threshold":      assert.JSONObject{"usage_percent": -0.3, "delay_seconds": 60},
+				"high_threshold":     assert.JSONObject{"usage_percent": -0.2, "delay_seconds": 60},
+				"critical_threshold": assert.JSONObject{"usage_percent": -0.1},
+				"size_steps":         assert.JSONObject{"percent": 10},
+			},
+			"low threshold must be between 0% and 100% of usage",
+			"high threshold must be between 0% and 100% of usage",
+			"critical threshold must be between 0% and 100% of usage",
+		)
+
 		//there's one thing we can only test with a "bar" resource since "bar" has
 		//ReportsAbsoluteUsage = false
 		assert.HTTPRequest{
