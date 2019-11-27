@@ -71,7 +71,8 @@ All components receive configuration via environment variables. The following va
 | `CASTELLUM_SENTRY_DSN` | *(optional)* | DSN for your Sentry project. If this variable is configured then Castellum will report failed backend operations to Sentry. |
 | `CASTELLUM_RABBITMQ_URI` | *(optional)* | RabbitMQ URI as per the [AMQP URI format](https://www.rabbitmq.com/uri-spec.html). If this variable is configured then Castellum will send audit events to the respective RabbitMQ server. |
 | `CASTELLUM_RABBITMQ_QUEUE_NAME` | *(required if `CASTELLUM_RABBITMQ_URI` is configured)* | Name for the queue that will hold the audit events. The events are published to the default exchange. |
-| `CASTELLUM_AUDIT_SILENT` | *(optional)* | Disable audit event logging to standard output. |
+| `CASTELLUM_AUDIT_SILENT` | `false` | Disable audit event logging to standard output. |
+| `CASTELLUM_LOG_SCRAPES` | `false` | Whether to write a log line for each asset scrape operation. This can be useful to debug situations where Castellum does not create operations when it should, but it generates a lot of log traffic (one line per asset per 5 minutes, which e.g. for 2000 assets is about 1 GiB per week). |
 | `OS_...` | *(required)* | A full set of OpenStack auth environment variables for Castellum's service user. See [documentation for openstackclient][os-env] for details. |
 
 ### Oslo policy

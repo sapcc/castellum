@@ -21,6 +21,8 @@ package tasks
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -38,6 +40,12 @@ var scrapeAssetSearchQuery = `
 	ORDER BY a.checked_at ASC, a.id ASC
 	LIMIT 1
 `
+
+var logScrapes bool
+
+func init() {
+	logScrapes, _ = strconv.ParseBool(os.Getenv("CASTELLUM_LOG_SCRAPES"))
+}
 
 //ScrapeNextAsset finds the next asset of the given type that needs scraping
 //and scrapes it, i.e. checks its status and creates/confirms/cancels
@@ -127,6 +135,20 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 		// 	captureSentryException(c.SentryHub, e)
 		// }
 		return e
+	}
+
+	if logScrapes {
+		if status.AbsoluteUsage == nil {
+			logg.Info("observed %s %s at size = %d, usage = %g%%",
+				assetType, asset.UUID,
+				status.Size, status.UsagePercent,
+			)
+		} else {
+			logg.Info("observed %s %s at size = %d, usage = %d (%g%%)",
+				assetType, asset.UUID,
+				status.Size, *status.AbsoluteUsage, status.UsagePercent,
+			)
+		}
 	}
 
 	//update asset attributes - We have four separate cases here, which
