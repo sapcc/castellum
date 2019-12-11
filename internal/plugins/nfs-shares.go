@@ -81,7 +81,7 @@ func (m *assetManagerNFS) CheckResourceAllowed(assetType db.AssetType, scopeUUID
 //ListAssets implements the core.AssetManager interface.
 func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 	page := 0
-	pageSize := 250
+	pageSize := 1000
 	var shareIDs []string
 
 	//TODO: simplify this by adding a shares.List() function to
