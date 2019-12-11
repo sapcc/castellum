@@ -84,10 +84,18 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 	pageSize := 1000
 	var shareIDs []string
 
+	//NOTE: Since Manila uses a shitty pagination strategy (limit/offset instead
+	//of marker), we could miss existing shares or observe them doubly if the
+	//pages shift around (due to creation or deletion of shares) between
+	//requests. Therefore we increment the offset by `pageSize-10` instead of
+	//`pageSize` between pages, so that pages overlap by 10 items. This decreases
+	//the chance of us missing items.
+	wasSeen := make(map[string]bool)
+
 	//TODO: simplify this by adding a shares.List() function to
 	//package github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares
 	for {
-		url := m.Manila.ServiceURL("shares") + fmt.Sprintf("?project_id=%s&all_tenants=1&limit=%d&offset=%d", res.ScopeUUID, pageSize, page*pageSize)
+		url := m.Manila.ServiceURL("shares") + fmt.Sprintf("?project_id=%s&all_tenants=1&limit=%d&offset=%d", res.ScopeUUID, pageSize, page*(pageSize-10))
 		var r gophercloud.Result
 		_, err := m.Manila.Get(url, &r.Body, nil)
 		if err != nil {
@@ -106,7 +114,10 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 
 		if len(data.Shares) > 0 {
 			for _, share := range data.Shares {
-				shareIDs = append(shareIDs, share.ID)
+				if !wasSeen[share.ID] {
+					shareIDs = append(shareIDs, share.ID)
+					wasSeen[share.ID] = true
+				}
 			}
 			page++
 		} else {
