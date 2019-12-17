@@ -128,6 +128,7 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 }
 
 var sizeInconsistencyErrorRx = regexp.MustCompile(`New size for (?:extend must be greater|shrink must be less) than current size`)
+var quotaErrorRx = regexp.MustCompile(`Requested share exceeds allowed project/user or share type \S+ quota.`)
 
 //SetAssetSize implements the core.AssetManager interface.
 func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (db.OperationOutcome, error) {
@@ -144,6 +145,9 @@ func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSiz
 		//If not successful, still return the original error (to avoid confusion).
 	}
 	if err != nil {
+		if quotaErrorRx.MatchString(err.Error()) {
+			return db.OperationOutcomeFailed, err
+		}
 		return db.OperationOutcomeErrored, err
 	}
 	return db.OperationOutcomeSucceeded, nil
