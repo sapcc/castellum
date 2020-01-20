@@ -163,19 +163,19 @@ func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useR
 //GetAssetStatus implements the core.AssetManager interface.
 func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
 	//check status in Prometheus
-	bytesTotal, err := m.getMetricForShare(res.ScopeUUID, assetUUID, "size_total")
+	bytesTotal, err := m.getMetricForShare("netapp_volume_total_bytes", res.ScopeUUID, assetUUID)
 	if err != nil {
 		return core.AssetStatus{}, err
 	}
-	bytesReservedBySnapshots, err := m.getMetricForShare(res.ScopeUUID, assetUUID, "size_reserved_by_snapshots")
+	bytesReservedBySnapshots, err := m.getMetricForShare("netapp_volume_snapshot_reserved_bytes", res.ScopeUUID, assetUUID)
 	if err != nil {
 		return core.AssetStatus{}, err
 	}
-	bytesUsed, err := m.getMetricForShare(res.ScopeUUID, assetUUID, "size_used")
+	bytesUsed, err := m.getMetricForShare("netapp_volume_used_bytes", res.ScopeUUID, assetUUID)
 	if err != nil {
 		return core.AssetStatus{}, err
 	}
-	bytesUsedBySnapshots, err := m.getMetricForShare(res.ScopeUUID, assetUUID, "size_used_by_snapshots")
+	bytesUsedBySnapshots, err := m.getMetricForShare("netapp_volume_snapshot_used_bytes", res.ScopeUUID, assetUUID)
 	if err != nil {
 		return core.AssetStatus{}, err
 	}
@@ -219,9 +219,11 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 	return status, nil
 }
 
-func (m *assetManagerNFS) getMetricForShare(projectUUID, shareUUID, metric string) (float64, error) {
-	query := fmt.Sprintf(`netapp_capacity_svm{project_id=%q,share_id=%q,metric=%q}`,
-		projectUUID, shareUUID, metric)
+func (m *assetManagerNFS) getMetricForShare(metric, projectUUID, shareUUID string) (float64, error) {
+	//NOTE: The `max by (share_id)` is necessary for when a share is being
+	//migrated to another shareserver and thus appears in the metrics twice.
+	query := fmt.Sprintf(`max by (share_id) (%s{project_id=%q,share_id=%q})`,
+		metric, projectUUID, shareUUID)
 	return prometheusGetSingleValue(m.Prometheus, query)
 }
 
