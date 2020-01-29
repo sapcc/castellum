@@ -17,7 +17,7 @@ import (
 
 // Logger is an instance of log.Logger that is use to provide debug information about running Sentry Client
 // can be enabled by either using `Logger.SetOutput` directly or with `Debug` client option
-var Logger = log.New(ioutil.Discard, "[Sentry] ", log.LstdFlags) // nolint: gochecknoglobals
+var Logger = log.New(ioutil.Discard, "[Sentry] ", log.LstdFlags) //nolint: gochecknoglobals
 
 type EventProcessor func(event *Event, hint *EventHint) *Event
 
@@ -25,7 +25,7 @@ type EventModifier interface {
 	ApplyToEvent(event *Event, hint *EventHint) *Event
 }
 
-var globalEventProcessors []EventProcessor // nolint: gochecknoglobals
+var globalEventProcessors []EventProcessor //nolint: gochecknoglobals
 
 func AddGlobalEventProcessor(processor EventProcessor) {
 	globalEventProcessors = append(globalEventProcessors, processor)
@@ -74,7 +74,11 @@ type ClientOptions struct {
 	Environment string
 	// Maximum number of breadcrumbs.
 	MaxBreadcrumbs int
+	// An optional pointer to `http.Client` that will be used with a default HTTPTransport.
+	// Using your own client will make HTTPTransport, HTTPProxy, HTTPSProxy and CaCerts options ignored.
+	HTTPClient *http.Client
 	// An optional pointer to `http.Transport` that will be used with a default HTTPTransport.
+	// Using your own transport will make HTTPProxy, HTTPSProxy and CaCerts options ignored.
 	HTTPTransport *http.Transport
 	// An optional HTTP proxy to use.
 	// This will default to the `http_proxy` environment variable.
@@ -298,11 +302,17 @@ func (client *Client) eventFromException(exception error, level Level) *Event {
 		stacktrace = NewStacktrace()
 	}
 
+	cause := exception
+	// Handle wrapped errors for github.com/pingcap/errors and github.com/pkg/errors
+	if ex, ok := exception.(interface{ Cause() error }); ok {
+		cause = ex.Cause()
+	}
+
 	event := NewEvent()
 	event.Level = level
 	event.Exception = []Exception{{
-		Value:      exception.Error(),
-		Type:       reflect.TypeOf(exception).String(),
+		Value:      cause.Error(),
+		Type:       reflect.TypeOf(cause).String(),
 		Stacktrace: stacktrace,
 	}}
 	return event
@@ -387,7 +397,9 @@ func (client *Client) prepareEvent(event *Event, hint *EventHint, scope EventMod
 		}},
 	}
 
-	event = scope.ApplyToEvent(event, hint)
+	if scope != nil {
+		event = scope.ApplyToEvent(event, hint)
+	}
 
 	for _, processor := range client.eventProcessors {
 		id := event.EventID
