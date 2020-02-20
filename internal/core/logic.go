@@ -106,6 +106,15 @@ func checkReason(res db.Resource, asset db.Asset, reason db.OperationReason) *ui
 				}
 			}
 
+			//ALSO the MinimumFreeSize takes precedence over the low threshold: we're
+			//allowed to go into low usage if it helps us satisfy the MinimumFreeSize
+			if res.MinimumFreeSize != nil && asset.AbsoluteUsage != nil {
+				minSize := *res.MinimumFreeSize + *asset.AbsoluteUsage
+				if lowSize < minSize {
+					lowSize = minSize
+				}
+			}
+
 			if lowSize > 0 {
 				c.forbidAbove(lowSize)
 			}

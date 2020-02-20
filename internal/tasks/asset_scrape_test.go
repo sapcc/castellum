@@ -1119,7 +1119,7 @@ func TestResizesEndingUpInLowThreshold(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
-		//BUT when we're inside the high/critical threshold, a downsize should be
+		//BUT when we're inside the high/critical threshold, an upsize should be
 		//generated even though upsizing puts us below the low threshold -- the
 		//idea being that it's better to be slightly too large than slightly too
 		//small
@@ -1136,6 +1136,37 @@ func TestResizesEndingUpInLowThreshold(baseT *testing.T) {
 			CreatedAt:    c.TimeNow(),
 			ConfirmedAt:  p2time(c.TimeNow()),
 			GreenlitAt:   p2time(c.TimeNow()),
+		})
+		t.ExpectFinishedOperations(c.DB /*, nothing */)
+	})
+}
+
+func TestUpsizeBecauseOfMinFreeSizePassingLowThreshold(baseT *testing.T) {
+	t := test.T{T: baseT}
+	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
+
+		//test that min_free_size takes precedence over the low usage threshold: we
+		//should upsize the asset to guarantee the min_free_size, even if this puts
+		//usage below the threshold
+		t.MustExec(c.DB, `UPDATE resources SET min_free_size = 2500`)
+		if !res.SingleStep {
+			//for percentage-step resizing, we need to set the size step comically
+			//large because we need to get below the low usage threshold to actually
+			//trigger the condition we want to test
+			t.MustExec(c.DB, `UPDATE resources SET size_step_percent = 200`)
+		}
+
+		clock.StepBy(10 * time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+
+		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+			ID:           1,
+			AssetID:      1,
+			Reason:       db.OperationReasonHigh,
+			OldSize:      1000,
+			NewSize:      3000,
+			UsagePercent: 50,
+			CreatedAt:    c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 	})
