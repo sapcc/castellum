@@ -131,7 +131,7 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 	}
 }
 
-func ignoreShare(metadata map[string]interface{}) {
+func ignoreShare(metadata map[string]interface{}) bool {
 	//ignore "shares" that are actually snapmirror targets (sapcc-specific extension)
 	if snapmirrorStr, ok := metadata["snapmirror"].(string); ok {
 		if snapmirrorStr == "1" {
