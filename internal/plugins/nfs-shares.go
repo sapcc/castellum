@@ -104,7 +104,8 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 
 		var data struct {
 			Shares []struct {
-				ID string `json:"id"`
+				ID       string                 `json:"id"`
+				Metadata map[string]interface{} `json:"metadata"`
 			} `json:"shares"`
 		}
 		err = r.ExtractInto(&data)
@@ -114,6 +115,9 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 
 		if len(data.Shares) > 0 {
 			for _, share := range data.Shares {
+				if ignoreShare(share.Metadata) {
+					continue
+				}
 				if !wasSeen[share.ID] {
 					shareIDs = append(shareIDs, share.ID)
 					wasSeen[share.ID] = true
@@ -125,6 +129,17 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 			return shareIDs, nil
 		}
 	}
+}
+
+func ignoreShare(metadata map[string]interface{}) {
+	//ignore "shares" that are actually snapmirror targets (sapcc-specific extension)
+	if snapmirrorStr, ok := metadata["snapmirror"].(string); ok {
+		if snapmirrorStr == "1" {
+			return true
+		}
+	}
+
+	return false
 }
 
 var sizeInconsistencyErrorRx = regexp.MustCompile(`New size for (?:extend must be greater|shrink must be less) than current size`)
