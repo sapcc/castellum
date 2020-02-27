@@ -95,7 +95,7 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 	//TODO: simplify this by adding a shares.List() function to
 	//package github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares
 	for {
-		url := m.Manila.ServiceURL("shares") + fmt.Sprintf("?project_id=%s&all_tenants=1&limit=%d&offset=%d", res.ScopeUUID, pageSize, page*(pageSize-10))
+		url := m.Manila.ServiceURL("shares", "detail") + fmt.Sprintf("?project_id=%s&all_tenants=1&limit=%d&offset=%d", res.ScopeUUID, pageSize, page*(pageSize-10))
 		var r gophercloud.Result
 		_, err := m.Manila.Get(url, &r.Body, nil)
 		if err != nil {
