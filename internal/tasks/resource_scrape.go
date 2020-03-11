@@ -82,15 +82,7 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 			return dbErr
 		}
 
-		e := listAssetsError{
-			scopeUUID: res.ScopeUUID,
-			assetType: string(assetType),
-			inner:     err,
-		}
-		if c.SentryHub != nil {
-			captureSentryException(c.SentryHub, e)
-		}
-		return e
+		return fmt.Errorf("cannot list %s assets in project %s: %s", string(assetType), res.ScopeUUID, err.Error())
 	}
 	logg.Debug("scraped %d assets for %s resource for project %s", len(assetUUIDs), assetType, res.ScopeUUID)
 	isExistingAsset := make(map[string]bool, len(assetUUIDs))
@@ -156,15 +148,6 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 
 		err = c.DB.Insert(&dbAsset)
 		if err != nil {
-			e := getAssetStatusError{
-				scopeUUID: res.ScopeUUID,
-				assetType: string(assetType),
-				assetUUID: assetUUID,
-				inner:     err,
-			}
-			if c.SentryHub != nil {
-				captureSentryException(c.SentryHub, e)
-			}
 			return err
 		}
 	}

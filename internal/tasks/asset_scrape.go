@@ -122,19 +122,7 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 		if dbErr != nil {
 			return dbErr
 		}
-		e := getAssetStatusError{
-			scopeUUID: res.ScopeUUID,
-			assetType: string(assetType),
-			assetUUID: asset.UUID,
-			inner:     err,
-		}
-		//NOTE: disabled because otherwise, a temporary backend problem causes a
-		//metric ton of Sentry alerts in regions with a lot of assets
-		//
-		// if c.SentryHub != nil {
-		// 	captureSentryException(c.SentryHub, e)
-		// }
-		return e
+		return fmt.Errorf("cannot query status of %s %s: %s", string(assetType), asset.UUID, err.Error())
 	}
 
 	if logScrapes {

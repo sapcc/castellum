@@ -104,22 +104,10 @@ func (c Context) ExecuteNextResize() (targetAssetType db.AssetType, returnedErro
 	outcome, err := manager.SetAssetSize(res, asset.UUID, asset.Size, op.NewSize)
 	errorMessage := ""
 	if err != nil {
-		e := setAssetSizeError{
-			scopeUUID: res.ScopeUUID,
-			assetType: string(res.AssetType),
-			assetUUID: asset.UUID,
-			newSize:   op.NewSize,
-			inner:     err,
-		}
-		logg.Error(e.Error())
+		logg.Error("cannot resize %s %s to size %d: %s", string(res.AssetType), asset.UUID, op.NewSize, err.Error())
 
 		if outcome == db.OperationOutcomeErrored {
-			//do not log "failed" operations to Sentry: fixing them is not within the
-			//responsibility of the Castellum operator
-			if c.SentryHub != nil {
-				captureSentryException(c.SentryHub, e)
-			}
-
+			//We are only interested in tracking the status errored in the DB.
 			errorMessage = err.Error()
 		}
 	}
