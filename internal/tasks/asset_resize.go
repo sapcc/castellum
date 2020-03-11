@@ -113,13 +113,15 @@ func (c Context) ExecuteNextResize() (targetAssetType db.AssetType, returnedErro
 		}
 		logg.Error(e.Error())
 
-		//do not log "failed" operations to Sentry: fixing them is not within the
-		//responsibility of the Castellum operator
-		if c.SentryHub != nil && outcome == db.OperationOutcomeErrored {
-			captureSentryException(c.SentryHub, e)
-		}
+		if outcome == db.OperationOutcomeErrored {
+			//do not log "failed" operations to Sentry: fixing them is not within the
+			//responsibility of the Castellum operator
+			if c.SentryHub != nil {
+				captureSentryException(c.SentryHub, e)
+			}
 
-		errorMessage = err.Error()
+			errorMessage = err.Error()
+		}
 	}
 
 	finishedOp := op.IntoFinishedOperation(outcome, c.TimeNow())
