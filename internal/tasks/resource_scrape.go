@@ -73,6 +73,15 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 	//check which assets exist in this resource in OpenStack
 	assetUUIDs, err := manager.ListAssets(res)
 	if err != nil {
+		//In case of error we update checked_at so that the next call continues
+		//but leave scraped_at unchanged to indicate old data
+		res.CheckedAt = c.TimeNow()
+		res.ScrapeErrorMessage = err.Error()
+		_, dbErr := c.DB.Update(&res)
+		if dbErr != nil {
+			return dbErr
+		}
+
 		e := listAssetsError{
 			scopeUUID: res.ScopeUUID,
 			assetType: string(assetType),
@@ -95,7 +104,11 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 	if err != nil {
 		return err
 	}
-	resourceScrapedTime := c.TimeNow()
+
+	now := c.TimeNow()
+	fmt.Println(now)
+	res.CheckedAt = now
+	res.ScrapedAt = &now
 
 	//cleanup asset entries for deleted assets
 	isAssetInDB := make(map[string]bool)
@@ -157,9 +170,10 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 	}
 
 	//record successful scrape
-	_, err = c.DB.Exec("UPDATE resources SET scraped_at = $1 WHERE id = $2", resourceScrapedTime, res.ID)
+	_, err = c.DB.Update(&res)
 	if err != nil {
 		return err
+
 	}
 
 	return nil

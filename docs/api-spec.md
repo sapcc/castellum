@@ -33,6 +33,10 @@ Returns 200 and a JSON response body like this:
   "resources": {
     "nfs-shares": {
       "scraped_at": 1557134678,
+      "checked": {
+        "at": 1557144528,
+        "error": "cannot connect to OpenStack"
+      },
       "asset_count": 42,
       "low_threshold": {
         "usage_percent": 20,
@@ -64,6 +68,8 @@ The following fields may be returned:
 | ----- | ---- | ----------- |
 | `resources.$type` | object | Configuration for a project resource. Resources will only be shown when a) autoscaling is enabled for them and b) the requester has sufficient permissions to read them. |
 | `resources.$type.scraped_at` | timestamp | *Readonly.* When Castellum last scanned this resource for new assets or deleted assets. |
+| `resources.$type.checked.at` | timestamp | *Readonly.* When Castellum last _tried_ to scan this resource for new assets or deleted assets. Only shown when different from `scraped_at`, i.e. when the last check failed. |
+| `resources.$type.checked.error` | string | *Readonly.* When the last check failed (see above), this field contains the error message that was returned from the backend. |
 | `resources.$type.asset_count` | integer | *Readonly.* The number of assets in this resource. |
 | `resources.$type.low_threshold`<br>`resources.$type.high_threshold`<br>`resources.$type.critical_threshold` | object | Configuration for thresholds that trigger an automated resize operation. Any of these may be missing if the threshold in question has not been enabled. |
 | `resources.$type.low_threshold.usage_percent`<br>`resources.$type.high_threshold.usage_percent`<br>`resources.$type.critical_threshold.usage_percent` | integer | Automated operations will be triggered when usage crosses these thresholds, i.e. `usage <= threshold` for the low threshold and `usage >= threshold` for the high and critical thresholds. |
@@ -93,6 +99,10 @@ Otherwise returns 200 and a JSON response body like this:
 ```json
 {
   "scraped_at": 1557134678,
+  "checked": {
+    "at": 1557144528,
+    "error": "cannot connect to OpenStack"
+  },
   "low_threshold": {
     "usage_percent": 20,
     "delay_seconds": 3600
@@ -125,6 +135,8 @@ document following the same schema as the response from the corresponding GET en
 except that the following fields may not be present:
 
 - `scraped_at`
+- `checked`
+- `asset_count`
 
 Returns 202 and an empty response body on success.
 
@@ -179,8 +191,8 @@ For each asset, the following fields may be returned:
 | `id` | string | UUID of asset. |
 | `size` | integer | Size of asset. The unit depends on the asset type. See [README.md](../README.md#supported-asset-types) for more information. |
 | `usage_percent` | integer | Usage of asset as percentage of size. When the asset has multiple usage types (e.g. instances have both CPU usage and RAM usage), usually the higher value is reported here. |
-| `scraped_at` | integer | When the size and usage of the asset was last retrieved by Castellum. |
-| `checked.at` | integer | When Castellum last tried to retrieve the size and usage of the asset. Only shown when different from `scraped_at`, i.e. when the last check failed. |
+| `scraped_at` | timestamp | When the size and usage of the asset was last retrieved by Castellum. |
+| `checked.at` | timestamp | When Castellum last tried to retrieve the size and usage of the asset. Only shown when different from `scraped_at`, i.e. when the last check failed. |
 | `checked.error` | string | When the last check failed (see above), this field contains the error message that was returned from the backend. |
 | `stale` | bool | This flag is set by Castellum after a resize operation to indicate that the reported size and usage are probably not accurate anymore. Will be cleared by the next scrape. |
 

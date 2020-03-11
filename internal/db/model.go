@@ -48,7 +48,9 @@ type Resource struct {
 	DomainUUID string    `db:"domain_uuid"` //for domain resources: equal to .ScopeUUID
 	AssetType  AssetType `db:"asset_type"`
 
-	//When we last checked this Resource for new or deleted assets.
+	//When we last tried to check this Resource for new or deleted assets.
+	CheckedAt time.Time `db:"checked_at"`
+	//When this Resource was checked for new or deleted assets.
 	ScrapedAt *time.Time `db:"scraped_at"`
 
 	//Assets will resize when they have crossed a certain threshold for a certain
@@ -77,6 +79,9 @@ type Resource struct {
 	//If configured, downsize operations will be inhibited when `newSize -
 	//absoluteUsage` would be smaller than this.
 	MinimumFreeSize *uint64 `db:"min_free_size"`
+
+	//Contains the error message if the last scrape failed, otherwise an empty string.
+	ScrapeErrorMessage string `db:"scrape_error_message"`
 }
 
 //AssetType is the type of Resource.AssetType. It extends type string with some

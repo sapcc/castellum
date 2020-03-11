@@ -178,4 +178,18 @@ var SQLMigrations = map[string]string{
 	"010_add_resources_domain_uuid.up.sql": `
 		ALTER TABLE resources ADD COLUMN domain_uuid TEXT NOT NULL DEFAULT 'unknown';
 	`,
+	"011_add_resources_checked_at.down.sql": `
+		ALTER TABLE resources DROP COLUMN checked_at;
+	`,
+	"011_add_resources_checked_at.up.sql": `
+		ALTER TABLE resources ADD COLUMN checked_at TIMESTAMP;
+		UPDATE resources SET checked_at = scraped_at;
+		ALTER TABLE resources ALTER COLUMN checked_at SET NOT NULL;
+	`,
+	"012_add_resources_scrape_error_message.down.sql": `
+		ALTER TABLE resources DROP COLUMN scrape_error_message;
+	`,
+	"012_add_resources_scrape_error_message.up.sql": `
+		ALTER TABLE resources ADD COLUMN scrape_error_message TEXT NOT NULL DEFAULT '';
+	`,
 }

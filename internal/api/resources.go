@@ -35,6 +35,7 @@ import (
 //Resource is how a db.Resource looks like in the API.
 type Resource struct {
 	ScrapedAtUnix     *int64           `json:"scraped_at,omitempty"`
+	Checked           *Checked         `json:"checked,omitempty"`
 	AssetCount        int64            `json:"asset_count"`
 	LowThreshold      *Threshold       `json:"low_threshold,omitempty"`
 	HighThreshold     *Threshold       `json:"high_threshold,omitempty"`
@@ -79,6 +80,12 @@ func (h handler) ResourceFromDB(res db.Resource) (Resource, error) {
 		AssetCount:    assetCount,
 		SizeSteps:     SizeSteps{Percent: res.SizeStepPercent, Single: res.SingleStep},
 	}
+	if res.ScrapeErrorMessage != "" {
+		result.Checked = &Checked{
+			AtUnix:       res.CheckedAt.Unix(),
+			ErrorMessage: res.ScrapeErrorMessage,
+		}
+	}
 	if res.LowThresholdPercent > 0 {
 		result.LowThreshold = &Threshold{
 			UsagePercent: res.LowThresholdPercent,
@@ -113,6 +120,9 @@ func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo) (e
 
 	if r.ScrapedAtUnix != nil {
 		complain("resource.scraped_at cannot be set via the API")
+	}
+	if r.Checked != nil {
+		complain("resource.checked cannot be set via the API")
 	}
 	if r.AssetCount != 0 {
 		complain("resource.asset_count cannot be set via the API")
