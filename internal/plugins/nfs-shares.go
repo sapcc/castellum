@@ -142,8 +142,11 @@ func ignoreShare(metadata map[string]interface{}) bool {
 	return false
 }
 
-var sizeInconsistencyErrorRx = regexp.MustCompile(`New size for (?:extend must be greater|shrink must be less) than current size`)
-var quotaErrorRx = regexp.MustCompile(`Requested share exceeds allowed project/user or share type \S+ quota.`)
+var (
+	sizeInconsistencyErrorRx = regexp.MustCompile(`New size for (?:extend must be greater|shrink must be less) than current size`)
+	quotaErrorRx             = regexp.MustCompile(`Requested share exceeds allowed project/user or share type \S+ quota.`)
+	shareStatusErrorRx       = regexp.MustCompile(`Invalid share: .* current status is: error.`)
+)
 
 //SetAssetSize implements the core.AssetManager interface.
 func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (db.OperationOutcome, error) {
@@ -160,7 +163,9 @@ func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSiz
 		//If not successful, still return the original error (to avoid confusion).
 	}
 	if err != nil {
-		if quotaErrorRx.MatchString(err.Error()) {
+		//If the resize fails because of missing quota or because the share is in
+		//status "error", it's the user's fault, not ours.
+		if quotaErrorRx.MatchString(err.Error()) || shareStatusErrorRx.MatchString(err.Error()) {
 			return db.OperationOutcomeFailed, err
 		}
 		return db.OperationOutcomeErrored, err
