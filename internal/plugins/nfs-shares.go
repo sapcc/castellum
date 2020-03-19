@@ -106,6 +106,7 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 			Shares []struct {
 				ID       string                 `json:"id"`
 				Metadata map[string]interface{} `json:"metadata"`
+				Status   string                 `json:"status"`
 			} `json:"shares"`
 		}
 		err = r.ExtractInto(&data)
@@ -115,7 +116,7 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 
 		if len(data.Shares) > 0 {
 			for _, share := range data.Shares {
-				if ignoreShare(share.Metadata) {
+				if ignoreShare(share.Metadata, share.Status) {
 					continue
 				}
 				if !wasSeen[share.ID] {
@@ -131,7 +132,12 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 	}
 }
 
-func ignoreShare(metadata map[string]interface{}) bool {
+func ignoreShare(metadata map[string]interface{}, status string) bool {
+	//ignore shares in status "error" (we won't be able to resize them anyway)
+	if status == "error" {
+		return true
+	}
+
 	//ignore "shares" that are actually snapmirror targets (sapcc-specific extension)
 	if snapmirrorStr, ok := metadata["snapmirror"].(string); ok {
 		if snapmirrorStr == "1" {
