@@ -98,9 +98,9 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 	}
 
 	now := c.TimeNow()
-	fmt.Println(now)
 	res.CheckedAt = now
 	res.ScrapedAt = &now
+	res.ScrapeErrorMessage = ""
 
 	//cleanup asset entries for deleted assets
 	isAssetInDB := make(map[string]bool)
