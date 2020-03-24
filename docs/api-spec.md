@@ -22,11 +22,12 @@ This document uses the terminology defined in the [README.md](../README.md#termi
 * [GET /v1/operations/pending](#get-v1operationspending)
 * [GET /v1/operations/recently-failed](#get-v1operationsrecently-failed)
 * [GET /v1/operations/recently-succeeded](#get-v1operationsrecently-succeeded)
+* [GET /v1/admin/resource-scrape-errors](#get-v1adminresource-scrape-errors)
 
 ## GET /v1/projects/:id
 
 Shows information about which resources are configured for this project.
-Returns 200 and a JSON response body like this:
+Returns `200` and a JSON response body like this:
 
 ```json
 {
@@ -93,8 +94,8 @@ Single-step resizing is a good idea when usage changes infrequently, but possibl
 ## GET /v1/projects/:id/resources/:type
 
 Shows information about an individual project resource.
-Returns 404 if autoscaling is not enabled for this resource.
-Otherwise returns 200 and a JSON response body like this:
+Returns `404` if autoscaling is not enabled for this resource.
+Otherwise returns `200` and a JSON response body like this:
 
 ```json
 {
@@ -149,8 +150,8 @@ Returns 204 and an empty response body on success.
 ## GET /v1/projects/:id/assets/:type
 
 Shows a list of all known assets in a project resource.
-Returns 404 if autoscaling is not enabled for this resource.
-Otherwise returns 200 and a JSON response body like this:
+Returns `404` if autoscaling is not enabled for this resource.
+Otherwise returns `200` and a JSON response body like this:
 
 ```json
 {
@@ -202,9 +203,9 @@ When no scrape ever succeeded (e.g. because the asset is in an error state since
 ## GET /v1/projects/:id/assets/:type/:id
 
 Shows information about a certain asset.
-Returns 404 if the asset does not exist in the selected project, or if autoscaling is not
+Returns `404` if the asset does not exist in the selected project, or if autoscaling is not
 enabled for the selected project resource.
-Otherwise returns 200 and a JSON response body like this:
+Otherwise returns `200` and a JSON response body like this:
 
 ```json
 {
@@ -264,7 +265,7 @@ The following additional fields may be returned:
 | `pending_operation` | object | Information about an automated resize operation that is currently in progress. If there is no resize operation ongoing, this field will be omitted. |
 | `finished_operations` | array of objects | Information about earlier automated resize operations. **This field is only shown on request** because it may be quite large. Add the query parameter `?history` to see it. |
 | `finished_operations[].finished.at` | timestamp | When the operation entered its final state. |
-| `finished_operations[].finished.error` | string | The backend error that caused this operation to fail. Only present when `state` is `failed` or `errored`. |
+| `finished_operations[].finished.error` | string | The backend error that caused this operation to fail. Only present when `state` is `errored`. |
 
 The following fields may be returned for each operation, both below `pending_operation` and below `finished_operations[]`:
 
@@ -302,8 +303,8 @@ The following query parameters can be given to filter the result:
 - When `domain` is given, it is interpreted as a domain ID. Only resources in project in that domain will be considered.
 - When `asset-type` is given, only resources with this asset type are considered.
 
-Returns 404 if autoscaling is not enabled for any resource matching the query.
-Otherwise returns 200 and a JSON response body like this:
+Returns `404` if autoscaling is not enabled for any resource matching the query.
+Otherwise returns `200` and a JSON response body like this:
 
 ```json
 {
@@ -357,8 +358,8 @@ for assets where the usage returned to normal levels in the meantime.
 The query parameters `domain`, `project` and `asset-type` are recognized with the same semantics as for
 `GET /v1/operations/pending`.
 
-Returns 404 if autoscaling is not enabled for this resource.
-Otherwise returns 200 and a JSON response body like this:
+Returns `404` if autoscaling is not enabled for this resource.
+Otherwise returns `200` and a JSON response body like this:
 
 ```json
 {
@@ -406,8 +407,8 @@ Shows information about all operations on assets in resources accessible to the 
 succeeded**, that is, all operations in state "succeeded" where there is no newer operation in state "succeeded",
 "failed" or "errored" for the same asset.
 
-Returns 404 if autoscaling is not enabled for this resource.
-Otherwise returns 200 and a JSON response body looking like that from the `recently-failed` endpoint above, except that
+Returns `404` if autoscaling is not enabled for this resource.
+Otherwise returns `200` and a JSON response body looking like that from the `recently-failed` endpoint above, except that
 `recently_failed_operations` is called `recently_succeeded_operations`.
 
 The query parameters `domain`, `project` and `asset-type` are recognized with the same semantics as for
@@ -416,3 +417,45 @@ The query parameters `domain`, `project` and `asset-type` are recognized with th
 - When `max-age` is given, only those operations will be shown that finished after `now - max_age`. The value must be an
   integer followed by one of the units `m` (minute), `h` (hour) or `d` (day), e.g. `12h` or `7d`. The default value is
   `1d`.
+
+## GET /v1/admin/resource-scrape-errors
+
+Shows information about resource scrape errors. This is intended to give
+operators a view of all scrape errors across all resources.
+
+Returns `200` on success and a JSON response body like this:
+
+```json
+{
+  "resource_scrape_errors": [
+    {
+      "asset_type": "nfs-shares",
+      "checked": {
+        "at": 1557144528,
+        "error": "cannot connect to OpenStack"
+      },
+      "domain_id": "481b2af2-d816-4453-8743-a05382e7d1ce",
+      "project_id": "0181e612-fcad-438d-a1a4-2a21fc0a2442"
+    },
+    {
+      "asset_type": "foo",
+      "checked": {
+        "at": 1557144777,
+        "error": "datacenter is on fire"
+      },
+      "domain_id": "481b2af2-d816-4453-8743-a05382e7d1ce",
+      "project_id": "89b76fc7-78fa-454c-b23b-674bd7589390"
+    }
+  ]
+}
+```
+
+Most fields on the top level have the same meaning as for `GET
+/v1/projects/:id/resources/:type` (see above), except for the following
+additional fields:
+
+- `asset_type` indicates which type of assets belong to this resource.
+- `project_id` and `domain_id` identify the resource. `project_id` is
+  only shown for non-domain resources.
+
+For each resource, at most one error will be listed (the most recent one).
