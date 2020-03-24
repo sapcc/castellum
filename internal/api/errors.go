@@ -37,6 +37,15 @@ type ResourceScrapeError struct {
 	Checked     Checked `json:"checked"`
 }
 
+// AssetScrapeError is how a resource's scrape error appears in API.
+type AssetScrapeError struct {
+	AssetUUID   string  `json:"asset_id"`
+	ProjectUUID string  `json:"project_id,omitempty"`
+	DomainUUID  string  `json:"domain_id"`
+	AssetType   string  `json:"asset_type"`
+	Checked     Checked `json:"checked"`
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // HTTP handlers
 
@@ -77,6 +86,62 @@ func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request)
 					ErrorMessage: res.ScrapeErrorMessage,
 				},
 			})
+	}
+
+	respondwith.JSON(w, http.StatusOK, result)
+}
+
+func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
+	sre.IdentifyEndpoint(r, "/v1/admin/asset-scrape-errors")
+	_, token := h.CheckToken(w, r)
+	if token == nil {
+		return
+	}
+	if !token.Require(w, "cluster:access") {
+		return
+	}
+
+	var result struct {
+		AssetScrapeErrors []AssetScrapeError `json:"asset_scrape_errors"`
+	}
+
+	var dbResources []db.Resource
+	_, err := h.DB.Select(&dbResources,
+		`SELECT * FROM resources ORDER BY id`)
+	if respondwith.ErrorText(w, err) {
+		return
+	}
+
+	for _, res := range dbResources {
+		var dbAssets []db.Asset
+		_, err := h.DB.Select(&dbAssets,
+			`SELECT * FROM assets
+			 WHERE scrape_error_message != '' AND resource_id = $1
+			 ORDER BY id
+			`, res.ID)
+		if respondwith.ErrorText(w, err) {
+			return
+		}
+
+		projectID := ""
+		// res.ScopeUUID is either a domain- or project UUID.
+		if res.ScopeUUID != res.DomainUUID {
+			projectID = res.ScopeUUID
+		}
+
+		for _, a := range dbAssets {
+			result.AssetScrapeErrors = append(result.AssetScrapeErrors,
+				AssetScrapeError{
+					AssetUUID:   a.UUID,
+					ProjectUUID: projectID,
+					DomainUUID:  res.DomainUUID,
+					AssetType:   string(res.AssetType),
+					Checked: Checked{
+						AtUnix:       a.CheckedAt.Unix(),
+						ErrorMessage: a.ScrapeErrorMessage,
+					},
+				})
+		}
 	}
 
 	respondwith.JSON(w, http.StatusOK, result)

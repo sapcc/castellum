@@ -100,6 +100,9 @@ func (h *handler) BuildRouter() http.Handler {
 	router.Methods("GET").
 		Path(`/v1/admin/resource-scrape-errors`).
 		HandlerFunc(h.GetResourceScrapeErrors)
+	router.Methods("GET").
+		Path(`/v1/admin/asset-scrape-errors`).
+		HandlerFunc(h.GetAssetScrapeErrors)
 
 	return sre.Instrument(router)
 }

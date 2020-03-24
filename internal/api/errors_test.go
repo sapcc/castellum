@@ -70,3 +70,39 @@ func TestGetResourceScrapeErrors(baseT *testing.T) {
 		}.Check(t.T, hh)
 	})
 }
+
+func TestGetAssetScrapeErrors(baseT *testing.T) {
+	t := test.T{T: baseT}
+	withHandler(t, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+
+		//endpoint requires a token with cluster access
+		mv.Forbid("cluster:access")
+		assert.HTTPRequest{
+			Method:       "GET",
+			Path:         "/v1/admin/asset-scrape-errors",
+			ExpectStatus: http.StatusForbidden,
+		}.Check(t.T, hh)
+		mv.Allow("cluster:access")
+
+		//happy path
+		assert.HTTPRequest{
+			Method:       "GET",
+			Path:         "/v1/admin/asset-scrape-errors",
+			ExpectStatus: http.StatusOK,
+			ExpectBody: assert.JSONObject{
+				"asset_scrape_errors": []assert.JSONObject{
+					assert.JSONObject{
+						"asset_id":   "fooasset2",
+						"asset_type": "foo",
+						"checked": assert.JSONObject{
+							"at":    15,
+							"error": "unexpected uptime",
+						},
+						"domain_id":  "domain1",
+						"project_id": "project1",
+					},
+				},
+			},
+		}.Check(t.T, hh)
+	})
+}
