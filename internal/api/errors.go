@@ -37,13 +37,20 @@ type ResourceScrapeError struct {
 	Checked     Checked `json:"checked"`
 }
 
-// AssetScrapeError is how a resource's scrape error appears in API.
-type AssetScrapeError struct {
-	AssetUUID   string  `json:"asset_id"`
-	ProjectUUID string  `json:"project_id,omitempty"`
-	DomainUUID  string  `json:"domain_id"`
-	AssetType   string  `json:"asset_type"`
-	Checked     Checked `json:"checked"`
+// AssetError is how a resource's error appears in API.
+type AssetError struct {
+	AssetUUID   string `json:"asset_id"`
+	ProjectUUID string `json:"project_id,omitempty"`
+	DomainUUID  string `json:"domain_id"`
+	AssetType   string `json:"asset_type"`
+
+	// this field is only used in scrape errors
+	Checked *Checked `json:"checked,omitempty"`
+
+	// these fields are only used in resize errors
+	OldSize  uint64   `json:"old_size,omitempty"`
+	NewSize  uint64   `json:"new_size,omitempty"`
+	Finished *Checked `json:"finished,omitempty"`
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -102,7 +109,7 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var result struct {
-		AssetScrapeErrors []AssetScrapeError `json:"asset_scrape_errors"`
+		AssetScrapeErrors []AssetError `json:"asset_scrape_errors"`
 	}
 
 	var dbResources []db.Resource
@@ -131,16 +138,83 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 
 		for _, a := range dbAssets {
 			result.AssetScrapeErrors = append(result.AssetScrapeErrors,
-				AssetScrapeError{
+				AssetError{
 					AssetUUID:   a.UUID,
 					ProjectUUID: projectID,
 					DomainUUID:  res.DomainUUID,
 					AssetType:   string(res.AssetType),
-					Checked: Checked{
+					Checked: &Checked{
 						AtUnix:       a.CheckedAt.Unix(),
 						ErrorMessage: a.ScrapeErrorMessage,
 					},
 				})
+		}
+	}
+
+	respondwith.JSON(w, http.StatusOK, result)
+}
+
+func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
+	sre.IdentifyEndpoint(r, "/v1/admin/asset-resize-errors")
+	_, token := h.CheckToken(w, r)
+	if token == nil {
+		return
+	}
+	if !token.Require(w, "cluster:access") {
+		return
+	}
+
+	var result struct {
+		AssetResizeErrors []AssetError `json:"asset_resize_errors"`
+	}
+
+	var dbResources []db.Resource
+	_, err := h.DB.Select(&dbResources,
+		`SELECT * FROM resources ORDER BY id`)
+	if respondwith.ErrorText(w, err) {
+		return
+	}
+
+	for _, res := range dbResources {
+		var ops []db.FinishedOperation
+		_, err := h.DB.Select(&ops, `
+			SELECT o.* FROM finished_operations o
+				JOIN assets a ON a.id = o.asset_id
+			 WHERE a.resource_id = $1
+		`, res.ID)
+		if respondwith.ErrorText(w, err) {
+			return
+		}
+
+		projectID := ""
+		// res.ScopeUUID is either a domain- or project UUID.
+		if res.ScopeUUID != res.DomainUUID {
+			projectID = res.ScopeUUID
+		}
+
+		//find asset UUIDs
+		assetUUIDs, err := h.getAssetUUIDMap(res)
+		if respondwith.ErrorText(w, err) {
+			return
+		}
+
+		for _, o := range ops {
+			if o.Outcome == db.OperationOutcomeErrored {
+				//We are only interested in the status errored.
+				result.AssetResizeErrors = append(result.AssetResizeErrors,
+					AssetError{
+						AssetUUID:   assetUUIDs[o.AssetID],
+						ProjectUUID: projectID,
+						DomainUUID:  res.DomainUUID,
+						AssetType:   string(res.AssetType),
+						OldSize:     o.OldSize,
+						NewSize:     o.NewSize,
+						Finished: &Checked{
+							AtUnix:       o.FinishedAt.Unix(),
+							ErrorMessage: o.ErrorMessage,
+						},
+					})
+			}
 		}
 	}
 

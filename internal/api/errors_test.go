@@ -106,3 +106,41 @@ func TestGetAssetScrapeErrors(baseT *testing.T) {
 		}.Check(t.T, hh)
 	})
 }
+
+func TestGetAssetResizeErrors(baseT *testing.T) {
+	t := test.T{T: baseT}
+	withHandler(t, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+
+		//endpoint requires a token with cluster access
+		mv.Forbid("cluster:access")
+		assert.HTTPRequest{
+			Method:       "GET",
+			Path:         "/v1/admin/asset-resize-errors",
+			ExpectStatus: http.StatusForbidden,
+		}.Check(t.T, hh)
+		mv.Allow("cluster:access")
+
+		//happy path
+		assert.HTTPRequest{
+			Method:       "GET",
+			Path:         "/v1/admin/asset-resize-errors",
+			ExpectStatus: http.StatusOK,
+			ExpectBody: assert.JSONObject{
+				"asset_resize_errors": []assert.JSONObject{
+					assert.JSONObject{
+						"asset_id":   "fooasset1",
+						"asset_type": "foo",
+						"domain_id":  "domain1",
+						"finished": assert.JSONObject{
+							"at":    53,
+							"error": "datacenter is on fire",
+						},
+						"new_size":   1025,
+						"old_size":   1024,
+						"project_id": "project1",
+					},
+				},
+			},
+		}.Check(t.T, hh)
+	})
+}

@@ -103,6 +103,9 @@ func (h *handler) BuildRouter() http.Handler {
 	router.Methods("GET").
 		Path(`/v1/admin/asset-scrape-errors`).
 		HandlerFunc(h.GetAssetScrapeErrors)
+	router.Methods("GET").
+		Path(`/v1/admin/asset-resize-errors`).
+		HandlerFunc(h.GetAssetResizeErrors)
 
 	return sre.Instrument(router)
 }

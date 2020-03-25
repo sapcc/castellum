@@ -24,6 +24,7 @@ This document uses the terminology defined in the [README.md](../README.md#termi
 * [GET /v1/operations/recently-succeeded](#get-v1operationsrecently-succeeded)
 * [GET /v1/admin/resource-scrape-errors](#get-v1adminresource-scrape-errors)
 * [GET /v1/admin/asset-scrape-errors](#get-v1adminasset-scrape-errors)
+* [GET /v1/admin/asset-resize-errors](#get-v1adminasset-resize-errors)
 
 ## GET /v1/projects/:id
 
@@ -488,6 +489,42 @@ Returns `200` on success and a JSON response body like this:
 Most fields on the top level have the same meaning as for `GET
 /v1/projects/:id/assets/:type` (see above), except for the following additional
 fields:
+
+- `asset_id` identifies the concerning asset.
+- `asset_type`, `project_id` and `domain_id` identify the resource to which
+  this asset belongs. `project_id` is only shown for non-domain resources.
+
+For each asset, at most one error will be listed (the most recent one).
+
+## GET /v1/admin/asset-resize-errors
+
+Shows information about asset resize errors. This is intended to give operators
+a view of resize errors for all assets across all resources.
+
+Returns `200` on success and a JSON response body like this:
+
+```json
+{
+  "asset_resize_errors": [
+    {
+      "asset_id": "c991eb08-e14e-4559-94d6-c9c390c18776",
+      "asset_type": "nfs-shares",
+      "domain_id": "481b2af2-d816-4453-8743-a05382e7d1ce",
+      "finished": {
+        "at": 1557144789,
+        "error": "datacenter is on fire"
+      },
+      "new_size": 1025,
+      "old_size": 1024,
+      "project_id": "89b76fc7-78fa-454c-b23b-674bd7589390"
+    }
+  ]
+}
+```
+
+Most fields on the top level have the same meaning as for `GET
+/v1/projects/:id/assets/:type/:id` (see above), except for the following
+additional fields:
 
 - `asset_id` identifies the concerning asset.
 - `asset_type`, `project_id` and `domain_id` identify the resource to which
