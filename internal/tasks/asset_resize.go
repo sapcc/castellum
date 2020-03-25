@@ -105,11 +105,7 @@ func (c Context) ExecuteNextResize() (targetAssetType db.AssetType, returnedErro
 	errorMessage := ""
 	if err != nil {
 		logg.Error("cannot resize %s %s to size %d: %s", string(res.AssetType), asset.UUID, op.NewSize, err.Error())
-
-		if outcome == db.OperationOutcomeErrored {
-			//We are only interested in tracking the status errored in the DB.
-			errorMessage = err.Error()
-		}
+		errorMessage = err.Error()
 	}
 
 	finishedOp := op.IntoFinishedOperation(outcome, c.TimeNow())

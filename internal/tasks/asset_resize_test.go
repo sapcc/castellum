@@ -154,6 +154,7 @@ func TestFailingResize(tBase *testing.T) {
 			GreenlitAt:   p2time(c.TimeNow().Add(-5 * time.Minute)),
 			FinishedAt:   c.TimeNow(),
 			Outcome:      db.OperationOutcomeFailed,
+			ErrorMessage: "SetAssetSize failing as requested",
 		})
 
 		//check that asset does not have an ExpectedSize

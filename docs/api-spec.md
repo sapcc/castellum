@@ -267,7 +267,7 @@ The following additional fields may be returned:
 | `pending_operation` | object | Information about an automated resize operation that is currently in progress. If there is no resize operation ongoing, this field will be omitted. |
 | `finished_operations` | array of objects | Information about earlier automated resize operations. **This field is only shown on request** because it may be quite large. Add the query parameter `?history` to see it. |
 | `finished_operations[].finished.at` | timestamp | When the operation entered its final state. |
-| `finished_operations[].finished.error` | string | The backend error that caused this operation to fail. Only present when `state` is `errored`. |
+| `finished_operations[].finished.error` | string | The backend error that caused this operation to fail. Only present when `state` is `failed` or `errored`. |
 
 The following fields may be returned for each operation, both below `pending_operation` and below `finished_operations[]`:
 
