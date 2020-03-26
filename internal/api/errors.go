@@ -121,8 +121,8 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 
 	for _, res := range dbResources {
 		var dbAssets []db.Asset
-		_, err := h.DB.Select(&dbAssets,
-			`SELECT * FROM assets
+		_, err := h.DB.Select(&dbAssets, `
+			SELECT * FROM assets
 			 WHERE scrape_error_message != '' AND resource_id = $1
 			 ORDER BY id
 			`, res.ID)
@@ -164,10 +164,6 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var result struct {
-		AssetResizeErrors []AssetError `json:"asset_resize_errors"`
-	}
-
 	var dbResources []db.Resource
 	_, err := h.DB.Select(&dbResources,
 		`SELECT * FROM resources ORDER BY id`)
@@ -175,12 +171,20 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	assetResizeErrs := []AssetError{}
 	for _, res := range dbResources {
 		var ops []db.FinishedOperation
+		//We only care about assets that are still problematic.
+		//So we want to skip "errored" operations where a more recent operation
+		//on the same asset finished as "succeeded", "cancelled", or "failed".
 		_, err := h.DB.Select(&ops, `
-			SELECT o.* FROM finished_operations o
-				JOIN assets a ON a.id = o.asset_id
-			 WHERE a.resource_id = $1
+			WITH latest_finished_operations AS (
+				SELECT DISTINCT ON (asset_id) o.* FROM finished_operations o
+					JOIN assets a ON a.id = o.asset_id
+				 WHERE a.resource_id = $1
+				 ORDER BY o.asset_id, o.finished_at DESC
+			)
+			SELECT * FROM latest_finished_operations WHERE outcome = 'errored'
 		`, res.ID)
 		if respondwith.ErrorText(w, err) {
 			return
@@ -199,24 +203,23 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for _, o := range ops {
-			if o.Outcome == db.OperationOutcomeErrored {
-				//We are only interested in the status errored.
-				result.AssetResizeErrors = append(result.AssetResizeErrors,
-					AssetError{
-						AssetUUID:   assetUUIDs[o.AssetID],
-						ProjectUUID: projectID,
-						DomainUUID:  res.DomainUUID,
-						AssetType:   string(res.AssetType),
-						OldSize:     o.OldSize,
-						NewSize:     o.NewSize,
-						Finished: &Checked{
-							AtUnix:       o.FinishedAt.Unix(),
-							ErrorMessage: o.ErrorMessage,
-						},
-					})
-			}
+			assetResizeErrs = append(assetResizeErrs,
+				AssetError{
+					AssetUUID:   assetUUIDs[o.AssetID],
+					ProjectUUID: projectID,
+					DomainUUID:  res.DomainUUID,
+					AssetType:   string(res.AssetType),
+					OldSize:     o.OldSize,
+					NewSize:     o.NewSize,
+					Finished: &Checked{
+						AtUnix:       o.FinishedAt.Unix(),
+						ErrorMessage: o.ErrorMessage,
+					},
+				})
 		}
 	}
 
-	respondwith.JSON(w, http.StatusOK, result)
+	respondwith.JSON(w, http.StatusOK, struct {
+		AssetScrapeErrors []AssetError `json:"asset_resize_errors,keepempty"`
+	}{assetResizeErrs})
 }
