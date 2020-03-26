@@ -37,7 +37,7 @@ type ResourceScrapeError struct {
 	Checked     Checked `json:"checked"`
 }
 
-// AssetError is how a resource's error appears in API.
+// AssetError is how an asset's error appears in API.
 type AssetError struct {
 	AssetUUID   string `json:"asset_id"`
 	ProjectUUID string `json:"project_id,omitempty"`
@@ -73,9 +73,7 @@ func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var result struct {
-		ResourceScrapeErrors []ResourceScrapeError `json:"resource_scrape_errors"`
-	}
+	resScrapeErrs := []ResourceScrapeError{}
 	for _, res := range dbResources {
 		projectID := ""
 		// .ScopeUUID is either a domain- or project UUID.
@@ -83,7 +81,7 @@ func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request)
 			projectID = res.ScopeUUID
 		}
 
-		result.ResourceScrapeErrors = append(result.ResourceScrapeErrors,
+		resScrapeErrs = append(resScrapeErrs,
 			ResourceScrapeError{
 				ProjectUUID: projectID,
 				DomainUUID:  res.DomainUUID,
@@ -95,7 +93,9 @@ func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request)
 			})
 	}
 
-	respondwith.JSON(w, http.StatusOK, result)
+	respondwith.JSON(w, http.StatusOK, struct {
+		ResourceScrapeErrors []ResourceScrapeError `json:"resource_scrape_errors,keepempty"`
+	}{resScrapeErrs})
 }
 
 func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
@@ -108,10 +108,6 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var result struct {
-		AssetScrapeErrors []AssetError `json:"asset_scrape_errors"`
-	}
-
 	var dbResources []db.Resource
 	_, err := h.DB.Select(&dbResources,
 		`SELECT * FROM resources ORDER BY id`)
@@ -119,6 +115,7 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	assetScrapeErrs := []AssetError{}
 	for _, res := range dbResources {
 		var dbAssets []db.Asset
 		_, err := h.DB.Select(&dbAssets, `
@@ -137,7 +134,7 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for _, a := range dbAssets {
-			result.AssetScrapeErrors = append(result.AssetScrapeErrors,
+			assetScrapeErrs = append(assetScrapeErrs,
 				AssetError{
 					AssetUUID:   a.UUID,
 					ProjectUUID: projectID,
@@ -151,7 +148,9 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	respondwith.JSON(w, http.StatusOK, result)
+	respondwith.JSON(w, http.StatusOK, struct {
+		AssetScrapeErrors []AssetError `json:"asset_scrape_errors,keepempty"`
+	}{assetScrapeErrs})
 }
 
 func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
