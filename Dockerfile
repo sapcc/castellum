@@ -7,6 +7,7 @@ RUN make -C /src install PREFIX=/pkg GO_BUILDFLAGS='-mod vendor'
 ################################################################################
 
 FROM alpine:latest
+LABEL source_repository="https://github.com/sapcc/castellum"
 
 RUN apk add --no-cache ca-certificates
 COPY --from=builder /pkg/ /usr/
