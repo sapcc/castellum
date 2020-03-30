@@ -47,7 +47,11 @@ var (
 		},
 	}
 	initialBarResourceJSON = assert.JSONObject{
-		"scraped_at":  2,
+		"scraped_at": 2,
+		"checked": assert.JSONObject{
+			"at":    3,
+			"error": "datacenter is on fire",
+		},
 		"asset_count": 1,
 		"critical_threshold": assert.JSONObject{
 			"usage_percent": 95,
@@ -306,6 +310,7 @@ func TestPutResource(baseT *testing.T) {
 					DomainUUID:               "domain1",
 					AssetType:                "foo",
 					ScrapedAt:                res.ScrapedAt,
+					CheckedAt:                *res.ScrapedAt,
 					CriticalThresholdPercent: 98,
 					SizeStepPercent:          15,
 					MinimumFreeSize:          p2uint64(23),
@@ -374,6 +379,7 @@ func TestPutResource(baseT *testing.T) {
 					DomainUUID:               "domain1",
 					AssetType:                "foo",
 					ScrapedAt:                res.ScrapedAt,
+					CheckedAt:                *res.ScrapedAt,
 					CriticalThresholdPercent: 98,
 					SizeStepPercent:          15,
 					SingleStep:               false,
@@ -420,6 +426,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 		expectErrors(
 			assert.JSONObject{
 				"scraped_at":       12345,
+				"checked":          assert.JSONObject{"at": 56789},
 				"asset_count":      500,
 				"low_threshold":    assert.JSONObject{"usage_percent": 20},
 				"high_threshold":   assert.JSONObject{"usage_percent": 80},
@@ -427,6 +434,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 				"size_constraints": assert.JSONObject{"minimum": 30, "maximum": 20},
 			},
 			"resource.scraped_at cannot be set via the API",
+			"resource.checked cannot be set via the API",
 			"resource.asset_count cannot be set via the API",
 			"delay for low threshold is missing",
 			"delay for high threshold is missing",

@@ -34,18 +34,18 @@ import (
 
 //Asset is how a db.Asset looks like in the API.
 type Asset struct {
-	UUID               string        `json:"id"`
-	Size               uint64        `json:"size,omitempty"`
-	UsagePercent       float64       `json:"usage_percent,omitempty"`
-	ScrapedAtUnix      *int64        `json:"scraped_at,omitempty"`
-	Checked            *AssetChecked `json:"checked,omitempty"`
-	Stale              bool          `json:"stale"`
-	PendingOperation   *Operation    `json:"pending_operation,omitempty"`
-	FinishedOperations *[]Operation  `json:"finished_operations,omitempty"`
+	UUID               string       `json:"id"`
+	Size               uint64       `json:"size,omitempty"`
+	UsagePercent       float64      `json:"usage_percent,omitempty"`
+	ScrapedAtUnix      *int64       `json:"scraped_at,omitempty"`
+	Checked            *Checked     `json:"checked,omitempty"`
+	Stale              bool         `json:"stale"`
+	PendingOperation   *Operation   `json:"pending_operation,omitempty"`
+	FinishedOperations *[]Operation `json:"finished_operations,omitempty"`
 }
 
-//AssetChecked appears in type Asset.
-type AssetChecked struct {
+//Checked appears in type Asset and Resource.
+type Checked struct {
 	AtUnix       int64  `json:"at"`
 	ErrorMessage string `json:"error,omitempty"`
 }
@@ -103,7 +103,7 @@ func AssetFromDB(asset db.Asset) Asset {
 		Stale:         asset.ExpectedSize != nil,
 	}
 	if asset.ScrapeErrorMessage != "" {
-		a.Checked = &AssetChecked{
+		a.Checked = &Checked{
 			AtUnix:       asset.CheckedAt.Unix(),
 			ErrorMessage: asset.ScrapeErrorMessage,
 		}

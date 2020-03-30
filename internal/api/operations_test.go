@@ -113,12 +113,12 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 }
 
 func withEitherFailedOrErroredOperation(action func(db.OperationOutcome)) {
-	//start-data.sql has a FinishedOperation with outcome "failed". This helper
-	//function enables us to re-run tests concerning this "failed" operation with
-	//its outcome changed to "errored", to check that "errored" behaves like
-	//"failed" for the operations report endpoints.
-	action(db.OperationOutcomeFailed)
+	//start-data.sql has a FinishedOperation with outcome "errored". This helper
+	//function enables us to re-run tests concerning this "errored" operation with
+	//its outcome changed to "failed", to check that "failed" behaves like
+	//"errored" for the operations report endpoints.
 	action(db.OperationOutcomeErrored)
+	action(db.OperationOutcomeFailed)
 }
 
 func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
@@ -130,7 +130,7 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 				"/v1/projects/%s/resources/%s/operations/recently-failed")
 
 			t.MustExec(h.DB, `UPDATE finished_operations SET outcome = $1 WHERE outcome = $2`,
-				failedOperationOutcome, db.OperationOutcomeFailed,
+				failedOperationOutcome, db.OperationOutcomeErrored,
 			)
 
 			//start-data.sql has a recently failed critical operation for fooasset1, but
@@ -249,7 +249,7 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 				"/v1/projects/%s/resources/%s/operations/recently-succeeded")
 
 			t.MustExec(h.DB, `UPDATE finished_operations SET outcome = $1 WHERE outcome = $2`,
-				failedOperationOutcome, db.OperationOutcomeFailed,
+				failedOperationOutcome, db.OperationOutcomeErrored,
 			)
 
 			//start-data.sql has a succeeded operation, but also a failed/errored one on the same

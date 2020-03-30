@@ -44,16 +44,19 @@ func TestResourceScraping(baseT *testing.T) {
 			ScopeUUID:  "project1",
 			DomainUUID: "domain1",
 			AssetType:  "foo",
+			CheckedAt:  c.TimeNow(),
 		}))
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:  "project2",
 			DomainUUID: "domain1",
 			AssetType:  "bar", //note: different asset type
+			CheckedAt:  c.TimeNow(),
 		}))
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:  "project3",
 			DomainUUID: "domain1",
 			AssetType:  "foo",
+			CheckedAt:  c.TimeNow(),
 		}))
 
 		//create some mock assets that ScrapeNextResource() can find
@@ -85,7 +88,7 @@ func TestResourceScraping(baseT *testing.T) {
 
 		//next ScrapeNextResource() should scrape project1/foo again because its
 		//scraped_at timestamp is the smallest; there should be no changes except for
-		//resources.scraped_at
+		//resources.scraped_at and resource.checked_at
 		clock.Step()
 		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
 		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-3.sql")
@@ -107,11 +110,11 @@ func TestResourceScraping(baseT *testing.T) {
 			ScopeUUID:  "project4",
 			DomainUUID: "domain1",
 			AssetType:  "foo",
+			CheckedAt:  c.TimeNow(),
 		}))
 		amStatic.Assets["project4"] = nil
 		clock.Step()
 		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
 		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-6.sql")
-
 	})
 }

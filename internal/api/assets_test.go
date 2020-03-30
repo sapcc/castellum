@@ -183,7 +183,7 @@ func TestGetAsset(baseT *testing.T) {
 			},
 			{
 				"reason":   "critical",
-				"state":    "failed",
+				"state":    "errored",
 				"old_size": 1024,
 				"new_size": 1025,
 				"created": assert.JSONObject{

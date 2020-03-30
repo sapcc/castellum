@@ -97,6 +97,16 @@ func (h *handler) BuildRouter() http.Handler {
 		Path(`/v1/operations/recently-succeeded`).
 		HandlerFunc(h.GetRecentlySucceededOperations)
 
+	router.Methods("GET").
+		Path(`/v1/admin/resource-scrape-errors`).
+		HandlerFunc(h.GetResourceScrapeErrors)
+	router.Methods("GET").
+		Path(`/v1/admin/asset-scrape-errors`).
+		HandlerFunc(h.GetAssetScrapeErrors)
+	router.Methods("GET").
+		Path(`/v1/admin/asset-resize-errors`).
+		HandlerFunc(h.GetAssetResizeErrors)
+
 	return sre.Instrument(router)
 }
 

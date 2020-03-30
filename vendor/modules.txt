@@ -4,8 +4,6 @@ github.com/beorn7/perks/quantile
 github.com/cespare/xxhash/v2
 # github.com/databus23/goslo.policy v0.0.0-20170317131957-3ae74dd07ebf
 github.com/databus23/goslo.policy
-# github.com/getsentry/sentry-go v0.4.0
-github.com/getsentry/sentry-go
 # github.com/gofrs/uuid v3.2.0+incompatible
 github.com/gofrs/uuid
 # github.com/golang/protobuf v1.3.2

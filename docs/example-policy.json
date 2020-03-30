@@ -8,5 +8,7 @@
   "project_nfs_viewer": "role:cloud_sharedfilesystem_viewer or (rule:project_scope and role:sharedfilesystem_viewer) or rule:project_nfs_editor",
 
   "project:edit:nfs-shares": "rule:project_nfs_editor",
-  "project:show:nfs-shares": "rule:project_nfs_viewer"
+  "project:show:nfs-shares": "rule:project_nfs_viewer",
+
+  "cluster:access": "role:cloud_support_tools_viewer"
 }

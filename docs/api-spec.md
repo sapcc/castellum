@@ -22,17 +22,24 @@ This document uses the terminology defined in the [README.md](../README.md#termi
 * [GET /v1/operations/pending](#get-v1operationspending)
 * [GET /v1/operations/recently-failed](#get-v1operationsrecently-failed)
 * [GET /v1/operations/recently-succeeded](#get-v1operationsrecently-succeeded)
+* [GET /v1/admin/resource-scrape-errors](#get-v1adminresource-scrape-errors)
+* [GET /v1/admin/asset-scrape-errors](#get-v1adminasset-scrape-errors)
+* [GET /v1/admin/asset-resize-errors](#get-v1adminasset-resize-errors)
 
 ## GET /v1/projects/:id
 
 Shows information about which resources are configured for this project.
-Returns 200 and a JSON response body like this:
+Returns `200` and a JSON response body like this:
 
 ```json
 {
   "resources": {
     "nfs-shares": {
       "scraped_at": 1557134678,
+      "checked": {
+        "at": 1557144528,
+        "error": "cannot connect to OpenStack"
+      },
       "asset_count": 42,
       "low_threshold": {
         "usage_percent": 20,
@@ -64,6 +71,8 @@ The following fields may be returned:
 | ----- | ---- | ----------- |
 | `resources.$type` | object | Configuration for a project resource. Resources will only be shown when a) autoscaling is enabled for them and b) the requester has sufficient permissions to read them. |
 | `resources.$type.scraped_at` | timestamp | *Readonly.* When Castellum last scanned this resource for new assets or deleted assets. |
+| `resources.$type.checked.at` | timestamp | *Readonly.* When Castellum last _tried_ to scan this resource for new assets or deleted assets. Only shown when different from `scraped_at`, i.e. when the last check failed. |
+| `resources.$type.checked.error` | string | *Readonly.* When the last check failed (see above), this field contains the error message that was returned from the backend. |
 | `resources.$type.asset_count` | integer | *Readonly.* The number of assets in this resource. |
 | `resources.$type.low_threshold`<br>`resources.$type.high_threshold`<br>`resources.$type.critical_threshold` | object | Configuration for thresholds that trigger an automated resize operation. Any of these may be missing if the threshold in question has not been enabled. |
 | `resources.$type.low_threshold.usage_percent`<br>`resources.$type.high_threshold.usage_percent`<br>`resources.$type.critical_threshold.usage_percent` | integer | Automated operations will be triggered when usage crosses these thresholds, i.e. `usage <= threshold` for the low threshold and `usage >= threshold` for the high and critical thresholds. |
@@ -87,12 +96,16 @@ Single-step resizing is a good idea when usage changes infrequently, but possibl
 ## GET /v1/projects/:id/resources/:type
 
 Shows information about an individual project resource.
-Returns 404 if autoscaling is not enabled for this resource.
-Otherwise returns 200 and a JSON response body like this:
+Returns `404` if autoscaling is not enabled for this resource.
+Otherwise returns `200` and a JSON response body like this:
 
 ```json
 {
   "scraped_at": 1557134678,
+  "checked": {
+    "at": 1557144528,
+    "error": "cannot connect to OpenStack"
+  },
   "low_threshold": {
     "usage_percent": 20,
     "delay_seconds": 3600
@@ -125,6 +138,8 @@ document following the same schema as the response from the corresponding GET en
 except that the following fields may not be present:
 
 - `scraped_at`
+- `checked`
+- `asset_count`
 
 Returns 202 and an empty response body on success.
 
@@ -137,8 +152,8 @@ Returns 204 and an empty response body on success.
 ## GET /v1/projects/:id/assets/:type
 
 Shows a list of all known assets in a project resource.
-Returns 404 if autoscaling is not enabled for this resource.
-Otherwise returns 200 and a JSON response body like this:
+Returns `404` if autoscaling is not enabled for this resource.
+Otherwise returns `200` and a JSON response body like this:
 
 ```json
 {
@@ -179,8 +194,8 @@ For each asset, the following fields may be returned:
 | `id` | string | UUID of asset. |
 | `size` | integer | Size of asset. The unit depends on the asset type. See [README.md](../README.md#supported-asset-types) for more information. |
 | `usage_percent` | integer | Usage of asset as percentage of size. When the asset has multiple usage types (e.g. instances have both CPU usage and RAM usage), usually the higher value is reported here. |
-| `scraped_at` | integer | When the size and usage of the asset was last retrieved by Castellum. |
-| `checked.at` | integer | When Castellum last tried to retrieve the size and usage of the asset. Only shown when different from `scraped_at`, i.e. when the last check failed. |
+| `scraped_at` | timestamp | When the size and usage of the asset was last retrieved by Castellum. |
+| `checked.at` | timestamp | When Castellum last tried to retrieve the size and usage of the asset. Only shown when different from `scraped_at`, i.e. when the last check failed. |
 | `checked.error` | string | When the last check failed (see above), this field contains the error message that was returned from the backend. |
 | `stale` | bool | This flag is set by Castellum after a resize operation to indicate that the reported size and usage are probably not accurate anymore. Will be cleared by the next scrape. |
 
@@ -190,9 +205,9 @@ When no scrape ever succeeded (e.g. because the asset is in an error state since
 ## GET /v1/projects/:id/assets/:type/:id
 
 Shows information about a certain asset.
-Returns 404 if the asset does not exist in the selected project, or if autoscaling is not
+Returns `404` if the asset does not exist in the selected project, or if autoscaling is not
 enabled for the selected project resource.
-Otherwise returns 200 and a JSON response body like this:
+Otherwise returns `200` and a JSON response body like this:
 
 ```json
 {
@@ -290,8 +305,8 @@ The following query parameters can be given to filter the result:
 - When `domain` is given, it is interpreted as a domain ID. Only resources in project in that domain will be considered.
 - When `asset-type` is given, only resources with this asset type are considered.
 
-Returns 404 if autoscaling is not enabled for any resource matching the query.
-Otherwise returns 200 and a JSON response body like this:
+Returns `404` if autoscaling is not enabled for any resource matching the query.
+Otherwise returns `200` and a JSON response body like this:
 
 ```json
 {
@@ -345,8 +360,8 @@ for assets where the usage returned to normal levels in the meantime.
 The query parameters `domain`, `project` and `asset-type` are recognized with the same semantics as for
 `GET /v1/operations/pending`.
 
-Returns 404 if autoscaling is not enabled for this resource.
-Otherwise returns 200 and a JSON response body like this:
+Returns `404` if autoscaling is not enabled for this resource.
+Otherwise returns `200` and a JSON response body like this:
 
 ```json
 {
@@ -394,8 +409,8 @@ Shows information about all operations on assets in resources accessible to the 
 succeeded**, that is, all operations in state "succeeded" where there is no newer operation in state "succeeded",
 "failed" or "errored" for the same asset.
 
-Returns 404 if autoscaling is not enabled for this resource.
-Otherwise returns 200 and a JSON response body looking like that from the `recently-failed` endpoint above, except that
+Returns `404` if autoscaling is not enabled for this resource.
+Otherwise returns `200` and a JSON response body looking like that from the `recently-failed` endpoint above, except that
 `recently_failed_operations` is called `recently_succeeded_operations`.
 
 The query parameters `domain`, `project` and `asset-type` are recognized with the same semantics as for
@@ -404,3 +419,115 @@ The query parameters `domain`, `project` and `asset-type` are recognized with th
 - When `max-age` is given, only those operations will be shown that finished after `now - max_age`. The value must be an
   integer followed by one of the units `m` (minute), `h` (hour) or `d` (day), e.g. `12h` or `7d`. The default value is
   `1d`.
+
+## GET /v1/admin/resource-scrape-errors
+
+Shows information about resource scrape errors. This is intended to give
+operators a view of all scrape errors across all resources.
+
+Returns `200` on success and a JSON response body like this:
+
+```json
+{
+  "resource_scrape_errors": [
+    {
+      "asset_type": "nfs-shares",
+      "checked": {
+        "at": 1557144528,
+        "error": "cannot connect to OpenStack"
+      },
+      "domain_id": "481b2af2-d816-4453-8743-a05382e7d1ce",
+      "project_id": "0181e612-fcad-438d-a1a4-2a21fc0a2442"
+    },
+    {
+      "asset_type": "foo",
+      "checked": {
+        "at": 1557144777,
+        "error": "datacenter is on fire"
+      },
+      "domain_id": "481b2af2-d816-4453-8743-a05382e7d1ce",
+      "project_id": "89b76fc7-78fa-454c-b23b-674bd7589390"
+    }
+  ]
+}
+```
+
+Most fields on the top level have the same meaning as for `GET
+/v1/projects/:id/resources/:type` (see above), except for the following
+additional fields:
+
+- `asset_type` indicates which type of assets belong to this resource.
+- `project_id` and `domain_id` identify the resource. `project_id` is
+  only shown for non-domain resources.
+
+For each resource, at most one error will be listed (the most recent one).
+
+## GET /v1/admin/asset-scrape-errors
+
+Shows information about asset scrape errors. This is intended to give operators
+a view of scrape errors for all assets across all resources.
+
+Returns `200` on success and a JSON response body like this:
+
+```json
+{
+  "asset_scrape_errors": [
+    {
+      "asset_id": "c991eb08-e14e-4559-94d6-c9c390c18776",
+      "asset_type": "nfs-shares",
+      "checked": {
+        "at": 1557144799,
+        "error": "cannot connect to OpenStack"
+      },
+      "domain_id": "481b2af2-d816-4453-8743-a05382e7d1ce",
+      "project_id": "89b76fc7-78fa-454c-b23b-674bd7589390"
+    }
+  ]
+}
+```
+
+Most fields on the top level have the same meaning as for `GET
+/v1/projects/:id/assets/:type` (see above), except for the following additional
+fields:
+
+- `asset_id` identifies the concerning asset.
+- `asset_type`, `project_id` and `domain_id` identify the resource to which
+  this asset belongs. `project_id` is only shown for non-domain resources.
+
+For each asset, at most one error will be listed (the most recent one).
+
+## GET /v1/admin/asset-resize-errors
+
+Shows information about asset resize errors. This is intended to give operators
+a view of resize errors for all assets across all resources.
+
+Returns `200` on success and a JSON response body like this:
+
+```json
+{
+  "asset_resize_errors": [
+    {
+      "asset_id": "c991eb08-e14e-4559-94d6-c9c390c18776",
+      "asset_type": "nfs-shares",
+      "domain_id": "481b2af2-d816-4453-8743-a05382e7d1ce",
+      "finished": {
+        "at": 1557144789,
+        "error": "datacenter is on fire"
+      },
+      "new_size": 1025,
+      "old_size": 1024,
+      "project_id": "89b76fc7-78fa-454c-b23b-674bd7589390"
+    }
+  ]
+}
+```
+
+Most fields on the top level have the same meaning as for `GET
+/v1/projects/:id/assets/:type/:id` (see above), except for the following
+additional fields:
+
+- `asset_id` identifies the concerning asset.
+- `asset_type`, `project_id` and `domain_id` identify the resource to which
+  this asset belongs. `project_id` is only shown for non-domain resources.
+
+For each asset, at most one error will be listed (the most recent one).
