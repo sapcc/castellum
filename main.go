@@ -143,7 +143,10 @@ func mustGetenv(key string) string {
 // task: API
 
 func runAPI(dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient *core.ProviderClient, eo gophercloud.EndpointOpts, httpListenAddr string) {
-	tv := gopherpolicy.TokenValidator{IdentityV3: providerClient.KeystoneV3}
+	tv := gopherpolicy.TokenValidator{
+		IdentityV3: providerClient.KeystoneV3,
+		Cacher:     gopherpolicy.InMemoryCacher(),
+	}
 	err := tv.LoadPolicyFile(mustGetenv("CASTELLUM_OSLO_POLICY_PATH"))
 	if err != nil {
 		logg.Fatal("cannot load oslo.policy: " + err.Error())
