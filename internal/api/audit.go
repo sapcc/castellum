@@ -86,7 +86,7 @@ func logAndPublishEvent(time time.Time, req *http.Request, token *gopherpolicy.T
 	p := audittools.EventParameters{
 		Time:       time,
 		Request:    req,
-		Token:      token,
+		User:       token,
 		ReasonCode: reasonCode,
 		Action:     action,
 		Observer: struct {
