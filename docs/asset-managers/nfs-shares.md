@@ -19,3 +19,11 @@ The Castellum service user must be able to list, extend and shrink Manila shares
 
 - `project:show:nfs-shares` can usually be given to everyone who can interact with Manila shares.
 - `project:edit:nfs-shares` should only be given to users who can extend and shrink Manila shares.
+
+## Hooks
+
+If you want Castellum to ignore a Manila share, you can set the metadata key `snapmirror` to value `1`, e.g.
+
+    manila metadata SHARE_ID set snapmirror=1
+
+Usually you want that, if your share is a target in a NetApp SnapMirror setup. Size modification is anyhow not possible in this case.
