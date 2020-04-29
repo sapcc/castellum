@@ -149,7 +149,7 @@ func ignoreShare(metadata map[string]interface{}, status string) bool {
 }
 
 var (
-	sizeInconsistencyErrorRx = regexp.MustCompile(`New size for (?:extend must be greater|shrink must be less) than current size`)
+	sizeInconsistencyErrorRx = regexp.MustCompile(`New size for (?:extend must be greater|shrink must be less) than current size.*\(current: ([0-9]+), (?:new|extended): ([0-9]+)\)`)
 	quotaErrorRx             = regexp.MustCompile(`Requested share exceeds allowed project/user or share type \S+ quota.`)
 	shareStatusErrorRx       = regexp.MustCompile(`Invalid share: .* current status is: error.`)
 )
@@ -157,18 +157,26 @@ var (
 //SetAssetSize implements the core.AssetManager interface.
 func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (db.OperationOutcome, error) {
 	err := m.resize(assetUUID, oldSize, newSize /* useReverseOperation = */, false)
-	if err != nil && sizeInconsistencyErrorRx.MatchString(err.Error()) {
-		//We only rely on sizes reported by NetApp. But bugs in the Manila API may
-		//cause it to have a different expection how big the share is, therefore
-		//rejecting shrink/extend requests because it thinks they go in the wrong
-		//direction. In this case, we try the opposite direction to see if it helps.
-		err2 := m.resize(assetUUID, oldSize, newSize /* useReverseOperation = */, true)
-		if err2 == nil {
-			return db.OperationOutcomeSucceeded, nil
-		}
-		//If not successful, still return the original error (to avoid confusion).
-	}
 	if err != nil {
+		match := sizeInconsistencyErrorRx.FindStringSubmatch(err.Error())
+		if match != nil {
+			//ignore idiotic complaints about the share already having the size we
+			//want to resize to
+			if match[1] == match[2] {
+				return db.OperationOutcomeSucceeded, nil
+			}
+
+			//We only rely on sizes reported by NetApp. But bugs in the Manila API may
+			//cause it to have a different expection how big the share is, therefore
+			//rejecting shrink/extend requests because it thinks they go in the wrong
+			//direction. In this case, we try the opposite direction to see if it helps.
+			err2 := m.resize(assetUUID, oldSize, newSize /* useReverseOperation = */, true)
+			if err2 == nil {
+				return db.OperationOutcomeSucceeded, nil
+			}
+			//If not successful, still return the original error (to avoid confusion).
+		}
+
 		//If the resize fails because of missing quota or because the share is in
 		//status "error", it's the user's fault, not ours.
 		if quotaErrorRx.MatchString(err.Error()) || shareStatusErrorRx.MatchString(err.Error()) {
