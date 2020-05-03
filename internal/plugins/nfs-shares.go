@@ -25,6 +25,7 @@ import (
 	"math"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gophercloud/gophercloud"
@@ -197,20 +198,27 @@ func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useR
 //GetAssetStatus implements the core.AssetManager interface.
 func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
 	//check status in Prometheus
+	var bytesReservedBySnapshots, bytesUsed, bytesUsedBySnapshots float64
 	bytesTotal, err := m.getMetricForShare("netapp_volume_total_bytes", res.ScopeUUID, assetUUID)
-	if err != nil {
-		return core.AssetStatus{}, err
+	if err == nil {
+		bytesReservedBySnapshots, err = m.getMetricForShare("netapp_volume_snapshot_reserved_bytes", res.ScopeUUID, assetUUID)
+		if err == nil {
+			bytesUsed, err = m.getMetricForShare("netapp_volume_used_bytes", res.ScopeUUID, assetUUID)
+			if err == nil {
+				bytesUsedBySnapshots, err = m.getMetricForShare("netapp_volume_snapshot_used_bytes", res.ScopeUUID, assetUUID)
+			}
+		}
 	}
-	bytesReservedBySnapshots, err := m.getMetricForShare("netapp_volume_snapshot_reserved_bytes", res.ScopeUUID, assetUUID)
 	if err != nil {
-		return core.AssetStatus{}, err
-	}
-	bytesUsed, err := m.getMetricForShare("netapp_volume_used_bytes", res.ScopeUUID, assetUUID)
-	if err != nil {
-		return core.AssetStatus{}, err
-	}
-	bytesUsedBySnapshots, err := m.getMetricForShare("netapp_volume_snapshot_used_bytes", res.ScopeUUID, assetUUID)
-	if err != nil {
+		if strings.Contains(err.Error(), "Prometheus query returned empty result") {
+			//check if the share still exists in the backend
+			_, getErr := shares.Get(m.Manila, assetUUID).Extract()
+			if getErr != nil {
+				if _, ok := getErr.(gophercloud.ErrDefault404); ok {
+					return core.AssetStatus{}, core.AssetNotFoundErr{InnerError: fmt.Errorf("share not found in Manila: %s", getErr.Error())}
+				}
+			}
+		}
 		return core.AssetStatus{}, err
 	}
 
@@ -276,6 +284,8 @@ func prometheusGetSingleValue(api prom_v1.API, queryStr string) (float64, error)
 
 	switch resultVector.Len() {
 	case 0:
+		//Note: this error message is used by assetManagerNFS.GetAssetStatus()
+		//to check if the share still exists in the backend.
 		return 0, fmt.Errorf("Prometheus query returned empty result: %s", queryStr)
 	default:
 		//suppress the log message when all values are the same (this can happen

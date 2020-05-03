@@ -112,6 +112,17 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 	}
 	status, err := manager.GetAssetStatus(res, asset.UUID, oldStatus)
 	if err != nil {
+		errMsg := fmt.Errorf("cannot query status of %s %s: %s", string(assetType), asset.UUID, err.Error())
+		if _, ok := err.(core.AssetNotFoundErr); ok {
+			//GetAssetStatus may return a core.AssetNotFoundErr, if the
+			//concerning asset could not be found in the backend; in that case,
+			//delete the asset from db.
+			logg.Error(errMsg.Error())
+			logg.Info("removing deleted %s asset from DB: UUID = %s, scope UUID = %s", assetType, asset.UUID, res.ScopeUUID)
+			_, dbErr := c.DB.Delete(&asset)
+			return dbErr
+		}
+
 		//GetAssetStatus may fail for single assets, e.g. for Manila shares in
 		//transitional states like Creating/Deleting; in that case, update
 		//checked_at so that the next call continues with the next asset, but leave
@@ -122,7 +133,7 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 		if dbErr != nil {
 			return dbErr
 		}
-		return fmt.Errorf("cannot query status of %s %s: %s", string(assetType), asset.UUID, err.Error())
+		return errMsg
 	}
 
 	if logScrapes {
