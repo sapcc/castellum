@@ -92,30 +92,24 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 	//the chance of us missing items.
 	wasSeen := make(map[string]bool)
 
-	//TODO: simplify this by adding a shares.List() function to
-	//package github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares
 	for {
-		url := m.Manila.ServiceURL("shares", "detail") + fmt.Sprintf("?project_id=%s&all_tenants=1&limit=%d&offset=%d", res.ScopeUUID, pageSize, page*(pageSize-10))
-		var r gophercloud.Result
-		_, err := m.Manila.Get(url, &r.Body, nil)
+		p, err := shares.ListDetail(m.Manila, shares.ListOpts{
+			ProjectID:  res.ScopeUUID,
+			AllTenants: true,
+			Limit:      pageSize,
+			Offset:     page * (pageSize - 10),
+		}).AllPages()
 		if err != nil {
 			return nil, err
 		}
 
-		var data struct {
-			Shares []struct {
-				ID       string                 `json:"id"`
-				Metadata map[string]interface{} `json:"metadata"`
-				Status   string                 `json:"status"`
-			} `json:"shares"`
-		}
-		err = r.ExtractInto(&data)
+		s, err := shares.ExtractShares(p)
 		if err != nil {
 			return nil, err
 		}
 
-		if len(data.Shares) > 0 {
-			for _, share := range data.Shares {
+		if len(s) > 0 {
+			for _, share := range s {
 				if ignoreShare(share.Metadata, share.Status) {
 					continue
 				}
@@ -132,14 +126,14 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 	}
 }
 
-func ignoreShare(metadata map[string]interface{}, status string) bool {
+func ignoreShare(metadata map[string]string, status string) bool {
 	//ignore shares in status "error" (we won't be able to resize them anyway)
 	if status == "error" {
 		return true
 	}
 
 	//ignore "shares" that are actually snapmirror targets (sapcc-specific extension)
-	if snapmirrorStr, ok := metadata["snapmirror"].(string); ok {
+	if snapmirrorStr, ok := metadata["snapmirror"]; ok {
 		if snapmirrorStr == "1" {
 			return true
 		}
