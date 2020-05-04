@@ -193,7 +193,7 @@ func (m *assetManagerProjectQuota) getQuotaStatus(assetType db.AssetType, projec
 		return nil, err
 	}
 	if project == nil {
-		return nil, core.AssetNotFoundErr{InnerError: fmt.Errorf("project not found in Keystone: %s", projectID)}
+		return nil, fmt.Errorf("project not found in Keystone: %s", projectID)
 	}
 
 	opts := projects.GetOpts{Service: info.ServiceType, Resource: info.ResourceName}
