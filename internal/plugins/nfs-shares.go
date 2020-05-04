@@ -25,7 +25,6 @@ import (
 	"math"
 	"os"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/gophercloud/gophercloud"
@@ -210,7 +209,7 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 		}
 	}
 	if err != nil {
-		if strings.Contains(err.Error(), "Prometheus query returned empty result") {
+		if _, ok := err.(emptyPrometheusResultErr); ok {
 			//check if the share still exists in the backend
 			_, getErr := shares.Get(m.Manila, assetUUID).Extract()
 			if getErr != nil {
@@ -261,6 +260,14 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 	return status, nil
 }
 
+type emptyPrometheusResultErr struct {
+	Query string
+}
+
+func (e emptyPrometheusResultErr) Error() string {
+	return fmt.Sprintf("Prometheus query returned empty result: %s", e.Query)
+}
+
 func (m *assetManagerNFS) getMetricForShare(metric, projectUUID, shareUUID string) (float64, error) {
 	//NOTE: The `max by (share_id)` is necessary for when a share is being
 	//migrated to another shareserver and thus appears in the metrics twice.
@@ -284,9 +291,7 @@ func prometheusGetSingleValue(api prom_v1.API, queryStr string) (float64, error)
 
 	switch resultVector.Len() {
 	case 0:
-		//Note: this error message is used by assetManagerNFS.GetAssetStatus()
-		//to check if the share still exists in the backend.
-		return 0, fmt.Errorf("Prometheus query returned empty result: %s", queryStr)
+		return 0, emptyPrometheusResultErr{Query: queryStr}
 	default:
 		//suppress the log message when all values are the same (this can happen
 		//when an adventurous Prometheus configuration causes the NetApp exporter
