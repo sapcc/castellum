@@ -92,30 +92,24 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 	//the chance of us missing items.
 	wasSeen := make(map[string]bool)
 
-	//TODO: simplify this by adding a shares.List() function to
-	//package github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares
 	for {
-		url := m.Manila.ServiceURL("shares", "detail") + fmt.Sprintf("?project_id=%s&all_tenants=1&limit=%d&offset=%d", res.ScopeUUID, pageSize, page*(pageSize-10))
-		var r gophercloud.Result
-		_, err := m.Manila.Get(url, &r.Body, nil)
+		p, err := shares.ListDetail(m.Manila, shares.ListOpts{
+			ProjectID:  res.ScopeUUID,
+			AllTenants: true,
+			Limit:      pageSize,
+			Offset:     page * (pageSize - 10),
+		}).AllPages()
 		if err != nil {
 			return nil, err
 		}
 
-		var data struct {
-			Shares []struct {
-				ID       string                 `json:"id"`
-				Metadata map[string]interface{} `json:"metadata"`
-				Status   string                 `json:"status"`
-			} `json:"shares"`
-		}
-		err = r.ExtractInto(&data)
+		s, err := shares.ExtractShares(p)
 		if err != nil {
 			return nil, err
 		}
 
-		if len(data.Shares) > 0 {
-			for _, share := range data.Shares {
+		if len(s) > 0 {
+			for _, share := range s {
 				if ignoreShare(share.Metadata, share.Status) {
 					continue
 				}
@@ -132,14 +126,14 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 	}
 }
 
-func ignoreShare(metadata map[string]interface{}, status string) bool {
+func ignoreShare(metadata map[string]string, status string) bool {
 	//ignore shares in status "error" (we won't be able to resize them anyway)
 	if status == "error" {
 		return true
 	}
 
 	//ignore "shares" that are actually snapmirror targets (sapcc-specific extension)
-	if snapmirrorStr, ok := metadata["snapmirror"].(string); ok {
+	if snapmirrorStr, ok := metadata["snapmirror"]; ok {
 		if snapmirrorStr == "1" {
 			return true
 		}
@@ -197,20 +191,27 @@ func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useR
 //GetAssetStatus implements the core.AssetManager interface.
 func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
 	//check status in Prometheus
+	var bytesReservedBySnapshots, bytesUsed, bytesUsedBySnapshots float64
 	bytesTotal, err := m.getMetricForShare("netapp_volume_total_bytes", res.ScopeUUID, assetUUID)
-	if err != nil {
-		return core.AssetStatus{}, err
+	if err == nil {
+		bytesReservedBySnapshots, err = m.getMetricForShare("netapp_volume_snapshot_reserved_bytes", res.ScopeUUID, assetUUID)
+		if err == nil {
+			bytesUsed, err = m.getMetricForShare("netapp_volume_used_bytes", res.ScopeUUID, assetUUID)
+			if err == nil {
+				bytesUsedBySnapshots, err = m.getMetricForShare("netapp_volume_snapshot_used_bytes", res.ScopeUUID, assetUUID)
+			}
+		}
 	}
-	bytesReservedBySnapshots, err := m.getMetricForShare("netapp_volume_snapshot_reserved_bytes", res.ScopeUUID, assetUUID)
 	if err != nil {
-		return core.AssetStatus{}, err
-	}
-	bytesUsed, err := m.getMetricForShare("netapp_volume_used_bytes", res.ScopeUUID, assetUUID)
-	if err != nil {
-		return core.AssetStatus{}, err
-	}
-	bytesUsedBySnapshots, err := m.getMetricForShare("netapp_volume_snapshot_used_bytes", res.ScopeUUID, assetUUID)
-	if err != nil {
+		if _, ok := err.(emptyPrometheusResultErr); ok {
+			//check if the share still exists in the backend
+			_, getErr := shares.Get(m.Manila, assetUUID).Extract()
+			if getErr != nil {
+				if _, ok := getErr.(gophercloud.ErrDefault404); ok {
+					return core.AssetStatus{}, core.AssetNotFoundErr{InnerError: fmt.Errorf("share not found in Manila: %s", getErr.Error())}
+				}
+			}
+		}
 		return core.AssetStatus{}, err
 	}
 
@@ -253,6 +254,14 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 	return status, nil
 }
 
+type emptyPrometheusResultErr struct {
+	Query string
+}
+
+func (e emptyPrometheusResultErr) Error() string {
+	return fmt.Sprintf("Prometheus query returned empty result: %s", e.Query)
+}
+
 func (m *assetManagerNFS) getMetricForShare(metric, projectUUID, shareUUID string) (float64, error) {
 	//NOTE: The `max by (share_id)` is necessary for when a share is being
 	//migrated to another shareserver and thus appears in the metrics twice.
@@ -276,7 +285,7 @@ func prometheusGetSingleValue(api prom_v1.API, queryStr string) (float64, error)
 
 	switch resultVector.Len() {
 	case 0:
-		return 0, fmt.Errorf("Prometheus query returned empty result: %s", queryStr)
+		return 0, emptyPrometheusResultErr{Query: queryStr}
 	default:
 		//suppress the log message when all values are the same (this can happen
 		//when an adventurous Prometheus configuration causes the NetApp exporter

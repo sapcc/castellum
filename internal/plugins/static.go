@@ -40,6 +40,9 @@ type StaticAsset struct {
 
 	//When true, return a bogus error from GetAssetStatus().
 	CannotGetAssetStatus bool
+
+	//When true, return a core.AssetNotFoundErr from GetAssetStatus().
+	CannotFindAsset bool
 }
 
 //AssetManagerStatic is a core.AssetManager for testing purposes. It just
@@ -79,6 +82,7 @@ var (
 	errTooSmall            = errors.New("cannot set size smaller than current usage")
 	errSimulatedRejection  = errors.New("CheckResourceAllowed failing as requested")
 	errSimulatedGetFailure = errors.New("GetAssetStatus failing as requested")
+	errSimulatedNotFound   = errors.New("GetAssetStatus asset not found in backend")
 	errSimulatedSetFailure = errors.New("SetAssetSize failing as requested")
 )
 
@@ -115,6 +119,9 @@ func (m AssetManagerStatic) GetAssetStatus(res db.Resource, assetUUID string, pr
 
 	if asset.CannotGetAssetStatus {
 		return core.AssetStatus{}, errSimulatedGetFailure
+	}
+	if asset.CannotFindAsset {
+		return core.AssetStatus{}, core.AssetNotFoundErr{InnerError: errSimulatedNotFound}
 	}
 
 	if asset.NewSize != 0 {

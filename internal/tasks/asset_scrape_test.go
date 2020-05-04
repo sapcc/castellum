@@ -605,10 +605,12 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
 }
 
 func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
-	//This tests the behavior when GetAssetStatus returns an error. The error is
-	//passed through to the caller of ScrapeNextAsset, but the asset's checked_at
-	//timestamp is still updated to ensure that the main loop progresses to the
-	//next asset.
+	//This tests the behavior when GetAssetStatus returns an error:
+	//1. If core.AssetNotFoundErr is returned then the asset is deleted from
+	//the db.
+	//2. All other errors are passed through to the caller of ScrapeNextAsset,
+	//but the asset's checked_at timestamp is still updated to ensure that the
+	//main loop progresses to the next asset.
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
 
@@ -658,6 +660,14 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 			ExpectedSize:       nil,
 			ScrapeErrorMessage: "",
 		})
+
+		//Note: this test should be at the end, see below.
+		//Run GetAssetStatus on the same asset again except this time the
+		//ScrapeNextAsset should delete the asset from the db.
+		setAsset(plugins.StaticAsset{Size: 1000, Usage: 600, CannotFindAsset: true})
+		clock.StepBy(5 * time.Minute)
+		t.Must(c.ScrapeNextAsset("foo", c.TimeNow()))
+		t.ExpectAssets(c.DB)
 
 	})
 }

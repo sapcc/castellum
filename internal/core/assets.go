@@ -38,6 +38,16 @@ type AssetTypeInfo struct {
 	ReportsAbsoluteUsage bool
 }
 
+//AssetNotFoundErr is returned by AssetManager.GetAssetStatus() if the
+//concerning asset can not be found in the respective backend.
+type AssetNotFoundErr struct {
+	InnerError error
+}
+
+func (e AssetNotFoundErr) Error() string {
+	return e.InnerError.Error()
+}
+
 //AssetManager is the main modularization interface in Castellum. It
 //provides a separation boundary between the plugins that implement the
 //concrete behavior for specific asset types, and the core logic of Castellum.
