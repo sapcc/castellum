@@ -21,6 +21,7 @@ package tasks
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/castellum/internal/core"
@@ -32,11 +33,16 @@ import (
 //will not work as expected.
 var selectAndDeleteNextResizeQuery = `
 	DELETE FROM pending_operations WHERE id = (
-		SELECT id FROM pending_operations WHERE greenlit_at < $1
+		SELECT id FROM pending_operations WHERE greenlit_at < $1 AND (retry_at IS NULL OR retry_at < $1)
 		ORDER BY reason ASC LIMIT 1
 		FOR UPDATE SKIP LOCKED
 	) RETURNING *
 `
+
+const (
+	maxRetries    = 3
+	retryInterval = 2 * time.Minute
+)
 
 //ExecuteNextResize finds the next pending operation and executes it, i.e.
 //moves it from status "greenlit" to either "succeeded", "failed" or "errored".
@@ -106,6 +112,27 @@ func (c Context) ExecuteNextResize() (targetAssetType db.AssetType, returnedErro
 	if err != nil {
 		logg.Error("cannot resize %s %s to size %d: %s", string(res.AssetType), asset.UUID, op.NewSize, err.Error())
 		errorMessage = err.Error()
+	}
+
+	//if we have not exceeded our retry budget, put this operation back in the queue
+	//
+	//We only do this for outcome "errored", which indicates a system error.
+	//These problems are usually discovered via alerts and quickly resolved, so
+	//there is actual hope that everything will be better in a few minutes
+	//without us failing the entire operation. For outcome "failed", we have a
+	//user error and the user will likely only notice once they see the failed
+	//operation in Castellum, so there is little use retrying here.
+	if outcome == db.OperationOutcomeErrored && op.ErroredAttempts < maxRetries {
+		op.ID = 0
+		op.ErroredAttempts++
+		retryAt := c.TimeNow().Add(retryInterval)
+		op.RetryAt = &retryAt
+
+		err = tx.Insert(&op)
+		if err != nil {
+			return res.AssetType, err
+		}
+		return res.AssetType, tx.Commit()
 	}
 
 	finishedOp := op.IntoFinishedOperation(outcome, c.TimeNow())

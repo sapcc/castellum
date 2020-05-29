@@ -192,4 +192,18 @@ var SQLMigrations = map[string]string{
 	"012_add_resources_scrape_error_message.up.sql": `
 		ALTER TABLE resources ADD COLUMN scrape_error_message TEXT NOT NULL DEFAULT '';
 	`,
+	"013_add_operations_retry_counter.down.sql": `
+		ALTER TABLE pending_operations
+			DROP COLUMN errored_attempts,
+			DROP COLUMN retry_at;
+		ALTER TABLE finished_operations
+			DROP COLUMN errored_attempts;
+	`,
+	"013_add_operations_retry_counter.up.sql": `
+		ALTER TABLE pending_operations
+			ADD COLUMN errored_attempts INT DEFAULT 0,
+			ADD COLUMN retry_at TIMESTAMP;
+		ALTER TABLE finished_operations
+			ADD COLUMN errored_attempts INT DEFAULT 0;
+	`,
 }

@@ -177,6 +177,14 @@ type PendingOperation struct {
 	//not null, but this field is null, it means that the operation did not
 	//require operator approval.
 	GreenlitByUserUUID *string `db:"greenlit_by_user_uuid"`
+
+	//When the resize results in the outcome "errored", we have the option of
+	//retrying at a later point in time. This field tracks how many times the
+	//operation was put back in the queue after an errored resize.
+	ErroredAttempts uint32 `db:"errored_attempts"`
+	//When we will attempt the next resize. This field is only filled after an
+	//errored resize, i.e. when `op.ErroredAttempts > 0`.
+	RetryAt *time.Time `db:"retry_at"`
 }
 
 //IntoFinishedOperation creates the FinishedOperation for this PendingOperation.
@@ -193,6 +201,7 @@ func (o PendingOperation) IntoFinishedOperation(outcome OperationOutcome, finish
 		GreenlitAt:         o.GreenlitAt,
 		FinishedAt:         finishedAt,
 		GreenlitByUserUUID: o.GreenlitByUserUUID,
+		ErroredAttempts:    o.ErroredAttempts,
 	}
 }
 
@@ -216,6 +225,7 @@ type FinishedOperation struct {
 
 	GreenlitByUserUUID *string `db:"greenlit_by_user_uuid"`
 	ErrorMessage       string  `db:"error_message"`
+	ErroredAttempts    uint32  `db:"errored_attempts"`
 }
 
 //OperationReason is an enumeration type for possible reasons for a resize operation.

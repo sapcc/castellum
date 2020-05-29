@@ -189,22 +189,46 @@ func TestErroringResize(tBase *testing.T) {
 		}
 		t.Must(c.DB.Insert(&pendingOp))
 
-		//check that resizing errors as expected
+		//when the outcome of the resize is "errored", we can retry several times
+		for try := 0; try < maxRetries; try++ {
+			clock.StepBy(10 * time.Minute)
+			_, err := c.ExecuteNextResize()
+			t.Must(err)
+
+			pendingOp.ID++
+			pendingOp.ErroredAttempts++
+			pendingOp.RetryAt = p2time(c.TimeNow().Add(retryInterval))
+			t.ExpectPendingOperations(c.DB, pendingOp)
+			t.ExpectFinishedOperations(c.DB /*, nothing */)
+		}
+
+		//ExecuteNextResize() should do nothing right now because, although the
+		//operation is greenlit, its retry_at timestamp is in the future
 		_, err := c.ExecuteNextResize()
+		if err != sql.ErrNoRows {
+			t.Fatalf("expected sql.ErrNoRows, got %s instead", err.Error())
+		}
+		t.ExpectPendingOperations(c.DB, pendingOp)
+		t.ExpectFinishedOperations(c.DB /*, nothing */)
+
+		//check that resizing errors as expected once the retry budget is exceeded
+		clock.StepBy(10 * time.Minute)
+		_, err = c.ExecuteNextResize()
 		t.Must(err)
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
-			AssetID:      1,
-			Reason:       db.OperationReasonLow,
-			OldSize:      1000,
-			NewSize:      400,
-			UsagePercent: 50,
-			CreatedAt:    c.TimeNow().Add(-10 * time.Minute),
-			ConfirmedAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
-			GreenlitAt:   p2time(c.TimeNow().Add(-5 * time.Minute)),
-			FinishedAt:   c.TimeNow(),
-			Outcome:      db.OperationOutcomeErrored,
-			ErrorMessage: "cannot set size smaller than current usage",
+			AssetID:         1,
+			Reason:          db.OperationReasonLow,
+			OldSize:         1000,
+			NewSize:         400,
+			UsagePercent:    50,
+			CreatedAt:       pendingOp.CreatedAt,
+			ConfirmedAt:     pendingOp.ConfirmedAt,
+			GreenlitAt:      pendingOp.GreenlitAt,
+			FinishedAt:      c.TimeNow(),
+			Outcome:         db.OperationOutcomeErrored,
+			ErrorMessage:    "cannot set size smaller than current usage",
+			ErroredAttempts: maxRetries,
 		})
 
 		//check that asset does not have an ExpectedSize
@@ -214,7 +238,7 @@ func TestErroringResize(tBase *testing.T) {
 			UUID:         "asset1",
 			Size:         1000,
 			UsagePercent: 50,
-			ScrapedAt:    p2time(c.TimeNow().Add(-10 * time.Minute)),
+			ScrapedAt:    p2time(c.TimeNow().Add(-(2 + maxRetries) * 10 * time.Minute)),
 			ExpectedSize: nil,
 		})
 	})
