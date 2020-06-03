@@ -104,7 +104,7 @@ func (m AssetManagerStatic) ListAssets(res db.Resource) ([]string, error) {
 }
 
 //GetAssetStatus implements the core.AssetManager interface.
-func (m AssetManagerStatic) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
+func (m AssetManagerStatic) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus, expectedSize *uint64) (core.AssetStatus, error) {
 	if res.AssetType != m.AssetType {
 		return core.AssetStatus{}, errWrongAssetType
 	}

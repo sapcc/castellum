@@ -342,7 +342,7 @@ func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetTyp
 				logg.Error("wrong number of arguments")
 				continue
 			}
-			result, err := manager.GetAssetStatus(res, fields[2], previousStatus)
+			result, err := manager.GetAssetStatus(res, fields[2], previousStatus, nil)
 			if err != nil {
 				logg.Error(err.Error())
 				continue

@@ -171,7 +171,7 @@ func isUserError(err error) bool {
 }
 
 //GetAssetStatus implements the core.AssetManager interface.
-func (m *assetManagerProjectQuota) GetAssetStatus(res db.Resource, projectID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
+func (m *assetManagerProjectQuota) GetAssetStatus(res db.Resource, projectID string, previousStatus *core.AssetStatus, expectedSize *uint64) (core.AssetStatus, error) {
 	resource, err := m.getQuotaStatus(res.AssetType, projectID)
 	if err != nil {
 		return core.AssetStatus{}, err

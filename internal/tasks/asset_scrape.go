@@ -110,7 +110,7 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 			UsagePercent: asset.UsagePercent,
 		}
 	}
-	status, err := manager.GetAssetStatus(res, asset.UUID, oldStatus)
+	status, err := manager.GetAssetStatus(res, asset.UUID, oldStatus, asset.ExpectedSize)
 	if err != nil {
 		errMsg := fmt.Errorf("cannot query status of %s %s: %s", string(assetType), asset.UUID, err.Error())
 		if _, ok := err.(core.AssetNotFoundErr); ok {

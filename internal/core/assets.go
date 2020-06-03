@@ -66,8 +66,9 @@ type AssetManager interface {
 	//The returned error should be nil if and only if the outcome is Succeeded.
 	SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (db.OperationOutcome, error)
 	//previousStatus will be nil when this function is called for the first time
-	//for the given asset.
-	GetAssetStatus(res db.Resource, assetUUID string, previousStatus *AssetStatus) (AssetStatus, error)
+	//for the given asset. expectedSize will be non-nil only after a resize, when
+	//the new size has not been observed by a previous GetAssetStatus call.
+	GetAssetStatus(res db.Resource, assetUUID string, previousStatus *AssetStatus, expectedSize *uint64) (AssetStatus, error)
 }
 
 //AssetManagerFactory is something that creates AssetManager instances. This

@@ -189,7 +189,7 @@ func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useR
 }
 
 //GetAssetStatus implements the core.AssetManager interface.
-func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
+func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus, expectedSize *uint64) (core.AssetStatus, error) {
 	//check status in Prometheus
 	var bytesReservedBySnapshots, bytesUsed, bytesUsedBySnapshots float64
 	bytesTotal, err := m.getMetricForShare("netapp_volume_total_bytes", res.ScopeUUID, assetUUID)
@@ -245,6 +245,14 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 				assetUUID, err.Error())
 		}
 		if uint64(share.Size) != status.Size {
+			//immediately after a resize, the Prometheus metrics might not have been
+			//scraped yet and thus show the previous size while Manila already knows
+			//about the new size; in this case, just wait until the next scrape
+			if previousStatus != nil && expectedSize != nil && previousStatus.Size == status.Size && *expectedSize == uint64(share.Size) {
+				return status, nil
+			}
+			//otherwise something seems to be persistently wrong and an operator
+			//should take a look
 			return core.AssetStatus{}, fmt.Errorf(
 				"inconsistent size reports for share %s: Prometheus says %d GiB, Manila says %d GiB",
 				assetUUID, status.Size, share.Size)
