@@ -130,7 +130,7 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 			ExpectedSize: nil,
 		}
 
-		status, err := manager.GetAssetStatus(res, assetUUID, nil, nil)
+		status, err := manager.GetAssetStatus(res, assetUUID, nil)
 		labels := prometheus.Labels{"asset": string(assetType)}
 		if err == nil {
 			assetScrapeSuccessCounter.With(labels).Inc()
