@@ -167,7 +167,7 @@ func (m *assetManagerProjectQuota) SetAssetSize(res db.Resource, projectID strin
 
 func isUserError(err error) bool {
 	msg := err.Error()
-	return strings.Contains(msg, "got 409 instead") && strings.Contains(msg, "domain quota exceeded")
+	return strings.Contains(msg, "got 409 instead") && (strings.Contains(msg, "domain quota exceeded") || strings.Contains(msg, "quota may not be lower than current usage"))
 }
 
 //GetAssetStatus implements the core.AssetManager interface.
