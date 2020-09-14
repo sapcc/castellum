@@ -31,6 +31,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dlmiddlecote/sqlstats"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/utils/openstack/clientconfig"
@@ -66,6 +67,7 @@ func main() {
 	if err != nil {
 		logg.Fatal(err.Error())
 	}
+	prometheus.MustRegister(sqlstats.NewStatsCollector("castellum", dbi.Db))
 
 	//initialize OpenStack connection
 	ao, err := clientconfig.AuthOptions(nil)

@@ -328,6 +328,9 @@ func Init(urlStr string) (*gorp.DbMap, error) {
 		return nil, fmt.Errorf("cannot connect to database: " + err.Error())
 	}
 
+	//ensure that this process does not starve other Castellum processes for DB connections
+	dbConn.SetMaxOpenConns(16)
+
 	gorpDB := &gorp.DbMap{Db: dbConn, Dialect: gorp.PostgresDialect{}}
 	gorpDB.AddTableWithName(Resource{}, "resources").SetKeys(true, "id")
 	gorpDB.AddTableWithName(Asset{}, "assets").SetKeys(true, "id")
