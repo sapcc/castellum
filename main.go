@@ -104,6 +104,36 @@ func main() {
 		logg.Fatal(err.Error())
 	}
 
+	//get max asset sizes
+	cfg := core.Config{
+		MaxAssetSize: make(map[db.AssetType]*uint64),
+	}
+	maxAssetSizes := strings.Split(mustGetenv("CASTELLUM_MAX_ASSET_SIZES"), ",")
+	for _, v := range maxAssetSizes {
+		sL := strings.Split(v, "=")
+		if len(sL) != 2 {
+			logg.Fatal("expected a max asset size configuration value in the format: '<asset-type>:<max-asset-size>', got: %s", v)
+		}
+		assetType := sL[0]
+		maxSize, err := strconv.ParseUint(sL[1], 10, 64)
+		if err != nil {
+			logg.Fatal(err.Error())
+		}
+
+		found := false
+		for _, assetManager := range team {
+			for _, info := range assetManager.AssetTypes() {
+				if assetType == string(info.AssetType) {
+					found = true
+					cfg.MaxAssetSize[info.AssetType] = &maxSize
+				}
+			}
+		}
+		if !found {
+			logg.Fatal("unknown asset type: %s", assetType)
+		}
+	}
+
 	if len(os.Args) < 2 {
 		usage()
 	}
@@ -112,7 +142,7 @@ func main() {
 		if len(os.Args) != 2 {
 			usage()
 		}
-		runAPI(dbi, team, providerClient, eo, httpListenAddr)
+		runAPI(&cfg, dbi, team, providerClient, eo, httpListenAddr)
 	case "observer":
 		if len(os.Args) != 2 {
 			usage()
@@ -144,7 +174,7 @@ func mustGetenv(key string) string {
 ////////////////////////////////////////////////////////////////////////////////
 // task: API
 
-func runAPI(dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient *core.ProviderClient, eo gophercloud.EndpointOpts, httpListenAddr string) {
+func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient *core.ProviderClient, eo gophercloud.EndpointOpts, httpListenAddr string) {
 	tv := gopherpolicy.TokenValidator{
 		IdentityV3: providerClient.KeystoneV3,
 		Cacher:     gopherpolicy.InMemoryCacher(),
@@ -157,7 +187,7 @@ func runAPI(dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient *core.Pr
 	//wrap the main API handler in several layers of middleware (CORS is
 	//deliberately the outermost middleware, to exclude preflight checks from
 	//logging)
-	handler := api.NewHandler(dbi, team, &tv, providerClient)
+	handler := api.NewHandler(cfg, dbi, team, &tv, providerClient)
 	handler = logg.Middleware{}.Wrap(handler)
 	handler = cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},

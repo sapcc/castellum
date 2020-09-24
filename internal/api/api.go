@@ -39,6 +39,7 @@ import (
 )
 
 type handler struct {
+	Config    *core.Config
 	DB        *gorp.DbMap
 	Team      core.AssetManagerTeam
 	Validator gopherpolicy.Validator
@@ -49,8 +50,8 @@ type handler struct {
 }
 
 //NewHandler constructs the main http.Handler for this package.
-func NewHandler(dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClientInterface) http.Handler {
-	h := &handler{DB: dbi, Team: team, Validator: validator, Provider: provider, TimeNow: time.Now}
+func NewHandler(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClientInterface) http.Handler {
+	h := &handler{Config: cfg, DB: dbi, Team: team, Validator: validator, Provider: provider, TimeNow: time.Now}
 	return h.BuildRouter()
 }
 
