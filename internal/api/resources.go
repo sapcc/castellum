@@ -204,21 +204,18 @@ func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo, ma
 		}
 	}
 
-	isNFS := string(info.AssetType) == "nfs-shares"
 	if r.SizeConstraints == nil {
-		if isNFS {
-			complain("maximum size must be configured for nfs-shares")
+		if maxAssetSize != nil {
+			complain(fmt.Sprintf("maximum size must be configured for %s", info.AssetType))
 		}
 		res.MinimumSize = nil
 		res.MaximumSize = nil
 		res.MinimumFreeSize = nil
 	} else {
-		if isNFS {
-			if res.MaximumSize == nil {
-				complain("maximum size must be configured for nfs-shares")
-			} else if maxAssetSize != nil && *res.MaximumSize > *maxAssetSize {
-				complain(fmt.Sprintf("maximum size must be less than %d", *maxAssetSize))
-			}
+		if res.MaximumSize == nil {
+			complain(fmt.Sprintf("maximum size must be configured for %s", info.AssetType))
+		} else if maxAssetSize != nil && *res.MaximumSize > *maxAssetSize {
+			complain(fmt.Sprintf("maximum size must be less than %d", *maxAssetSize))
 		}
 
 		res.MinimumSize = r.SizeConstraints.Minimum
