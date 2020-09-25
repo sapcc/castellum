@@ -112,7 +112,7 @@ func main() {
 	for _, v := range maxAssetSizes {
 		sL := strings.Split(v, "=")
 		if len(sL) != 2 {
-			logg.Fatal("expected a max asset size configuration value in the format: '<asset-type>:<max-asset-size>', got: %s", v)
+			logg.Fatal("expected a max asset size configuration value in the format: '<asset-type>=<max-asset-size>', got: %s", v)
 		}
 		assetType := sL[0]
 		maxSize, err := strconv.ParseUint(sL[1], 10, 64)
