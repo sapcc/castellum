@@ -53,7 +53,7 @@ func withHandler(t test.T, timeNow func() time.Time, action func(*handler, http.
 		if timeNow == nil {
 			timeNow = time.Now
 		}
-		h := &handler{DB: dbi, Team: team, Validator: mv, Provider: MockProviderClient{}, TimeNow: timeNow}
+		h := &handler{Config: &core.Config{}, DB: dbi, Team: team, Validator: mv, Provider: MockProviderClient{}, TimeNow: timeNow}
 		action(h, h.BuildRouter(), mv, resources, assets)
 	})
 }

@@ -19,6 +19,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -115,7 +116,7 @@ func (h handler) ResourceFromDB(res db.Resource) (Resource, error) {
 
 //UpdateDBResource updates the given db.Resource with the values provided in
 //this api.Resource.
-func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo) (errors []string) {
+func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo, maxAssetSize *uint64) (errors []string) {
 	complain := func(msg string) { errors = append(errors, msg) }
 
 	if r.ScrapedAtUnix != nil {
@@ -204,10 +205,19 @@ func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo) (e
 	}
 
 	if r.SizeConstraints == nil {
+		if maxAssetSize != nil {
+			complain(fmt.Sprintf("maximum size must be configured for %s", info.AssetType))
+		}
 		res.MinimumSize = nil
 		res.MaximumSize = nil
 		res.MinimumFreeSize = nil
 	} else {
+		if res.MaximumSize == nil {
+			complain(fmt.Sprintf("maximum size must be configured for %s", info.AssetType))
+		} else if maxAssetSize != nil && *res.MaximumSize > *maxAssetSize {
+			complain(fmt.Sprintf("maximum size must be less than %d", *maxAssetSize))
+		}
+
 		res.MinimumSize = r.SizeConstraints.Minimum
 		if res.MinimumSize != nil && *res.MinimumSize == 0 {
 			res.MinimumSize = nil
@@ -309,6 +319,7 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	}
 
 	manager, info := h.Team.ForAssetType(dbResource.AssetType)
+	maxAssetSize := h.Config.MaxAssetSize[info.AssetType]
 	err := manager.CheckResourceAllowed(dbResource.AssetType, dbResource.ScopeUUID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
@@ -335,7 +346,7 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 			})
 	}
 
-	errs := input.UpdateDBResource(dbResource, info)
+	errs := input.UpdateDBResource(dbResource, info, maxAssetSize)
 	if len(errs) > 0 {
 		doAudit(http.StatusUnprocessableEntity)
 		http.Error(w, strings.Join(errs, "\n"), http.StatusUnprocessableEntity)
