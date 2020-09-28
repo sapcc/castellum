@@ -401,6 +401,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 	withHandler(t, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, _ []db.Asset) {
 
 		expectErrors := func(body assert.JSONObject, errors ...string) {
+			t.T.Helper()
 			assert.HTTPRequest{
 				Method:       "PUT",
 				Path:         "/v1/projects/project1/resources/foo",
