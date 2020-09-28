@@ -212,25 +212,26 @@ func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo, ma
 		res.MaximumSize = nil
 		res.MinimumFreeSize = nil
 	} else {
-		if res.MaximumSize == nil && maxAssetSize != nil {
-			complain(fmt.Sprintf("maximum size must be configured for %s", info.AssetType))
-		} else if maxAssetSize != nil && *res.MaximumSize > *maxAssetSize {
-			complain(fmt.Sprintf("maximum size must be less than %d", *maxAssetSize))
-		}
-
 		res.MinimumSize = r.SizeConstraints.Minimum
 		if res.MinimumSize != nil && *res.MinimumSize == 0 {
 			res.MinimumSize = nil
 		}
 
 		res.MaximumSize = r.SizeConstraints.Maximum
-		if res.MaximumSize != nil {
+		if res.MaximumSize == nil {
+			if maxAssetSize != nil {
+				complain(fmt.Sprintf("maximum size must be configured for %s", info.AssetType))
+			}
+		} else {
 			min := uint64(0)
 			if res.MinimumSize != nil {
 				min = *res.MinimumSize
 			}
 			if *res.MaximumSize <= min {
 				complain("maximum size must be greater than minimum size")
+			}
+			if maxAssetSize != nil && *res.MaximumSize > *maxAssetSize {
+				complain(fmt.Sprintf("maximum size must be less than %d", *maxAssetSize))
 			}
 		}
 
