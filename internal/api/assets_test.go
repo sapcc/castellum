@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/test"
 	"github.com/sapcc/go-bits/assert"
@@ -30,7 +31,7 @@ import (
 
 func TestGetAssets(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, mv,
 			"/v1/projects/%s/assets/%s")
 
@@ -68,7 +69,7 @@ func TestGetAssets(baseT *testing.T) {
 
 func TestGetAsset(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, mv,
 			"/v1/projects/%s/assets/%s/fooasset1")
 

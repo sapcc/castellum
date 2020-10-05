@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/test"
 	"github.com/sapcc/go-bits/assert"
@@ -30,7 +31,7 @@ import (
 
 func TestGetPendingOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
 
 		testCommonEndpointBehavior(t, hh, mv,
 			"/v1/projects/%s/resources/%s/operations/pending")
@@ -124,7 +125,7 @@ func withEitherFailedOrErroredOperation(action func(db.OperationOutcome)) {
 func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withEitherFailedOrErroredOperation(func(failedOperationOutcome db.OperationOutcome) {
-		withHandler(t, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+		withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
 
 			testCommonEndpointBehavior(t, hh, mv,
 				"/v1/projects/%s/resources/%s/operations/recently-failed")
@@ -243,7 +244,7 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	clock := test.FakeClock(3600)
 	withEitherFailedOrErroredOperation(func(failedOperationOutcome db.OperationOutcome) {
-		withHandler(t, clock.Now, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+		withHandler(t, core.Config{}, clock.Now, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
 
 			testCommonEndpointBehavior(t, hh, mv,
 				"/v1/projects/%s/resources/%s/operations/recently-succeeded")

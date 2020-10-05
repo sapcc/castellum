@@ -33,7 +33,7 @@ import (
 	"gopkg.in/gorp.v2"
 )
 
-func withHandler(t test.T, timeNow func() time.Time, action func(*handler, http.Handler, *MockValidator, []db.Resource, []db.Asset)) {
+func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action func(*handler, http.Handler, *MockValidator, []db.Resource, []db.Asset)) {
 	baseline := "fixtures/start-data.sql"
 	t.WithDB(&baseline, func(dbi *gorp.DbMap) {
 		team := core.AssetManagerTeam{
@@ -53,7 +53,7 @@ func withHandler(t test.T, timeNow func() time.Time, action func(*handler, http.
 		if timeNow == nil {
 			timeNow = time.Now
 		}
-		h := &handler{Config: &core.Config{}, DB: dbi, Team: team, Validator: mv, Provider: MockProviderClient{}, TimeNow: timeNow}
+		h := &handler{Config: &cfg, DB: dbi, Team: team, Validator: mv, Provider: MockProviderClient{}, TimeNow: timeNow}
 		action(h, h.BuildRouter(), mv, resources, assets)
 	})
 }
