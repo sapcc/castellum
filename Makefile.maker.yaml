@@ -1,0 +1,21 @@
+# Configuration file for <https://github.com/sapcc/go-makefile-maker>
+
+binaries:
+  - name:        castellum
+    fromPackage: .
+    installTo:   bin/
+
+coverageTest:
+  only: '/internal'
+  except: '/plugins|/test'
+
+variables:
+  GO_TESTENV: 'CASTELLUM_AUDIT_SILENT=true'
+
+verbatim: |
+  # convenience targets for developers: `make run-api/run-collector/run-worker/test-asset-type-*`
+  # runs one of the components, with environment options sourced from $PWD/.env
+  run-%: build/castellum
+    set -euo pipefail && source ./.env && ./build/castellum $*
+  test-asset-type-%: build/castellum
+    set -euo pipefail && source ./.env && ./build/castellum test-asset-type $*
