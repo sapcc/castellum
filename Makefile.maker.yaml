@@ -12,6 +12,9 @@ coverageTest:
 variables:
   GO_TESTENV: 'CASTELLUM_AUDIT_SILENT=true'
 
+vendoring:
+  enabled: true
+
 verbatim: |
   # convenience targets for developers: `make run-api/run-collector/run-worker/test-asset-type-*`
   # runs one of the components, with environment options sourced from $PWD/.env
