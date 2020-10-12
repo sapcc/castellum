@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
@@ -67,7 +68,7 @@ var (
 
 func TestGetProject(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
 
 		//endpoint requires a token with project access
 		mv.Forbid("project:access")
@@ -120,7 +121,7 @@ func TestGetProject(baseT *testing.T) {
 
 func TestGetResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
 
 		//endpoint requires a token with project access
 		mv.Forbid("project:access")
@@ -180,7 +181,7 @@ func TestGetResource(baseT *testing.T) {
 
 func TestPutResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, _ []db.Asset) {
 
 		//mostly like `initialFooResourceJSON`, but with some delays changed and
 		//single-step resizing instead of percentage-based resizing
@@ -398,7 +399,15 @@ func TestPutResource(baseT *testing.T) {
 
 func TestPutResourceValidationErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, _ []db.Asset) {
+
+	var maxFooSize uint64 = 30
+	cfg := core.Config{
+		MaxAssetSize: map[db.AssetType]*uint64{
+			"foo": &maxFooSize,
+		},
+	}
+
+	withHandler(t, cfg, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, _ []db.Asset) {
 
 		expectErrors := func(body assert.JSONObject, errors ...string) {
 			t.T.Helper()
@@ -422,6 +431,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 			assert.JSONObject{},
 			"at least one threshold must be configured",
 			"size step must be greater than 0%",
+			"maximum size must be configured for foo",
 		)
 
 		expectErrors(
@@ -445,18 +455,29 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 
 		expectErrors(
 			assert.JSONObject{
-				"critical_threshold": assert.JSONObject{"usage_percent": 95, "delay_seconds": 60},
+				"critical_threshold": assert.JSONObject{"usage_percent": 95},
 				"size_steps":         assert.JSONObject{"percent": 10},
-				"size_constraints":   assert.JSONObject{"minimum": 20, "maximum": 30},
+				"size_constraints":   assert.JSONObject{"minimum": 20},
 			},
-			"critical threshold may not have a delay",
+			"maximum size must be configured for foo",
 		)
 
 		expectErrors(
 			assert.JSONObject{
-				"low_threshold":  assert.JSONObject{"usage_percent": 120, "delay_seconds": 60},
-				"high_threshold": assert.JSONObject{"usage_percent": 80, "delay_seconds": 60},
-				"size_steps":     assert.JSONObject{"percent": 10},
+				"critical_threshold": assert.JSONObject{"usage_percent": 95, "delay_seconds": 60},
+				"size_steps":         assert.JSONObject{"percent": 10},
+				"size_constraints":   assert.JSONObject{"minimum": 20, "maximum": 40},
+			},
+			"critical threshold may not have a delay",
+			"maximum size must be 30 or less",
+		)
+
+		expectErrors(
+			assert.JSONObject{
+				"low_threshold":    assert.JSONObject{"usage_percent": 120, "delay_seconds": 60},
+				"high_threshold":   assert.JSONObject{"usage_percent": 80, "delay_seconds": 60},
+				"size_steps":       assert.JSONObject{"percent": 10},
+				"size_constraints": assert.JSONObject{"maximum": 30},
 			},
 			"low threshold must be between 0% and 100% of usage",
 			"low threshold must be below high threshold",
@@ -467,6 +488,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 				"high_threshold":     assert.JSONObject{"usage_percent": 120, "delay_seconds": 60},
 				"critical_threshold": assert.JSONObject{"usage_percent": 105},
 				"size_steps":         assert.JSONObject{"percent": 10},
+				"size_constraints":   assert.JSONObject{"maximum": 30},
 			},
 			"high threshold must be between 0% and 100% of usage",
 			"critical threshold must be between 0% and 100% of usage",
@@ -478,6 +500,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 				"low_threshold":      assert.JSONObject{"usage_percent": 20, "delay_seconds": 60},
 				"critical_threshold": assert.JSONObject{"usage_percent": 15},
 				"size_steps":         assert.JSONObject{"percent": 10},
+				"size_constraints":   assert.JSONObject{"maximum": 30},
 			},
 			"low threshold must be below critical threshold",
 		)
@@ -488,6 +511,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 				"high_threshold":     assert.JSONObject{"usage_percent": -0.2, "delay_seconds": 60},
 				"critical_threshold": assert.JSONObject{"usage_percent": -0.1},
 				"size_steps":         assert.JSONObject{"percent": 10},
+				"size_constraints":   assert.JSONObject{"maximum": 30},
 			},
 			"low threshold must be between 0% and 100% of usage",
 			"high threshold must be between 0% and 100% of usage",
@@ -516,7 +540,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 
 func TestDeleteResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, allAssets []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, allAssets []db.Asset) {
 
 		//endpoint requires a token with project access
 		mv.Forbid("project:access")

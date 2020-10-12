@@ -231,7 +231,7 @@ func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo, ma
 				complain("maximum size must be greater than minimum size")
 			}
 			if maxAssetSize != nil && *res.MaximumSize > *maxAssetSize {
-				complain(fmt.Sprintf("maximum size must be less than %d", *maxAssetSize))
+				complain(fmt.Sprintf("maximum size must be %d or less", *maxAssetSize))
 			}
 		}
 
