@@ -466,9 +466,10 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 			assert.JSONObject{
 				"critical_threshold": assert.JSONObject{"usage_percent": 95, "delay_seconds": 60},
 				"size_steps":         assert.JSONObject{"percent": 10},
-				"size_constraints":   assert.JSONObject{"minimum": 20, "maximum": 30},
+				"size_constraints":   assert.JSONObject{"minimum": 20, "maximum": 40},
 			},
 			"critical threshold may not have a delay",
+			"maximum size must be less than 30",
 		)
 
 		expectErrors(
