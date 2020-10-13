@@ -279,7 +279,7 @@ type recentOperationQuery struct {
 //This returns the most recent finished operation with the outcomes `%[2]s` for
 //each asset with `resource_id = $1`, unless there is a newer finished
 //operation matching `%[1]s`.
-var recentOperationQueryStr = `
+var recentOperationQueryStr = db.SimplifyWhitespaceInSQL(`
 	WITH tmp AS (
 		SELECT asset_id, MAX(finished_at) AS max_finished_at
 		  FROM finished_operations
@@ -290,7 +290,7 @@ var recentOperationQueryStr = `
 	  JOIN tmp ON tmp.asset_id = o.asset_id AND tmp.max_finished_at = o.finished_at
 	  JOIN assets a ON a.id = o.asset_id
 	 WHERE a.resource_id = $1 AND o.outcome IN ('%s')
-`
+`)
 
 func (q recentOperationQuery) Execute() (map[int64]db.FinishedOperation, error) {
 	outcomes := make([]string, len(q.Outcomes))

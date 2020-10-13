@@ -29,13 +29,13 @@ import (
 )
 
 //query that finds the next resource that needs to be scraped
-var scrapeResourceSearchQuery = `
+var scrapeResourceSearchQuery = db.SimplifyWhitespaceInSQL(`
 	SELECT * FROM resources
 	WHERE asset_type = $1 AND (scraped_at IS NULL or scraped_at < $2)
 	-- order by update priority (first new resources, then outdated resources, then ID for deterministic test behavior)
 	ORDER BY COALESCE(scraped_at, to_timestamp(-1)) ASC, id ASC
 	LIMIT 1
-`
+`)
 
 //ScrapeNextResource finds the next resource of the given asset type that needs
 //scraping and scrapes it, i.e. it looks for new and deleted assets within that

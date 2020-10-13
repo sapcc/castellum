@@ -31,13 +31,13 @@ import (
 
 //WARNING: This must be run in a transaction, or else `FOR UPDATE SKIP LOCKED`
 //will not work as expected.
-var selectAndDeleteNextResizeQuery = `
+var selectAndDeleteNextResizeQuery = db.SimplifyWhitespaceInSQL(`
 	DELETE FROM pending_operations WHERE id = (
 		SELECT id FROM pending_operations WHERE greenlit_at < $1 AND (retry_at IS NULL OR retry_at < $1)
 		ORDER BY reason ASC LIMIT 1
 		FOR UPDATE SKIP LOCKED
 	) RETURNING *
-`
+`)
 
 const (
 	maxRetries    = 3
