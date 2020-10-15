@@ -363,8 +363,8 @@ github.com/sapcc/go-bits v0.0.0-20190910095551-3863bd6b4943 h1:tOsa/z/MGmhxp5qlu
 github.com/sapcc/go-bits v0.0.0-20190910095551-3863bd6b4943/go.mod h1:YpW83RbRSHPedMBfuvdfYJMQbejxSxzK1Kj/39szShw=
 github.com/sapcc/go-bits v0.0.0-20200719195243-6f202ca5296a h1:qYxXWqfFKGnHo3wLSyyXewRCQygkoanKnu/syOiRzDE=
 github.com/sapcc/go-bits v0.0.0-20200719195243-6f202ca5296a/go.mod h1:r6AY7ym3xd4WK0Crz/D0Rf7J+oMg7haFiADpqiY1e3A=
-github.com/sapcc/go-bits v0.0.0-20200827121435-b1150353c544 h1:wHIV7vHKhwLt9neUWYp5GeWGAF1HAI1SzrBpHzop7pQ=
-github.com/sapcc/go-bits v0.0.0-20200827121435-b1150353c544/go.mod h1:r6AY7ym3xd4WK0Crz/D0Rf7J+oMg7haFiADpqiY1e3A=
+github.com/sapcc/go-bits v0.0.0-20201015115835-074a64c6872b h1:wfqD8GCHepCooDWjt7NvEOv5IpWa2uXCShz4wJuiDDU=
+github.com/sapcc/go-bits v0.0.0-20201015115835-074a64c6872b/go.mod h1:r6AY7ym3xd4WK0Crz/D0Rf7J+oMg7haFiADpqiY1e3A=
 github.com/sapcc/gophercloud-limes v0.0.0-20200819120227-33ee0896b7e8 h1:oeLSkpv6DhRiNmMnYPwlCm/HeGfogYslFQDdLSWhRTY=
 github.com/sapcc/gophercloud-limes v0.0.0-20200819120227-33ee0896b7e8/go.mod h1:8/BIFprjDN70kq0r6GyFgBmZHEWF6/8+q6wmcvSmHmM=
 github.com/sapcc/hermes v0.0.0-20190722215605-d772f40f9fc6 h1:iI+ew9JUORCqP+8pElkSayI/smvdiYoPRX6J4DmkVTI=
