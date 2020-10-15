@@ -19,6 +19,8 @@
 package core
 
 import (
+	"sync"
+
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/domains"
@@ -38,6 +40,7 @@ type ProviderClient struct {
 	KeystoneV3   *gophercloud.ServiceClient
 	projectCache map[string]*CachedProject //key = UUID, nil value = project does not exist
 	domainCache  map[string]*CachedDomain  //key = UUID, nil value = domain does not exist
+	cacheMutex   *sync.RWMutex
 }
 
 //CachedProject contains cached information about a Keystone project.
@@ -62,47 +65,62 @@ func WrapProviderClient(provider *gophercloud.ProviderClient, eo gophercloud.End
 		KeystoneV3:     keystoneV3,
 		projectCache:   make(map[string]*CachedProject),
 		domainCache:    make(map[string]*CachedDomain),
+		cacheMutex:     new(sync.RWMutex),
 	}, nil
 }
 
 //GetProject queries the given project ID in Keystone, unless it is already cached.
 //When the project does not exist, nil is returned instead of an error.
 func (p *ProviderClient) GetProject(projectID string) (*CachedProject, error) {
-	if result, ok := p.projectCache[projectID]; ok {
+	p.cacheMutex.RLock()
+	result, ok := p.projectCache[projectID]
+	p.cacheMutex.RUnlock()
+	if ok {
 		return result, nil
 	}
 
 	project, err := projects.Get(p.KeystoneV3, projectID).Extract()
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
+			p.cacheMutex.Lock()
 			p.projectCache[projectID] = nil
+			p.cacheMutex.Unlock()
 			return nil, nil
 		}
 		return nil, err
 	}
 
-	result := &CachedProject{Name: project.Name, DomainID: project.DomainID}
+	result = &CachedProject{Name: project.Name, DomainID: project.DomainID}
+	p.cacheMutex.Lock()
 	p.projectCache[projectID] = result
+	p.cacheMutex.Unlock()
 	return result, nil
 }
 
 //GetDomain queries the given domain ID in Keystone, unless it is already cached.
 //When the project does not exist, nil is returned instead of an error.
 func (p *ProviderClient) GetDomain(domainID string) (*CachedDomain, error) {
-	if result, ok := p.domainCache[domainID]; ok {
+	p.cacheMutex.RLock()
+	result, ok := p.domainCache[domainID]
+	p.cacheMutex.RUnlock()
+	if ok {
 		return result, nil
 	}
 
 	domain, err := domains.Get(p.KeystoneV3, domainID).Extract()
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
+			p.cacheMutex.Lock()
 			p.domainCache[domainID] = nil
+			p.cacheMutex.Unlock()
 			return nil, nil
 		}
 		return nil, err
 	}
 
-	result := &CachedDomain{Name: domain.Name}
+	result = &CachedDomain{Name: domain.Name}
+	p.cacheMutex.Lock()
 	p.domainCache[domainID] = result
+	p.cacheMutex.Unlock()
 	return result, nil
 }
