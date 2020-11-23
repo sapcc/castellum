@@ -65,7 +65,12 @@ All components receive configuration via environment variables. The following va
 | Variable | Default | Explanation |
 | -------- | ------- | ----------- |
 | `CASTELLUM_ASSET_MANAGERS` | *(required)* | A comma-separated list of all asset managers that can be enabled. This configures what kinds of assets Castellum can handle. See [`docs/asset-managers/`](./docs/asset-managers/) for which asset managers exist. |
-| `CASTELLUM_DB_URI` | *(required)* | A [libpq connection URI][pq-uri] that locates the Castellum database. The non-URI "connection string" format is not allowed; it must be a URI. |
+| `CASTELLUM_DB_USERNAME` | `postgres` | Username of the user that Castellum should use to connect to the database. |
+| `CASTELLUM_DB_PASSWORD` | *(required)* | Password for the specified user. |
+| `CASTELLUM_DB_HOSTNAME` | *(required)* | Hostname of the database server. |
+| `CASTELLUM_DB_PORT` | `5432` | Port on which the PostgreSQL service is running on. |
+| `CASTELLUM_DB_NAME` | `castellum` | The name of the database. |
+| `CASTELLUM_DB_CONNECTION_OPTIONS` | `sslmode=disable` | Database connection options. |
 | `CASTELLUM_HTTP_LISTEN_ADDRESS` | `:8080` | Listen address for the internal HTTP server. For `castellum observer/worker`, this just exposes Prometheus metrics on `/metrics`. For `castelum api`, this also exposes [the REST API](./docs/api-spec.md). |
 | `CASTELLUM_MAX_ASSET_SIZES` | *(optional)* | A comma-separated list of `<asset-type>=<max-size>` pairs. If present, only resource configurations honoring these constraints will be allowed. |
 | `CASTELLUM_OSLO_POLICY_PATH` | *(required)* | Path to the `policy.json` file for this service. See [*Oslo policy*](#oslo-policy) for details. |

@@ -63,7 +63,15 @@ func main() {
 	logg.ShowDebug, _ = strconv.ParseBool(os.Getenv("CASTELLUM_DEBUG"))
 
 	//initialize DB connection
-	dbi, err := db.Init(mustGetenv("CASTELLUM_DB_URI"))
+	dbUsername := envOrDefault("CASTELLUM_DB_USERNAME", "postgres")
+	dbPass := mustGetenv("CASTELLUM_DB_PASSWORD")
+	dbHost := mustGetenv("CASTELLUM_DB_HOSTNAME")
+	dbPort := envOrDefault("CASTELLUM_DB_PORT", "5432")
+	dbName := envOrDefault("CASTELLUM_DB_NAME", "castellum")
+	dbConnOpts := envOrDefault("CASTELLUM_DB_CONNECTION_OPTIONS", "sslmode=disable")
+
+	dbURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?%s", dbUsername, dbPass, dbHost, dbPort, dbName, dbConnOpts)
+	dbi, err := db.Init(dbURL)
 	if err != nil {
 		logg.Fatal(err.Error())
 	}
@@ -167,6 +175,14 @@ func mustGetenv(key string) string {
 	val := os.Getenv(key)
 	if val == "" {
 		logg.Fatal("missing required environment variable: " + key)
+	}
+	return val
+}
+
+func envOrDefault(key, defaultVal string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		val = defaultVal
 	}
 	return val
 }
