@@ -313,7 +313,7 @@ func init() {
 func Init(urlStr string) (*gorp.DbMap, error) {
 	dbURL, err := url.Parse(urlStr)
 	if err != nil {
-		return nil, fmt.Errorf("malformed CASTELLUM_DB_URI: " + err.Error())
+		return nil, fmt.Errorf("malformed database URL %q: %s", urlStr, err.Error())
 	}
 
 	cfg := easypg.Configuration{
