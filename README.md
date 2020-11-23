@@ -74,8 +74,11 @@ All components receive configuration via environment variables. The following va
 | `CASTELLUM_HTTP_LISTEN_ADDRESS` | `:8080` | Listen address for the internal HTTP server. For `castellum observer/worker`, this just exposes Prometheus metrics on `/metrics`. For `castelum api`, this also exposes [the REST API](./docs/api-spec.md). |
 | `CASTELLUM_MAX_ASSET_SIZES` | *(optional)* | A comma-separated list of `<asset-type>=<max-size>` pairs. If present, only resource configurations honoring these constraints will be allowed. |
 | `CASTELLUM_OSLO_POLICY_PATH` | *(required)* | Path to the `policy.json` file for this service. See [*Oslo policy*](#oslo-policy) for details. |
-| `CASTELLUM_RABBITMQ_URI` | *(optional)* | RabbitMQ URI as per the [AMQP URI format](https://www.rabbitmq.com/uri-spec.html). If this variable is configured then Castellum will send audit events to the respective RabbitMQ server. |
-| `CASTELLUM_RABBITMQ_QUEUE_NAME` | *(required if `CASTELLUM_RABBITMQ_URI` is configured)* | Name for the queue that will hold the audit events. The events are published to the default exchange. |
+| `CASTELLUM_RABBITMQ_QUEUE_NAME` | *(optional)* | Name for the queue that will hold the audit events. The events are published to the default exchange. Audit logging to a RabbitMQ server is enabled if the value of this variable is set. |
+| `CASTELLUM_RABBITMQ_USERNAME` | `rabbitmq` | RabbitMQ Username. |
+| `CASTELLUM_RABBITMQ_PASSWORD` | *(required if `CASTELLUM_RABBITMQ_QUEUE_NAME` is configured)* | Password for the specified user. |
+| `CASTELLUM_RABBITMQ_HOSTNAME` | *(required if `CASTELLUM_RABBITMQ_QUEUE_NAME` is configured)* | Hostname of the RabbitMQ server. |
+| `CASTELLUM_RABBITMQ_PORT` | `5672` |  Port number to which the underlying connection is made. |
 | `CASTELLUM_AUDIT_SILENT` | `false` | Disable audit event logging to standard output. |
 | `CASTELLUM_LOG_SCRAPES` | `false` | Whether to write a log line for each asset scrape operation. This can be useful to debug situations where Castellum does not create operations when it should, but it generates a lot of log traffic (one line per asset per 5 minutes, which e.g. for 2000 assets is about 1 GiB per week). |
 | `OS_...` | *(required)* | A full set of OpenStack auth environment variables for Castellum's service user. See [documentation for openstackclient][os-env] for details. |

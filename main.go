@@ -211,6 +211,18 @@ func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provi
 		AllowedHeaders: []string{"Content-Type", "User-Agent", "X-Auth-Token"},
 	}).Handler(handler)
 
+	//Start audit logging.
+	rabbitQueueName := os.Getenv("CASTELLUM_RABBITMQ_QUEUE_NAME")
+	if rabbitQueueName != "" {
+		rabbitUsername := envOrDefault("CASTELLUM_RABBITMQ_USERNAME", "rabbitmq")
+		rabbitPass := mustGetenv("CASTELLUM_RABBITMQ_PASSWORD")
+		rabbitHost := mustGetenv("CASTELLUM_RABBITMQ_HOSTNAME")
+		rabbitPort := envOrDefault("CASTELLUM_RABBITMQ_PORT", "5672")
+
+		rabbitURI := fmt.Sprintf("amqp://%s:%s@%s:%s/", rabbitUsername, rabbitPass, rabbitHost, rabbitPort)
+		api.StartAuditLogging(rabbitURI, rabbitQueueName)
+	}
+
 	//metrics and healthcheck are deliberately not covered by any of the
 	//middlewares - we do not want to log those requests
 	http.Handle("/", handler)

@@ -34,45 +34,30 @@ import (
 //eventSink is a channel that receives audit events.
 var eventSink chan<- cadf.Event
 
-var (
-	showAuditOnStdout   bool
-	sendAuditToRabbitMQ bool
-	rabbitURI           string
-	rabbitQueueName     string
-)
+var showAuditOnStdout bool
 
-func init() {
+// StartAuditLogging starts audit logging for the API.
+func StartAuditLogging(rabbitURI, rabbitQueueName string) {
 	silenceAuditLogging, _ := strconv.ParseBool(os.Getenv("CASTELLUM_AUDIT_SILENT"))
 	showAuditOnStdout = !silenceAuditLogging
 
-	rabbitURI = os.Getenv("CASTELLUM_RABBITMQ_URI")
-	if rabbitURI != "" {
-		rabbitQueueName = os.Getenv("CASTELLUM_RABBITMQ_QUEUE_NAME")
-		if rabbitQueueName == "" {
-			logg.Fatal("missing required environment variable: CASTELLUM_RABBITMQ_QUEUE_NAME")
-		}
-		sendAuditToRabbitMQ = true
+	auditEventPublishSuccessCounter.Add(0)
+	auditEventPublishFailedCounter.Add(0)
+
+	onSuccessFunc := func() {
+		auditEventPublishSuccessCounter.Inc()
 	}
-
-	if sendAuditToRabbitMQ {
-		auditEventPublishSuccessCounter.Add(0)
-		auditEventPublishFailedCounter.Add(0)
-
-		onSuccessFunc := func() {
-			auditEventPublishSuccessCounter.Inc()
-		}
-		onFailFunc := func() {
-			auditEventPublishFailedCounter.Inc()
-		}
-		s := make(chan cadf.Event, 20)
-		eventSink = s
-
-		go audittools.AuditTrail{
-			EventSink:           s,
-			OnSuccessfulPublish: onSuccessFunc,
-			OnFailedPublish:     onFailFunc,
-		}.Commit(rabbitURI, rabbitQueueName)
+	onFailFunc := func() {
+		auditEventPublishFailedCounter.Inc()
 	}
+	s := make(chan cadf.Event, 20)
+	eventSink = s
+
+	go audittools.AuditTrail{
+		EventSink:           s,
+		OnSuccessfulPublish: onSuccessFunc,
+		OnFailedPublish:     onFailFunc,
+	}.Commit(rabbitURI, rabbitQueueName)
 }
 
 var observerUUID = audittools.GenerateUUID()
