@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -63,16 +64,20 @@ func main() {
 	logg.ShowDebug, _ = strconv.ParseBool(os.Getenv("CASTELLUM_DEBUG"))
 
 	//initialize DB connection
-	dbUserInfo := envOrDefault("CASTELLUM_DB_USERNAME", "postgres")
-	if dbPass := os.Getenv("CASTELLUM_DB_PASSWORD"); dbPass != "" {
-		dbUserInfo += ":" + dbPass
-	}
+	dbUsername := envOrDefault("CASTELLUM_DB_USERNAME", "postgres")
+	dbPass := os.Getenv("CASTELLUM_DB_PASSWORD")
 	dbHost := envOrDefault("CASTELLUM_DB_HOSTNAME", "localhost")
 	dbPort := envOrDefault("CASTELLUM_DB_PORT", "5432")
 	dbName := envOrDefault("CASTELLUM_DB_NAME", "castellum")
-	dbConnOpts := envOrDefault("CASTELLUM_DB_CONNECTION_OPTIONS", "sslmode=disable")
+	dbConnOpts := os.Getenv("CASTELLUM_DB_CONNECTION_OPTIONS")
 
-	dbURL := fmt.Sprintf("postgres://%s@%s:%s/%s?%s", dbUserInfo, dbHost, dbPort, dbName, dbConnOpts)
+	dbURL := &url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(dbUsername, dbPass),
+		Host:     dbHost + ":" + dbPort,
+		Path:     dbName,
+		RawQuery: dbConnOpts,
+	}
 	dbi, err := db.Init(dbURL)
 	if err != nil {
 		logg.Fatal(err.Error())

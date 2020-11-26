@@ -21,6 +21,7 @@ package test
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 
 	"github.com/sapcc/castellum/internal/db"
@@ -31,15 +32,20 @@ import (
 //WithDB prepares a DB reference for this test, or fails the test if the DB
 //is not ready.
 func (t T) WithDB(fixtureFile *string, action func(dbi *gorp.DbMap)) {
-	var postgresURL string
+	var postgresURLStr string
 	if os.Getenv("TRAVIS") == "true" {
 		//cf. https://docs.travis-ci.com/user/database-setup/#postgresql
-		postgresURL = "postgres://postgres@localhost/castellum?sslmode=disable"
+		postgresURLStr = "postgres://postgres@localhost/castellum?sslmode=disable"
 	} else {
 		//suitable for use with ./testing/with-postgres-db.sh
-		postgresURL = "postgres://postgres@localhost:54321/castellum?sslmode=disable"
+		postgresURLStr = "postgres://postgres@localhost:54321/castellum?sslmode=disable"
 	}
-	dbi, err := db.Init(postgresURL)
+	dbURL, err := url.Parse(postgresURLStr)
+	if err != nil {
+		t.Fatalf("malformed database URL %q: %s", postgresURLStr, err.Error())
+	}
+
+	dbi, err := db.Init(dbURL)
 	if err != nil {
 		t.Error(err)
 		t.Log("Try prepending ./testing/with-postgres-db.sh to your command.")
