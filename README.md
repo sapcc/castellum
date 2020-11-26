@@ -77,7 +77,7 @@ All components receive configuration via environment variables. The following va
 | `CASTELLUM_RABBITMQ_QUEUE_NAME` | *(required for enabling audit trail)* | Name for the queue that will hold the audit events. The events are published to the default exchange. |
 | `CASTELLUM_RABBITMQ_USERNAME` | *(optional)* | RabbitMQ Username. |
 | `CASTELLUM_RABBITMQ_PASSWORD` | *(optional)* | Password for the specified user. |
-| `CASTELLUM_RABBITMQ_HOSTNAME` | *(optional)* | Hostname of the RabbitMQ server. |
+| `CASTELLUM_RABBITMQ_HOSTNAME` | `localhost` | Hostname of the RabbitMQ server. |
 | `CASTELLUM_RABBITMQ_PORT` | `5672` |  Port number to which the underlying connection is made. |
 | `CASTELLUM_AUDIT_SILENT` | `false` | Disable audit event logging to standard output. |
 | `CASTELLUM_LOG_SCRAPES` | `false` | Whether to write a log line for each asset scrape operation. This can be useful to debug situations where Castellum does not create operations when it should, but it generates a lot of log traffic (one line per asset per 5 minutes, which e.g. for 2000 assets is about 1 GiB per week). |
