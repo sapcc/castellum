@@ -94,6 +94,8 @@ github.com/go-stack/stack v1.8.0/go.mod h1:v0f6uXyyMGvRgIKkXu+yp6POWl0qKG85gN/me
 github.com/gofrs/uuid v3.1.0+incompatible/go.mod h1:b2aQJv3Z4Fp6yNu3cdSllBxTCLRxnplIgP/c0N/04lM=
 github.com/gofrs/uuid v3.2.0+incompatible h1:y12jRkkFxsd7GpqdSZ+/KCs/fJbqpEXSGd4+jfEaewE=
 github.com/gofrs/uuid v3.2.0+incompatible/go.mod h1:b2aQJv3Z4Fp6yNu3cdSllBxTCLRxnplIgP/c0N/04lM=
+github.com/gofrs/uuid v3.3.0+incompatible h1:8K4tyRfvU1CYPgJsveYFQMhpFd/wXNM7iK6rR7UHz84=
+github.com/gofrs/uuid v3.3.0+incompatible/go.mod h1:b2aQJv3Z4Fp6yNu3cdSllBxTCLRxnplIgP/c0N/04lM=
 github.com/gogo/googleapis v1.1.0/go.mod h1:gf4bu3Q80BeJ6H1S1vYPm8/ELATdvryBaNFGgqEef3s=
 github.com/gogo/protobuf v1.1.1/go.mod h1:r8qH/GZQm5c6nD/R0oafs1akxWv10x8SbQlK7atdtwQ=
 github.com/gogo/protobuf v1.2.0/go.mod h1:r8qH/GZQm5c6nD/R0oafs1akxWv10x8SbQlK7atdtwQ=
@@ -138,8 +140,8 @@ github.com/gophercloud/gophercloud v0.6.1-0.20191122030953-d8ac278c1c9d/go.mod h
 github.com/gophercloud/gophercloud v0.10.1-0.20200424014253-c3bfe50899e5/go.mod h1:gmC5oQqMDOMO1t1gq5DquX/yAU808e/4mzjjDA76+Ss=
 github.com/gophercloud/gophercloud v0.12.0 h1:mZrie07npp6ODiwHZolTicr5jV8Ogn43AvAsSMm6Ork=
 github.com/gophercloud/gophercloud v0.12.0/go.mod h1:gmC5oQqMDOMO1t1gq5DquX/yAU808e/4mzjjDA76+Ss=
-github.com/gophercloud/gophercloud v0.13.0 h1:1XkslZZRm6Ks0bLup+hBNth+KQf+0JA1UeoB7YKw9E8=
-github.com/gophercloud/gophercloud v0.13.0/go.mod h1:VX0Ibx85B60B5XOrZr6kaNwrmPUzcmMpwxvQ1WQIIWM=
+github.com/gophercloud/gophercloud v0.14.0 h1:c2Byo+YMxhHlTJ3TPptjQ4dOQ1YknTHDJ/9zClDH+84=
+github.com/gophercloud/gophercloud v0.14.0/go.mod h1:VX0Ibx85B60B5XOrZr6kaNwrmPUzcmMpwxvQ1WQIIWM=
 github.com/gophercloud/utils v0.0.0-20190313033024-0bcc8e728cb5 h1:8USoe8m65WcTOYy+MUu+EtLJJysSODnoNDNCEWhDMso=
 github.com/gophercloud/utils v0.0.0-20190313033024-0bcc8e728cb5/go.mod h1:SZ9FTKibIotDtCrxAU/evccoyu1yhKST6hgBvwTB5Eg=
 github.com/gophercloud/utils v0.0.0-20200918191848-da0e919a012a h1:Nn4npa87SL5uLA6rYbQp/u3JwVTeEJ7VfaWrJw97F5Q=
@@ -363,8 +365,8 @@ github.com/sapcc/go-bits v0.0.0-20190910095551-3863bd6b4943 h1:tOsa/z/MGmhxp5qlu
 github.com/sapcc/go-bits v0.0.0-20190910095551-3863bd6b4943/go.mod h1:YpW83RbRSHPedMBfuvdfYJMQbejxSxzK1Kj/39szShw=
 github.com/sapcc/go-bits v0.0.0-20200719195243-6f202ca5296a h1:qYxXWqfFKGnHo3wLSyyXewRCQygkoanKnu/syOiRzDE=
 github.com/sapcc/go-bits v0.0.0-20200719195243-6f202ca5296a/go.mod h1:r6AY7ym3xd4WK0Crz/D0Rf7J+oMg7haFiADpqiY1e3A=
-github.com/sapcc/go-bits v0.0.0-20201015124403-5d1815e53d18 h1:EOVOg2worqvf2hGE7kPCN6CZUaK8doRBOWDLynIyKqU=
-github.com/sapcc/go-bits v0.0.0-20201015124403-5d1815e53d18/go.mod h1:r6AY7ym3xd4WK0Crz/D0Rf7J+oMg7haFiADpqiY1e3A=
+github.com/sapcc/go-bits v0.0.0-20201126124612-fcd600685fdb h1:bvD4yq3nxjUryiy921Eld0i33PE1oST4GLxW6Wlhzk4=
+github.com/sapcc/go-bits v0.0.0-20201126124612-fcd600685fdb/go.mod h1:MvjxocNfMqx+sQ2xdfrLveBljrUmGPaJT/UHUwyZ8lM=
 github.com/sapcc/gophercloud-limes v0.0.0-20200819120227-33ee0896b7e8 h1:oeLSkpv6DhRiNmMnYPwlCm/HeGfogYslFQDdLSWhRTY=
 github.com/sapcc/gophercloud-limes v0.0.0-20200819120227-33ee0896b7e8/go.mod h1:8/BIFprjDN70kq0r6GyFgBmZHEWF6/8+q6wmcvSmHmM=
 github.com/sapcc/hermes v0.0.0-20190722215605-d772f40f9fc6 h1:iI+ew9JUORCqP+8pElkSayI/smvdiYoPRX6J4DmkVTI=
@@ -407,6 +409,8 @@ github.com/streadway/amqp v0.0.0-20190404075320-75d898a42a94 h1:0ngsPmuP6XIjiFRN
 github.com/streadway/amqp v0.0.0-20190404075320-75d898a42a94/go.mod h1:AZpEONHx3DKn8O/DFsRAY58/XVQiIPMTMB1SddzLXVw=
 github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271 h1:WhxRHzgeVGETMlmVfqhRn8RIeeNoPr2Czh33I4Zdccw=
 github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271/go.mod h1:AZpEONHx3DKn8O/DFsRAY58/XVQiIPMTMB1SddzLXVw=
+github.com/streadway/amqp v1.0.0 h1:kuuDrUJFZL1QYL9hUNuCxNObNzB0bV/ZG5jV3RWAQgo=
+github.com/streadway/amqp v1.0.0/go.mod h1:AZpEONHx3DKn8O/DFsRAY58/XVQiIPMTMB1SddzLXVw=
 github.com/streadway/handy v0.0.0-20190108123426-d5acb3125c2a/go.mod h1:qNTQ5P5JnDBl6z3cMAg/SywNDC5ABu5ApDIw6lUbRmI=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=

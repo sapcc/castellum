@@ -310,12 +310,7 @@ func init() {
 }
 
 //Init connects to the database and initializes the schema and model types.
-func Init(urlStr string) (*gorp.DbMap, error) {
-	dbURL, err := url.Parse(urlStr)
-	if err != nil {
-		return nil, fmt.Errorf("malformed CASTELLUM_DB_URI: " + err.Error())
-	}
-
+func Init(dbURL *url.URL) (*gorp.DbMap, error) {
 	cfg := easypg.Configuration{
 		PostgresURL: dbURL,
 		Migrations:  SQLMigrations,

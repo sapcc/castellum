@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -63,7 +64,21 @@ func main() {
 	logg.ShowDebug, _ = strconv.ParseBool(os.Getenv("CASTELLUM_DEBUG"))
 
 	//initialize DB connection
-	dbi, err := db.Init(mustGetenv("CASTELLUM_DB_URI"))
+	dbUsername := envOrDefault("CASTELLUM_DB_USERNAME", "postgres")
+	dbPass := os.Getenv("CASTELLUM_DB_PASSWORD")
+	dbHost := envOrDefault("CASTELLUM_DB_HOSTNAME", "localhost")
+	dbPort := envOrDefault("CASTELLUM_DB_PORT", "5432")
+	dbName := envOrDefault("CASTELLUM_DB_NAME", "castellum")
+	dbConnOpts := os.Getenv("CASTELLUM_DB_CONNECTION_OPTIONS")
+
+	dbURL := &url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(dbUsername, dbPass),
+		Host:     dbHost + ":" + dbPort,
+		Path:     dbName,
+		RawQuery: dbConnOpts,
+	}
+	dbi, err := db.Init(dbURL)
 	if err != nil {
 		logg.Fatal(err.Error())
 	}
@@ -171,6 +186,14 @@ func mustGetenv(key string) string {
 	return val
 }
 
+func envOrDefault(key, defaultVal string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		val = defaultVal
+	}
+	return val
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // task: API
 
@@ -194,6 +217,26 @@ func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provi
 		AllowedMethods: []string{"HEAD", "GET", "POST", "PUT", "DELETE"},
 		AllowedHeaders: []string{"Content-Type", "User-Agent", "X-Auth-Token"},
 	}).Handler(handler)
+
+	//Start audit logging.
+	rabbitQueueName := os.Getenv("CASTELLUM_RABBITMQ_QUEUE_NAME")
+	if rabbitQueueName != "" {
+		var rabbitUserInfo string
+		if rabbitUsername := os.Getenv("CASTELLUM_RABBITMQ_USERNAME"); rabbitUsername != "" {
+			rabbitUserInfo += rabbitUsername
+		}
+		if rabbitPass := os.Getenv("CASTELLUM_RABBITMQ_PASSWORD"); rabbitPass != "" {
+			rabbitUserInfo += ":" + rabbitPass
+		}
+		if rabbitUserInfo != "" {
+			rabbitUserInfo += "@"
+		}
+		rabbitHost := envOrDefault("CASTELLUM_RABBITMQ_HOSTNAME", "localhost")
+		rabbitPort := envOrDefault("CASTELLUM_RABBITMQ_PORT", "5672")
+
+		rabbitURI := fmt.Sprintf("amqp://%s%s:%s/", rabbitUserInfo, rabbitHost, rabbitPort)
+		api.StartAuditLogging(rabbitURI, rabbitQueueName)
+	}
 
 	//metrics and healthcheck are deliberately not covered by any of the
 	//middlewares - we do not want to log those requests
