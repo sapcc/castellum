@@ -1,6 +1,6 @@
 /******************************************************************************
 *
-*  Copyright 2019 SAP SE
+*  Copyright 2019-2020 SAP SE
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -110,7 +110,7 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 
 		if len(s) > 0 {
 			for _, share := range s {
-				if ignoreShare(share.Metadata, share.Status) {
+				if m.ignoreShare(share) {
 					continue
 				}
 				if !wasSeen[share.ID] {
@@ -126,15 +126,34 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 	}
 }
 
-func ignoreShare(metadata map[string]string, status string) bool {
+func (m *assetManagerNFS) ignoreShare(share shares.Share) bool {
 	//ignore shares in status "error" (we won't be able to resize them anyway)
-	if status == "error" {
+	if share.Status == "error" {
 		return true
 	}
 
-	//ignore "shares" that are actually snapmirror targets (sapcc-specific extension)
-	if snapmirrorStr, ok := metadata["snapmirror"]; ok {
+	//ignore "shares" that are actually snapmirror targets (sapcc-specific
+	//extension); old-style check: check for the "snapmirror" metadata key
+	//
+	//NOTE: Just because it's the "old-style check" doesn't mean we can remove
+	//this without careful thought. As of Dec 2020, some snapmirrors are only
+	//detected with the old-style check. And vice versa as well: We built the new
+	//check because some snapmirrors are only detected by it, not by the old one.
+	if snapmirrorStr, ok := share.Metadata["snapmirror"]; ok {
 		if snapmirrorStr == "1" {
+			return true
+		}
+	}
+
+	//ignore "shares" that are actually snapmirror targets (sapcc-specific
+	//extension); new-style check: check for volume_type="dp" label on share metrics
+	query := fmt.Sprintf(`netapp_volume_total_bytes{project_id=%q,share_id=%q}`, share.ProjectID, share.ID)
+	resultVector, err := prometheusGetVector(m.Prometheus, query)
+	if err != nil {
+		logg.Error("cannot check volume_type for share %q: %s", share.ID, err.Error())
+	}
+	for _, sample := range resultVector {
+		if sample.Metric["volume_type"] == "dp" {
 			return true
 		}
 	}
@@ -270,17 +289,25 @@ func (m *assetManagerNFS) getMetricForShare(metric, projectUUID, shareUUID strin
 	return prometheusGetSingleValue(m.Prometheus, query)
 }
 
-func prometheusGetSingleValue(api prom_v1.API, queryStr string) (float64, error) {
+func prometheusGetVector(api prom_v1.API, queryStr string) (model.Vector, error) {
 	value, warnings, err := api.Query(context.Background(), queryStr, time.Now())
 	for _, warning := range warnings {
 		logg.Info("Prometheus query produced warning: %s", warning)
 	}
 	if err != nil {
-		return 0, fmt.Errorf("Prometheus query failed: %s: %s", queryStr, err.Error())
+		return nil, fmt.Errorf("Prometheus query failed: %s: %s", queryStr, err.Error())
 	}
 	resultVector, ok := value.(model.Vector)
 	if !ok {
-		return 0, fmt.Errorf("Prometheus query failed: %s: unexpected type %T", queryStr, value)
+		return nil, fmt.Errorf("Prometheus query failed: %s: unexpected type %T", queryStr, value)
+	}
+	return resultVector, nil
+}
+
+func prometheusGetSingleValue(api prom_v1.API, queryStr string) (float64, error) {
+	resultVector, err := prometheusGetVector(api, queryStr)
+	if err != nil {
+		return 0, err
 	}
 
 	switch resultVector.Len() {
