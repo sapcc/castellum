@@ -25,6 +25,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -46,6 +47,7 @@ import (
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpee"
 	"github.com/sapcc/go-bits/logg"
+	"github.com/streadway/amqp"
 	"gopkg.in/gorp.v2"
 
 	//load asset managers
@@ -74,7 +76,7 @@ func main() {
 	dbURL := &url.URL{
 		Scheme:   "postgres",
 		User:     url.UserPassword(dbUsername, dbPass),
-		Host:     dbHost + ":" + dbPort,
+		Host:     net.JoinHostPort(dbHost, dbPort),
 		Path:     dbName,
 		RawQuery: dbConnOpts,
 	}
@@ -221,21 +223,22 @@ func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provi
 	//Start audit logging.
 	rabbitQueueName := os.Getenv("CASTELLUM_RABBITMQ_QUEUE_NAME")
 	if rabbitQueueName != "" {
-		var rabbitUserInfo string
-		if rabbitUsername := os.Getenv("CASTELLUM_RABBITMQ_USERNAME"); rabbitUsername != "" {
-			rabbitUserInfo += rabbitUsername
+		username := envOrDefault("CASTELLUM_RABBITMQ_USERNAME", "guest")
+		pass := envOrDefault("CASTELLUM_RABBITMQ_PASSWORD", "guest")
+		hostname := envOrDefault("CASTELLUM_RABBITMQ_HOSTNAME", "localhost")
+		port, err := strconv.Atoi(envOrDefault("CASTELLUM_RABBITMQ_PORT", "5672"))
+		if err != nil {
+			logg.Fatal("invalid value for CASTELLUM_RABBITMQ_PORT: " + err.Error())
 		}
-		if rabbitPass := os.Getenv("CASTELLUM_RABBITMQ_PASSWORD"); rabbitPass != "" {
-			rabbitUserInfo += ":" + rabbitPass
+		rabbitURI := amqp.URI{
+			Scheme:   "amqp",
+			Host:     hostname,
+			Port:     port,
+			Username: username,
+			Password: pass,
+			Vhost:    "/",
 		}
-		if rabbitUserInfo != "" {
-			rabbitUserInfo += "@"
-		}
-		rabbitHost := envOrDefault("CASTELLUM_RABBITMQ_HOSTNAME", "localhost")
-		rabbitPort := envOrDefault("CASTELLUM_RABBITMQ_PORT", "5672")
-
-		rabbitURI := fmt.Sprintf("amqp://%s%s:%s/", rabbitUserInfo, rabbitHost, rabbitPort)
-		api.StartAuditLogging(rabbitURI, rabbitQueueName)
+		api.StartAuditLogging(rabbitQueueName, rabbitURI)
 	}
 
 	//metrics and healthcheck are deliberately not covered by any of the

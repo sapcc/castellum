@@ -75,8 +75,8 @@ All components receive configuration via environment variables. The following va
 | `CASTELLUM_MAX_ASSET_SIZES` | *(optional)* | A comma-separated list of `<asset-type>=<max-size>` pairs. If present, only resource configurations honoring these constraints will be allowed. |
 | `CASTELLUM_OSLO_POLICY_PATH` | *(required)* | Path to the `policy.json` file for this service. See [*Oslo policy*](#oslo-policy) for details. |
 | `CASTELLUM_RABBITMQ_QUEUE_NAME` | *(required for enabling audit trail)* | Name for the queue that will hold the audit events. The events are published to the default exchange. |
-| `CASTELLUM_RABBITMQ_USERNAME` | *(optional)* | RabbitMQ Username. |
-| `CASTELLUM_RABBITMQ_PASSWORD` | *(optional)* | Password for the specified user. |
+| `CASTELLUM_RABBITMQ_USERNAME` | `guest` | RabbitMQ Username. |
+| `CASTELLUM_RABBITMQ_PASSWORD` | `guest` | Password for the specified user. |
 | `CASTELLUM_RABBITMQ_HOSTNAME` | `localhost` | Hostname of the RabbitMQ server. |
 | `CASTELLUM_RABBITMQ_PORT` | `5672` |  Port number to which the underlying connection is made. |
 | `CASTELLUM_AUDIT_SILENT` | `false` | Disable audit event logging to standard output. |

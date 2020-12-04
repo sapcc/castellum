@@ -13,10 +13,10 @@ require (
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/common v0.14.0
 	github.com/rs/cors v1.7.0
-	github.com/sapcc/go-bits v0.0.0-20201126124612-fcd600685fdb
+	github.com/sapcc/go-bits v0.0.0-20201203204854-32575942fc71
 	github.com/sapcc/gophercloud-limes v0.0.0-20200819120227-33ee0896b7e8
 	github.com/sapcc/hermes v0.0.0-20200928164006-62559084bfce
 	github.com/sapcc/limes v0.0.0-20200928094800-7845b54d12e7
-	github.com/streadway/amqp v1.0.0 // indirect
+	github.com/streadway/amqp v1.0.1-0.20200716223359-e6b33f460591
 	gopkg.in/gorp.v2 v2.2.0
 )
