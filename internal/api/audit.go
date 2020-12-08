@@ -29,6 +29,7 @@ import (
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/hermes/pkg/cadf"
+	"github.com/streadway/amqp"
 )
 
 //eventSink is a channel that receives audit events.
@@ -37,7 +38,7 @@ var eventSink chan<- cadf.Event
 var showAuditOnStdout bool
 
 // StartAuditLogging starts audit logging for the API.
-func StartAuditLogging(rabbitURI, rabbitQueueName string) {
+func StartAuditLogging(rabbitQueueName string, rabbitURI amqp.URI) {
 	silenceAuditLogging, _ := strconv.ParseBool(os.Getenv("CASTELLUM_AUDIT_SILENT"))
 	showAuditOnStdout = !silenceAuditLogging
 
@@ -57,7 +58,7 @@ func StartAuditLogging(rabbitURI, rabbitQueueName string) {
 		EventSink:           s,
 		OnSuccessfulPublish: onSuccessFunc,
 		OnFailedPublish:     onFailFunc,
-	}.Commit(rabbitURI, rabbitQueueName)
+	}.Commit(rabbitQueueName, rabbitURI)
 }
 
 var observerUUID = audittools.GenerateUUID()
