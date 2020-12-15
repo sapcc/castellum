@@ -1,6 +1,6 @@
 /*******************************************************************************
 *
-* Copyright 2018 SAP SE
+* Copyright 2018-2020 SAP SE
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -37,6 +37,22 @@ type ResourceInfo struct {
 	//If ExternallyManaged is true, quota cannot be set via the API. The quota
 	//value reported by the QuotaPlugin is always authoritative.
 	ExternallyManaged bool `json:"externally_managed,omitempty"`
+	//If NoQuota is true, quota is not tracked at all for this resource. The
+	//resource will only report quota. This field is not shown in API responses.
+	//Check `res.Quota == nil` instead.
+	NoQuota bool `json:"-"`
+	//ContainedIn is an optional hint that UIs can use to group resources. If non-empty,
+	//this resource is semantically contained within the resource with that name
+	//in the same service.
+	ContainedIn string `json:"contained_in,omitempty"`
+}
+
+//RateInfo contains the metadata for a rate (i.e. some type of event that can
+//be rate-limited and for which there may a way to retrieve a count of past
+//events from a backend service).
+type RateInfo struct {
+	Name string `json:"name"`
+	Unit Unit   `json:"unit,omitempty"`
 }
 
 //ServiceInfo contains the metadata for a backend service.

@@ -1,0 +1,12 @@
+# Configuration file for <https://github.com/sapcc/go-makefile-maker>
+
+binaries:
+  - name:        limes
+    fromPackage: ./cmd/limes
+    installTo:   bin/
+
+coverageTest:
+  except: '/plugins'
+
+vendoring:
+  enabled: true

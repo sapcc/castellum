@@ -1,6 +1,6 @@
 /*******************************************************************************
 *
-* Copyright 2018 SAP SE
+* Copyright 2018-2020 SAP SE
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -36,20 +36,22 @@ type DomainReport struct {
 //a single backend service.
 type DomainServiceReport struct {
 	ServiceInfo
-	Resources    DomainResourceReports `json:"resources,keepempty"`
-	MaxScrapedAt *int64                `json:"max_scraped_at,omitempty"`
-	MinScrapedAt *int64                `json:"min_scraped_at,omitempty"`
+	Resources         DomainResourceReports `json:"resources,keepempty"`
+	MaxScrapedAt      *int64                `json:"max_scraped_at,omitempty"`
+	MinScrapedAt      *int64                `json:"min_scraped_at,omitempty"`
+	MaxRatesScrapedAt *int64                `json:"max_rates_scraped_at,omitempty"`
+	MinRatesScrapedAt *int64                `json:"min_rates_scraped_at,omitempty"`
 }
 
 //DomainResourceReport is a substructure of DomainReport containing data for
 //a single resource.
 type DomainResourceReport struct {
+	//Several fields are pointers to values to enable precise control over which fields are rendered in output.
 	ResourceInfo
-	DomainQuota   uint64 `json:"quota,keepempty"`
-	ProjectsQuota uint64 `json:"projects_quota,keepempty"`
-	Usage         uint64 `json:"usage,keepempty"`
-	BurstUsage    uint64 `json:"burst_usage,omitempty"`
-	//These are pointers to values to enable precise control over whether this field is rendered in output.
+	DomainQuota          *uint64          `json:"quota,omitempty"`
+	ProjectsQuota        *uint64          `json:"projects_quota,omitempty"`
+	Usage                uint64           `json:"usage,keepempty"`
+	BurstUsage           uint64           `json:"burst_usage,omitempty"`
 	PhysicalUsage        *uint64          `json:"physical_usage,omitempty"`
 	BackendQuota         *uint64          `json:"backend_quota,omitempty"`
 	InfiniteBackendQuota *bool            `json:"infinite_backend_quota,omitempty"`
