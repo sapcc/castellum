@@ -176,10 +176,13 @@ func (m *assetManagerProjectQuota) GetAssetStatus(res db.Resource, projectID str
 	if err != nil {
 		return core.AssetStatus{}, err
 	}
+	if resource.Quota == nil {
+		return core.AssetStatus{}, errors.New("resource does not track quota")
+	}
 	return core.AssetStatus{
-		Size:          resource.Quota,
+		Size:          *resource.Quota,
 		AbsoluteUsage: p2u64(resource.Usage),
-		UsagePercent:  core.GetUsagePercent(resource.Quota, resource.Usage),
+		UsagePercent:  core.GetUsagePercent(*resource.Quota, resource.Usage),
 	}, nil
 }
 
