@@ -96,6 +96,7 @@ func main() {
 	if err != nil {
 		logg.Fatal("cannot connect to OpenStack: " + err.Error())
 	}
+	baseProvider.UserAgent.Prepend("castellum")
 	eo := gophercloud.EndpointOpts{
 		//note that empty values are acceptable in both fields
 		Region:       os.Getenv("OS_REGION_NAME"),
