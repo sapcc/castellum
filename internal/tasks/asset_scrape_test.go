@@ -37,7 +37,8 @@ func runAssetScrapeTest(t test.T, resourceIsSingleStep bool, action func(*Contex
 		if err != sql.ErrNoRows {
 			t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
-		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-0.sql")
+		_, dbDump := easypg.NewTracker(t.T, c.DB.Db)
+		dbDump.AssertEmpty()
 
 		//create a resource and asset to test with
 		t.Must(c.DB.Insert(&db.Resource{

@@ -37,7 +37,8 @@ func TestResourceScraping(baseT *testing.T) {
 		if err != sql.ErrNoRows {
 			t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
-		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-0.sql")
+		_, dbDump := easypg.NewTracker(t.T, c.DB.Db)
+		dbDump.AssertEmpty()
 
 		//create some project resources for testing
 		t.Must(c.DB.Insert(&db.Resource{
@@ -74,36 +75,63 @@ func TestResourceScraping(baseT *testing.T) {
 				"asset6": {Size: 6000, Usage: 2520},
 			},
 		}
+		tr, _ := easypg.NewTracker(t.T, c.DB.Db)
 
 		//first ScrapeNextResource() should scrape project1/foo
 		clock.Step()
 		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
-		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-1.sql")
+		tr.DBChanges().AssertEqualf(`
+				INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message, absolute_usage) VALUES (1, 1, 'asset1', 1000, 40, %[1]d, NULL, %[1]d, '', 400);
+				INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message, absolute_usage) VALUES (2, 1, 'asset2', 2000, 50, %[1]d, NULL, %[1]d, '', 1000);
+				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+			`,
+			c.TimeNow().Unix(),
+		)
 
 		//first ScrapeNextResource() should scrape project3/foo
 		//(NOT project2 because its resource has a different asset type)
 		clock.Step()
 		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
-		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-2.sql")
+		tr.DBChanges().AssertEqualf(`
+				INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message, absolute_usage) VALUES (3, 3, 'asset5', 5000, 50, 99992, NULL, 99992, '', 2500);
+				INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message, absolute_usage) VALUES (4, 3, 'asset6', 6000, 42, 99992, NULL, 99992, '', 2520);
+				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d WHERE id = 3 AND scope_uuid = 'project3' AND asset_type = 'foo';
+			`,
+			c.TimeNow().Unix(),
+		)
 
 		//next ScrapeNextResource() should scrape project1/foo again because its
 		//scraped_at timestamp is the smallest; there should be no changes except for
 		//resources.scraped_at and resource.checked_at
 		clock.Step()
 		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
-		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-3.sql")
+		tr.DBChanges().AssertEqualf(`
+				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+			`,
+			c.TimeNow().Unix(),
+		)
 
 		//simulate deletion of an asset
 		delete(amStatic.Assets["project3"], "asset6")
 		clock.Step()
 		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
-		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-4.sql")
+		tr.DBChanges().AssertEqualf(`
+				DELETE FROM assets WHERE id = 4 AND resource_id = 3 AND uuid = 'asset6';
+				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d WHERE id = 3 AND scope_uuid = 'project3' AND asset_type = 'foo';
+			`,
+			c.TimeNow().Unix(),
+		)
 
 		//simulate addition of a new asset
 		amStatic.Assets["project1"]["asset7"] = plugins.StaticAsset{Size: 10, Usage: 3}
 		clock.Step()
 		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
-		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-5.sql")
+		tr.DBChanges().AssertEqualf(`
+				INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message, absolute_usage) VALUES (5, 1, 'asset7', 10, 30, %[1]d, NULL, %[1]d, '', 3);
+				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+			`,
+			c.TimeNow().Unix(),
+		)
 
 		//check behavior on a resource without assets
 		t.Must(c.DB.Insert(&db.Resource{
@@ -115,6 +143,10 @@ func TestResourceScraping(baseT *testing.T) {
 		amStatic.Assets["project4"] = nil
 		clock.Step()
 		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
-		easypg.AssertDBContent(t.T, c.DB.Db, "fixtures/resource-scrape-6.sql")
+		tr.DBChanges().AssertEqualf(`
+			INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_size, max_size, min_free_size, single_step, domain_uuid, checked_at, scrape_error_message) VALUES (4, 'project4', 'foo', %[1]d, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL, FALSE, 'domain1', %[1]d, '');
+			`,
+			c.TimeNow().Unix(),
+		)
 	})
 }
