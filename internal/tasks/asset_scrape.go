@@ -87,6 +87,13 @@ func (c Context) ScrapeNextAsset(maxCheckedAt time.Time) (returnedError error) {
 	if err != nil {
 		if err == sql.ErrNoRows {
 			logg.Debug("no assets to scrape - slowing down...")
+			//explicit rollback is not strictly needed because we use
+			//RollbackUnlessCommitted, but the implicit rollback does a log message
+			//which we can avoid for this very common case
+			dbErr := tx.Rollback()
+			if dbErr != nil {
+				return dbErr
+			}
 			return sql.ErrNoRows
 		}
 		return err
