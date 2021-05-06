@@ -33,12 +33,16 @@ import (
 )
 
 //query that finds the next resource that needs to be scraped
+//
+//WARNING: This must be run in a transaction, or else `FOR UPDATE SKIP LOCKED`
+//will not work as expected.
 var scrapeAssetSearchQuery = db.SimplifyWhitespaceInSQL(`
-	SELECT a.* FROM assets a JOIN resources r ON r.id = a.resource_id AND r.asset_type = $1
-	WHERE a.checked_at < $2
+	SELECT * FROM assets
+	WHERE checked_at < $1
 	-- order by update priority (first outdated assets, then by ID for deterministic test behavior)
-	ORDER BY a.checked_at ASC, a.id ASC
-	LIMIT 1
+	ORDER BY checked_at ASC, id ASC
+	-- prevent other job loops from working on the same asset concurrently
+	FOR UPDATE SKIP LOCKED LIMIT 1
 `)
 
 var logScrapes bool
@@ -53,9 +57,17 @@ func init() {
 //
 //Returns sql.ErrNoRows when no asset needed scraping, to indicate to the
 //caller to slow down.
-func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time) (returnedError error) {
+func (c Context) ScrapeNextAsset(maxCheckedAt time.Time) (returnedError error) {
+	var (
+		asset db.Asset
+		res   db.Resource
+	)
+
 	defer func() {
-		labels := prometheus.Labels{"asset": string(assetType)}
+		labels := prometheus.Labels{"asset": string(res.AssetType)}
+		if res.AssetType == "" { //because we did not get to loading it
+			labels["asset"] = "early-db-access"
+		}
 		if returnedError == nil {
 			assetScrapeSuccessCounter.With(labels).Inc()
 		} else if returnedError != sql.ErrNoRows {
@@ -63,33 +75,38 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 		}
 	}()
 
-	manager, _ := c.Team.ForAssetType(assetType)
-	if manager == nil {
-		panic(fmt.Sprintf("no asset manager for asset type %q", assetType))
+	//we need a DB transaction for the row-level locking to work correctly
+	tx, err := c.DB.Begin()
+	if err != nil {
+		return err
 	}
+	defer core.RollbackUnlessCommitted(tx)
 
 	//find asset
-	var asset db.Asset
-	err := c.DB.SelectOne(&asset, scrapeAssetSearchQuery, assetType, maxCheckedAt)
+	err = tx.SelectOne(&asset, scrapeAssetSearchQuery, maxCheckedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			logg.Debug("no %s assets to scrape - slowing down...", assetType)
+			logg.Debug("no assets to scrape - slowing down...")
 			return sql.ErrNoRows
 		}
 		return err
 	}
 
 	//find corresponding resource
-	var res db.Resource
-	err = c.DB.SelectOne(&res, `SELECT * FROM resources WHERE id = $1`, asset.ResourceID)
+	err = tx.SelectOne(&res, `SELECT * FROM resources WHERE id = $1`, asset.ResourceID)
 	if err != nil {
 		return err
 	}
-	logg.Debug("scraping %s asset %s in project %s using manager %v", assetType, asset.UUID, res.ScopeUUID, manager)
+	manager, _ := c.Team.ForAssetType(res.AssetType)
+	if manager == nil {
+		return fmt.Errorf("no asset manager for asset type %q", res.AssetType)
+	}
+
+	logg.Debug("scraping %s asset %s in scope %s using manager %v", res.AssetType, asset.UUID, res.ScopeUUID, manager)
 
 	//get pending operation for this asset
 	var pendingOps []db.PendingOperation
-	_, err = c.DB.Select(&pendingOps, `SELECT * FROM pending_operations WHERE asset_id = $1`, asset.ID)
+	_, err = tx.Select(&pendingOps, `SELECT * FROM pending_operations WHERE asset_id = $1`, asset.ID)
 	var pendingOp *db.PendingOperation
 	switch err {
 	case nil:
@@ -112,15 +129,16 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 	}
 	status, err := manager.GetAssetStatus(res, asset.UUID, oldStatus)
 	if err != nil {
-		errMsg := fmt.Errorf("cannot query status of %s %s: %s", string(assetType), asset.UUID, err.Error())
+		errMsg := fmt.Errorf("cannot query status of %s %s: %s", string(res.AssetType), asset.UUID, err.Error())
 		if _, ok := err.(core.AssetNotFoundErr); ok {
-			//GetAssetStatus may return a core.AssetNotFoundErr, if the
-			//concerning asset could not be found in the backend; in that case,
-			//delete the asset from db.
+			//asset was deleted since the last scrape of this resource
 			logg.Error(errMsg.Error())
-			logg.Info("removing deleted %s asset from DB: UUID = %s, scope UUID = %s", assetType, asset.UUID, res.ScopeUUID)
-			_, dbErr := c.DB.Delete(&asset)
-			return dbErr
+			logg.Info("removing deleted %s asset from DB: UUID = %s, scope UUID = %s", res.AssetType, asset.UUID, res.ScopeUUID)
+			_, dbErr := tx.Delete(&asset)
+			if dbErr != nil {
+				return dbErr
+			}
+			return tx.Commit()
 		}
 
 		//GetAssetStatus may fail for single assets, e.g. for Manila shares in
@@ -129,7 +147,11 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 		//scraped_at unchanged to indicate old data
 		asset.CheckedAt = c.TimeNow()
 		asset.ScrapeErrorMessage = err.Error()
-		_, dbErr := c.DB.Update(&asset)
+		_, dbErr := tx.Update(&asset)
+		if dbErr != nil {
+			return dbErr
+		}
+		dbErr = tx.Commit()
 		if dbErr != nil {
 			return dbErr
 		}
@@ -139,12 +161,12 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 	if logScrapes {
 		if status.AbsoluteUsage == nil {
 			logg.Info("observed %s %s at size = %d, usage = %.3f%%",
-				assetType, asset.UUID,
+				res.AssetType, asset.UUID,
 				status.Size, status.UsagePercent,
 			)
 		} else {
 			logg.Info("observed %s %s at size = %d, usage = %d (%.3f%%)",
-				assetType, asset.UUID,
+				res.AssetType, asset.UUID,
 				status.Size, *status.AbsoluteUsage, status.UsagePercent,
 			)
 		}
@@ -183,11 +205,6 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 	}
 
 	//update asset in DB
-	tx, err := c.DB.Begin()
-	if err != nil {
-		return err
-	}
-	defer core.RollbackUnlessCommitted(tx)
 	_, err = tx.Update(&asset)
 	if err != nil {
 		return err
@@ -206,19 +223,19 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 	if pendingOp != nil {
 		pendingOp, err = c.maybeCancelOperation(tx, res, asset, *pendingOp)
 		if err != nil {
-			return fmt.Errorf("cannot cancel operation on %s %s: %s", assetType, asset.UUID, err.Error())
+			return fmt.Errorf("cannot cancel operation on %s %s: %s", res.AssetType, asset.UUID, err.Error())
 		}
 	}
 	if pendingOp != nil {
 		pendingOp, err = c.maybeUpdateOperation(tx, res, asset, *pendingOp)
 		if err != nil {
-			return fmt.Errorf("cannot update operation on %s %s: %s", assetType, asset.UUID, err.Error())
+			return fmt.Errorf("cannot update operation on %s %s: %s", res.AssetType, asset.UUID, err.Error())
 		}
 	}
 	if pendingOp != nil {
 		pendingOp, err = c.maybeConfirmOperation(tx, res, asset, *pendingOp)
 		if err != nil {
-			return fmt.Errorf("cannot confirm operation on %s %s: %s", assetType, asset.UUID, err.Error())
+			return fmt.Errorf("cannot confirm operation on %s %s: %s", res.AssetType, asset.UUID, err.Error())
 		}
 	}
 
@@ -226,7 +243,7 @@ func (c Context) ScrapeNextAsset(assetType db.AssetType, maxCheckedAt time.Time)
 	if pendingOp == nil {
 		err = c.maybeCreateOperation(tx, res, asset)
 		if err != nil {
-			return fmt.Errorf("cannot create operation on %s %s: %s", assetType, asset.UUID, err.Error())
+			return fmt.Errorf("cannot create operation on %s %s: %s", res.AssetType, asset.UUID, err.Error())
 		}
 	}
 

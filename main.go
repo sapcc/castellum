@@ -281,10 +281,16 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 			go jobLoop(func() error {
 				return c.ScrapeNextResource(assetType, time.Now().Add(-30*time.Minute))
 			})
-			go jobLoop(func() error {
-				return c.ScrapeNextAsset(assetType, time.Now().Add(-5*time.Minute))
-			})
 		}
+	}
+	//NOTE: The observer process has a budget of 16 DB connections. Since there
+	//are much more assets than resources, we give most of these (12 of 16) to
+	//asset scraping. The rest is shared between resource scraping and the
+	//garbage collector.
+	for idx := 0; idx < 12; idx++ {
+		go jobLoop(func() error {
+			return c.ScrapeNextAsset(time.Now().Add(-5 * time.Minute))
+		})
 	}
 	go func() {
 		for {
