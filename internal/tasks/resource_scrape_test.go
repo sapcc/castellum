@@ -33,7 +33,7 @@ func TestResourceScraping(baseT *testing.T) {
 	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock) {
 
 		//ScrapeNextResource() without any resources just does nothing
-		err := c.ScrapeNextResource("foo", c.TimeNow())
+		err := c.ScrapeNextResource(c.TimeNow())
 		if err != sql.ErrNoRows {
 			t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
@@ -45,12 +45,6 @@ func TestResourceScraping(baseT *testing.T) {
 			ScopeUUID:  "project1",
 			DomainUUID: "domain1",
 			AssetType:  "foo",
-			CheckedAt:  c.TimeNow(),
-		}))
-		t.Must(c.DB.Insert(&db.Resource{
-			ScopeUUID:  "project2",
-			DomainUUID: "domain1",
-			AssetType:  "bar", //note: different asset type
 			CheckedAt:  c.TimeNow(),
 		}))
 		t.Must(c.DB.Insert(&db.Resource{
@@ -66,10 +60,6 @@ func TestResourceScraping(baseT *testing.T) {
 				"asset1": {Size: 1000, Usage: 400},
 				"asset2": {Size: 2000, Usage: 1000},
 			},
-			"project2": {
-				"asset3": {Size: 3000, Usage: 500},
-				"asset4": {Size: 4000, Usage: 800},
-			},
 			"project3": {
 				"asset5": {Size: 5000, Usage: 2500},
 				"asset6": {Size: 6000, Usage: 2520},
@@ -79,7 +69,7 @@ func TestResourceScraping(baseT *testing.T) {
 
 		//first ScrapeNextResource() should scrape project1/foo
 		clock.Step()
-		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+		t.Must(c.ScrapeNextResource(c.TimeNow()))
 		tr.DBChanges().AssertEqualf(`
 				INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message, absolute_usage) VALUES (1, 1, 'asset1', 1000, 40, %[1]d, NULL, %[1]d, '', 400);
 				INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message, absolute_usage) VALUES (2, 1, 'asset2', 2000, 50, %[1]d, NULL, %[1]d, '', 1000);
@@ -91,11 +81,11 @@ func TestResourceScraping(baseT *testing.T) {
 		//first ScrapeNextResource() should scrape project3/foo
 		//(NOT project2 because its resource has a different asset type)
 		clock.Step()
-		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+		t.Must(c.ScrapeNextResource(c.TimeNow()))
 		tr.DBChanges().AssertEqualf(`
-				INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message, absolute_usage) VALUES (3, 3, 'asset5', 5000, 50, 99992, NULL, 99992, '', 2500);
-				INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message, absolute_usage) VALUES (4, 3, 'asset6', 6000, 42, 99992, NULL, 99992, '', 2520);
-				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d WHERE id = 3 AND scope_uuid = 'project3' AND asset_type = 'foo';
+				INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message, absolute_usage) VALUES (3, 2, 'asset5', 5000, 50, 99992, NULL, 99992, '', 2500);
+				INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message, absolute_usage) VALUES (4, 2, 'asset6', 6000, 42, 99992, NULL, 99992, '', 2520);
+				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d WHERE id = 2 AND scope_uuid = 'project3' AND asset_type = 'foo';
 			`,
 			c.TimeNow().Unix(),
 		)
@@ -104,7 +94,7 @@ func TestResourceScraping(baseT *testing.T) {
 		//scraped_at timestamp is the smallest; there should be no changes except for
 		//resources.scraped_at and resource.checked_at
 		clock.Step()
-		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+		t.Must(c.ScrapeNextResource(c.TimeNow()))
 		tr.DBChanges().AssertEqualf(`
 				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 			`,
@@ -114,10 +104,10 @@ func TestResourceScraping(baseT *testing.T) {
 		//simulate deletion of an asset
 		delete(amStatic.Assets["project3"], "asset6")
 		clock.Step()
-		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+		t.Must(c.ScrapeNextResource(c.TimeNow()))
 		tr.DBChanges().AssertEqualf(`
-				DELETE FROM assets WHERE id = 4 AND resource_id = 3 AND uuid = 'asset6';
-				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d WHERE id = 3 AND scope_uuid = 'project3' AND asset_type = 'foo';
+				DELETE FROM assets WHERE id = 4 AND resource_id = 2 AND uuid = 'asset6';
+				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d WHERE id = 2 AND scope_uuid = 'project3' AND asset_type = 'foo';
 			`,
 			c.TimeNow().Unix(),
 		)
@@ -125,7 +115,7 @@ func TestResourceScraping(baseT *testing.T) {
 		//simulate addition of a new asset
 		amStatic.Assets["project1"]["asset7"] = plugins.StaticAsset{Size: 10, Usage: 3}
 		clock.Step()
-		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+		t.Must(c.ScrapeNextResource(c.TimeNow()))
 		tr.DBChanges().AssertEqualf(`
 				INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message, absolute_usage) VALUES (5, 1, 'asset7', 10, 30, %[1]d, NULL, %[1]d, '', 3);
 				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
@@ -135,16 +125,16 @@ func TestResourceScraping(baseT *testing.T) {
 
 		//check behavior on a resource without assets
 		t.Must(c.DB.Insert(&db.Resource{
-			ScopeUUID:  "project4",
+			ScopeUUID:  "project2",
 			DomainUUID: "domain1",
 			AssetType:  "foo",
 			CheckedAt:  c.TimeNow(),
 		}))
-		amStatic.Assets["project4"] = nil
+		amStatic.Assets["project2"] = nil
 		clock.Step()
-		t.Must(c.ScrapeNextResource("foo", c.TimeNow()))
+		t.Must(c.ScrapeNextResource(c.TimeNow()))
 		tr.DBChanges().AssertEqualf(`
-			INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_size, max_size, min_free_size, single_step, domain_uuid, checked_at, scrape_error_message) VALUES (4, 'project4', 'foo', %[1]d, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL, FALSE, 'domain1', %[1]d, '');
+			INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_size, max_size, min_free_size, single_step, domain_uuid, checked_at, scrape_error_message) VALUES (3, 'project2', 'foo', %[1]d, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL, FALSE, 'domain1', %[1]d, '');
 			`,
 			c.TimeNow().Unix(),
 		)

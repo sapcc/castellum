@@ -24,17 +24,22 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/logg"
 )
 
 //query that finds the next resource that needs to be scraped
+//
+//WARNING: This must be run in a transaction, or else `FOR UPDATE SKIP LOCKED`
+//will not work as expected.
 var scrapeResourceSearchQuery = db.SimplifyWhitespaceInSQL(`
 	SELECT * FROM resources
-	WHERE asset_type = $1 AND (scraped_at IS NULL or scraped_at < $2)
+	WHERE (scraped_at IS NULL or scraped_at < $1)
 	-- order by update priority (first new resources, then outdated resources, then ID for deterministic test behavior)
 	ORDER BY COALESCE(scraped_at, to_timestamp(-1)) ASC, id ASC
-	LIMIT 1
+	-- prevent other job loops from working on the same asset concurrently
+	FOR UPDATE SKIP LOCKED LIMIT 1
 `)
 
 //ScrapeNextResource finds the next resource of the given asset type that needs
@@ -43,9 +48,13 @@ var scrapeResourceSearchQuery = db.SimplifyWhitespaceInSQL(`
 //
 //Returns sql.ErrNoRows when no resource needed scraping, to indicate to the
 //caller to slow down.
-func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Time) (returnedError error) {
+func (c Context) ScrapeNextResource(maxScrapedAt time.Time) (returnedError error) {
+	var res db.Resource
 	defer func() {
-		labels := prometheus.Labels{"asset": string(assetType)}
+		labels := prometheus.Labels{"asset": string(res.AssetType)}
+		if res.AssetType == "" { //because we did not get to loading it
+			labels["asset"] = "early-db-access"
+		}
 		if returnedError == nil {
 			resourceScrapeSuccessCounter.With(labels).Inc()
 		} else if returnedError != sql.ErrNoRows {
@@ -53,22 +62,35 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 		}
 	}()
 
-	manager, _ := c.Team.ForAssetType(assetType)
-	if manager == nil {
-		panic(fmt.Sprintf("no asset manager for asset type %q", assetType))
+	//we need a DB transaction for the row-level locking to work correctly
+	tx, err := c.DB.Begin()
+	if err != nil {
+		return err
 	}
+	defer core.RollbackUnlessCommitted(tx)
 
-	logg.Debug("looking for %s resource to scrape, maxScrapedAt = %s", assetType, maxScrapedAt.String())
-	var res db.Resource
-	err := c.DB.SelectOne(&res, scrapeResourceSearchQuery, assetType, maxScrapedAt)
+	//find resource to scrape
+	logg.Debug("looking for resource to scrape, maxScrapedAt = %s", maxScrapedAt.String())
+	err = tx.SelectOne(&res, scrapeResourceSearchQuery, maxScrapedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			logg.Debug("no %s resources to scrape - slowing down...", assetType)
+			logg.Debug("no resources to scrape - slowing down...")
+			//explicit rollback is not strictly needed because we use
+			//RollbackUnlessCommitted, but the implicit rollback does a log message
+			//which we can avoid for this very common case
+			dbErr := tx.Rollback()
+			if dbErr != nil {
+				return dbErr
+			}
 			return sql.ErrNoRows
 		}
 		return err
 	}
-	logg.Debug("scraping %s resource for project %s", assetType, res.ScopeUUID)
+	manager, _ := c.Team.ForAssetType(res.AssetType)
+	if manager == nil {
+		return fmt.Errorf("no asset manager for asset type %q", res.AssetType)
+	}
+	logg.Debug("scraping %s resource in scope %s using manager %v", res.AssetType, res.ScopeUUID, manager)
 
 	//check which assets exist in this resource in OpenStack
 	assetUUIDs, err := manager.ListAssets(res)
@@ -77,14 +99,17 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 		//but leave scraped_at unchanged to indicate old data
 		res.CheckedAt = c.TimeNow()
 		res.ScrapeErrorMessage = err.Error()
-		_, dbErr := c.DB.Update(&res)
+		_, dbErr := tx.Update(&res)
 		if dbErr != nil {
 			return dbErr
 		}
-
-		return fmt.Errorf("cannot list %s assets in project %s: %s", string(assetType), res.ScopeUUID, err.Error())
+		dbErr = tx.Commit()
+		if dbErr != nil {
+			return dbErr
+		}
+		return fmt.Errorf("cannot list %s assets in scope %s: %s", string(res.AssetType), res.ScopeUUID, err.Error())
 	}
-	logg.Debug("scraped %d assets for %s resource for project %s", len(assetUUIDs), assetType, res.ScopeUUID)
+	logg.Debug("scraped %d assets for %s resource for scope %s", len(assetUUIDs), res.AssetType, res.ScopeUUID)
 	isExistingAsset := make(map[string]bool, len(assetUUIDs))
 	for _, uuid := range assetUUIDs {
 		isExistingAsset[uuid] = true
@@ -92,7 +117,7 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 
 	//load existing asset entries from DB
 	var dbAssets []db.Asset
-	_, err = c.DB.Select(&dbAssets, `SELECT * FROM assets WHERE resource_id = $1`, res.ID)
+	_, err = tx.Select(&dbAssets, `SELECT * FROM assets WHERE resource_id = $1`, res.ID)
 	if err != nil {
 		return err
 	}
@@ -109,8 +134,8 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 		if isExistingAsset[dbAsset.UUID] {
 			continue
 		}
-		logg.Info("removing deleted %s asset from DB: UUID = %s, scope UUID = %s", assetType, dbAsset.UUID, res.ScopeUUID)
-		_, err = c.DB.Delete(&dbAsset)
+		logg.Info("removing deleted %s asset from DB: UUID = %s, scope UUID = %s", res.AssetType, dbAsset.UUID, res.ScopeUUID)
+		_, err = tx.Delete(&dbAsset)
 		if err != nil {
 			return err
 		}
@@ -121,7 +146,7 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 		if isAssetInDB[assetUUID] {
 			continue
 		}
-		logg.Info("adding new %s asset to DB: UUID = %s, scope UUID = %s", assetType, assetUUID, res.ScopeUUID)
+		logg.Info("adding new %s asset to DB: UUID = %s, scope UUID = %s", res.AssetType, assetUUID, res.ScopeUUID)
 		now := c.TimeNow()
 		dbAsset := db.Asset{
 			ResourceID:   res.ID,
@@ -131,7 +156,7 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 		}
 
 		status, err := manager.GetAssetStatus(res, assetUUID, nil)
-		labels := prometheus.Labels{"asset": string(assetType)}
+		labels := prometheus.Labels{"asset": string(res.AssetType)}
 		if err == nil {
 			assetScrapeSuccessCounter.With(labels).Inc()
 			dbAsset.Size = status.Size
@@ -146,18 +171,18 @@ func (c Context) ScrapeNextResource(assetType db.AssetType, maxScrapedAt time.Ti
 			dbAsset.ScrapeErrorMessage = err.Error()
 		}
 
-		err = c.DB.Insert(&dbAsset)
+		err = tx.Insert(&dbAsset)
 		if err != nil {
 			return err
 		}
 	}
 
 	//record successful scrape
-	_, err = c.DB.Update(&res)
+	_, err = tx.Update(&res)
 	if err != nil {
 		return err
 
 	}
 
-	return nil
+	return tx.Commit()
 }

@@ -275,21 +275,17 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	c.InitializeScrapingCounters()
 	prometheus.MustRegister(tasks.StateMetricsCollector{Context: c})
 
-	for _, manager := range team {
-		for _, info := range manager.AssetTypes() {
-			assetType := info.AssetType
-			go jobLoop(func() error {
-				return c.ScrapeNextResource(assetType, time.Now().Add(-30*time.Minute))
-			})
-		}
-	}
-	//NOTE: The observer process has a budget of 16 DB connections. Since there
-	//are much more assets than resources, we give most of these (12 of 16) to
-	//asset scraping. The rest is shared between resource scraping and the
-	//garbage collector.
+	//The observer process has a budget of 16 DB connections. Since there are
+	//much more assets than resources, we give most of these (12 of 16) to asset
+	//scraping. The rest is split between resource scrape and garbage collection.
 	for idx := 0; idx < 12; idx++ {
 		go jobLoop(func() error {
 			return c.ScrapeNextAsset(time.Now().Add(-5 * time.Minute))
+		})
+	}
+	for idx := 0; idx < 3; idx++ {
+		go jobLoop(func() error {
+			return c.ScrapeNextResource(time.Now().Add(-30 * time.Minute))
 		})
 	}
 	go func() {
