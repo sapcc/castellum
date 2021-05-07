@@ -58,12 +58,15 @@ type AssetManagerStatic struct {
 	SetAssetSizeFails         bool
 }
 
-//AssetTypes implements the core.AssetManager interface.
-func (m AssetManagerStatic) AssetTypes() []core.AssetTypeInfo {
-	return []core.AssetTypeInfo{{
-		AssetType:            m.AssetType,
-		ReportsAbsoluteUsage: m.ReportsAbsoluteUsage,
-	}}
+//InfoForAssetType implements the core.AssetManager interface.
+func (m AssetManagerStatic) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
+	if assetType == m.AssetType {
+		return &core.AssetTypeInfo{
+			AssetType:            m.AssetType,
+			ReportsAbsoluteUsage: m.ReportsAbsoluteUsage,
+		}
+	}
+	return nil
 }
 
 //CheckResourceAllowed implements the core.AssetManager interface.

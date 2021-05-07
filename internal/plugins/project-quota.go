@@ -94,16 +94,18 @@ func init() {
 	})
 }
 
-//AssetTypes implements the core.AssetManager interface.
-func (m *assetManagerProjectQuota) AssetTypes() []core.AssetTypeInfo {
-	result := make([]core.AssetTypeInfo, len(m.KnownResources))
-	for idx, info := range m.KnownResources {
-		result[idx] = core.AssetTypeInfo{
-			AssetType:            info.AssetType(),
-			ReportsAbsoluteUsage: true,
+//InfoForAssetType implements the core.AssetManager interface.
+func (m *assetManagerProjectQuota) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
+	for _, info := range m.KnownResources {
+		thisAssetType := info.AssetType()
+		if thisAssetType == assetType {
+			return &core.AssetTypeInfo{
+				AssetType:            thisAssetType,
+				ReportsAbsoluteUsage: true,
+			}
 		}
 	}
-	return result
+	return nil
 }
 
 var errNotAllowedForThisProject = errors.New("resource is not whitelisted for autoscaling")

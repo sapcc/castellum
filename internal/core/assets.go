@@ -53,8 +53,9 @@ func (e AssetNotFoundErr) Error() string {
 //concrete behavior for specific asset types, and the core logic of Castellum.
 //It is created by CreateAssetManagers() using AssetManagerFactory.
 type AssetManager interface {
-	//Returns the list of all asset types supported by this asset manager.
-	AssetTypes() []AssetTypeInfo
+	//If this asset type is supported by this asset manager, return information
+	//about it. Otherwise return nil.
+	InfoForAssetType(assetType db.AssetType) *AssetTypeInfo
 
 	//Simple implementations can return nil unconditionally. A non-nil return value
 	//makes the API deny any attempts to create a resource with that scope and
@@ -125,10 +126,9 @@ func CreateAssetManagers(factoryIDs []string, provider *ProviderClient, eo gophe
 //the asset type is not supported.
 func (team AssetManagerTeam) ForAssetType(assetType db.AssetType) (AssetManager, AssetTypeInfo) {
 	for _, manager := range team {
-		for _, i := range manager.AssetTypes() {
-			if assetType == i.AssetType {
-				return manager, i
-			}
+		info := manager.InfoForAssetType(assetType)
+		if info != nil {
+			return manager, *info
 		}
 	}
 	return nil, AssetTypeInfo{}

@@ -65,12 +65,15 @@ func init() {
 	})
 }
 
-//AssetTypes implements the core.AssetManager interface.
-func (m *assetManagerNFS) AssetTypes() []core.AssetTypeInfo {
-	return []core.AssetTypeInfo{{
-		AssetType:            "nfs-shares",
-		ReportsAbsoluteUsage: true,
-	}}
+//InfoForAssetType implements the core.AssetManager interface.
+func (m *assetManagerNFS) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
+	if assetType == "nfs-shares" {
+		return &core.AssetTypeInfo{
+			AssetType:            "nfs-shares",
+			ReportsAbsoluteUsage: true,
+		}
+	}
+	return nil
 }
 
 //CheckResourceAllowed implements the core.AssetManager interface.

@@ -140,11 +140,10 @@ func main() {
 
 		found := false
 		for _, assetManager := range team {
-			for _, info := range assetManager.AssetTypes() {
-				if assetType == string(info.AssetType) {
-					found = true
-					cfg.MaxAssetSize[info.AssetType] = &maxSize
-				}
+			info := assetManager.InfoForAssetType(db.AssetType(assetType))
+			if info != nil {
+				found = true
+				cfg.MaxAssetSize[info.AssetType] = &maxSize
 			}
 		}
 		if !found {
