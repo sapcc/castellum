@@ -272,31 +272,25 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
 	c := tasks.Context{DB: dbi, Team: team}
 	c.ApplyDefaults()
-	c.InitializeScrapingCounters()
 	prometheus.MustRegister(tasks.StateMetricsCollector{Context: c})
 
 	//The observer process has a budget of 16 DB connections. Since there are
 	//much more assets than resources, we give most of these (12 of 16) to asset
 	//scraping. The rest is split between resource scrape and garbage collection.
 	for idx := 0; idx < 12; idx++ {
-		go jobLoop(func() error {
+		go queuedJobLoop(func() error {
 			return c.ScrapeNextAsset(time.Now().Add(-5 * time.Minute))
 		})
 	}
 	for idx := 0; idx < 3; idx++ {
-		go jobLoop(func() error {
+		go queuedJobLoop(func() error {
 			return c.ScrapeNextResource(time.Now().Add(-30 * time.Minute))
 		})
 	}
-	go func() {
-		for {
-			err := tasks.CollectGarbage(dbi, time.Now().Add(-14*24*time.Hour)) //14 days
-			if err != nil {
-				logg.Error(err.Error())
-			}
-			time.Sleep(time.Hour)
-		}
-	}()
+	go cronJobLoop(3*time.Minute, c.EnsureScrapingCounters)
+	go cronJobLoop(1*time.Hour, func() error {
+		return tasks.CollectGarbage(dbi, time.Now().Add(-14*24*time.Hour)) //14 days
+	})
 
 	//use main goroutine to emit Prometheus metrics
 	http.Handle("/metrics", promhttp.Handler())
@@ -311,7 +305,7 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 //Execute a task repeatedly, but slow down when sql.ErrNoRows is returned by it.
 //(Tasks use this error value to indicate that nothing needs scraping, so we
 //can back off a bit to avoid useless database load.)
-func jobLoop(task func() error) {
+func queuedJobLoop(task func() error) {
 	for {
 		err := task()
 		switch err {
@@ -326,18 +320,30 @@ func jobLoop(task func() error) {
 	}
 }
 
+//Execute a task repeatedly, in set intervals. Unlike queuedJobLoop(), this
+//does not change pace when errors are returned.
+func cronJobLoop(interval time.Duration, task func() error) {
+	for {
+		err := task()
+		if err != nil {
+			logg.Error(err.Error())
+		}
+		time.Sleep(interval)
+	}
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // task: worker
 
 func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
 	c := tasks.Context{DB: dbi, Team: team}
 	c.ApplyDefaults()
-	c.InitializeResizingCounters()
 
-	go jobLoop(func() error {
+	go queuedJobLoop(func() error {
 		_, err := c.ExecuteNextResize()
 		return err
 	})
+	go cronJobLoop(3*time.Minute, c.EnsureResizingCounters)
 
 	//use main goroutine to emit Prometheus metrics
 	http.Handle("/metrics", promhttp.Handler())

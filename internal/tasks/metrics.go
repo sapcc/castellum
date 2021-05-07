@@ -19,6 +19,8 @@
 package tasks
 
 import (
+	"fmt"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/logg"
@@ -85,30 +87,59 @@ func init() {
 	prometheus.MustRegister(assetResizeErroredCounter)
 }
 
-//InitializeScrapingCounters adds 0 to all scraping counters, to ensure that
+//EnsureScrapingCounters adds 0 to all scraping counters, to ensure that
 //all relevant timeseries exist.
-func (c Context) InitializeScrapingCounters() {
-	for _, manager := range c.Team {
-		for _, info := range manager.AssetTypes() {
-			labels := prometheus.Labels{"asset": string(info.AssetType)}
-			resourceScrapeSuccessCounter.With(labels).Add(0)
-			resourceScrapeFailedCounter.With(labels).Add(0)
-			assetScrapeSuccessCounter.With(labels).Add(0)
-			assetScrapeFailedCounter.With(labels).Add(0)
-		}
+func (c Context) EnsureScrapingCounters() error {
+	err := c.foreachAssetType(func(assetType db.AssetType) {
+		labels := prometheus.Labels{"asset": string(assetType)}
+		resourceScrapeSuccessCounter.With(labels).Add(0)
+		resourceScrapeFailedCounter.With(labels).Add(0)
+		assetScrapeSuccessCounter.With(labels).Add(0)
+		assetScrapeFailedCounter.With(labels).Add(0)
+	})
+	if err != nil {
+		return fmt.Errorf("during EnsureScrapingCounters: %w", err)
 	}
+	return nil
 }
 
-//InitializeResizingCounters adds 0 to all resizing counters, to ensure that
+//EnsureResizingCounters adds 0 to all resizing counters, to ensure that
 //all relevant timeseries exist.
-func (c Context) InitializeResizingCounters() {
-	for _, manager := range c.Team {
-		for _, info := range manager.AssetTypes() {
-			labels := prometheus.Labels{"asset": string(info.AssetType)}
-			assetResizeCounter.With(labels).Add(0)
-			assetResizeErroredCounter.With(labels).Add(0)
-		}
+func (c Context) EnsureResizingCounters() error {
+	err := c.foreachAssetType(func(assetType db.AssetType) {
+		labels := prometheus.Labels{"asset": string(assetType)}
+		assetResizeCounter.With(labels).Add(0)
+		assetResizeErroredCounter.With(labels).Add(0)
+	})
+	if err != nil {
+		return fmt.Errorf("during EnsureResizingCounters: %w", err)
 	}
+	return nil
+}
+
+func (c Context) foreachAssetType(action func(db.AssetType)) (err error) {
+	rows, err := c.DB.Query(`SELECT DISTINCT asset_type FROM resources`)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			err = rows.Close()
+		} else {
+			rows.Close()
+		}
+	}()
+
+	for rows.Next() {
+		var assetType db.AssetType
+		err := rows.Scan(&assetType)
+		if err != nil {
+			return err
+		}
+		action(assetType)
+	}
+	return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////
