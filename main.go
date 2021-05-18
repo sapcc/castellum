@@ -248,7 +248,7 @@ func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provi
 	http.Handle("/healthcheck", http.HandlerFunc(healthCheckHandler))
 
 	logg.Info("listening on " + httpListenAddr)
-	err = httpee.ListenAndServeContext(httpee.ContextWithSIGINT(context.Background()), httpListenAddr, nil)
+	err = httpee.ListenAndServeContext(httpee.ContextWithSIGINT(context.Background(), 10*time.Second), httpListenAddr, nil)
 	if err != nil {
 		logg.Error(err.Error())
 	}
@@ -295,7 +295,7 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/healthcheck", http.HandlerFunc(healthCheckHandler))
 	logg.Info("listening on " + httpListenAddr)
-	err := httpee.ListenAndServeContext(httpee.ContextWithSIGINT(context.Background()), httpListenAddr, nil)
+	err := httpee.ListenAndServeContext(httpee.ContextWithSIGINT(context.Background(), 10*time.Second), httpListenAddr, nil)
 	if err != nil {
 		logg.Error(err.Error())
 	}
@@ -348,7 +348,7 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/healthcheck", http.HandlerFunc(healthCheckHandler))
 	logg.Info("listening on " + httpListenAddr)
-	err := httpee.ListenAndServeContext(httpee.ContextWithSIGINT(context.Background()), httpListenAddr, nil)
+	err := httpee.ListenAndServeContext(httpee.ContextWithSIGINT(context.Background(), 10*time.Second), httpListenAddr, nil)
 	if err != nil {
 		logg.Error(err.Error())
 	}
