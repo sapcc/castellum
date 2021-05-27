@@ -75,11 +75,11 @@ The following fields may be returned:
 | `resources.$type.checked.error` | string | *Readonly.* When the last check failed (see above), this field contains the error message that was returned from the backend. |
 | `resources.$type.asset_count` | integer | *Readonly.* The number of assets in this resource. |
 | `resources.$type.low_threshold`<br>`resources.$type.high_threshold`<br>`resources.$type.critical_threshold` | object | Configuration for thresholds that trigger an automated resize operation. Any of these may be missing if the threshold in question has not been enabled. |
-| `resources.$type.low_threshold.usage_percent`<br>`resources.$type.high_threshold.usage_percent`<br>`resources.$type.critical_threshold.usage_percent` | integer | Automated operations will be triggered when usage crosses these thresholds, i.e. `usage <= threshold` for the low threshold and `usage >= threshold` for the high and critical thresholds. |
+| `resources.$type.low_threshold.usage_percent`<br>`resources.$type.high_threshold.usage_percent`<br>`resources.$type.critical_threshold.usage_percent` | float | Automated operations will be triggered when usage crosses these thresholds, i.e. `usage <= threshold` for the low threshold and `usage >= threshold` for the high and critical thresholds. |
 | `resources.$type.low_threshold.delay_seconds`<br>`resources.$type.high_threshold.delay_seconds` | integer | How long usage must cross the threshold before the operation is confirmed. Critical operations don't have a delay; they are always confirmed immediately. |
 | `resources.$type.size_constraints.minimum`<br>`resources.$type.size_constraints.maximum` | integer | If set, resize operations will only be scheduled when the target size fits into these constraints. |
 | `resources.$type.size_constraints.minimum_free` | integer | If set, downsize operations will be inhibited and upsize operations will be scheduled to ensure that `size - absoluteUsage` is always `>=` this value. |
-| `resources.$type.size_steps.percent` | integer | Step size for percentage-step resizing. [See below](#stepping-strategies) for details. |
+| `resources.$type.size_steps.percent` | float | Step size for percentage-step resizing. [See below](#stepping-strategies) for details. |
 | `resources.$type.size_steps.single` | boolean | When true, use single-step resizing. [See below](#stepping-strategies) for details. |
 
 ### Stepping strategies
@@ -193,7 +193,7 @@ For each asset, the following fields may be returned:
 | ----- | ---- | ----------- |
 | `id` | string | UUID of asset. |
 | `size` | integer | Size of asset. The unit depends on the asset type. See [README.md](../README.md#supported-asset-types) for more information. |
-| `usage_percent` | integer | Usage of asset as percentage of size. When the asset has multiple usage types (e.g. instances have both CPU usage and RAM usage), usually the higher value is reported here. |
+| `usage_percent` | float | Usage of asset as percentage of size. When the asset has multiple usage types (e.g. instances have both CPU usage and RAM usage), usually the higher value is reported here. |
 | `scraped_at` | timestamp | When the size and usage of the asset was last retrieved by Castellum. |
 | `checked.at` | timestamp | When Castellum last tried to retrieve the size and usage of the asset. Only shown when different from `scraped_at`, i.e. when the last check failed. |
 | `checked.error` | string | When the last check failed (see above), this field contains the error message that was returned from the backend. |
@@ -278,7 +278,7 @@ The following fields may be returned for each operation, both below `pending_ope
 | `.old_size` | integer | The asset's size before this resize operation. |
 | `.new_size` | integer | The (projected) asset's size after the successful completion of the resize operation. |
 | `.created.at` | timestamp | When Castellum first observed the asset's usage crossing a threshold. |
-| `.created.usage_percent` | string | The asset's usage at that time. |
+| `.created.usage_percent` | float | The asset's usage at that time. |
 | `.confirmed.at` | timestamp | When Castellum confirmed that usage had crossed the threshold for at least the required delay. When `reason` is `critical`, this timestamp will be identical to `.created.at`. For operations in state `created`, this field is not shown. For operations in state `cancelled`, this field may or may not be shown. |
 | `.greenlit.at` | timestamp | When a user permitted this operation to go ahead. For operations not subject to operator approval, this is equal to `.greenlit.at`. For operations in states `created`, `confirmed` or `cancelled`, this field is not shown. As an exception, for operations in state `confirmed`, **this timestamp may be in the future**, which means that the operation will automatically move into state `greenlit` at that point in time. |
 | `.greenlit.by_user` | string | The UUID of the user that greenlit this operation. For operations in states `created` or `confirmed`, this field is not shown. For operations not subject to operator approval, this field is not shown. |
