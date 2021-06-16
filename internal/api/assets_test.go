@@ -99,12 +99,12 @@ func TestGetAsset(baseT *testing.T) {
 
 		//check rendering of a pending operation in state "created"
 		pendingOp := db.PendingOperation{
-			AssetID:      1,
-			Reason:       db.OperationReasonHigh,
-			OldSize:      1024,
-			NewSize:      2048,
-			UsagePercent: 60,
-			CreatedAt:    time.Unix(21, 0).UTC(),
+			AssetID:   1,
+			Reason:    db.OperationReasonHigh,
+			OldSize:   1024,
+			NewSize:   2048,
+			Usage:     db.UsageValues{db.SingularUsageMetric: 768},
+			CreatedAt: time.Unix(21, 0).UTC(),
 		}
 		t.Must(h.DB.Insert(&pendingOp))
 		pendingOpJSON := assert.JSONObject{
@@ -114,7 +114,7 @@ func TestGetAsset(baseT *testing.T) {
 			"new_size": 2048,
 			"created": assert.JSONObject{
 				"at":            21,
-				"usage_percent": 60,
+				"usage_percent": 75,
 			},
 		}
 		response["pending_operation"] = pendingOpJSON
@@ -189,7 +189,7 @@ func TestGetAsset(baseT *testing.T) {
 				"new_size": 1025,
 				"created": assert.JSONObject{
 					"at":            51,
-					"usage_percent": 97,
+					"usage_percent": 96,
 				},
 				"confirmed": assert.JSONObject{
 					"at": 52,

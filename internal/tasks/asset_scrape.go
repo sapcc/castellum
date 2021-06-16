@@ -130,8 +130,8 @@ func (c Context) ScrapeNextAsset(maxCheckedAt time.Time) (returnedError error) {
 	var oldStatus *core.AssetStatus
 	if asset.ScrapedAt != nil {
 		oldStatus = &core.AssetStatus{
-			Size:         asset.Size,
-			UsagePercent: asset.UsagePercent,
+			Size:  asset.Size,
+			Usage: asset.Usage[db.SingularUsageMetric],
 		}
 	}
 	status, err := manager.GetAssetStatus(res, asset.UUID, oldStatus)
@@ -166,17 +166,10 @@ func (c Context) ScrapeNextAsset(maxCheckedAt time.Time) (returnedError error) {
 	}
 
 	if logScrapes {
-		if status.AbsoluteUsage == nil {
-			logg.Info("observed %s %s at size = %d, usage = %.3f%%",
-				res.AssetType, asset.UUID,
-				status.Size, status.UsagePercent,
-			)
-		} else {
-			logg.Info("observed %s %s at size = %d, usage = %d (%.3f%%)",
-				res.AssetType, asset.UUID,
-				status.Size, *status.AbsoluteUsage, status.UsagePercent,
-			)
-		}
+		logg.Info("observed %s %s at size = %d, usage = %d (%.3f%%)",
+			res.AssetType, asset.UUID,
+			status.Size, status.Usage, core.GetUsagePercent(status.Size, status.Usage),
+		)
 	}
 
 	//update asset attributes - We have four separate cases here, which
@@ -202,8 +195,7 @@ func (c Context) ScrapeNextAsset(maxCheckedAt time.Time) (returnedError error) {
 		//OldSize nor its NewSize) -> assume that some other user changed the size
 		//in parallel and take that new value as the actual size
 		asset.Size = status.Size
-		asset.UsagePercent = status.UsagePercent
-		asset.AbsoluteUsage = status.AbsoluteUsage
+		asset.Usage = db.UsageValues{db.SingularUsageMetric: status.Usage}
 		asset.ExpectedSize = nil
 	default:
 		//we are waiting for a resize operation to reflect in the backend, but
@@ -259,10 +251,10 @@ func (c Context) ScrapeNextAsset(maxCheckedAt time.Time) (returnedError error) {
 
 func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset) error {
 	op := db.PendingOperation{
-		AssetID:      asset.ID,
-		OldSize:      asset.Size,
-		UsagePercent: asset.UsagePercent,
-		CreatedAt:    c.TimeNow(),
+		AssetID:   asset.ID,
+		OldSize:   asset.Size,
+		Usage:     asset.Usage,
+		CreatedAt: c.TimeNow(),
 	}
 
 	eligibleFor := core.GetEligibleOperations(res, asset)

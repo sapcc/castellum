@@ -367,7 +367,7 @@ func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetTyp
 	fmt.Println("supported commands:")
 	fmt.Println("\tlist   <project-id>                                  - calls manager.ListAssets()")
 	fmt.Println("\tshow   <project-id> <asset-id>                       - calls manager.GetAssetStatus() with previousStatus == nil")
-	fmt.Println("\tshow   <project-id> <asset-id> <size> <usage%>       - calls manager.GetAssetStatus() with previousStatus != nil")
+	fmt.Println("\tshow   <project-id> <asset-id> <size> <usage>        - calls manager.GetAssetStatus() with previousStatus != nil")
 	fmt.Println("\tresize <project-id> <asset-id> <old-size> <new-size> - calls manager.SetAssetSize()")
 	fmt.Println("")
 
@@ -418,12 +418,12 @@ func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetTyp
 					logg.Error(err.Error())
 					continue
 				}
-				usagePerc, err := strconv.ParseFloat(fields[4], 64)
+				usage, err := strconv.ParseFloat(fields[4], 64)
 				if err != nil {
 					logg.Error(err.Error())
 					continue
 				}
-				previousStatus = &core.AssetStatus{Size: size, UsagePercent: usagePerc}
+				previousStatus = &core.AssetStatus{Size: size, Usage: usage}
 			default:
 				logg.Error("wrong number of arguments")
 				continue
@@ -433,10 +433,7 @@ func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetTyp
 				logg.Error(err.Error())
 				continue
 			}
-			logg.Info("size = %d, usage = %d%%", result.Size, result.UsagePercent)
-			if result.AbsoluteUsage != nil {
-				logg.Info("absolute usage = %d", *result.AbsoluteUsage)
-			}
+			logg.Info("size = %d, usage = %g", result.Size, result.Usage)
 
 		case "resize":
 			if len(fields) != 5 {

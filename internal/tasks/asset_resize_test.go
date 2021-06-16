@@ -46,7 +46,7 @@ func setupAssetResizeTest(t test.T, c *Context, amStatic *plugins.AssetManagerSt
 			ResourceID:   1,
 			UUID:         uuid,
 			Size:         1000,
-			UsagePercent: 50,
+			Usage:        db.UsageValues{db.SingularUsageMetric: 500},
 			ScrapedAt:    p2time(c.TimeNow()),
 			ExpectedSize: nil,
 		}))
@@ -66,14 +66,14 @@ func TestSuccessfulResize(baseT *testing.T) {
 		//add a greenlit PendingOperation
 		clock.StepBy(5 * time.Minute)
 		pendingOp := db.PendingOperation{
-			AssetID:      1,
-			Reason:       db.OperationReasonHigh,
-			OldSize:      1000,
-			NewSize:      1200,
-			UsagePercent: 50,
-			CreatedAt:    c.TimeNow().Add(-5 * time.Minute),
-			ConfirmedAt:  p2time(c.TimeNow()),
-			GreenlitAt:   p2time(c.TimeNow().Add(5 * time.Minute)),
+			AssetID:     1,
+			Reason:      db.OperationReasonHigh,
+			OldSize:     1000,
+			NewSize:     1200,
+			Usage:       db.UsageValues{db.SingularUsageMetric: 500},
+			CreatedAt:   c.TimeNow().Add(-5 * time.Minute),
+			ConfirmedAt: p2time(c.TimeNow()),
+			GreenlitAt:  p2time(c.TimeNow().Add(5 * time.Minute)),
 		}
 		t.Must(c.DB.Insert(&pendingOp))
 
@@ -92,16 +92,16 @@ func TestSuccessfulResize(baseT *testing.T) {
 		t.Must(err)
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
-			AssetID:      1,
-			Reason:       db.OperationReasonHigh,
-			OldSize:      1000,
-			NewSize:      1200,
-			UsagePercent: 50,
-			CreatedAt:    c.TimeNow().Add(-15 * time.Minute),
-			ConfirmedAt:  p2time(c.TimeNow().Add(-10 * time.Minute)),
-			GreenlitAt:   p2time(c.TimeNow().Add(-5 * time.Minute)),
-			FinishedAt:   c.TimeNow(),
-			Outcome:      db.OperationOutcomeSucceeded,
+			AssetID:     1,
+			Reason:      db.OperationReasonHigh,
+			OldSize:     1000,
+			NewSize:     1200,
+			Usage:       db.UsageValues{db.SingularUsageMetric: 500},
+			CreatedAt:   c.TimeNow().Add(-15 * time.Minute),
+			ConfirmedAt: p2time(c.TimeNow().Add(-10 * time.Minute)),
+			GreenlitAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
+			FinishedAt:  c.TimeNow(),
+			Outcome:     db.OperationOutcomeSucceeded,
 		})
 
 		//expect asset to report an expected size, but still show the old size
@@ -111,7 +111,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 			ResourceID:   1,
 			UUID:         "asset1",
 			Size:         1000,
-			UsagePercent: 50,
+			Usage:        db.UsageValues{db.SingularUsageMetric: 500},
 			ScrapedAt:    p2time(c.TimeNow().Add(-15 * time.Minute)),
 			ExpectedSize: p2uint64(1200),
 		})
@@ -126,14 +126,14 @@ func TestFailingResize(tBase *testing.T) {
 		//add a greenlit PendingOperation
 		clock.StepBy(10 * time.Minute)
 		pendingOp := db.PendingOperation{
-			AssetID:      1,
-			Reason:       db.OperationReasonLow,
-			OldSize:      1000,
-			NewSize:      600,
-			UsagePercent: 50,
-			CreatedAt:    c.TimeNow().Add(-10 * time.Minute),
-			ConfirmedAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
-			GreenlitAt:   p2time(c.TimeNow().Add(-5 * time.Minute)),
+			AssetID:     1,
+			Reason:      db.OperationReasonLow,
+			OldSize:     1000,
+			NewSize:     600,
+			Usage:       db.UsageValues{db.SingularUsageMetric: 500},
+			CreatedAt:   c.TimeNow().Add(-10 * time.Minute),
+			ConfirmedAt: p2time(c.TimeNow().Add(-5 * time.Minute)),
+			GreenlitAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
 		}
 		t.Must(c.DB.Insert(&pendingOp))
 
@@ -148,7 +148,7 @@ func TestFailingResize(tBase *testing.T) {
 			Reason:       db.OperationReasonLow,
 			OldSize:      1000,
 			NewSize:      600,
-			UsagePercent: 50,
+			Usage:        db.UsageValues{db.SingularUsageMetric: 500},
 			CreatedAt:    c.TimeNow().Add(-10 * time.Minute),
 			ConfirmedAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
 			GreenlitAt:   p2time(c.TimeNow().Add(-5 * time.Minute)),
@@ -163,7 +163,7 @@ func TestFailingResize(tBase *testing.T) {
 			ResourceID:   1,
 			UUID:         "asset1",
 			Size:         1000,
-			UsagePercent: 50,
+			Usage:        db.UsageValues{db.SingularUsageMetric: 500},
 			ScrapedAt:    p2time(c.TimeNow().Add(-10 * time.Minute)),
 			ExpectedSize: nil,
 		})
@@ -178,14 +178,14 @@ func TestErroringResize(tBase *testing.T) {
 		//add a greenlit PendingOperation that will error in SetAssetSize()
 		clock.StepBy(10 * time.Minute)
 		pendingOp := db.PendingOperation{
-			AssetID:      1,
-			Reason:       db.OperationReasonLow,
-			OldSize:      1000,
-			NewSize:      400, //will error because `new_size < usage` (usage = 500, see above)
-			UsagePercent: 50,
-			CreatedAt:    c.TimeNow().Add(-10 * time.Minute),
-			ConfirmedAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
-			GreenlitAt:   p2time(c.TimeNow().Add(-5 * time.Minute)),
+			AssetID:     1,
+			Reason:      db.OperationReasonLow,
+			OldSize:     1000,
+			NewSize:     400, //will error because `new_size < usage` (usage = 500, see above)
+			Usage:       db.UsageValues{db.SingularUsageMetric: 500},
+			CreatedAt:   c.TimeNow().Add(-10 * time.Minute),
+			ConfirmedAt: p2time(c.TimeNow().Add(-5 * time.Minute)),
+			GreenlitAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
 		}
 		t.Must(c.DB.Insert(&pendingOp))
 
@@ -221,7 +221,7 @@ func TestErroringResize(tBase *testing.T) {
 			Reason:          db.OperationReasonLow,
 			OldSize:         1000,
 			NewSize:         400,
-			UsagePercent:    50,
+			Usage:           db.UsageValues{db.SingularUsageMetric: 500},
 			CreatedAt:       pendingOp.CreatedAt,
 			ConfirmedAt:     pendingOp.ConfirmedAt,
 			GreenlitAt:      pendingOp.GreenlitAt,
@@ -237,7 +237,7 @@ func TestErroringResize(tBase *testing.T) {
 			ResourceID:   1,
 			UUID:         "asset1",
 			Size:         1000,
-			UsagePercent: 50,
+			Usage:        db.UsageValues{db.SingularUsageMetric: 500},
 			ScrapedAt:    p2time(c.TimeNow().Add(-(2 + maxRetries) * 10 * time.Minute)),
 			ExpectedSize: nil,
 		})
@@ -256,14 +256,14 @@ func TestOperationQueueBehavior(baseT *testing.T) {
 		var finishedOps []db.FinishedOperation
 		for idx := uint64(1); idx <= 10; idx++ {
 			pendingOp := db.PendingOperation{
-				AssetID:      int64(idx),
-				Reason:       db.OperationReasonHigh,
-				OldSize:      1000,
-				NewSize:      1200 + idx, //need operations to be distinguishable
-				UsagePercent: 50,
-				CreatedAt:    c.TimeNow().Add(-10 * time.Minute),
-				ConfirmedAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
-				GreenlitAt:   p2time(c.TimeNow().Add(-5 * time.Minute)),
+				AssetID:     int64(idx),
+				Reason:      db.OperationReasonHigh,
+				OldSize:     1000,
+				NewSize:     1200 + idx, //need operations to be distinguishable
+				Usage:       db.UsageValues{db.SingularUsageMetric: 500},
+				CreatedAt:   c.TimeNow().Add(-10 * time.Minute),
+				ConfirmedAt: p2time(c.TimeNow().Add(-5 * time.Minute)),
+				GreenlitAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
 			}
 			t.Must(c.DB.Insert(&pendingOp))
 			finishedOps = append(finishedOps,

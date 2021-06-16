@@ -69,8 +69,7 @@ func init() {
 func (m *assetManagerNFS) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
 	if assetType == "nfs-shares" {
 		return &core.AssetTypeInfo{
-			AssetType:            "nfs-shares",
-			ReportsAbsoluteUsage: true,
+			AssetType: "nfs-shares",
 		}
 	}
 	return nil
@@ -248,13 +247,11 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 	sizeBytes := bytesTotal + bytesReservedBySnapshots
 	usageBytes := bytesUsed + bytesUsedBySnapshots
 	status := core.AssetStatus{
-		Size:          uint64(math.Round(sizeBytes / 1024 / 1024 / 1024)),
-		AbsoluteUsage: p2u64(uint64(math.Round(usageBytes / 1024 / 1024 / 1024))),
-		UsagePercent:  core.GetUsagePercent(uint64(sizeBytes), uint64(usageBytes)),
+		Size:  uint64(math.Round(sizeBytes / 1024 / 1024 / 1024)),
+		Usage: usageBytes / 1024 / 1024 / 1024,
 	}
 	if usageBytes <= 0 {
-		status.AbsoluteUsage = p2u64(0)
-		status.UsagePercent = 0
+		status.Usage = 0
 	}
 
 	//when size has changed compared to last time, double-check with the Manila
@@ -335,8 +332,4 @@ func prometheusGetSingleValue(api prom_v1.API, queryStr string) (float64, error)
 	case 1:
 		return float64(resultVector[0].Value), nil
 	}
-}
-
-func p2u64(val uint64) *uint64 {
-	return &val
 }

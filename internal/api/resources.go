@@ -192,9 +192,6 @@ func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo, ma
 	res.SizeStepPercent = r.SizeSteps.Percent
 	res.SingleStep = r.SizeSteps.Single
 	if res.SingleStep {
-		if !info.ReportsAbsoluteUsage {
-			complain("cannot use single-step resizing: asset type does not report absolute usage")
-		}
 		if res.SizeStepPercent != 0 {
 			complain("percentage-based step may not be configured when single-step resizing is used")
 		}
@@ -238,9 +235,6 @@ func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo, ma
 		res.MinimumFreeSize = r.SizeConstraints.MinimumFree
 		if res.MinimumFreeSize != nil && *res.MinimumFreeSize == 0 {
 			res.MinimumFreeSize = nil
-		}
-		if res.MinimumFreeSize != nil && !info.ReportsAbsoluteUsage {
-			complain("cannot use minimum free size constraint: asset type does not report absolute usage")
 		}
 	}
 

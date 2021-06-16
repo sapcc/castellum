@@ -160,14 +160,12 @@ func (c Context) ScrapeNextResource(maxScrapedAt time.Time) (returnedError error
 		if err == nil {
 			assetScrapeSuccessCounter.With(labels).Inc()
 			dbAsset.Size = status.Size
-			dbAsset.UsagePercent = status.UsagePercent
-			dbAsset.AbsoluteUsage = status.AbsoluteUsage
+			dbAsset.Usage = db.UsageValues{db.SingularUsageMetric: status.Usage}
 			dbAsset.ScrapedAt = &now
 		} else {
 			assetScrapeFailedCounter.With(labels).Inc()
 			dbAsset.Size = 0
-			dbAsset.UsagePercent = 0
-			dbAsset.AbsoluteUsage = nil
+			dbAsset.Usage = db.UsageValues{db.SingularUsageMetric: 0}
 			dbAsset.ScrapeErrorMessage = err.Error()
 		}
 

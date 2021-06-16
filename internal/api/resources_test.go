@@ -518,20 +518,6 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 			"critical threshold must be between 0% and 100% of usage",
 		)
 
-		//there's one thing we can only test with a "bar" resource since "bar" has
-		//ReportsAbsoluteUsage = false
-		assert.HTTPRequest{
-			Method: "PUT",
-			Path:   "/v1/projects/project1/resources/bar",
-			Body: assert.JSONObject{
-				"critical_threshold": assert.JSONObject{"usage_percent": 90},
-				"size_steps":         assert.JSONObject{"single": true},
-				"size_constraints":   assert.JSONObject{"minimum_free": 10},
-			},
-			ExpectStatus: http.StatusUnprocessableEntity,
-			ExpectBody:   assert.StringData("cannot use single-step resizing: asset type does not report absolute usage\ncannot use minimum free size constraint: asset type does not report absolute usage\n"),
-		}.Check(t.T, hh)
-
 		//none of this should have touched the DB
 		t.ExpectResources(h.DB, allResources...)
 

@@ -27,7 +27,7 @@ import (
 
 //GetUsagePercent calculates `100 * usage / size`, but has additional logic for
 //some corner cases like size = 0.
-func GetUsagePercent(size, usage uint64) float64 {
+func GetUsagePercent(size uint64, usage float64) float64 {
 	if size == 0 {
 		if usage == 0 {
 			return 0
@@ -37,7 +37,16 @@ func GetUsagePercent(size, usage uint64) float64 {
 		return 200
 	}
 
-	return 100 * float64(usage) / float64(size)
+	return 100 * usage / float64(size)
+}
+
+//GetMultiUsagePercent is like GetUsagePercent, but converts multiple usage values at once.
+func GetMultiUsagePercent(size uint64, usage db.UsageValues) db.UsageValues {
+	result := make(db.UsageValues, len(usage))
+	for k, v := range usage {
+		result[k] = GetUsagePercent(size, v)
+	}
+	return result
 }
 
 //GetEligibleOperations calculates which resizing operations the given asset
@@ -46,7 +55,7 @@ func GetUsagePercent(size, usage uint64) float64 {
 //resized to `value`.
 func GetEligibleOperations(res db.Resource, asset db.Asset) map[db.OperationReason]uint64 {
 	//never touch a zero-sized asset unless it has non-zero usage
-	if asset.Size == 0 && asset.UsagePercent == 0 {
+	if asset.Size == 0 && asset.Usage[db.SingularUsageMetric] == 0 {
 		return nil
 	}
 
@@ -77,47 +86,45 @@ func checkReason(res db.Resource, asset db.Asset, reason db.OperationReason) *ui
 		c.forbidAbove(*res.MaximumSize)
 	}
 
-	if asset.AbsoluteUsage != nil {
-		absUsage := float64(*asset.AbsoluteUsage)
+	absUsage := asset.Usage[db.SingularUsageMetric]
 
-		//do not allow downsize operations to cross above the high/critical thresholds
-		if reason == db.OperationReasonLow && res.HighThresholdPercent != 0 {
-			c.forbidBelow(uint64(math.Floor(100*absUsage/res.HighThresholdPercent)) + 1)
+	//do not allow downsize operations to cross above the high/critical thresholds
+	if reason == db.OperationReasonLow && res.HighThresholdPercent != 0 {
+		c.forbidBelow(uint64(math.Floor(100*absUsage/res.HighThresholdPercent)) + 1)
+	}
+	if reason == db.OperationReasonLow && res.CriticalThresholdPercent != 0 {
+		c.forbidBelow(uint64(math.Floor(100*absUsage/res.CriticalThresholdPercent)) + 1)
+	}
+
+	//do not allow upsize operations to cross below the low threshold
+	if reason != db.OperationReasonLow && res.LowThresholdPercent != 0 {
+		lowSize := uint64(math.Floor(100*absUsage/res.LowThresholdPercent)) - 1
+
+		//BUT ensure that this threshold does not prevent us from taking action
+		//at all (if in doubt, the high or critical threshold is more important
+		//than the low threshold; it's better to have an asset slightly too large
+		//than slightly too small)
+		highThresholdPerc := res.HighThresholdPercent
+		if highThresholdPerc == 0 {
+			highThresholdPerc = res.CriticalThresholdPercent
 		}
-		if reason == db.OperationReasonLow && res.CriticalThresholdPercent != 0 {
-			c.forbidBelow(uint64(math.Floor(100*absUsage/res.CriticalThresholdPercent)) + 1)
+		if highThresholdPerc != 0 {
+			for lowSize > 0 && (100*absUsage/float64(lowSize)) >= highThresholdPerc {
+				lowSize++
+			}
 		}
 
-		//do not allow upsize operations to cross below the low threshold
-		if reason != db.OperationReasonLow && res.LowThresholdPercent != 0 {
-			lowSize := uint64(math.Floor(100*absUsage/res.LowThresholdPercent)) - 1
+		//ALSO the MinimumFreeSize takes precedence over the low threshold: we're
+		//allowed to go into low usage if it helps us satisfy the MinimumFreeSize
+		if res.MinimumFreeSize != nil {
+			minSize := *res.MinimumFreeSize + uint64(math.Ceil(absUsage))
+			if lowSize < minSize {
+				lowSize = minSize
+			}
+		}
 
-			//BUT ensure that this threshold does not prevent us from taking action
-			//at all (if in doubt, the high or critical threshold is more important
-			//than the low threshold; it's better to have an asset slightly too large
-			//than slightly too small)
-			highThresholdPerc := res.HighThresholdPercent
-			if highThresholdPerc == 0 {
-				highThresholdPerc = res.CriticalThresholdPercent
-			}
-			if highThresholdPerc != 0 {
-				for lowSize > 0 && (100*absUsage/float64(lowSize)) >= highThresholdPerc {
-					lowSize++
-				}
-			}
-
-			//ALSO the MinimumFreeSize takes precedence over the low threshold: we're
-			//allowed to go into low usage if it helps us satisfy the MinimumFreeSize
-			if res.MinimumFreeSize != nil && asset.AbsoluteUsage != nil {
-				minSize := *res.MinimumFreeSize + *asset.AbsoluteUsage
-				if lowSize < minSize {
-					lowSize = minSize
-				}
-			}
-
-			if lowSize > 0 {
-				c.forbidAbove(lowSize)
-			}
+		if lowSize > 0 {
+			c.forbidAbove(lowSize)
 		}
 	}
 
@@ -125,8 +132,8 @@ func checkReason(res db.Resource, asset db.Asset, reason db.OperationReason) *ui
 	//technically falls in both phase 1 and phase 2
 	var a actions
 	takeActionBecauseMinimumFreeSize := false
-	if res.MinimumFreeSize != nil && asset.AbsoluteUsage != nil {
-		minSize := *res.MinimumFreeSize + *asset.AbsoluteUsage
+	if res.MinimumFreeSize != nil {
+		minSize := *res.MinimumFreeSize + uint64(math.Ceil(absUsage))
 		switch reason {
 		case db.OperationReasonLow:
 			c.forbidBelow(minSize)
@@ -144,13 +151,14 @@ func checkReason(res db.Resource, asset db.Asset, reason db.OperationReason) *ui
 
 	//phase 2: generate an action when the corresponding threshold is passed
 	takeActionBecauseThreshold := false
+	usagePercent := GetUsagePercent(asset.Size, asset.Usage[db.SingularUsageMetric])
 	switch reason {
 	case db.OperationReasonLow:
-		takeActionBecauseThreshold = res.LowThresholdPercent > 0 && asset.UsagePercent <= res.LowThresholdPercent
+		takeActionBecauseThreshold = res.LowThresholdPercent > 0 && usagePercent <= res.LowThresholdPercent
 	case db.OperationReasonHigh:
-		takeActionBecauseThreshold = res.HighThresholdPercent > 0 && asset.UsagePercent >= res.HighThresholdPercent
+		takeActionBecauseThreshold = res.HighThresholdPercent > 0 && usagePercent >= res.HighThresholdPercent
 	case db.OperationReasonCritical:
-		takeActionBecauseThreshold = res.CriticalThresholdPercent > 0 && asset.UsagePercent >= res.CriticalThresholdPercent
+		takeActionBecauseThreshold = res.CriticalThresholdPercent > 0 && usagePercent >= res.CriticalThresholdPercent
 	}
 	if takeActionBecauseThreshold || takeActionBecauseMinimumFreeSize {
 		if res.SingleStep {
@@ -185,15 +193,11 @@ func getNewSizePercentageStep(res db.Resource, asset db.Asset, reason db.Operati
 	switch reason {
 	case db.OperationReasonCritical:
 		newSize := assetSize + step
-		//for assets reporting absolute usage, we can estimate the new usage-%
-		//immediately and take multiple steps if usage would still be crossing the
-		//critical threshold otherwise
-		if asset.AbsoluteUsage != nil {
-			newUsagePercent := GetUsagePercent(newSize, *asset.AbsoluteUsage)
-			if newUsagePercent >= res.CriticalThresholdPercent {
-				//restart call with newSize as old size to calculate the next step
-				return getNewSizePercentageStep(res, asset, reason, newSize)
-			}
+		//take multiple steps if usage continues to cross the critical threshold
+		newUsagePercent := GetUsagePercent(newSize, asset.Usage[db.SingularUsageMetric])
+		if newUsagePercent >= res.CriticalThresholdPercent {
+			//restart call with newSize as old size to calculate the next step
+			return getNewSizePercentageStep(res, asset, reason, newSize)
 		}
 		return newSize
 	case db.OperationReasonHigh:
@@ -240,7 +244,7 @@ func getActionSingleStep(res db.Resource, asset db.Asset, reason db.OperationRea
 
 	//the new size should be close to the threshold, but with a small delta to
 	//avoid hitting the threshold exactly
-	newSizeFloat := 100 * float64(*asset.AbsoluteUsage) / (thresholdPerc + delta)
+	newSizeFloat := 100 * asset.Usage[db.SingularUsageMetric] / (thresholdPerc + delta)
 	if reason == db.OperationReasonLow {
 		//for "low", round size down to ensure usage-% comes out above the threshold
 		newSizeRounded := math.Floor(newSizeFloat)
