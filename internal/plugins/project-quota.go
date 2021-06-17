@@ -100,7 +100,8 @@ func (m *assetManagerProjectQuota) InfoForAssetType(assetType db.AssetType) *cor
 		thisAssetType := info.AssetType()
 		if thisAssetType == assetType {
 			return &core.AssetTypeInfo{
-				AssetType: thisAssetType,
+				AssetType:    thisAssetType,
+				UsageMetrics: []db.UsageMetric{db.SingularUsageMetric},
 			}
 		}
 	}
@@ -182,7 +183,7 @@ func (m *assetManagerProjectQuota) GetAssetStatus(res db.Resource, projectID str
 	}
 	return core.AssetStatus{
 		Size:  *resource.Quota,
-		Usage: float64(resource.Usage),
+		Usage: db.UsageValues{db.SingularUsageMetric: float64(resource.Usage)},
 	}, nil
 }
 

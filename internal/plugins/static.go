@@ -61,7 +61,8 @@ type AssetManagerStatic struct {
 func (m AssetManagerStatic) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
 	if assetType == m.AssetType {
 		return &core.AssetTypeInfo{
-			AssetType: m.AssetType,
+			AssetType:    m.AssetType,
+			UsageMetrics: []db.UsageMetric{db.SingularUsageMetric},
 		}
 	}
 	return nil
@@ -135,7 +136,7 @@ func (m AssetManagerStatic) GetAssetStatus(res db.Resource, assetUUID string, pr
 
 	return core.AssetStatus{
 		Size:  asset.Size,
-		Usage: float64(asset.Usage),
+		Usage: db.UsageValues{db.SingularUsageMetric: float64(asset.Usage)},
 	}, nil
 }
 

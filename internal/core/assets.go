@@ -28,12 +28,13 @@ import (
 //AssetStatus shows the current state of an asset. It is returned by AssetManager.GetAssetStatus().
 type AssetStatus struct {
 	Size  uint64
-	Usage float64
+	Usage db.UsageValues
 }
 
 //AssetTypeInfo describes an AssetType supported by an AssetManager.
 type AssetTypeInfo struct {
-	AssetType db.AssetType
+	AssetType    db.AssetType
+	UsageMetrics []db.UsageMetric
 }
 
 //AssetNotFoundErr is returned by AssetManager.GetAssetStatus() if the

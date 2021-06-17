@@ -69,7 +69,8 @@ func init() {
 func (m *assetManagerNFS) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
 	if assetType == "nfs-shares" {
 		return &core.AssetTypeInfo{
-			AssetType: "nfs-shares",
+			AssetType:    "nfs-shares",
+			UsageMetrics: []db.UsageMetric{db.SingularUsageMetric},
 		}
 	}
 	return nil
@@ -246,12 +247,13 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 	}
 	sizeBytes := bytesTotal + bytesReservedBySnapshots
 	usageBytes := bytesUsed + bytesUsedBySnapshots
+	usageGiB := usageBytes / 1024 / 1024 / 1024
+	if usageBytes <= 0 {
+		usageGiB = 0
+	}
 	status := core.AssetStatus{
 		Size:  uint64(math.Round(sizeBytes / 1024 / 1024 / 1024)),
-		Usage: usageBytes / 1024 / 1024 / 1024,
-	}
-	if usageBytes <= 0 {
-		status.Usage = 0
+		Usage: db.UsageValues{db.SingularUsageMetric: usageGiB},
 	}
 
 	//when size has changed compared to last time, double-check with the Manila

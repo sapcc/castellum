@@ -365,14 +365,15 @@ func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetTyp
 
 	fmt.Println("")
 	fmt.Println("supported commands:")
-	fmt.Println("\tlist   <project-id>                                  - calls manager.ListAssets()")
-	fmt.Println("\tshow   <project-id> <asset-id>                       - calls manager.GetAssetStatus() with previousStatus == nil")
-	fmt.Println("\tshow   <project-id> <asset-id> <size> <usage>        - calls manager.GetAssetStatus() with previousStatus != nil")
-	fmt.Println("\tresize <project-id> <asset-id> <old-size> <new-size> - calls manager.SetAssetSize()")
+	fmt.Println("\tlist   <project-id>                                     - calls manager.ListAssets()")
+	fmt.Println("\tshow   <project-id> <asset-id>                          - calls manager.GetAssetStatus() with previousStatus == nil")
+	fmt.Println("\tshow   <project-id> <asset-id> <size> <metric=usage>... - calls manager.GetAssetStatus() with previousStatus != nil")
+	fmt.Println("\tresize <project-id> <asset-id> <old-size> <new-size>    - calls manager.SetAssetSize()")
 	fmt.Println("")
 
 	stdin := bufio.NewReader(os.Stdin)
 	eof := false
+PROMPT:
 	for !eof {
 		//show prompt
 		os.Stdout.Write([]byte("> "))
@@ -409,21 +410,30 @@ func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetTyp
 
 		case "show":
 			var previousStatus *core.AssetStatus
-			switch len(fields) {
-			case 3:
+			switch {
+			case len(fields) == 3:
 				previousStatus = nil
-			case 5:
+			case len(fields) >= 5:
 				size, err := strconv.ParseUint(fields[3], 10, 64)
 				if err != nil {
 					logg.Error(err.Error())
 					continue
 				}
-				usage, err := strconv.ParseFloat(fields[4], 64)
-				if err != nil {
-					logg.Error(err.Error())
-					continue
+				usageValues := make(db.UsageValues)
+				for _, field := range fields[4:] {
+					subfields := strings.SplitN(field, "=", 2)
+					if len(subfields) != 2 {
+						logg.Error(`field %q is not of the form "metric=value"`, field)
+						continue PROMPT
+					}
+					usage, err := strconv.ParseFloat(subfields[1], 64)
+					if err != nil {
+						logg.Error(err.Error())
+						continue PROMPT
+					}
+					usageValues[db.UsageMetric(subfields[0])] = usage
 				}
-				previousStatus = &core.AssetStatus{Size: size, Usage: usage}
+				previousStatus = &core.AssetStatus{Size: size, Usage: usageValues}
 			default:
 				logg.Error("wrong number of arguments")
 				continue
