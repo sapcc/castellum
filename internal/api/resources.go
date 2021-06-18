@@ -21,6 +21,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -149,9 +150,14 @@ func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo, ma
 			}
 		}
 
+		providedMetrics := make([]string, 0, len(vals))
 		for metric := range vals {
-			if !isMetric[metric] {
-				complain("%s threshold specified for metric %q which is not valid for this resource", tType, metric)
+			providedMetrics = append(providedMetrics, string(metric))
+		}
+		sort.Strings(providedMetrics) //for deterministic order of error messages in unit test
+		for _, metric := range providedMetrics {
+			if !isMetric[db.UsageMetric(metric)] {
+				complain("%s threshold specified for metric %q which is not valid for this asset type", tType, metric)
 			}
 		}
 	}
@@ -160,7 +166,6 @@ func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo, ma
 		res.LowThresholdPercent = info.MakeZeroUsageValues()
 		res.LowDelaySeconds = 0
 	} else {
-		//NOTE TO SELF: check that members in UsageValues match info.UsageMetrics
 		res.LowThresholdPercent = r.LowThreshold.UsagePercent
 		checkThresholdCommon("low", res.LowThresholdPercent)
 		res.LowDelaySeconds = r.LowThreshold.DelaySeconds

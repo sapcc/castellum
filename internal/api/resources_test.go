@@ -55,7 +55,10 @@ var (
 		},
 		"asset_count": 1,
 		"critical_threshold": assert.JSONObject{
-			"usage_percent": 95,
+			"usage_percent": assert.JSONObject{
+				"first":  95,
+				"second": 97,
+			},
 		},
 		"size_constraints": assert.JSONObject{
 			"maximum": 20000,
@@ -415,32 +418,32 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 
 	withHandler(t, cfg, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, _ []db.Asset) {
 
-		expectErrors := func(body assert.JSONObject, errors ...string) {
+		expectErrors := func(assetType string, body assert.JSONObject, errors ...string) {
 			t.T.Helper()
 			assert.HTTPRequest{
 				Method:       "PUT",
-				Path:         "/v1/projects/project1/resources/foo",
+				Path:         "/v1/projects/project1/resources/" + assetType,
 				Body:         body,
 				ExpectStatus: http.StatusUnprocessableEntity,
 				ExpectBody:   assert.StringData(strings.Join(errors, "\n") + "\n"),
 			}.Check(t.T, hh)
 		}
 
-		expectErrors(
+		expectErrors("foo",
 			assert.JSONObject{
 				"critical_dingsbums": assert.JSONObject{"usage_percent": 95},
 			},
 			`request body is not valid JSON: json: unknown field "critical_dingsbums"`,
 		)
 
-		expectErrors(
+		expectErrors("foo",
 			assert.JSONObject{},
 			"at least one threshold must be configured",
 			"size step must be greater than 0%",
 			"maximum size must be configured for foo",
 		)
 
-		expectErrors(
+		expectErrors("foo",
 			assert.JSONObject{
 				"scraped_at":       12345,
 				"checked":          assert.JSONObject{"at": 56789},
@@ -459,7 +462,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 			"maximum size must be greater than minimum size",
 		)
 
-		expectErrors(
+		expectErrors("foo",
 			assert.JSONObject{
 				"critical_threshold": assert.JSONObject{"usage_percent": 95},
 				"size_steps":         assert.JSONObject{"percent": 10},
@@ -468,7 +471,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 			"maximum size must be configured for foo",
 		)
 
-		expectErrors(
+		expectErrors("foo",
 			assert.JSONObject{
 				"critical_threshold": assert.JSONObject{"usage_percent": 95, "delay_seconds": 60},
 				"size_steps":         assert.JSONObject{"percent": 10},
@@ -478,7 +481,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 			"maximum size must be 30 or less",
 		)
 
-		expectErrors(
+		expectErrors("foo",
 			assert.JSONObject{
 				"low_threshold":    assert.JSONObject{"usage_percent": 120, "delay_seconds": 60},
 				"high_threshold":   assert.JSONObject{"usage_percent": 80, "delay_seconds": 60},
@@ -489,7 +492,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 			"low threshold must be below high threshold",
 		)
 
-		expectErrors(
+		expectErrors("foo",
 			assert.JSONObject{
 				"high_threshold":     assert.JSONObject{"usage_percent": 120, "delay_seconds": 60},
 				"critical_threshold": assert.JSONObject{"usage_percent": 105},
@@ -501,7 +504,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 			"high threshold must be below critical threshold",
 		)
 
-		expectErrors(
+		expectErrors("foo",
 			assert.JSONObject{
 				"low_threshold":      assert.JSONObject{"usage_percent": 20, "delay_seconds": 60},
 				"critical_threshold": assert.JSONObject{"usage_percent": 15},
@@ -511,7 +514,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 			"low threshold must be below critical threshold",
 		)
 
-		expectErrors(
+		expectErrors("foo",
 			assert.JSONObject{
 				"low_threshold":      assert.JSONObject{"usage_percent": -0.3, "delay_seconds": 60},
 				"high_threshold":     assert.JSONObject{"usage_percent": -0.2, "delay_seconds": 60},
@@ -522,6 +525,44 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 			"low threshold must be between 0% and 100% of usage",
 			"high threshold must be between 0% and 100% of usage",
 			"critical threshold must be between 0% and 100% of usage",
+		)
+
+		expectErrors("foo",
+			assert.JSONObject{
+				"low_threshold":      assert.JSONObject{"usage_percent": assert.JSONObject{"first": 1, "second": 2}, "delay_seconds": 60},
+				"high_threshold":     assert.JSONObject{"usage_percent": assert.JSONObject{"first": 2, "second": 4}, "delay_seconds": 60},
+				"critical_threshold": assert.JSONObject{"usage_percent": assert.JSONObject{"first": 3, "second": 6}},
+				"size_steps":         assert.JSONObject{"percent": 10},
+				"size_constraints":   assert.JSONObject{"maximum": 30},
+			},
+			"missing low threshold",
+			`low threshold specified for metric "first" which is not valid for this asset type`,
+			`low threshold specified for metric "second" which is not valid for this asset type`,
+			"missing high threshold",
+			`high threshold specified for metric "first" which is not valid for this asset type`,
+			`high threshold specified for metric "second" which is not valid for this asset type`,
+			"missing critical threshold",
+			`critical threshold specified for metric "first" which is not valid for this asset type`,
+			`critical threshold specified for metric "second" which is not valid for this asset type`,
+		)
+
+		expectErrors("bar",
+			assert.JSONObject{
+				"low_threshold":      assert.JSONObject{"usage_percent": 1, "delay_seconds": 60},
+				"high_threshold":     assert.JSONObject{"usage_percent": 2, "delay_seconds": 60},
+				"critical_threshold": assert.JSONObject{"usage_percent": 3},
+				"size_steps":         assert.JSONObject{"percent": 10},
+				"size_constraints":   assert.JSONObject{"maximum": 30},
+			},
+			"missing low threshold for first",
+			"missing low threshold for second",
+			`low threshold specified for metric "singular" which is not valid for this asset type`,
+			"missing high threshold for first",
+			"missing high threshold for second",
+			`high threshold specified for metric "singular" which is not valid for this asset type`,
+			"missing critical threshold for first",
+			"missing critical threshold for second",
+			`critical threshold specified for metric "singular" which is not valid for this asset type`,
 		)
 
 		//none of this should have touched the DB

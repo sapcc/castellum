@@ -2,7 +2,7 @@ CREATE OR REPLACE FUNCTION unix(i integer) RETURNS timestamp AS $$ SELECT TO_TIM
 
 -- insert some resources in 'project1' that we can actually list -- both have a different set of thresholds activated to exercise different code paths
 INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_size, max_size, min_free_size, single_step, domain_uuid, checked_at, scrape_error_message) VALUES (1, 'project1', 'foo', UNIX(1), '{"singular":20}', 3600, '{"singular":80}', 1800, '{"singular":0}', 20, NULL, NULL, NULL, FALSE, 'domain1', UNIX(1), '');
-INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_size, max_size, min_free_size, single_step, domain_uuid, checked_at, scrape_error_message) VALUES (2, 'project1', 'bar', UNIX(2), '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":95}', 10, NULL, 20000, NULL, FALSE, 'domain1', UNIX(3), 'datacenter is on fire');
+INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_size, max_size, min_free_size, single_step, domain_uuid, checked_at, scrape_error_message) VALUES (2, 'project1', 'bar', UNIX(2), '{"first":0,"second":0}', 0, '{"first":0,"second":0}', 0, '{"first":95,"second":97}', 10, NULL, 20000, NULL, FALSE, 'domain1', UNIX(3), 'datacenter is on fire');
 
 -- insert some resources that we should not be able to list (ID=3 has wrong project ID, ID=4 has unknown asset type)
 INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_size, max_size, min_free_size, single_step, domain_uuid, checked_at, scrape_error_message) VALUES (3, 'something-else', 'foo', UNIX(3), '{"singular":20}', 3600, '{"singular":80}', 1800, '{"singular":95}', 20, NULL, NULL, NULL, FALSE, 'domain1', UNIX(6), 'datacenter is on fire');
@@ -11,7 +11,7 @@ INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_per
 -- insert some assets in 'project1' that we can list
 INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage) VALUES (1, 1, 'fooasset1', 1024, UNIX(11), 1200, UNIX(11), '', '{"singular":512}');
 INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage) VALUES (2, 1, 'fooasset2', 512, UNIX(12), NULL, UNIX(15), 'unexpected uptime', '{"singular":409.6}');
-INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage) VALUES (3, 2, 'barasset1', 2000, UNIX(13), NULL, UNIX(13), '', '{"singular":200}');
+INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage) VALUES (3, 2, 'barasset1', 2000, UNIX(13), NULL, UNIX(13), '', '{"first":200,"second":222}');
 -- insert a bogus asset in an unknown asset type; we should not be able to list this in the API
 INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage) VALUES (4, 4, 'bogusasset', 100, UNIX(14), NULL, UNIX(14), '', '{"singular":50}');
 

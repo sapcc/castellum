@@ -169,13 +169,10 @@ func (c Context) ScrapeNextAsset(maxCheckedAt time.Time) (returnedError error) {
 	if logScrapes {
 		var usageLogStrings []string
 		for metric, usage := range status.Usage {
-			str := fmt.Sprintf("%.3f (%.3f%%)", usage, core.GetUsagePercent(status.Size, usage))
-			if metric == db.SingularUsageMetric {
-				str = fmt.Sprintf("usage = %s", str)
-			} else {
-				str = fmt.Sprintf("usage[%s] = %s", metric, str)
-			}
-			usageLogStrings = append(usageLogStrings, str)
+			usageLogStrings = append(usageLogStrings, fmt.Sprintf(
+				"usage%s = %.3f (%.3f%%)",
+				metric.Identifier("[%s]"), usage, core.GetUsagePercent(status.Size, usage),
+			))
 		}
 		logg.Info("observed %s %s at size = %d, %s",
 			res.AssetType, asset.UUID, status.Size, strings.Join(usageLogStrings, ", "),
