@@ -58,16 +58,14 @@ type Resource struct {
 	//time. Those thresholds (in percent of usage) and delays (in seconds) are
 	//defined here. The "critical" threshold will cause immediate upscaling, so
 	//it does not have a configurable delay.
-	LowThresholdPercent      float64 `db:"low_threshold_percent"`
-	LowDelaySeconds          uint32  `db:"low_delay_seconds"`
-	HighThresholdPercent     float64 `db:"high_threshold_percent"`
-	HighDelaySeconds         uint32  `db:"high_delay_seconds"`
-	CriticalThresholdPercent float64 `db:"critical_threshold_percent"`
+	LowThresholdPercent      UsageValues `db:"low_threshold_percent"`
+	LowDelaySeconds          uint32      `db:"low_delay_seconds"`
+	HighThresholdPercent     UsageValues `db:"high_threshold_percent"`
+	HighDelaySeconds         uint32      `db:"high_delay_seconds"`
+	CriticalThresholdPercent UsageValues `db:"critical_threshold_percent"`
 
 	//This defines how much the the asset's size changes per
-	//downscaling/upscaling operation (in % of previous size). This can be NULL
-	//when the asset type defines size steps differently. For example, for the
-	//asset type "instance", we will have a list of allowed flavors somewhere else.
+	//downscaling/upscaling operation (in % of previous size).
 	SizeStepPercent float64 `db:"size_step_percent"`
 	//When true, ignore SizeStepPercent and always resize by the smallest step
 	//that will move usage back into normal areas.

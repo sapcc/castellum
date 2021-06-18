@@ -37,7 +37,7 @@ import (
 type Asset struct {
 	UUID               string         `json:"id"`
 	Size               uint64         `json:"size,omitempty"`
-	UsagePercent       db.UsageValues `json:"usage_percent,omitempty"`
+	UsagePercent       db.UsageValues `json:"usage_percent"`
 	ScrapedAtUnix      *int64         `json:"scraped_at,omitempty"`
 	Checked            *Checked       `json:"checked,omitempty"`
 	Stale              bool           `json:"stale"`

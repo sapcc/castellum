@@ -105,7 +105,7 @@ func (c Context) ScrapeNextAsset(maxCheckedAt time.Time) (returnedError error) {
 	if err != nil {
 		return err
 	}
-	manager, _ := c.Team.ForAssetType(res.AssetType)
+	manager, info := c.Team.ForAssetType(res.AssetType)
 	if manager == nil {
 		return fmt.Errorf("no asset manager for asset type %q", res.AssetType)
 	}
@@ -230,19 +230,19 @@ func (c Context) ScrapeNextAsset(maxCheckedAt time.Time) (returnedError error) {
 
 	//if there is a pending operation, try to move it forward
 	if pendingOp != nil {
-		pendingOp, err = c.maybeCancelOperation(tx, res, asset, *pendingOp)
+		pendingOp, err = c.maybeCancelOperation(tx, res, asset, info, *pendingOp)
 		if err != nil {
 			return fmt.Errorf("cannot cancel operation on %s %s: %s", res.AssetType, asset.UUID, err.Error())
 		}
 	}
 	if pendingOp != nil {
-		pendingOp, err = c.maybeUpdateOperation(tx, res, asset, *pendingOp)
+		pendingOp, err = c.maybeUpdateOperation(tx, res, asset, info, *pendingOp)
 		if err != nil {
 			return fmt.Errorf("cannot update operation on %s %s: %s", res.AssetType, asset.UUID, err.Error())
 		}
 	}
 	if pendingOp != nil {
-		pendingOp, err = c.maybeConfirmOperation(tx, res, asset, *pendingOp)
+		pendingOp, err = c.maybeConfirmOperation(tx, res, asset, info, *pendingOp)
 		if err != nil {
 			return fmt.Errorf("cannot confirm operation on %s %s: %s", res.AssetType, asset.UUID, err.Error())
 		}
@@ -250,7 +250,7 @@ func (c Context) ScrapeNextAsset(maxCheckedAt time.Time) (returnedError error) {
 
 	//if there is no pending operation (or if we just cancelled it), see if we can start one
 	if pendingOp == nil {
-		err = c.maybeCreateOperation(tx, res, asset)
+		err = c.maybeCreateOperation(tx, res, asset, info)
 		if err != nil {
 			return fmt.Errorf("cannot create operation on %s %s: %s", res.AssetType, asset.UUID, err.Error())
 		}
@@ -259,7 +259,7 @@ func (c Context) ScrapeNextAsset(maxCheckedAt time.Time) (returnedError error) {
 	return tx.Commit()
 }
 
-func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset) error {
+func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, info core.AssetTypeInfo) error {
 	op := db.PendingOperation{
 		AssetID:   asset.ID,
 		OldSize:   asset.Size,
@@ -267,7 +267,7 @@ func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, ass
 		CreatedAt: c.TimeNow(),
 	}
 
-	eligibleFor := core.GetEligibleOperations(res, asset)
+	eligibleFor := core.GetEligibleOperations(res, asset, info)
 	if val, exists := eligibleFor[db.OperationReasonCritical]; exists {
 		op.Reason = db.OperationReasonCritical
 		op.NewSize = val
@@ -299,9 +299,9 @@ func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, ass
 	return tx.Insert(&op)
 }
 
-func (c Context) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, op db.PendingOperation) (*db.PendingOperation, error) {
+func (c Context) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (*db.PendingOperation, error) {
 	//cancel when the threshold that triggered this operation is no longer being crossed
-	eligibleFor := core.GetEligibleOperations(res, asset)
+	eligibleFor := core.GetEligibleOperations(res, asset, info)
 	_, isEligible := eligibleFor[op.Reason]
 	if op.Reason == db.OperationReasonHigh {
 		if _, canBeUpgraded := eligibleFor[db.OperationReasonCritical]; canBeUpgraded {
@@ -325,9 +325,9 @@ func (c Context) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, ass
 	return nil, tx.Insert(&finishedOp)
 }
 
-func (c Context) maybeUpdateOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, op db.PendingOperation) (*db.PendingOperation, error) {
+func (c Context) maybeUpdateOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (*db.PendingOperation, error) {
 	//do not touch `op` unless the corresponding threshold is still being crossed
-	eligibleFor := core.GetEligibleOperations(res, asset)
+	eligibleFor := core.GetEligibleOperations(res, asset, info)
 	newSize, exists := eligibleFor[op.Reason]
 	if !exists {
 		return &op, nil
@@ -344,9 +344,9 @@ func (c Context) maybeUpdateOperation(tx *gorp.Transaction, res db.Resource, ass
 	return &op, err
 }
 
-func (c Context) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, op db.PendingOperation) (*db.PendingOperation, error) {
+func (c Context) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (*db.PendingOperation, error) {
 	//can only confirm when the corresponding threshold is still being crossed
-	if _, exists := core.GetEligibleOperations(res, asset)[op.Reason]; !exists {
+	if _, exists := core.GetEligibleOperations(res, asset, info)[op.Reason]; !exists {
 		return &op, nil
 	}
 

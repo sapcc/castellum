@@ -42,16 +42,22 @@ func TestResourceScraping(baseT *testing.T) {
 
 		//create some project resources for testing
 		t.Must(c.DB.Insert(&db.Resource{
-			ScopeUUID:  "project1",
-			DomainUUID: "domain1",
-			AssetType:  "foo",
-			CheckedAt:  c.TimeNow(),
+			ScopeUUID:                "project1",
+			DomainUUID:               "domain1",
+			AssetType:                "foo",
+			CheckedAt:                c.TimeNow(),
+			LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 0},
+			HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 0},
+			CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 0},
 		}))
 		t.Must(c.DB.Insert(&db.Resource{
-			ScopeUUID:  "project3",
-			DomainUUID: "domain1",
-			AssetType:  "foo",
-			CheckedAt:  c.TimeNow(),
+			ScopeUUID:                "project3",
+			DomainUUID:               "domain1",
+			AssetType:                "foo",
+			CheckedAt:                c.TimeNow(),
+			LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 0},
+			HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 0},
+			CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 0},
 		}))
 
 		//create some mock assets that ScrapeNextResource() can find
@@ -134,7 +140,7 @@ func TestResourceScraping(baseT *testing.T) {
 		clock.Step()
 		t.Must(c.ScrapeNextResource(c.TimeNow()))
 		tr.DBChanges().AssertEqualf(`
-			INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_size, max_size, min_free_size, single_step, domain_uuid, checked_at, scrape_error_message) VALUES (3, 'project2', 'foo', %[1]d, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL, FALSE, 'domain1', %[1]d, '');
+				INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_size, max_size, min_free_size, single_step, domain_uuid, checked_at, scrape_error_message) VALUES (3, 'project2', 'foo', %[1]d, '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":0}', 0, NULL, NULL, NULL, FALSE, 'domain1', %[1]d, '');
 			`,
 			c.TimeNow().Unix(),
 		)

@@ -44,11 +44,11 @@ func runAssetScrapeTest(t test.T, resourceIsSingleStep bool, action func(*Contex
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",
 			AssetType:                "foo",
-			LowThresholdPercent:      20,
+			LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 20},
 			LowDelaySeconds:          3600,
-			HighThresholdPercent:     80,
+			HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 80},
 			HighDelaySeconds:         3600,
-			CriticalThresholdPercent: 95,
+			CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 95},
 			SizeStepPercent:          ifthenelseF64(resourceIsSingleStep, 0, 20),
 			SingleStep:               resourceIsSingleStep,
 		}))
@@ -401,11 +401,11 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",
 			AssetType:                "foo",
-			LowThresholdPercent:      20,
+			LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 20},
 			LowDelaySeconds:          3600,
-			HighThresholdPercent:     80,
+			HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 80},
 			HighDelaySeconds:         3600,
-			CriticalThresholdPercent: 95,
+			CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 95},
 			SizeStepPercent:          20,
 		}))
 		assets := []db.Asset{

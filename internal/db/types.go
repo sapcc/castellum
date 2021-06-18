@@ -35,6 +35,15 @@ type UsageMetric string
 //(for CPU and RAM usage, respectively), so SingularUsageMetric is not used.
 const SingularUsageMetric UsageMetric = "singular"
 
+//Identifier inserts the metric name into the given format string, but returns
+//the empty string for SingularUsageMetric.
+func (m UsageMetric) Identifier(format string) string {
+	if m == SingularUsageMetric {
+		return ""
+	}
+	return fmt.Sprintf(format, m)
+}
+
 //UsageValues contains all usage values for an asset at a particular point in time.
 type UsageValues map[UsageMetric]float64
 
@@ -85,4 +94,35 @@ func (u UsageValues) MarshalJSON() ([]byte, error) {
 
 	//otherwise encode like a regular map
 	return json.Marshal(map[UsageMetric]float64(u))
+}
+
+//UnmarshalJSON implements the json.Unmarshaler interface.
+//
+//This unmarshalling is only used in API requests. Deserialization from the
+//database bypasses it and always requires a map-shaped input, even for singular values.
+func (u *UsageValues) UnmarshalJSON(buf []byte) error {
+	//for backwards-compatibility, interpret `x` as `{"singular":x}`
+	var x float64
+	err := json.Unmarshal(buf, &x)
+	if err == nil {
+		*u = UsageValues{SingularUsageMetric: x}
+		return nil
+	}
+
+	var m map[UsageMetric]float64
+	err = json.Unmarshal(buf, &m)
+	if err == nil {
+		*u = m
+	}
+	return nil
+}
+
+//IsNonZero returns true if any usage value in this set is not zero.
+func (u UsageValues) IsNonZero() bool {
+	for _, v := range u {
+		if v != 0 {
+			return true
+		}
+	}
+	return false
 }

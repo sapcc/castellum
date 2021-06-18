@@ -37,6 +37,15 @@ type AssetTypeInfo struct {
 	UsageMetrics []db.UsageMetric
 }
 
+//MakeZeroUsageValues is a convenience function to instantiate an all-zero UsageValues for this AssetType.
+func (info AssetTypeInfo) MakeZeroUsageValues() db.UsageValues {
+	vals := make(db.UsageValues, len(info.UsageMetrics))
+	for _, metric := range info.UsageMetrics {
+		vals[metric] = 0
+	}
+	return vals
+}
+
 //AssetNotFoundErr is returned by AssetManager.GetAssetStatus() if the
 //concerning asset can not be found in the respective backend.
 type AssetNotFoundErr struct {
@@ -130,5 +139,9 @@ func (team AssetManagerTeam) ForAssetType(assetType db.AssetType) (AssetManager,
 			return manager, *info
 		}
 	}
-	return nil, AssetTypeInfo{}
+	return nil, AssetTypeInfo{
+		//provide a reasonable fallback for AssetTypeInfo
+		AssetType:    assetType,
+		UsageMetrics: []db.UsageMetric{db.SingularUsageMetric},
+	}
 }

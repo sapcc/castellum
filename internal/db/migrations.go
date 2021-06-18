@@ -207,6 +207,14 @@ var SQLMigrations = map[string]string{
 			ADD COLUMN errored_attempts INT DEFAULT 0;
 	`,
 	"014_refactor_usage_values.up.sql": `
+		ALTER TABLE resources
+			ALTER COLUMN low_threshold_percent SET DATA TYPE text
+				USING CONCAT('{"singular":', low_threshold_percent, '}'),
+			ALTER COLUMN high_threshold_percent SET DATA TYPE text
+				USING CONCAT('{"singular":', high_threshold_percent, '}'),
+			ALTER COLUMN critical_threshold_percent SET DATA TYPE text
+				USING CONCAT('{"singular":', critical_threshold_percent, '}');
+
 		ALTER TABLE assets ADD COLUMN usage TEXT NOT NULL DEFAULT '';
 		UPDATE assets SET usage = CONCAT('{"singular":', absolute_usage, '}');
 		ALTER TABLE assets

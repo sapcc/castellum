@@ -188,6 +188,7 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 
 	relevantOps := []Operation{}
 	for _, dbResource := range dbResources {
+		_, info := h.Team.ForAssetType(dbResource.AssetType)
 
 		failedOpsByAssetID, err := recentOperationQuery{
 			DB:           h.DB,
@@ -211,7 +212,7 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 			if !exists {
 				continue
 			}
-			if _, exists := core.GetEligibleOperations(dbResource, asset)[op.Reason]; exists {
+			if _, exists := core.GetEligibleOperations(dbResource, asset, info)[op.Reason]; exists {
 				relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &dbResource))
 			}
 		}

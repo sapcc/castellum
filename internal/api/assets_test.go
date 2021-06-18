@@ -223,7 +223,8 @@ func TestGetAsset(baseT *testing.T) {
 					"at":    42,
 					"error": "filer has stranger anxiety",
 				},
-				"stale": false,
+				"stale":         false,
+				"usage_percent": 0,
 			},
 		}.Check(t.T, hh)
 	})

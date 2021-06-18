@@ -165,10 +165,7 @@ func (c Context) ScrapeNextResource(maxScrapedAt time.Time) (returnedError error
 		} else {
 			assetScrapeFailedCounter.With(labels).Inc()
 			dbAsset.Size = 0
-			dbAsset.Usage = make(db.UsageValues)
-			for _, metric := range info.UsageMetrics {
-				dbAsset.Usage[metric] = 0
-			}
+			dbAsset.Usage = info.MakeZeroUsageValues()
 			dbAsset.ScrapeErrorMessage = err.Error()
 		}
 

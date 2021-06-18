@@ -85,5 +85,14 @@ func TestUsageValuesEncodingDecoding(t *testing.T) {
 		} else {
 			t.Errorf("JSON encoding of %#v failed: %v", tc.UsageValues, err.Error())
 		}
+
+		//check decoding from JSON
+		actualDecoded = UsageValues{}
+		err = json.Unmarshal([]byte(tc.JSONEncoding), &actualDecoded)
+		if err == nil {
+			assert.DeepEqual(t, indexed("JSONDecoded"), actualDecoded, tc.UsageValues)
+		} else {
+			t.Errorf("JSON decoding of %q failed: %v", tc.JSONEncoding, err.Error())
+		}
 	}
 }

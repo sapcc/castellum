@@ -312,7 +312,9 @@ func TestPutResource(baseT *testing.T) {
 					AssetType:                "foo",
 					ScrapedAt:                res.ScrapedAt,
 					CheckedAt:                *res.ScrapedAt,
-					CriticalThresholdPercent: 98,
+					LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 0},
+					HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 0},
+					CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 98},
 					SizeStepPercent:          15,
 					MinimumFreeSize:          p2uint64(23),
 				})
@@ -343,7 +345,9 @@ func TestPutResource(baseT *testing.T) {
 			ScopeUUID:                "project3",
 			DomainUUID:               "domain1",
 			AssetType:                "foo",
-			CriticalThresholdPercent: 98,
+			LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 0},
+			HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 0},
+			CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 98},
 			SizeStepPercent:          15,
 			MinimumFreeSize:          p2uint64(23),
 		})
@@ -381,7 +385,9 @@ func TestPutResource(baseT *testing.T) {
 					AssetType:                "foo",
 					ScrapedAt:                res.ScrapedAt,
 					CheckedAt:                *res.ScrapedAt,
-					CriticalThresholdPercent: 98,
+					LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 0},
+					HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 0},
+					CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 98},
 					SizeStepPercent:          15,
 					SingleStep:               false,
 					MinimumSize:              nil, //0 gets normalized to NULL
