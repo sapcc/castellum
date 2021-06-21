@@ -223,13 +223,13 @@ var SQLMigrations = map[string]string{
 			DROP COLUMN usage_percent;
 
 		ALTER TABLE finished_operations ADD COLUMN usage TEXT NOT NULL DEFAULT '';
-		UPDATE finished_operations SET usage = CONCAT('{"singular":', old_size * usage_percent, '}');
+		UPDATE finished_operations SET usage = CONCAT('{"singular":', old_size * usage_percent / 100, '}');
 		ALTER TABLE finished_operations
 			ALTER COLUMN usage DROP DEFAULT,
 			DROP COLUMN usage_percent;
 
 		ALTER TABLE pending_operations ADD COLUMN usage TEXT NOT NULL DEFAULT '';
-		UPDATE pending_operations SET usage = CONCAT('{"singular":', old_size * usage_percent, '}');
+		UPDATE pending_operations SET usage = CONCAT('{"singular":', old_size * usage_percent / 100, '}');
 		ALTER TABLE pending_operations
 			ALTER COLUMN usage DROP DEFAULT,
 			DROP COLUMN usage_percent;
