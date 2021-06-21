@@ -235,9 +235,6 @@ func getNewSizePercentageStep(res db.Resource, asset db.Asset, info AssetTypeInf
 }
 
 func getActionSingleStep(res db.Resource, asset db.Asset, metric db.UsageMetric, reason db.OperationReason) action {
-	//NOTE: Single-step resizing is only allowed for resources that report
-	//absolute usage, so we are going to assum that asset.AbsoluteUsage != nil.
-
 	var (
 		thresholdPerc float64
 		delta         float64
