@@ -100,8 +100,8 @@ func (m *assetManagerProjectQuota) InfoForAssetType(assetType db.AssetType) *cor
 		thisAssetType := info.AssetType()
 		if thisAssetType == assetType {
 			return &core.AssetTypeInfo{
-				AssetType:            thisAssetType,
-				ReportsAbsoluteUsage: true,
+				AssetType:    thisAssetType,
+				UsageMetrics: []db.UsageMetric{db.SingularUsageMetric},
 			}
 		}
 	}
@@ -182,9 +182,8 @@ func (m *assetManagerProjectQuota) GetAssetStatus(res db.Resource, projectID str
 		return core.AssetStatus{}, errors.New("resource does not track quota")
 	}
 	return core.AssetStatus{
-		Size:          *resource.Quota,
-		AbsoluteUsage: p2u64(resource.Usage),
-		UsagePercent:  core.GetUsagePercent(*resource.Quota, resource.Usage),
+		Size:  *resource.Quota,
+		Usage: db.UsageValues{db.SingularUsageMetric: float64(resource.Usage)},
 	}, nil
 }
 

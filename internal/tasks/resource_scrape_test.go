@@ -42,16 +42,22 @@ func TestResourceScraping(baseT *testing.T) {
 
 		//create some project resources for testing
 		t.Must(c.DB.Insert(&db.Resource{
-			ScopeUUID:  "project1",
-			DomainUUID: "domain1",
-			AssetType:  "foo",
-			CheckedAt:  c.TimeNow(),
+			ScopeUUID:                "project1",
+			DomainUUID:               "domain1",
+			AssetType:                "foo",
+			CheckedAt:                c.TimeNow(),
+			LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 0},
+			HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 0},
+			CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 0},
 		}))
 		t.Must(c.DB.Insert(&db.Resource{
-			ScopeUUID:  "project3",
-			DomainUUID: "domain1",
-			AssetType:  "foo",
-			CheckedAt:  c.TimeNow(),
+			ScopeUUID:                "project3",
+			DomainUUID:               "domain1",
+			AssetType:                "foo",
+			CheckedAt:                c.TimeNow(),
+			LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 0},
+			HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 0},
+			CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 0},
 		}))
 
 		//create some mock assets that ScrapeNextResource() can find
@@ -71,8 +77,8 @@ func TestResourceScraping(baseT *testing.T) {
 		clock.Step()
 		t.Must(c.ScrapeNextResource(c.TimeNow()))
 		tr.DBChanges().AssertEqualf(`
-				INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message, absolute_usage) VALUES (1, 1, 'asset1', 1000, 40, %[1]d, NULL, %[1]d, '', 400);
-				INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message, absolute_usage) VALUES (2, 1, 'asset2', 2000, 50, %[1]d, NULL, %[1]d, '', 1000);
+				INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage) VALUES (1, 1, 'asset1', 1000, %[1]d, NULL, %[1]d, '', '{"singular":400}');
+				INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage) VALUES (2, 1, 'asset2', 2000, %[1]d, NULL, %[1]d, '', '{"singular":1000}');
 				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 			`,
 			c.TimeNow().Unix(),
@@ -83,8 +89,8 @@ func TestResourceScraping(baseT *testing.T) {
 		clock.Step()
 		t.Must(c.ScrapeNextResource(c.TimeNow()))
 		tr.DBChanges().AssertEqualf(`
-				INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message, absolute_usage) VALUES (3, 2, 'asset5', 5000, 50, 99992, NULL, 99992, '', 2500);
-				INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message, absolute_usage) VALUES (4, 2, 'asset6', 6000, 42, 99992, NULL, 99992, '', 2520);
+				INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage) VALUES (3, 2, 'asset5', 5000, %[1]d, NULL, %[1]d, '', '{"singular":2500}');
+				INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage) VALUES (4, 2, 'asset6', 6000, %[1]d, NULL, %[1]d, '', '{"singular":2520}');
 				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d WHERE id = 2 AND scope_uuid = 'project3' AND asset_type = 'foo';
 			`,
 			c.TimeNow().Unix(),
@@ -117,7 +123,7 @@ func TestResourceScraping(baseT *testing.T) {
 		clock.Step()
 		t.Must(c.ScrapeNextResource(c.TimeNow()))
 		tr.DBChanges().AssertEqualf(`
-				INSERT INTO assets (id, resource_id, uuid, size, usage_percent, scraped_at, expected_size, checked_at, scrape_error_message, absolute_usage) VALUES (5, 1, 'asset7', 10, 30, %[1]d, NULL, %[1]d, '', 3);
+				INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage) VALUES (5, 1, 'asset7', 10, %[1]d, NULL, %[1]d, '', '{"singular":3}');
 				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 			`,
 			c.TimeNow().Unix(),
@@ -134,7 +140,7 @@ func TestResourceScraping(baseT *testing.T) {
 		clock.Step()
 		t.Must(c.ScrapeNextResource(c.TimeNow()))
 		tr.DBChanges().AssertEqualf(`
-			INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_size, max_size, min_free_size, single_step, domain_uuid, checked_at, scrape_error_message) VALUES (3, 'project2', 'foo', %[1]d, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL, FALSE, 'domain1', %[1]d, '');
+				INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_size, max_size, min_free_size, single_step, domain_uuid, checked_at, scrape_error_message) VALUES (3, 'project2', 'foo', %[1]d, '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":0}', 0, NULL, NULL, NULL, FALSE, 'domain1', %[1]d, '');
 			`,
 			c.TimeNow().Unix(),
 		)

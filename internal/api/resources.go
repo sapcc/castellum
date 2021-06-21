@@ -21,6 +21,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -47,8 +48,8 @@ type Resource struct {
 
 //Threshold appears in type Resource.
 type Threshold struct {
-	UsagePercent float64 `json:"usage_percent"`
-	DelaySeconds uint32  `json:"delay_seconds,omitempty"`
+	UsagePercent db.UsageValues `json:"usage_percent"`
+	DelaySeconds uint32         `json:"delay_seconds,omitempty"`
 }
 
 //SizeSteps appears in type Resource.
@@ -87,19 +88,19 @@ func (h handler) ResourceFromDB(res db.Resource) (Resource, error) {
 			ErrorMessage: res.ScrapeErrorMessage,
 		}
 	}
-	if res.LowThresholdPercent > 0 {
+	if res.LowThresholdPercent.IsNonZero() {
 		result.LowThreshold = &Threshold{
 			UsagePercent: res.LowThresholdPercent,
 			DelaySeconds: res.LowDelaySeconds,
 		}
 	}
-	if res.HighThresholdPercent > 0 {
+	if res.HighThresholdPercent.IsNonZero() {
 		result.HighThreshold = &Threshold{
 			UsagePercent: res.HighThresholdPercent,
 			DelaySeconds: res.HighDelaySeconds,
 		}
 	}
-	if res.CriticalThresholdPercent > 0 {
+	if res.CriticalThresholdPercent.IsNonZero() {
 		result.CriticalThreshold = &Threshold{
 			UsagePercent: res.CriticalThresholdPercent,
 		}
@@ -117,7 +118,12 @@ func (h handler) ResourceFromDB(res db.Resource) (Resource, error) {
 //UpdateDBResource updates the given db.Resource with the values provided in
 //this api.Resource.
 func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo, maxAssetSize *uint64) (errors []string) {
-	complain := func(msg string) { errors = append(errors, msg) }
+	complain := func(msg string, args ...interface{}) {
+		if len(args) > 0 {
+			msg = fmt.Sprintf(msg, args...)
+		}
+		errors = append(errors, msg)
+	}
 
 	if r.ScrapedAtUnix != nil {
 		complain("resource.scraped_at cannot be set via the API")
@@ -129,59 +135,86 @@ func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo, ma
 		complain("resource.asset_count cannot be set via the API")
 	}
 
+	//helper function to check the internal consistency of {Low,High,Critical}ThresholdPercent
+	checkThresholdCommon := func(tType string, vals db.UsageValues) {
+		isMetric := make(map[db.UsageMetric]bool)
+		for _, metric := range info.UsageMetrics {
+			isMetric[metric] = true
+			val, exists := vals[metric]
+			if !exists {
+				complain("missing %s threshold%s", tType, metric.Identifier(" for %s"))
+				continue
+			}
+			if val < 0 || val > 100 {
+				complain("%s threshold%s must be between 0%% and 100%% of usage", tType, metric.Identifier(" for %s"))
+			}
+		}
+
+		providedMetrics := make([]string, 0, len(vals))
+		for metric := range vals {
+			providedMetrics = append(providedMetrics, string(metric))
+		}
+		sort.Strings(providedMetrics) //for deterministic order of error messages in unit test
+		for _, metric := range providedMetrics {
+			if !isMetric[db.UsageMetric(metric)] {
+				complain("%s threshold specified for metric %q which is not valid for this asset type", tType, metric)
+			}
+		}
+	}
+
 	if r.LowThreshold == nil {
-		res.LowThresholdPercent = 0
+		res.LowThresholdPercent = info.MakeZeroUsageValues()
 		res.LowDelaySeconds = 0
 	} else {
 		res.LowThresholdPercent = r.LowThreshold.UsagePercent
+		checkThresholdCommon("low", res.LowThresholdPercent)
 		res.LowDelaySeconds = r.LowThreshold.DelaySeconds
-		if res.LowThresholdPercent < 0 || res.LowThresholdPercent > 100 {
-			complain("low threshold must be between 0% and 100% of usage")
-		}
 		if res.LowDelaySeconds == 0 {
 			complain("delay for low threshold is missing")
 		}
 	}
 
 	if r.HighThreshold == nil {
-		res.HighThresholdPercent = 0
+		res.HighThresholdPercent = info.MakeZeroUsageValues()
 		res.HighDelaySeconds = 0
 	} else {
 		res.HighThresholdPercent = r.HighThreshold.UsagePercent
+		checkThresholdCommon("high", res.HighThresholdPercent)
 		res.HighDelaySeconds = r.HighThreshold.DelaySeconds
-		if res.HighThresholdPercent < 0 || res.HighThresholdPercent > 100 {
-			complain("high threshold must be between 0% and 100% of usage")
-		}
 		if res.HighDelaySeconds == 0 {
 			complain("delay for high threshold is missing")
 		}
 	}
 
 	if r.CriticalThreshold == nil {
-		res.CriticalThresholdPercent = 0
+		res.CriticalThresholdPercent = info.MakeZeroUsageValues()
 	} else {
 		res.CriticalThresholdPercent = r.CriticalThreshold.UsagePercent
-		if res.CriticalThresholdPercent < 0 || res.CriticalThresholdPercent > 100 {
-			complain("critical threshold must be between 0% and 100% of usage")
-		}
+		checkThresholdCommon("critical", res.CriticalThresholdPercent)
 		if r.CriticalThreshold.DelaySeconds != 0 {
 			complain("critical threshold may not have a delay")
 		}
 	}
 
 	if r.LowThreshold != nil && r.HighThreshold != nil {
-		if res.LowThresholdPercent > res.HighThresholdPercent {
-			complain("low threshold must be below high threshold")
+		for _, metric := range info.UsageMetrics {
+			if res.LowThresholdPercent[metric] > res.HighThresholdPercent[metric] {
+				complain("low threshold%s must be below high threshold", metric.Identifier(" for %s"))
+			}
 		}
 	}
 	if r.LowThreshold != nil && r.CriticalThreshold != nil {
-		if res.LowThresholdPercent > res.CriticalThresholdPercent {
-			complain("low threshold must be below critical threshold")
+		for _, metric := range info.UsageMetrics {
+			if res.LowThresholdPercent[metric] > res.CriticalThresholdPercent[metric] {
+				complain("low threshold%s must be below critical threshold", metric.Identifier(" for %s"))
+			}
 		}
 	}
 	if r.HighThreshold != nil && r.CriticalThreshold != nil {
-		if res.HighThresholdPercent > res.CriticalThresholdPercent {
-			complain("high threshold must be below critical threshold")
+		for _, metric := range info.UsageMetrics {
+			if res.HighThresholdPercent[metric] > res.CriticalThresholdPercent[metric] {
+				complain("high threshold%s must be below critical threshold", metric.Identifier(" for %s"))
+			}
 		}
 	}
 
@@ -192,9 +225,6 @@ func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo, ma
 	res.SizeStepPercent = r.SizeSteps.Percent
 	res.SingleStep = r.SizeSteps.Single
 	if res.SingleStep {
-		if !info.ReportsAbsoluteUsage {
-			complain("cannot use single-step resizing: asset type does not report absolute usage")
-		}
 		if res.SizeStepPercent != 0 {
 			complain("percentage-based step may not be configured when single-step resizing is used")
 		}
@@ -238,9 +268,6 @@ func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo, ma
 		res.MinimumFreeSize = r.SizeConstraints.MinimumFree
 		if res.MinimumFreeSize != nil && *res.MinimumFreeSize == 0 {
 			res.MinimumFreeSize = nil
-		}
-		if res.MinimumFreeSize != nil && !info.ReportsAbsoluteUsage {
-			complain("cannot use minimum free size constraint: asset type does not report absolute usage")
 		}
 	}
 

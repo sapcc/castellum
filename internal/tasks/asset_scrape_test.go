@@ -44,23 +44,22 @@ func runAssetScrapeTest(t test.T, resourceIsSingleStep bool, action func(*Contex
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",
 			AssetType:                "foo",
-			LowThresholdPercent:      20,
+			LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 20},
 			LowDelaySeconds:          3600,
-			HighThresholdPercent:     80,
+			HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 80},
 			HighDelaySeconds:         3600,
-			CriticalThresholdPercent: 95,
+			CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 95},
 			SizeStepPercent:          ifthenelseF64(resourceIsSingleStep, 0, 20),
 			SingleStep:               resourceIsSingleStep,
 		}))
 		t.Must(c.DB.Insert(&db.Asset{
-			ResourceID:    1,
-			UUID:          "asset1",
-			Size:          1000,
-			AbsoluteUsage: p2uint64(500),
-			UsagePercent:  50,
-			CheckedAt:     c.TimeNow(),
-			ScrapedAt:     p2time(c.TimeNow()),
-			ExpectedSize:  nil,
+			ResourceID:   1,
+			UUID:         "asset1",
+			Size:         1000,
+			Usage:        db.UsageValues{db.SingularUsageMetric: 500},
+			CheckedAt:    c.TimeNow(),
+			ScrapedAt:    p2time(c.TimeNow()),
+			ExpectedSize: nil,
 		}))
 
 		//setup asset with configurable size
@@ -122,13 +121,13 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 
 		expectedOp := db.PendingOperation{
-			ID:           1,
-			AssetID:      1,
-			Reason:       db.OperationReasonHigh,
-			OldSize:      1000,
-			NewSize:      ifthenelseU64(res.SingleStep, 1001, 1200),
-			UsagePercent: 80,
-			CreatedAt:    c.TimeNow(),
+			ID:        1,
+			AssetID:   1,
+			Reason:    db.OperationReasonHigh,
+			OldSize:   1000,
+			NewSize:   ifthenelseU64(res.SingleStep, 1001, 1200),
+			Usage:     db.UsageValues{db.SingularUsageMetric: 800},
+			CreatedAt: c.TimeNow(),
 		}
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
@@ -180,13 +179,13 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
-			ID:           1,
-			AssetID:      1,
-			Reason:       db.OperationReasonHigh,
-			OldSize:      1000,
-			NewSize:      ifthenelseU64(res.SingleStep, 1001, 1200),
-			UsagePercent: 80,
-			CreatedAt:    c.TimeNow(),
+			ID:        1,
+			AssetID:   1,
+			Reason:    db.OperationReasonHigh,
+			OldSize:   1000,
+			NewSize:   ifthenelseU64(res.SingleStep, 1001, 1200),
+			Usage:     db.UsageValues{db.SingularUsageMetric: 800},
+			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -197,14 +196,14 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
-			AssetID:      1,
-			Reason:       db.OperationReasonHigh,
-			Outcome:      db.OperationOutcomeCancelled,
-			OldSize:      1000,
-			NewSize:      ifthenelseU64(res.SingleStep, 1001, 1200),
-			UsagePercent: 80,
-			CreatedAt:    c.TimeNow().Add(-40 * time.Minute),
-			FinishedAt:   c.TimeNow(),
+			AssetID:    1,
+			Reason:     db.OperationReasonHigh,
+			Outcome:    db.OperationOutcomeCancelled,
+			OldSize:    1000,
+			NewSize:    ifthenelseU64(res.SingleStep, 1001, 1200),
+			Usage:      db.UsageValues{db.SingularUsageMetric: 800},
+			CreatedAt:  c.TimeNow().Add(-40 * time.Minute),
+			FinishedAt: c.TimeNow(),
 		})
 
 	})
@@ -226,13 +225,13 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 
 		expectedOp := db.PendingOperation{
-			ID:           1,
-			AssetID:      1,
-			Reason:       db.OperationReasonLow,
-			OldSize:      1000,
-			NewSize:      ifthenelseU64(res.SingleStep, 999, 800),
-			UsagePercent: 20,
-			CreatedAt:    c.TimeNow(),
+			ID:        1,
+			AssetID:   1,
+			Reason:    db.OperationReasonLow,
+			OldSize:   1000,
+			NewSize:   ifthenelseU64(res.SingleStep, 999, 800),
+			Usage:     db.UsageValues{db.SingularUsageMetric: 200},
+			CreatedAt: c.TimeNow(),
 		}
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
@@ -284,13 +283,13 @@ func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
-			ID:           1,
-			AssetID:      1,
-			Reason:       db.OperationReasonLow,
-			OldSize:      1000,
-			NewSize:      ifthenelseU64(res.SingleStep, 999, 800),
-			UsagePercent: 20,
-			CreatedAt:    c.TimeNow(),
+			ID:        1,
+			AssetID:   1,
+			Reason:    db.OperationReasonLow,
+			OldSize:   1000,
+			NewSize:   ifthenelseU64(res.SingleStep, 999, 800),
+			Usage:     db.UsageValues{db.SingularUsageMetric: 200},
+			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -301,14 +300,14 @@ func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
-			AssetID:      1,
-			Reason:       db.OperationReasonLow,
-			Outcome:      db.OperationOutcomeCancelled,
-			OldSize:      1000,
-			NewSize:      ifthenelseU64(res.SingleStep, 999, 800),
-			UsagePercent: 20,
-			CreatedAt:    c.TimeNow().Add(-40 * time.Minute),
-			FinishedAt:   c.TimeNow(),
+			AssetID:    1,
+			Reason:     db.OperationReasonLow,
+			Outcome:    db.OperationOutcomeCancelled,
+			OldSize:    1000,
+			NewSize:    ifthenelseU64(res.SingleStep, 999, 800),
+			Usage:      db.UsageValues{db.SingularUsageMetric: 200},
+			CreatedAt:  c.TimeNow().Add(-40 * time.Minute),
+			FinishedAt: c.TimeNow(),
 		})
 
 	})
@@ -325,15 +324,15 @@ func TestCriticalUpsizeTowardsGreenlight(baseT *testing.T) {
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 
 		expectedOp := db.PendingOperation{
-			ID:           1,
-			AssetID:      1,
-			Reason:       db.OperationReasonCritical,
-			OldSize:      1000,
-			NewSize:      ifthenelseU64(res.SingleStep, 1188, 1200),
-			UsagePercent: 95,
-			CreatedAt:    c.TimeNow(),
-			ConfirmedAt:  p2time(c.TimeNow()),
-			GreenlitAt:   p2time(c.TimeNow()),
+			ID:          1,
+			AssetID:     1,
+			Reason:      db.OperationReasonCritical,
+			OldSize:     1000,
+			NewSize:     ifthenelseU64(res.SingleStep, 1188, 1200),
+			Usage:       db.UsageValues{db.SingularUsageMetric: 950},
+			CreatedAt:   c.TimeNow(),
+			ConfirmedAt: p2time(c.TimeNow()),
+			GreenlitAt:  p2time(c.TimeNow()),
 		}
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
@@ -352,13 +351,13 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
-			ID:           1,
-			AssetID:      1,
-			Reason:       db.OperationReasonHigh,
-			OldSize:      1000,
-			NewSize:      ifthenelseU64(res.SingleStep, 1126, 1200),
-			UsagePercent: 90,
-			CreatedAt:    c.TimeNow(),
+			ID:        1,
+			AssetID:   1,
+			Reason:    db.OperationReasonHigh,
+			OldSize:   1000,
+			NewSize:   ifthenelseU64(res.SingleStep, 1126, 1200),
+			Usage:     db.UsageValues{db.SingularUsageMetric: 900},
+			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -370,25 +369,25 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
-			ID:           2,
-			AssetID:      1,
-			Reason:       db.OperationReasonCritical,
-			OldSize:      1000,
-			NewSize:      ifthenelseU64(res.SingleStep, 1201, 1200),
-			UsagePercent: 96,
-			CreatedAt:    c.TimeNow(),
-			ConfirmedAt:  p2time(c.TimeNow()),
-			GreenlitAt:   p2time(c.TimeNow()),
+			ID:          2,
+			AssetID:     1,
+			Reason:      db.OperationReasonCritical,
+			OldSize:     1000,
+			NewSize:     ifthenelseU64(res.SingleStep, 1201, 1200),
+			Usage:       db.UsageValues{db.SingularUsageMetric: 960},
+			CreatedAt:   c.TimeNow(),
+			ConfirmedAt: p2time(c.TimeNow()),
+			GreenlitAt:  p2time(c.TimeNow()),
 		})
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
-			AssetID:      1,
-			Reason:       db.OperationReasonHigh,
-			Outcome:      db.OperationOutcomeCancelled,
-			OldSize:      1000,
-			NewSize:      ifthenelseU64(res.SingleStep, 1126, 1200),
-			UsagePercent: 90,
-			CreatedAt:    c.TimeNow().Add(-10 * time.Minute),
-			FinishedAt:   c.TimeNow(),
+			AssetID:    1,
+			Reason:     db.OperationReasonHigh,
+			Outcome:    db.OperationOutcomeCancelled,
+			OldSize:    1000,
+			NewSize:    ifthenelseU64(res.SingleStep, 1126, 1200),
+			Usage:      db.UsageValues{db.SingularUsageMetric: 900},
+			CreatedAt:  c.TimeNow().Add(-10 * time.Minute),
+			FinishedAt: c.TimeNow(),
 		})
 
 	})
@@ -402,11 +401,11 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",
 			AssetType:                "foo",
-			LowThresholdPercent:      20,
+			LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 20},
 			LowDelaySeconds:          3600,
-			HighThresholdPercent:     80,
+			HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 80},
 			HighDelaySeconds:         3600,
-			CriticalThresholdPercent: 95,
+			CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 95},
 			SizeStepPercent:          20,
 		}))
 		assets := []db.Asset{
@@ -414,7 +413,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 				ResourceID:   1,
 				UUID:         "asset1",
 				Size:         1000,
-				UsagePercent: 50,
+				Usage:        db.UsageValues{db.SingularUsageMetric: 500},
 				CheckedAt:    c.TimeNow(),
 				ScrapedAt:    p2time(c.TimeNow()),
 				ExpectedSize: nil,
@@ -423,7 +422,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 				ResourceID:   1,
 				UUID:         "asset2",
 				Size:         1000,
-				UsagePercent: 50,
+				Usage:        db.UsageValues{db.SingularUsageMetric: 500},
 				CheckedAt:    c.TimeNow(),
 				ScrapedAt:    p2time(c.TimeNow()),
 				ExpectedSize: nil,
@@ -432,7 +431,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 				ResourceID:   1,
 				UUID:         "asset3",
 				Size:         1000,
-				UsagePercent: 50,
+				Usage:        db.UsageValues{db.SingularUsageMetric: 500},
 				CheckedAt:    c.TimeNow(),
 				ScrapedAt:    p2time(c.TimeNow()),
 				ExpectedSize: nil,
@@ -462,12 +461,9 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 		assets[0].CheckedAt = c.TimeNow().Add(-2 * time.Minute)
 		assets[1].CheckedAt = c.TimeNow().Add(-time.Minute)
 		assets[2].CheckedAt = c.TimeNow()
-		assets[0].AbsoluteUsage = p2uint64(510)
-		assets[1].AbsoluteUsage = p2uint64(520)
-		assets[2].AbsoluteUsage = p2uint64(530)
-		assets[0].UsagePercent = 51
-		assets[1].UsagePercent = 52
-		assets[2].UsagePercent = 53
+		assets[0].Usage = db.UsageValues{db.SingularUsageMetric: 510}
+		assets[1].Usage = db.UsageValues{db.SingularUsageMetric: 520}
+		assets[2].Usage = db.UsageValues{db.SingularUsageMetric: 530}
 		for idx := 0; idx < len(assets); idx++ {
 			assets[idx].ScrapedAt = p2time(assets[idx].CheckedAt)
 		}
@@ -523,15 +519,14 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 			RemainingDelay: 2,
 		})
 		asset := db.Asset{
-			ID:            1,
-			ResourceID:    1,
-			UUID:          "asset1",
-			Size:          1000,
-			AbsoluteUsage: p2uint64(500),
-			UsagePercent:  50,
-			CheckedAt:     c.TimeNow(),
-			ScrapedAt:     p2time(c.TimeNow()),
-			ExpectedSize:  p2uint64(1100),
+			ID:           1,
+			ResourceID:   1,
+			UUID:         "asset1",
+			Size:         1000,
+			Usage:        db.UsageValues{db.SingularUsageMetric: 500},
+			CheckedAt:    c.TimeNow(),
+			ScrapedAt:    p2time(c.TimeNow()),
+			ExpectedSize: p2uint64(1100),
 		}
 
 		//first scrape will not touch anything about the asset, and also not create
@@ -553,21 +548,20 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 
 		asset.Size = 1100
-		asset.AbsoluteUsage = p2uint64(1000)
-		asset.UsagePercent = 1000. / 11.
+		asset.Usage = db.UsageValues{db.SingularUsageMetric: 1000}
 		asset.CheckedAt = c.TimeNow()
 		asset.ScrapedAt = p2time(c.TimeNow())
 		asset.ExpectedSize = nil
 		t.ExpectAssets(c.DB, asset)
 
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
-			ID:           1,
-			AssetID:      1,
-			Reason:       db.OperationReasonHigh,
-			OldSize:      1100,
-			NewSize:      ifthenelseU64(res.SingleStep, 1251, 1320),
-			UsagePercent: 1000. / 11.,
-			CreatedAt:    c.TimeNow(),
+			ID:        1,
+			AssetID:   1,
+			Reason:    db.OperationReasonHigh,
+			OldSize:   1100,
+			NewSize:   ifthenelseU64(res.SingleStep, 1251, 1320),
+			Usage:     db.UsageValues{db.SingularUsageMetric: 1000},
+			CreatedAt: c.TimeNow(),
 		})
 
 	})
@@ -591,15 +585,14 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
 		clock.StepBy(5 * time.Minute)
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 		t.ExpectAssets(c.DB, db.Asset{
-			ID:            1,
-			ResourceID:    1,
-			UUID:          "asset1",
-			Size:          1200,
-			AbsoluteUsage: p2uint64(600),
-			UsagePercent:  50,
-			CheckedAt:     c.TimeNow(),
-			ScrapedAt:     p2time(c.TimeNow()),
-			ExpectedSize:  nil,
+			ID:           1,
+			ResourceID:   1,
+			UUID:         "asset1",
+			Size:         1200,
+			Usage:        db.UsageValues{db.SingularUsageMetric: 600},
+			CheckedAt:    c.TimeNow(),
+			ScrapedAt:    p2time(c.TimeNow()),
+			ExpectedSize: nil,
 		})
 
 	})
@@ -635,10 +628,9 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 			ResourceID:         1,
 			UUID:               "asset1",
 			Size:               1000,
-			AbsoluteUsage:      p2uint64(500),
-			UsagePercent:       50,                                        //changed usage not observed because of error
-			ScrapedAt:          p2time(c.TimeNow().Add(-5 * time.Minute)), //not updated by ScrapeNextAsset!
-			CheckedAt:          c.TimeNow(),                               //but this WAS updated!
+			Usage:              db.UsageValues{db.SingularUsageMetric: 500}, //changed usage not observed because of error
+			ScrapedAt:          p2time(c.TimeNow().Add(-5 * time.Minute)),   //not updated by ScrapeNextAsset!
+			CheckedAt:          c.TimeNow(),                                 //but this WAS updated!
 			ExpectedSize:       nil,
 			ScrapeErrorMessage: "GetAssetStatus failing as requested",
 		})
@@ -654,8 +646,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 			ResourceID:         1,
 			UUID:               "asset1",
 			Size:               1000,
-			AbsoluteUsage:      p2uint64(600),
-			UsagePercent:       60,
+			Usage:              db.UsageValues{db.SingularUsageMetric: 600},
 			ScrapedAt:          p2time(c.TimeNow()),
 			CheckedAt:          c.TimeNow(),
 			ExpectedSize:       nil,
@@ -708,13 +699,13 @@ func TestRestrictDownsizeBecauseOfMinimumSize(baseT *testing.T) {
 		clock.StepBy(5 * time.Minute)
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
-			ID:           1,
-			AssetID:      1,
-			Reason:       db.OperationReasonLow,
-			OldSize:      1000,
-			NewSize:      900,
-			UsagePercent: 10,
-			CreatedAt:    c.TimeNow(),
+			ID:        1,
+			AssetID:   1,
+			Reason:    db.OperationReasonLow,
+			OldSize:   1000,
+			NewSize:   900,
+			Usage:     db.UsageValues{db.SingularUsageMetric: 100},
+			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -757,15 +748,15 @@ func TestRestrictUpsizeBecauseOfMaximumSize(baseT *testing.T) {
 		clock.StepBy(5 * time.Minute)
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
-			ID:           1,
-			AssetID:      1,
-			Reason:       db.OperationReasonCritical,
-			OldSize:      1000,
-			NewSize:      1100,
-			UsagePercent: 99.9,
-			CreatedAt:    c.TimeNow(),
-			ConfirmedAt:  p2time(c.TimeNow()),
-			GreenlitAt:   p2time(c.TimeNow()),
+			ID:          1,
+			AssetID:     1,
+			Reason:      db.OperationReasonCritical,
+			OldSize:     1000,
+			NewSize:     1100,
+			Usage:       db.UsageValues{db.SingularUsageMetric: 999},
+			CreatedAt:   c.TimeNow(),
+			ConfirmedAt: p2time(c.TimeNow()),
+			GreenlitAt:  p2time(c.TimeNow()),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -782,13 +773,13 @@ func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 
 		expectedOp := db.PendingOperation{
-			ID:           1,
-			AssetID:      1,
-			Reason:       db.OperationReasonHigh,
-			OldSize:      1000,
-			NewSize:      ifthenelseU64(res.SingleStep, 1126, 1200),
-			UsagePercent: 90,
-			CreatedAt:    c.TimeNow(),
+			ID:        1,
+			AssetID:   1,
+			Reason:    db.OperationReasonHigh,
+			OldSize:   1000,
+			NewSize:   ifthenelseU64(res.SingleStep, 1126, 1200),
+			Usage:     db.UsageValues{db.SingularUsageMetric: 900},
+			CreatedAt: c.TimeNow(),
 		}
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
@@ -822,13 +813,13 @@ func TestDownsizeAllowedByMinimumFreeSize(baseT *testing.T) {
 		clock.StepBy(10 * time.Minute)
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
-			ID:           1,
-			AssetID:      1,
-			Reason:       db.OperationReasonLow,
-			OldSize:      1000,
-			NewSize:      ifthenelseU64(res.SingleStep, 700, 800),
-			UsagePercent: 10,
-			CreatedAt:    c.TimeNow(),
+			ID:        1,
+			AssetID:   1,
+			Reason:    db.OperationReasonLow,
+			OldSize:   1000,
+			NewSize:   ifthenelseU64(res.SingleStep, 700, 800),
+			Usage:     db.UsageValues{db.SingularUsageMetric: 100},
+			CreatedAt: c.TimeNow(),
 		})
 
 	})
@@ -850,13 +841,13 @@ func TestDownsizeRestrictedByMinimumFreeSize(baseT *testing.T) {
 		clock.StepBy(10 * time.Minute)
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
-			ID:           1,
-			AssetID:      1,
-			Reason:       db.OperationReasonLow,
-			OldSize:      1000,
-			NewSize:      900,
-			UsagePercent: 10,
-			CreatedAt:    c.TimeNow(),
+			ID:        1,
+			AssetID:   1,
+			Reason:    db.OperationReasonLow,
+			OldSize:   1000,
+			NewSize:   900,
+			Usage:     db.UsageValues{db.SingularUsageMetric: 100},
+			CreatedAt: c.TimeNow(),
 		})
 
 	})
@@ -893,13 +884,13 @@ func TestUpsizeForcedByMinimumFreeSize(baseT *testing.T) {
 		clock.StepBy(10 * time.Minute)
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
-			ID:           1,
-			AssetID:      1,
-			Reason:       db.OperationReasonHigh,
-			OldSize:      1000,
-			NewSize:      ifthenelseU64(res.SingleStep, 1100, 1200),
-			UsagePercent: 50,
-			CreatedAt:    c.TimeNow(),
+			ID:        1,
+			AssetID:   1,
+			Reason:    db.OperationReasonHigh,
+			OldSize:   1000,
+			NewSize:   ifthenelseU64(res.SingleStep, 1100, 1200),
+			Usage:     db.UsageValues{db.SingularUsageMetric: 500},
+			CreatedAt: c.TimeNow(),
 		})
 
 		//to double-check, remove the reason for the upsize operation
@@ -939,15 +930,15 @@ func TestCriticalUpsizeTakingMultipleStepsAtOnce(baseT *testing.T) {
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
-			ID:           1,
-			AssetID:      1,
-			Reason:       db.OperationReasonCritical,
-			OldSize:      1380,
-			NewSize:      1434,
-			UsagePercent: 13500. / 138.,
-			CreatedAt:    c.TimeNow(),
-			ConfirmedAt:  p2time(c.TimeNow()),
-			GreenlitAt:   p2time(c.TimeNow()),
+			ID:          1,
+			AssetID:     1,
+			Reason:      db.OperationReasonCritical,
+			OldSize:     1380,
+			NewSize:     1434,
+			Usage:       db.UsageValues{db.SingularUsageMetric: 1350},
+			CreatedAt:   c.TimeNow(),
+			ConfirmedAt: p2time(c.TimeNow()),
+			GreenlitAt:  p2time(c.TimeNow()),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -968,15 +959,14 @@ func TestZeroSizedAssetWithoutUsage(baseT *testing.T) {
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 
 		t.ExpectAssets(c.DB, db.Asset{
-			ID:            1,
-			ResourceID:    1,
-			UUID:          "asset1",
-			Size:          0,
-			AbsoluteUsage: p2uint64(0),
-			UsagePercent:  0,
-			CheckedAt:     c.TimeNow(),
-			ScrapedAt:     p2time(c.TimeNow()),
-			ExpectedSize:  nil,
+			ID:           1,
+			ResourceID:   1,
+			UUID:         "asset1",
+			Size:         0,
+			Usage:        db.UsageValues{db.SingularUsageMetric: 0},
+			CheckedAt:    c.TimeNow(),
+			ScrapedAt:    p2time(c.TimeNow()),
+			ExpectedSize: nil,
 		})
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
@@ -996,15 +986,14 @@ func TestZeroSizedAssetWithUsage(baseT *testing.T) {
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 
 		t.ExpectAssets(c.DB, db.Asset{
-			ID:            1,
-			ResourceID:    1,
-			UUID:          "asset1",
-			Size:          0,
-			AbsoluteUsage: p2uint64(5),
-			UsagePercent:  200, //arbitrary value that represents non-zero usage on zero size
-			CheckedAt:     c.TimeNow(),
-			ScrapedAt:     p2time(c.TimeNow()),
-			ExpectedSize:  nil,
+			ID:           1,
+			ResourceID:   1,
+			UUID:         "asset1",
+			Size:         0,
+			Usage:        db.UsageValues{db.SingularUsageMetric: 5},
+			CheckedAt:    c.TimeNow(),
+			ScrapedAt:    p2time(c.TimeNow()),
+			ExpectedSize: nil,
 		})
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:      1,
@@ -1013,11 +1002,11 @@ func TestZeroSizedAssetWithUsage(baseT *testing.T) {
 			OldSize: 0,
 			//single-step resizing will end up one higher than percentage-step
 			//resizing because it also wants to leave the high threshold
-			NewSize:      ifthenelseU64(res.SingleStep, 7, 6),
-			UsagePercent: 200,
-			CreatedAt:    c.TimeNow(),
-			ConfirmedAt:  p2time(c.TimeNow()),
-			GreenlitAt:   p2time(c.TimeNow()),
+			NewSize:     ifthenelseU64(res.SingleStep, 7, 6),
+			Usage:       db.UsageValues{db.SingularUsageMetric: 5},
+			CreatedAt:   c.TimeNow(),
+			ConfirmedAt: p2time(c.TimeNow()),
+			GreenlitAt:  p2time(c.TimeNow()),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -1042,9 +1031,9 @@ func TestDownsizeShouldNotGoIntoHighThreshold(baseT *testing.T) {
 			//single-step resizing targets just above the low threshold and thus does
 			//not come near the high threshold, but percentage-step resizing would
 			//(if it ignored the high threshold) go down to size 800 which is too far
-			NewSize:      ifthenelseU64(res.SingleStep, 933, 876),
-			UsagePercent: 70,
-			CreatedAt:    c.TimeNow(),
+			NewSize:   ifthenelseU64(res.SingleStep, 933, 876),
+			Usage:     db.UsageValues{db.SingularUsageMetric: 700},
+			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -1071,9 +1060,9 @@ func TestDownsizeShouldNotGoIntoCriticalThreshold(baseT *testing.T) {
 			//not come near the critical threshold, but percentage-step resizing
 			//would (if it ignored the critical threshold) go down to size 800 which
 			//is too far
-			NewSize:      ifthenelseU64(res.SingleStep, 888, 843),
-			UsagePercent: 80,
-			CreatedAt:    c.TimeNow(),
+			NewSize:   ifthenelseU64(res.SingleStep, 888, 843),
+			Usage:     db.UsageValues{db.SingularUsageMetric: 800},
+			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -1100,9 +1089,9 @@ func TestUpsizeShouldNotGoIntoHighThreshold(baseT *testing.T) {
 			//does not come near the low threshold, but percentage-step resizing
 			//would (if it ignored the low threshold) go up to size 1200 which is too
 			//far
-			NewSize:      ifthenelseU64(res.SingleStep, 1046, 1149),
-			UsagePercent: 23,
-			CreatedAt:    c.TimeNow(),
+			NewSize:   ifthenelseU64(res.SingleStep, 1046, 1149),
+			Usage:     db.UsageValues{db.SingularUsageMetric: 230},
+			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -1138,15 +1127,15 @@ func TestResizesEndingUpInLowThreshold(baseT *testing.T) {
 		clock.StepBy(10 * time.Minute)
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
-			ID:           1,
-			AssetID:      1,
-			Reason:       db.OperationReasonCritical,
-			OldSize:      14,
-			NewSize:      15,
-			UsagePercent: 100,
-			CreatedAt:    c.TimeNow(),
-			ConfirmedAt:  p2time(c.TimeNow()),
-			GreenlitAt:   p2time(c.TimeNow()),
+			ID:          1,
+			AssetID:     1,
+			Reason:      db.OperationReasonCritical,
+			OldSize:     14,
+			NewSize:     15,
+			Usage:       db.UsageValues{db.SingularUsageMetric: 14},
+			CreatedAt:   c.TimeNow(),
+			ConfirmedAt: p2time(c.TimeNow()),
+			GreenlitAt:  p2time(c.TimeNow()),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 	})
@@ -1171,13 +1160,13 @@ func TestUpsizeBecauseOfMinFreeSizePassingLowThreshold(baseT *testing.T) {
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
-			ID:           1,
-			AssetID:      1,
-			Reason:       db.OperationReasonHigh,
-			OldSize:      1000,
-			NewSize:      3000,
-			UsagePercent: 50,
-			CreatedAt:    c.TimeNow(),
+			ID:        1,
+			AssetID:   1,
+			Reason:    db.OperationReasonHigh,
+			OldSize:   1000,
+			NewSize:   3000,
+			Usage:     db.UsageValues{db.SingularUsageMetric: 500},
+			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 	})

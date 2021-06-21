@@ -29,10 +29,7 @@ import (
 
 func withContext(t test.T, action func(*Context, *plugins.AssetManagerStatic, *test.FakeClock)) {
 	t.WithDB(nil, func(dbi *gorp.DbMap) {
-		amStatic := &plugins.AssetManagerStatic{
-			AssetType:            "foo",
-			ReportsAbsoluteUsage: true,
-		}
+		amStatic := &plugins.AssetManagerStatic{AssetType: "foo"}
 		//clock starts at an easily recognizable value
 		clockVar := test.FakeClock(99990)
 		clock := &clockVar

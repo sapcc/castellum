@@ -49,12 +49,12 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 
 		//check rendering of a pending operation in state "created"
 		pendingOp := db.PendingOperation{
-			AssetID:      1,
-			Reason:       db.OperationReasonHigh,
-			OldSize:      1024,
-			NewSize:      2048,
-			UsagePercent: 60,
-			CreatedAt:    time.Unix(21, 0).UTC(),
+			AssetID:   1,
+			Reason:    db.OperationReasonHigh,
+			OldSize:   1024,
+			NewSize:   2048,
+			Usage:     db.UsageValues{db.SingularUsageMetric: 768},
+			CreatedAt: time.Unix(21, 0).UTC(),
 		}
 		t.Must(h.DB.Insert(&pendingOp))
 		pendingOpJSON := assert.JSONObject{
@@ -67,7 +67,7 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 			"new_size":   2048,
 			"created": assert.JSONObject{
 				"at":            21,
-				"usage_percent": 60,
+				"usage_percent": 75,
 			},
 		}
 		req.ExpectBody = assert.JSONObject{
@@ -149,7 +149,10 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 			//to make the recently-failed operation appear, move fooasset1 back to
 			//critical usage levels
 			t.MustExec(h.DB, `UPDATE resources SET critical_threshold_percent = 95 WHERE id = 1`)
-			t.MustExec(h.DB, `UPDATE assets SET usage_percent = 97 WHERE id = 1`)
+			t.MustExec(h.DB, `UPDATE assets SET usage = $1 WHERE id = $2`,
+				db.UsageValues{db.SingularUsageMetric: 0.97 * 1024},
+				1,
+			)
 			expectedOps = []assert.JSONObject{{
 				"project_id": "project1",
 				"asset_type": "foo",
@@ -160,7 +163,7 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 				"new_size":   1025,
 				"created": assert.JSONObject{
 					"at":            51,
-					"usage_percent": 97,
+					"usage_percent": 96,
 				},
 				"confirmed": assert.JSONObject{
 					"at": 52,
@@ -183,12 +186,12 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 			//operation should NOT disappear when there is a pending operation that has
 			//not yet finished
 			t.Must(h.DB.Insert(&db.PendingOperation{
-				AssetID:      1,
-				Reason:       db.OperationReasonHigh,
-				OldSize:      1024,
-				NewSize:      2048,
-				UsagePercent: 60,
-				CreatedAt:    time.Unix(61, 0).UTC(),
+				AssetID:   1,
+				Reason:    db.OperationReasonHigh,
+				OldSize:   1024,
+				NewSize:   2048,
+				Usage:     db.UsageValues{db.SingularUsageMetric: 768},
+				CreatedAt: time.Unix(61, 0).UTC(),
 			}))
 			assert.HTTPRequest{
 				Method:       "GET",
@@ -200,16 +203,16 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 			//operation should disappear when there is a non-failed operation that
 			//finished after the failed one
 			t.Must(h.DB.Insert(&db.FinishedOperation{
-				AssetID:      1,
-				Reason:       db.OperationReasonHigh,
-				Outcome:      db.OperationOutcomeSucceeded,
-				OldSize:      1024,
-				NewSize:      2048,
-				UsagePercent: 60,
-				CreatedAt:    time.Unix(61, 0).UTC(),
-				ConfirmedAt:  p2time(time.Unix(61, 0).UTC()),
-				GreenlitAt:   p2time(time.Unix(61, 0).UTC()),
-				FinishedAt:   time.Unix(61, 0).UTC(),
+				AssetID:     1,
+				Reason:      db.OperationReasonHigh,
+				Outcome:     db.OperationOutcomeSucceeded,
+				OldSize:     1024,
+				NewSize:     2048,
+				Usage:       db.UsageValues{db.SingularUsageMetric: 768},
+				CreatedAt:   time.Unix(61, 0).UTC(),
+				ConfirmedAt: p2time(time.Unix(61, 0).UTC()),
+				GreenlitAt:  p2time(time.Unix(61, 0).UTC()),
+				FinishedAt:  time.Unix(61, 0).UTC(),
 			}))
 			expectedOps = []assert.JSONObject{}
 			req := assert.HTTPRequest{
@@ -301,12 +304,12 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 			//operation should NOT disappear when there is a pending operation that has
 			//not yet finished
 			t.Must(h.DB.Insert(&db.PendingOperation{
-				AssetID:      1,
-				Reason:       db.OperationReasonHigh,
-				OldSize:      1024,
-				NewSize:      2048,
-				UsagePercent: 60,
-				CreatedAt:    time.Unix(61, 0).UTC(),
+				AssetID:   1,
+				Reason:    db.OperationReasonHigh,
+				OldSize:   1024,
+				NewSize:   2048,
+				Usage:     db.UsageValues{db.SingularUsageMetric: 768},
+				CreatedAt: time.Unix(61, 0).UTC(),
 			}))
 			req := assert.HTTPRequest{
 				Method:       "GET",

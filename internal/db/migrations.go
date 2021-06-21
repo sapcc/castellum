@@ -206,4 +206,37 @@ var SQLMigrations = map[string]string{
 		ALTER TABLE finished_operations
 			ADD COLUMN errored_attempts INT DEFAULT 0;
 	`,
+	"014_refactor_usage_values.up.sql": `
+		ALTER TABLE resources
+			ALTER COLUMN low_threshold_percent SET DATA TYPE text
+				USING CONCAT('{"singular":', low_threshold_percent, '}'),
+			ALTER COLUMN high_threshold_percent SET DATA TYPE text
+				USING CONCAT('{"singular":', high_threshold_percent, '}'),
+			ALTER COLUMN critical_threshold_percent SET DATA TYPE text
+				USING CONCAT('{"singular":', critical_threshold_percent, '}');
+
+		ALTER TABLE assets ADD COLUMN usage TEXT NOT NULL DEFAULT '';
+		UPDATE assets SET usage = CONCAT('{"singular":', absolute_usage, '}');
+		ALTER TABLE assets
+			ALTER COLUMN usage DROP DEFAULT,
+			DROP COLUMN absolute_usage,
+			DROP COLUMN usage_percent;
+
+		ALTER TABLE finished_operations ADD COLUMN usage TEXT NOT NULL DEFAULT '';
+		UPDATE finished_operations SET usage = CONCAT('{"singular":', old_size * usage_percent, '}');
+		ALTER TABLE finished_operations
+			ALTER COLUMN usage DROP DEFAULT,
+			DROP COLUMN usage_percent;
+
+		ALTER TABLE pending_operations ADD COLUMN usage TEXT NOT NULL DEFAULT '';
+		UPDATE pending_operations SET usage = CONCAT('{"singular":', old_size * usage_percent, '}');
+		ALTER TABLE pending_operations
+			ALTER COLUMN usage DROP DEFAULT,
+			DROP COLUMN usage_percent;
+	`,
+	"014_refactor_usage_values.down.sql": `
+		-- in all likelihood, we are not going to need this rollback, and it would
+		-- be very tedious to write (and test!), so we don't bother
+		ROLLBACK;
+	`,
 }

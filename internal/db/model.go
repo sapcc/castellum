@@ -58,16 +58,14 @@ type Resource struct {
 	//time. Those thresholds (in percent of usage) and delays (in seconds) are
 	//defined here. The "critical" threshold will cause immediate upscaling, so
 	//it does not have a configurable delay.
-	LowThresholdPercent      float64 `db:"low_threshold_percent"`
-	LowDelaySeconds          uint32  `db:"low_delay_seconds"`
-	HighThresholdPercent     float64 `db:"high_threshold_percent"`
-	HighDelaySeconds         uint32  `db:"high_delay_seconds"`
-	CriticalThresholdPercent float64 `db:"critical_threshold_percent"`
+	LowThresholdPercent      UsageValues `db:"low_threshold_percent"`
+	LowDelaySeconds          uint32      `db:"low_delay_seconds"`
+	HighThresholdPercent     UsageValues `db:"high_threshold_percent"`
+	HighDelaySeconds         uint32      `db:"high_delay_seconds"`
+	CriticalThresholdPercent UsageValues `db:"critical_threshold_percent"`
 
 	//This defines how much the the asset's size changes per
-	//downscaling/upscaling operation (in % of previous size). This can be NULL
-	//when the asset type defines size steps differently. For example, for the
-	//asset type "instance", we will have a list of allowed flavors somewhere else.
+	//downscaling/upscaling operation (in % of previous size).
 	SizeStepPercent float64 `db:"size_step_percent"`
 	//When true, ignore SizeStepPercent and always resize by the smallest step
 	//that will move usage back into normal areas.
@@ -124,16 +122,12 @@ type Asset struct {
 	//The asset's current size as reported by OpenStack. The meaning of this
 	//value is defined by the plugin that implements this asset type.
 	Size uint64 `db:"size"`
-	//The asset's current utilization as a percentage of its size. This must
-	//always be between 0 and 100.
-	UsagePercent float64 `db:"usage_percent"`
-	//The asset's current utilization, in the same unit as .Size. This is only
-	//set when the asset manager reports absolute usages.
-	AbsoluteUsage *uint64 `db:"absolute_usage"`
+	//The asset's current utilization, in the same unit as .Size.
+	Usage UsageValues `db:"usage"`
 
-	//When we last tried to obtain the current .Size and .UsagePercent values.
+	//When we last tried to obtain the current .Size and .Usage values.
 	CheckedAt time.Time `db:"checked_at"`
-	//When the current .Size and .UsagePercent values were obtained.
+	//When the current .Size and .Usage values were obtained.
 	ScrapedAt *time.Time `db:"scraped_at"`
 	//This flag is set by a Castellum worker after a resize operation to indicate
 	//that the .Size attribute is outdated. The value is the new_size of the
@@ -155,11 +149,11 @@ type PendingOperation struct {
 	AssetID int64           `db:"asset_id"`
 	Reason  OperationReason `db:"reason"`
 
-	//.OldSize and .UsagePercent mirror the state of the asset when the operation
+	//.OldSize and .Usage mirror the state of the asset when the operation
 	//was created, and .NewSize defines the target size.
-	OldSize      uint64  `db:"old_size"`
-	NewSize      uint64  `db:"new_size"`
-	UsagePercent float64 `db:"usage_percent"`
+	OldSize uint64      `db:"old_size"`
+	NewSize uint64      `db:"new_size"`
+	Usage   UsageValues `db:"usage"`
 
 	//This sequence of timestamps represent the various states that an operation enters in its lifecycle.
 
@@ -196,7 +190,7 @@ func (o PendingOperation) IntoFinishedOperation(outcome OperationOutcome, finish
 		Outcome:            outcome,
 		OldSize:            o.OldSize,
 		NewSize:            o.NewSize,
-		UsagePercent:       o.UsagePercent,
+		Usage:              o.Usage,
 		CreatedAt:          o.CreatedAt,
 		ConfirmedAt:        o.ConfirmedAt,
 		GreenlitAt:         o.GreenlitAt,
@@ -214,9 +208,9 @@ type FinishedOperation struct {
 	Reason  OperationReason  `db:"reason"`
 	Outcome OperationOutcome `db:"outcome"`
 
-	OldSize      uint64  `db:"old_size"`
-	NewSize      uint64  `db:"new_size"`
-	UsagePercent float64 `db:"usage_percent"`
+	OldSize uint64      `db:"old_size"`
+	NewSize uint64      `db:"new_size"`
+	Usage   UsageValues `db:"usage"`
 
 	CreatedAt   time.Time  `db:"created_at"`
 	ConfirmedAt *time.Time `db:"confirmed_at"`

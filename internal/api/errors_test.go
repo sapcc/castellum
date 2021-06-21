@@ -148,16 +148,16 @@ func TestGetAssetResizeErrors(baseT *testing.T) {
 		//add a new operation on the same asset that results with outcome
 		//"succeeded" and check that we get an empty list
 		t.Must(h.DB.Insert(&db.FinishedOperation{
-			AssetID:      1,
-			Reason:       db.OperationReasonCritical,
-			Outcome:      db.OperationOutcomeSucceeded,
-			OldSize:      1024,
-			NewSize:      1025,
-			UsagePercent: 97,
-			CreatedAt:    time.Unix(70, 0).UTC(),
-			ConfirmedAt:  p2time(time.Unix(71, 0).UTC()),
-			GreenlitAt:   p2time(time.Unix(71, 0).UTC()),
-			FinishedAt:   time.Unix(73, 0).UTC(),
+			AssetID:     1,
+			Reason:      db.OperationReasonCritical,
+			Outcome:     db.OperationOutcomeSucceeded,
+			OldSize:     1024,
+			NewSize:     1025,
+			Usage:       db.UsageValues{db.SingularUsageMetric: 983.04},
+			CreatedAt:   time.Unix(70, 0).UTC(),
+			ConfirmedAt: p2time(time.Unix(71, 0).UTC()),
+			GreenlitAt:  p2time(time.Unix(71, 0).UTC()),
+			FinishedAt:  time.Unix(73, 0).UTC(),
 		}))
 		req.ExpectBody = assert.JSONObject{
 			"asset_resize_errors": []assert.JSONObject{},

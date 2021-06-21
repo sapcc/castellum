@@ -37,8 +37,8 @@ func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action fun
 	baseline := "fixtures/start-data.sql"
 	t.WithDB(&baseline, func(dbi *gorp.DbMap) {
 		team := core.AssetManagerTeam{
-			&plugins.AssetManagerStatic{AssetType: "foo", ReportsAbsoluteUsage: true},
-			&plugins.AssetManagerStatic{AssetType: "bar", ReportsAbsoluteUsage: false},
+			&plugins.AssetManagerStatic{AssetType: "foo"},
+			&plugins.AssetManagerStatic{AssetType: "bar", UsageMetrics: []db.UsageMetric{"first", "second"}},
 		}
 		mv := &MockValidator{}
 

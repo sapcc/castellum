@@ -53,7 +53,7 @@ type StaticAsset struct {
 type AssetManagerStatic struct {
 	AssetType                 db.AssetType
 	Assets                    map[string]map[string]StaticAsset
-	ReportsAbsoluteUsage      bool
+	UsageMetrics              []db.UsageMetric
 	CheckResourceAllowedFails bool
 	SetAssetSizeFails         bool
 }
@@ -61,9 +61,13 @@ type AssetManagerStatic struct {
 //InfoForAssetType implements the core.AssetManager interface.
 func (m AssetManagerStatic) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
 	if assetType == m.AssetType {
+		usageMetrics := m.UsageMetrics
+		if len(usageMetrics) == 0 {
+			usageMetrics = []db.UsageMetric{db.SingularUsageMetric}
+		}
 		return &core.AssetTypeInfo{
-			AssetType:            m.AssetType,
-			ReportsAbsoluteUsage: m.ReportsAbsoluteUsage,
+			AssetType:    m.AssetType,
+			UsageMetrics: usageMetrics,
 		}
 	}
 	return nil
@@ -136,9 +140,8 @@ func (m AssetManagerStatic) GetAssetStatus(res db.Resource, assetUUID string, pr
 	}
 
 	return core.AssetStatus{
-		Size:          asset.Size,
-		AbsoluteUsage: p2u64(asset.Usage),
-		UsagePercent:  core.GetUsagePercent(asset.Size, asset.Usage),
+		Size:  asset.Size,
+		Usage: db.UsageValues{db.SingularUsageMetric: float64(asset.Usage)},
 	}, nil
 }
 

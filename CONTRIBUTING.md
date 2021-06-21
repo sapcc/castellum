@@ -31,14 +31,3 @@ export OS_AUTH_URL="https://keystone.example.com/v3"
 ```
 
 You will then be presented with a shell prompt that should be pretty self-explanatory.
-
-## Random notes
-
-- Castellum does not deal with usage values directly. It only stores
-  `usage_percent = usage / size`. This is because some resources might not have
-  a single usage value. For example, an instance has both RAM usage and CPU
-  usage, so we would want to use the highest relative usage:
-
-  ```
-  usage_percent = max(100 * cpu_usage / num_cores, 100 * used_ram / total_ram)
-  ```

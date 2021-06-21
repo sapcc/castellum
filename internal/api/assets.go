@@ -24,6 +24,7 @@ import (
 	"sort"
 
 	"github.com/gorilla/mux"
+	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/respondwith"
 	"github.com/sapcc/go-bits/sre"
@@ -34,14 +35,14 @@ import (
 
 //Asset is how a db.Asset looks like in the API.
 type Asset struct {
-	UUID               string       `json:"id"`
-	Size               uint64       `json:"size,omitempty"`
-	UsagePercent       float64      `json:"usage_percent,omitempty"`
-	ScrapedAtUnix      *int64       `json:"scraped_at,omitempty"`
-	Checked            *Checked     `json:"checked,omitempty"`
-	Stale              bool         `json:"stale"`
-	PendingOperation   *Operation   `json:"pending_operation,omitempty"`
-	FinishedOperations *[]Operation `json:"finished_operations,omitempty"`
+	UUID               string         `json:"id"`
+	Size               uint64         `json:"size,omitempty"`
+	UsagePercent       db.UsageValues `json:"usage_percent"`
+	ScrapedAtUnix      *int64         `json:"scraped_at,omitempty"`
+	Checked            *Checked       `json:"checked,omitempty"`
+	Stale              bool           `json:"stale"`
+	PendingOperation   *Operation     `json:"pending_operation,omitempty"`
+	FinishedOperations *[]Operation   `json:"finished_operations,omitempty"`
 }
 
 //Checked appears in type Asset and Resource.
@@ -69,8 +70,8 @@ type Operation struct {
 
 //OperationCreation appears in type Operation.
 type OperationCreation struct {
-	AtUnix       int64   `json:"at"`
-	UsagePercent float64 `json:"usage_percent"`
+	AtUnix       int64          `json:"at"`
+	UsagePercent db.UsageValues `json:"usage_percent"`
 }
 
 //OperationConfirmation appears in type Operation.
@@ -98,7 +99,7 @@ func AssetFromDB(asset db.Asset) Asset {
 	a := Asset{
 		UUID:          asset.UUID,
 		Size:          asset.Size,
-		UsagePercent:  asset.UsagePercent,
+		UsagePercent:  core.GetMultiUsagePercent(asset.Size, asset.Usage),
 		ScrapedAtUnix: timeOrNullToUnix(asset.ScrapedAt),
 		Stale:         asset.ExpectedSize != nil,
 	}
@@ -121,7 +122,7 @@ func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, res *db.Re
 		NewSize: dbOp.NewSize,
 		Created: OperationCreation{
 			AtUnix:       dbOp.CreatedAt.Unix(),
-			UsagePercent: dbOp.UsagePercent,
+			UsagePercent: core.GetMultiUsagePercent(dbOp.OldSize, dbOp.Usage),
 		},
 		Finished: nil,
 	}
@@ -153,7 +154,7 @@ func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string, res *db.
 		NewSize: dbOp.NewSize,
 		Created: OperationCreation{
 			AtUnix:       dbOp.CreatedAt.Unix(),
-			UsagePercent: dbOp.UsagePercent,
+			UsagePercent: core.GetMultiUsagePercent(dbOp.OldSize, dbOp.Usage),
 		},
 		Finished: &OperationFinish{
 			AtUnix:       dbOp.FinishedAt.Unix(),
