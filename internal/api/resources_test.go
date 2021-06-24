@@ -488,7 +488,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 				"size_steps":       assert.JSONObject{"percent": 10},
 				"size_constraints": assert.JSONObject{"maximum": 30},
 			},
-			"low threshold must be between 0% and 100% of usage",
+			"low threshold must be above 0% and below or at 100% of usage",
 			"low threshold must be below high threshold",
 		)
 
@@ -499,8 +499,8 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 				"size_steps":         assert.JSONObject{"percent": 10},
 				"size_constraints":   assert.JSONObject{"maximum": 30},
 			},
-			"high threshold must be between 0% and 100% of usage",
-			"critical threshold must be between 0% and 100% of usage",
+			"high threshold must be above 0% and below or at 100% of usage",
+			"critical threshold must be above 0% and below or at 100% of usage",
 			"high threshold must be below critical threshold",
 		)
 
@@ -522,9 +522,9 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 				"size_steps":         assert.JSONObject{"percent": 10},
 				"size_constraints":   assert.JSONObject{"maximum": 30},
 			},
-			"low threshold must be between 0% and 100% of usage",
-			"high threshold must be between 0% and 100% of usage",
-			"critical threshold must be between 0% and 100% of usage",
+			"low threshold must be above 0% and below or at 100% of usage",
+			"high threshold must be above 0% and below or at 100% of usage",
+			"critical threshold must be above 0% and below or at 100% of usage",
 		)
 
 		expectErrors("foo",

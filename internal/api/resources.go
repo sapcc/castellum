@@ -145,8 +145,8 @@ func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo, ma
 				complain("missing %s threshold%s", tType, metric.Identifier(" for %s"))
 				continue
 			}
-			if val < 0 || val > 100 {
-				complain("%s threshold%s must be between 0%% and 100%% of usage", tType, metric.Identifier(" for %s"))
+			if val <= 0 || val > 100 {
+				complain("%s threshold%s must be above 0%% and below or at 100%% of usage", tType, metric.Identifier(" for %s"))
 			}
 		}
 
