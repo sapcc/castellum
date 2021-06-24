@@ -212,7 +212,7 @@ func (c Context) ScrapeNextAsset(maxCheckedAt time.Time) (returnedError error) {
 
 	//compute value of `asset.CriticalUsages` field (for reporting to admin only)
 	var criticalUsageMetrics []string
-	if res.CriticalThresholdPercent.IsNonZero() {
+	if res.CriticalThresholdPercent.IsNonZero() && (res.MaximumSize == nil || asset.Size < *res.MaximumSize) {
 		usagePerc := core.GetMultiUsagePercent(asset.Size, asset.Usage)
 		for _, metric := range info.UsageMetrics {
 			if usagePerc[metric] >= res.CriticalThresholdPercent[metric] {
