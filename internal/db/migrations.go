@@ -239,4 +239,10 @@ var SQLMigrations = map[string]string{
 		-- be very tedious to write (and test!), so we don't bother
 		ROLLBACK;
 	`,
+	"015_add_assets_critical_usages.up.sql": `
+		ALTER TABLE assets ADD COLUMN critical_usages TEXT NOT NULL DEFAULT '';
+	`,
+	"015_add_assets_critical_usages.down.sql": `
+		ALTER TABLE assets DROP COLUMN critical_usages;
+	`,
 }

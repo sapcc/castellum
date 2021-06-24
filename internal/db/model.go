@@ -141,6 +141,12 @@ type Asset struct {
 	//If the last scrape failed, contains the error message returned by
 	//GetAssetStatus(). Contains the empty string otherwise.
 	ScrapeErrorMessage string `db:"scrape_error_message"`
+
+	//A comma-separated list of all UsageMetrics for which this asset has
+	//critical usage levels. This field is only generated and never consumed by
+	//Castellum. Its intention is to allow operators to inspect the DB and alert
+	//on assets that remain on critical usage levels for too long.
+	CriticalUsages string `db:"critical_usages"`
 }
 
 //PendingOperation describes an ongoing resize operation for an asset.

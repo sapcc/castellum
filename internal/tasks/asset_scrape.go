@@ -1,5 +1,5 @@
 /******************************************************************************
-*
+n*
 *  Copyright 2019 SAP SE
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -209,6 +209,18 @@ func (c Context) ScrapeNextAsset(maxCheckedAt time.Time) (returnedError error) {
 		//the backend is still reporting the old size -> do not touch anything until the backend is showing the new size
 		canTouchPendingOperations = false
 	}
+
+	//compute value of `asset.CriticalUsages` field (for reporting to admin only)
+	var criticalUsageMetrics []string
+	if res.CriticalThresholdPercent.IsNonZero() {
+		usagePerc := core.GetMultiUsagePercent(asset.Size, asset.Usage)
+		for _, metric := range info.UsageMetrics {
+			if usagePerc[metric] >= res.CriticalThresholdPercent[metric] {
+				criticalUsageMetrics = append(criticalUsageMetrics, string(metric))
+			}
+		}
+	}
+	asset.CriticalUsages = strings.Join(criticalUsageMetrics, ",")
 
 	//update asset in DB
 	_, err = tx.Update(&asset)

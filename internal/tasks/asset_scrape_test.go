@@ -986,14 +986,15 @@ func TestZeroSizedAssetWithUsage(baseT *testing.T) {
 		t.Must(c.ScrapeNextAsset(c.TimeNow()))
 
 		t.ExpectAssets(c.DB, db.Asset{
-			ID:           1,
-			ResourceID:   1,
-			UUID:         "asset1",
-			Size:         0,
-			Usage:        db.UsageValues{db.SingularUsageMetric: 5},
-			CheckedAt:    c.TimeNow(),
-			ScrapedAt:    p2time(c.TimeNow()),
-			ExpectedSize: nil,
+			ID:             1,
+			ResourceID:     1,
+			UUID:           "asset1",
+			Size:           0,
+			Usage:          db.UsageValues{db.SingularUsageMetric: 5},
+			CheckedAt:      c.TimeNow(),
+			ScrapedAt:      p2time(c.TimeNow()),
+			ExpectedSize:   nil,
+			CriticalUsages: string(db.SingularUsageMetric),
 		})
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:      1,

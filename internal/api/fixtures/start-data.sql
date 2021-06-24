@@ -9,11 +9,11 @@ INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_per
 INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_size, max_size, min_free_size, single_step, domain_uuid, checked_at, scrape_error_message) VALUES (4, 'project1', 'unknown', UNIX(4), '{"singular":20}', 3600, '{"singular":80}', 1800, '{"singular":95}', 20, NULL, NULL, NULL, FALSE, 'domain1', UNIX(4), '');
 
 -- insert some assets in 'project1' that we can list
-INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage) VALUES (1, 1, 'fooasset1', 1024, UNIX(11), 1200, UNIX(11), '', '{"singular":512}');
-INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage) VALUES (2, 1, 'fooasset2', 512, UNIX(12), NULL, UNIX(15), 'unexpected uptime', '{"singular":409.6}');
-INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage) VALUES (3, 2, 'barasset1', 2000, UNIX(13), NULL, UNIX(13), '', '{"first":200,"second":222}');
+INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage, critical_usages) VALUES (1, 1, 'fooasset1', 1024, UNIX(11), 1200, UNIX(11), '', '{"singular":512}', '');
+INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage, critical_usages) VALUES (2, 1, 'fooasset2', 512, UNIX(12), NULL, UNIX(15), 'unexpected uptime', '{"singular":409.6}', '');
+INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage, critical_usages) VALUES (3, 2, 'barasset1', 2000, UNIX(13), NULL, UNIX(13), '', '{"first":200,"second":222}', '');
 -- insert a bogus asset in an unknown asset type; we should not be able to list this in the API
-INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage) VALUES (4, 4, 'bogusasset', 100, UNIX(14), NULL, UNIX(14), '', '{"singular":50}');
+INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage, critical_usages) VALUES (4, 4, 'bogusasset', 100, UNIX(14), NULL, UNIX(14), '', '{"singular":50}', '');
 
 INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, greenlit_by_user_uuid, finished_at, error_message, usage) VALUES (1, 'low', 'cancelled', 1000, 900, UNIX(31), NULL, NULL, NULL, UNIX(32), '', '{"singular":200}');
 INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, greenlit_by_user_uuid, finished_at, error_message, usage) VALUES (1, 'high', 'succeeded', 1023, 1024, UNIX(41), UNIX(42), UNIX(43), 'user2', UNIX(44), '', '{"singular":818.4}');
