@@ -1,6 +1,6 @@
 # Castellum
 
-[![Build Status](https://travis-ci.org/sapcc/castellum.svg?branch=master)](https://travis-ci.org/sapcc/castellum)
+[![CI](https://github.com/sapcc/castellum/actions/workflows/ci.yaml/badge.svg)](https://github.com/sapcc/castellum/actions/workflows/ci.yaml)
 [![Coverage Status](https://coveralls.io/repos/github/sapcc/castellum/badge.svg?branch=master)](https://coveralls.io/github/sapcc/castellum?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/sapcc/castellum)](https://goreportcard.com/report/github.com/sapcc/castellum)
 
