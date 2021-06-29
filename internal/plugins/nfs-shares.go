@@ -183,7 +183,7 @@ func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSiz
 			}
 
 			//We only rely on sizes reported by NetApp. But bugs in the Manila API may
-			//cause it to have a different expection how big the share is, therefore
+			//cause it to have a different expectation of how big the share is, therefore
 			//rejecting shrink/extend requests because it thinks they go in the wrong
 			//direction. In this case, we try the opposite direction to see if it helps.
 			err2 := m.resize(assetUUID, oldSize, newSize /* useReverseOperation = */, true)
