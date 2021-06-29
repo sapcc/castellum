@@ -186,7 +186,7 @@ func checkReason(res db.Resource, asset db.Asset, info AssetTypeInfo, reason db.
 		}
 	}
 
-	//phase 3: take the boldest action that satifies the constraints
+	//phase 3: take the boldest action that satisfies the constraints
 	if reason == db.OperationReasonLow {
 		return a.Min()
 	}

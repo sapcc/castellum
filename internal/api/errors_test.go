@@ -49,7 +49,7 @@ func TestGetResourceScrapeErrors(baseT *testing.T) {
 			ExpectStatus: http.StatusOK,
 			ExpectBody: assert.JSONObject{
 				"resource_scrape_errors": []assert.JSONObject{
-					assert.JSONObject{
+					{
 						"asset_type": "bar",
 						"checked": assert.JSONObject{
 							"at":    3,
@@ -58,7 +58,7 @@ func TestGetResourceScrapeErrors(baseT *testing.T) {
 						"domain_id":  "domain1",
 						"project_id": "project1",
 					},
-					assert.JSONObject{
+					{
 						"asset_type": "foo",
 						"checked": assert.JSONObject{
 							"at":    6,
@@ -92,7 +92,7 @@ func TestGetAssetScrapeErrors(baseT *testing.T) {
 			ExpectStatus: http.StatusOK,
 			ExpectBody: assert.JSONObject{
 				"asset_scrape_errors": []assert.JSONObject{
-					assert.JSONObject{
+					{
 						"asset_id":   "fooasset2",
 						"asset_type": "foo",
 						"checked": assert.JSONObject{
@@ -128,7 +128,7 @@ func TestGetAssetResizeErrors(baseT *testing.T) {
 			ExpectStatus: http.StatusOK,
 			ExpectBody: assert.JSONObject{
 				"asset_resize_errors": []assert.JSONObject{
-					assert.JSONObject{
+					{
 						"asset_id":   "fooasset1",
 						"asset_type": "foo",
 						"domain_id":  "domain1",

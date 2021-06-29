@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"os"
 
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/easypg"
@@ -32,14 +31,7 @@ import (
 //WithDB prepares a DB reference for this test, or fails the test if the DB
 //is not ready.
 func (t T) WithDB(fixtureFile *string, action func(dbi *gorp.DbMap)) {
-	var postgresURLStr string
-	if os.Getenv("TRAVIS") == "true" {
-		//cf. https://docs.travis-ci.com/user/database-setup/#postgresql
-		postgresURLStr = "postgres://postgres@localhost/castellum?sslmode=disable"
-	} else {
-		//suitable for use with ./testing/with-postgres-db.sh
-		postgresURLStr = "postgres://postgres@localhost:54321/castellum?sslmode=disable"
-	}
+	postgresURLStr := "postgres://postgres:postgres@localhost:54321/castellum?sslmode=disable"
 	dbURL, err := url.Parse(postgresURLStr)
 	if err != nil {
 		t.Fatalf("malformed database URL %q: %s", postgresURLStr, err.Error())
