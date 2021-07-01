@@ -13,6 +13,7 @@ This document uses the terminology defined in the [README.md](../README.md#termi
 * [GET /v1/projects/:id](#get-v1projectsid)
   * [Stepping strategies](#stepping-strategies)
   * [Multi-usage resources](#multi-usage-resources)
+  * [Asset-type-specific configuration](#asset-type-specific-configuration)
 * [GET /v1/projects/:id/resources/:type](#get-v1projectsidresourcestype)
 * [PUT /v1/projects/:id/resources/:type](#put-v1projectsidresourcestype)
 * [DELETE /v1/projects/:id/resources/:type](#delete-v1projectsidresourcestype)
@@ -43,6 +44,7 @@ Returns `200` and a JSON response body like this:
         "error": "cannot connect to OpenStack"
       },
       "asset_count": 42,
+      "config": { ... },
       "low_threshold": {
         "usage_percent": 20,
         "delay_seconds": 3600
@@ -76,6 +78,7 @@ The following fields may be returned:
 | `resources.$type.checked.at` | timestamp | *Readonly.* When Castellum last _tried_ to scan this resource for new assets or deleted assets. Only shown when different from `scraped_at`, i.e. when the last check failed. |
 | `resources.$type.checked.error` | string | *Readonly.* When the last check failed (see above), this field contains the error message that was returned from the backend. |
 | `resources.$type.asset_count` | integer | *Readonly.* The number of assets in this resource. |
+| `resources.$type.config` | object or null | Type-specific configuration for this resource. Most resources don't take configuration here, in which case this field will be missing. If a resource accepts or requires configuration, [see below](#asset-type-specific-configuration) for the exact format. |
 | `resources.$type.low_threshold`<br>`resources.$type.high_threshold`<br>`resources.$type.critical_threshold` | object | Configuration for thresholds that trigger an automated resize operation. Any of these may be missing if the threshold in question has not been enabled. |
 | `resources.$type.low_threshold.usage_percent`<br>`resources.$type.high_threshold.usage_percent`<br>`resources.$type.critical_threshold.usage_percent` | [float or object](#multi-usage-resources) | Automated operations will be triggered when usage crosses these thresholds, i.e. `usage <= threshold` for the low threshold and `usage >= threshold` for the high and critical thresholds. |
 | `resources.$type.low_threshold.delay_seconds`<br>`resources.$type.high_threshold.delay_seconds` | integer | How long usage must cross the threshold before the operation is confirmed. Critical operations don't have a delay; they are always confirmed immediately. |
@@ -114,6 +117,10 @@ Most resources only have a single usage metric, so all fields called `usage_perc
 ```
 
 This is why `usage_percent` fields are listed throughout this spec with a data type of "float or object".
+
+### Asset-type-specific configuration
+
+Resources with an asset type of `nfs-shares` or `project-quota:*` do not take configuration, so the `config` key will always be absent in GET operations, and providing the `config` key in PUT operations is an error.
 
 ## GET /v1/projects/:id/resources/:type
 

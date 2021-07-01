@@ -19,6 +19,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sort"
@@ -39,6 +40,7 @@ type Resource struct {
 	ScrapedAtUnix     *int64           `json:"scraped_at,omitempty"`
 	Checked           *Checked         `json:"checked,omitempty"`
 	AssetCount        int64            `json:"asset_count"`
+	ConfigJSON        *json.RawMessage `json:"config,omitempty"`
 	LowThreshold      *Threshold       `json:"low_threshold,omitempty"`
 	HighThreshold     *Threshold       `json:"high_threshold,omitempty"`
 	CriticalThreshold *Threshold       `json:"critical_threshold,omitempty"`
@@ -82,6 +84,10 @@ func (h handler) ResourceFromDB(res db.Resource) (Resource, error) {
 		AssetCount:    assetCount,
 		SizeSteps:     SizeSteps{Percent: res.SizeStepPercent, Single: res.SingleStep},
 	}
+	if res.ConfigJSON != "" {
+		val := json.RawMessage(res.ConfigJSON)
+		result.ConfigJSON = &val
+	}
 	if res.ScrapeErrorMessage != "" {
 		result.Checked = &Checked{
 			AtUnix:       res.CheckedAt.Unix(),
@@ -117,12 +123,22 @@ func (h handler) ResourceFromDB(res db.Resource) (Resource, error) {
 
 //UpdateDBResource updates the given db.Resource with the values provided in
 //this api.Resource.
-func (r Resource) UpdateDBResource(res *db.Resource, info core.AssetTypeInfo, maxAssetSize *uint64) (errors []string) {
+func (r Resource) UpdateDBResource(res *db.Resource, manager core.AssetManager, info core.AssetTypeInfo, maxAssetSize *uint64) (errors []string) {
 	complain := func(msg string, args ...interface{}) {
 		if len(args) > 0 {
 			msg = fmt.Sprintf(msg, args...)
 		}
 		errors = append(errors, msg)
+	}
+
+	if r.ConfigJSON == nil {
+		res.ConfigJSON = ""
+	} else {
+		res.ConfigJSON = string(*r.ConfigJSON)
+	}
+	err := manager.CheckResourceAllowed(res.AssetType, res.ScopeUUID, res.ConfigJSON)
+	if err != nil {
+		complain(err.Error())
 	}
 
 	if r.ScrapedAtUnix != nil {
@@ -346,18 +362,13 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	manager, info := h.Team.ForAssetType(dbResource.AssetType)
-	maxAssetSize := h.Config.MaxAssetSize[info.AssetType]
-	err := manager.CheckResourceAllowed(dbResource.AssetType, dbResource.ScopeUUID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
-		return
-	}
-
 	var input Resource
 	if !RequireJSON(w, r, &input) {
 		return
 	}
+
+	manager, info := h.Team.ForAssetType(dbResource.AssetType)
+	maxAssetSize := h.Config.MaxAssetSize[info.AssetType]
 
 	action := updateAction
 	if dbResource.ID == 0 {
@@ -374,12 +385,13 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 			})
 	}
 
-	errs := input.UpdateDBResource(dbResource, info, maxAssetSize)
+	errs := input.UpdateDBResource(dbResource, manager, info, maxAssetSize)
 	if len(errs) > 0 {
 		doAudit(http.StatusUnprocessableEntity)
 		http.Error(w, strings.Join(errs, "\n"), http.StatusUnprocessableEntity)
 		return
 	}
+	var err error
 	if dbResource.ID == 0 {
 		err = h.DB.Insert(dbResource)
 	} else {

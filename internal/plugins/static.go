@@ -56,6 +56,7 @@ type AssetManagerStatic struct {
 	UsageMetrics              []db.UsageMetric
 	CheckResourceAllowedFails bool
 	SetAssetSizeFails         bool
+	ExpectsConfiguration      bool
 }
 
 //InfoForAssetType implements the core.AssetManager interface.
@@ -74,7 +75,20 @@ func (m AssetManagerStatic) InfoForAssetType(assetType db.AssetType) *core.Asset
 }
 
 //CheckResourceAllowed implements the core.AssetManager interface.
-func (m AssetManagerStatic) CheckResourceAllowed(assetType db.AssetType, scopeUUID string) error {
+func (m AssetManagerStatic) CheckResourceAllowed(assetType db.AssetType, scopeUUID string, configJSON string) error {
+	if m.ExpectsConfiguration {
+		if configJSON == "" {
+			return core.ErrNoConfigurationProvided
+		}
+		if configJSON != `{"foo":"bar"}` {
+			return errors.New("wrong configuration was supplied")
+		}
+	} else {
+		if configJSON != "" {
+			return core.ErrNoConfigurationAllowed
+		}
+	}
+
 	if m.CheckResourceAllowedFails {
 		return errSimulatedRejection
 	}

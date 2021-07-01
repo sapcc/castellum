@@ -54,6 +54,9 @@ var (
 			"error": "datacenter is on fire",
 		},
 		"asset_count": 1,
+		"config": assert.JSONObject{
+			"foo": "bar",
+		},
 		"critical_threshold": assert.JSONObject{
 			"usage_percent": assert.JSONObject{
 				"first":  95,
@@ -448,11 +451,13 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 				"scraped_at":       12345,
 				"checked":          assert.JSONObject{"at": 56789},
 				"asset_count":      500,
+				"config":           assert.JSONObject{"foo": "bar"},
 				"low_threshold":    assert.JSONObject{"usage_percent": 20},
 				"high_threshold":   assert.JSONObject{"usage_percent": 80},
 				"size_steps":       assert.JSONObject{"percent": 10, "single": true},
 				"size_constraints": assert.JSONObject{"minimum": 30, "maximum": 20},
 			},
+			"no configuration allowed for this asset type",
 			"resource.scraped_at cannot be set via the API",
 			"resource.checked cannot be set via the API",
 			"resource.asset_count cannot be set via the API",
@@ -548,6 +553,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 
 		expectErrors("bar",
 			assert.JSONObject{
+				"config":             assert.JSONObject{"foo": "bar"},
 				"low_threshold":      assert.JSONObject{"usage_percent": 1, "delay_seconds": 60},
 				"high_threshold":     assert.JSONObject{"usage_percent": 2, "delay_seconds": 60},
 				"critical_threshold": assert.JSONObject{"usage_percent": 3},
@@ -563,6 +569,23 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 			"missing critical threshold for first",
 			"missing critical threshold for second",
 			`critical threshold specified for metric "singular" which is not valid for this asset type`,
+		)
+
+		expectErrors("bar",
+			assert.JSONObject{
+				"config":             assert.JSONObject{"foo": "wrong"},
+				"critical_threshold": assert.JSONObject{"usage_percent": assert.JSONObject{"first": 1, "second": 2}},
+				"size_steps":         assert.JSONObject{"percent": 10},
+			},
+			"wrong configuration was supplied",
+		)
+
+		expectErrors("bar",
+			assert.JSONObject{
+				"critical_threshold": assert.JSONObject{"usage_percent": assert.JSONObject{"first": 1, "second": 2}},
+				"size_steps":         assert.JSONObject{"percent": 10},
+			},
+			"type-specific configuration must be provided for this asset type",
 		)
 
 		//none of this should have touched the DB

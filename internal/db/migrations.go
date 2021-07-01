@@ -245,4 +245,10 @@ var SQLMigrations = map[string]string{
 	"015_add_assets_critical_usages.down.sql": `
 		ALTER TABLE assets DROP COLUMN critical_usages;
 	`,
+	"016_add_resources_config_json.up.sql": `
+		ALTER TABLE resources ADD COLUMN config_json TEXT NOT NULL DEFAULT '';
+	`,
+	"016_add_resources_config_json.down.sql": `
+		ALTER TABLE resources DROP COLUMN config_json;
+	`,
 }

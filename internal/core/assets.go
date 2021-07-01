@@ -19,6 +19,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/gophercloud/gophercloud"
@@ -56,6 +57,17 @@ func (e AssetNotFoundErr) Error() string {
 	return e.InnerError.Error()
 }
 
+var (
+	//ErrNoConfigurationAllowed is returned by AssetManager.CheckResourceAllowed()
+	//when the user has given configuration, but the asset type in question does
+	//not accept any configuration.
+	ErrNoConfigurationAllowed = errors.New("no configuration allowed for this asset type")
+	//ErrNoConfigurationProvided is returned by
+	//AssetManager.CheckResourceAllowed() when the user has not given
+	//configuration, but the asset type in question requires configuration.
+	ErrNoConfigurationProvided = errors.New("type-specific configuration must be provided for this asset type")
+)
+
 //AssetManager is the main modularization interface in Castellum. It
 //provides a separation boundary between the plugins that implement the
 //concrete behavior for specific asset types, and the core logic of Castellum.
@@ -65,10 +77,16 @@ type AssetManager interface {
 	//about it. Otherwise return nil.
 	InfoForAssetType(assetType db.AssetType) *AssetTypeInfo
 
-	//Simple implementations can return nil unconditionally. A non-nil return value
-	//makes the API deny any attempts to create a resource with that scope and
-	//asset type with that error.
-	CheckResourceAllowed(assetType db.AssetType, scopeUUID string) error
+	//A non-nil return value makes the API deny any attempts to create a resource
+	//with that scope and asset type with that error.
+	//
+	//The initial intended purpose is to allow resources for some scopes, but
+	//deny them for others. The second purpose is to validate plugin-specific
+	//configuration passed in the `configJSON` parameter.
+	//
+	//Simple implementations should return nil for empty `configJSON` and
+	//`core.ErrNoConfigurationAllowed` otherwise.
+	CheckResourceAllowed(assetType db.AssetType, scopeUUID string, configJSON string) error
 
 	ListAssets(res db.Resource) ([]string, error)
 	//The returned Outcome should be either Succeeded, Failed or Errored, but not Cancelled.

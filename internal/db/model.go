@@ -48,6 +48,7 @@ type Resource struct {
 	ScopeUUID  string    `db:"scope_uuid"`  //either project UUID or domain UUID
 	DomainUUID string    `db:"domain_uuid"` //for domain resources: equal to .ScopeUUID
 	AssetType  AssetType `db:"asset_type"`
+	ConfigJSON string    `db:"config_json"` //(optional) config specifically for this asset type
 
 	//When we last tried to check this Resource for new or deleted assets.
 	CheckedAt time.Time `db:"checked_at"`
