@@ -14,6 +14,7 @@ This document uses the terminology defined in the [README.md](../README.md#termi
   * [Stepping strategies](#stepping-strategies)
   * [Multi-usage resources](#multi-usage-resources)
   * [Asset-type-specific configuration](#asset-type-specific-configuration)
+    * [server-group:\*](#server-group)
 * [GET /v1/projects/:id/resources/:type](#get-v1projectsidresourcestype)
 * [PUT /v1/projects/:id/resources/:type](#put-v1projectsidresourcestype)
 * [DELETE /v1/projects/:id/resources/:type](#delete-v1projectsidresourcestype)
@@ -121,6 +122,23 @@ This is why `usage_percent` fields are listed throughout this spec with a data t
 ### Asset-type-specific configuration
 
 Resources with an asset type of `nfs-shares` or `project-quota:*` do not take configuration, so the `config` key will always be absent in GET operations, and providing the `config` key in PUT operations is an error.
+
+#### server-group:\*
+
+Resources with an asset type of `server-group:*` present (in GET) and expect (in PUT) the following configuration at `resources.$type.config`:
+
+| Field | Type | Explanation |
+| ----- | ---- | ----------- |
+| `template.availability_zone` | string | If not empty, new instances will be created in this availability zone. |
+| `template.flavor.name` | string<br>*(required)* | The name of the flavor that will be used for new instances. |
+| `template.image.name` | string<br>*(required)* | The name of the image that new instances will be booted with. |
+| `template.metadata` | object of strings | Metadata key and value pairs that will be provided to new instances. The maximum size of keys and values is 255 bytes each. |
+| `template.networks` | array of objects<br>*(required)* | Which networks the new instances will be connected to. |
+| `template.networks[].uuid` | string<br>*(required)* | The ID of the network. |
+| `template.networks[].tag` | string | A device role tag that can be applied to a network interface. The guest OS of a server that has devices tagged in this manner can access hardware metadata about the tagged devices from the metadata API and on the config drive, if enabled. |
+| `template.public_key.barbican_uuid` | string<br>*(required)* | A UUID under which an SSH public key is stored in Barbican. This public key will be used when booting new instances. |
+| `template.security_groups` | array of strings<br>*(required)* | New instances will be created in these security groups. |
+| `template.user_data` | string | Configuration information or scripts to use when booting new instances. The maximum size is 65535 bytes. |
 
 ## GET /v1/projects/:id/resources/:type
 
