@@ -38,7 +38,7 @@ import (
 //for each project resource, exactly one asset is reported, the project itself
 //(i.e. `asset.UUID == resource.ScopeUUID`).
 type assetManagerProjectQuota struct {
-	Provider       *core.ProviderClient
+	Provider       core.ProviderClient
 	Limes          *gophercloud.ServiceClient
 	KnownResources []limesResourceInfo
 }
@@ -54,8 +54,8 @@ func (info limesResourceInfo) AssetType() db.AssetType {
 }
 
 func init() {
-	core.RegisterAssetManagerFactory("project-quota", func(provider *core.ProviderClient, eo gophercloud.EndpointOpts) (core.AssetManager, error) {
-		limes, err := resources.NewLimesV1(provider.ProviderClient, eo)
+	core.RegisterAssetManagerFactory("project-quota", func(provider core.ProviderClient) (core.AssetManager, error) {
+		limes, err := provider.CloudAdminClient(resources.NewLimesV1)
 		if err != nil {
 			return nil, err
 		}

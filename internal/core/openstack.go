@@ -27,21 +27,36 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 )
 
-//ProviderClientInterface is implemented by ProviderClient. Use this type to
-//allow for test doubles.
-type ProviderClientInterface interface {
+//ProviderClient is an interface for an internal type that wraps
+//gophercloud.ProviderClient to provide caching and rescoping. It is only
+//provided as an interface to enable substitution of a mock for tests.
+type ProviderClient interface {
+	//CloudAdminClient returns a service client in the provider client's default scope.
+	//The argument is a function like `openstack.NewIdentityV3`.
+	CloudAdminClient(factory ServiceClientFactory) (*gophercloud.ServiceClient, error)
+
+	//GetAuthResult has the same semantics as gophercloud.ProviderClient.GetAuthResult.
+	GetAuthResult() gophercloud.AuthResult
+	//GetProject queries the given project ID in Keystone, unless it is already cached.
+	//When the project does not exist, nil is returned instead of an error.
 	GetProject(projectID string) (*CachedProject, error)
+	//GetDomain queries the given domain ID in Keystone, unless it is already cached.
+	//When the project does not exist, nil is returned instead of an error.
 	GetDomain(domainID string) (*CachedDomain, error)
 }
 
-//ProviderClient extends gophercloud.ProviderClient with some caching.
-type ProviderClient struct {
-	*gophercloud.ProviderClient
-	KeystoneV3   *gophercloud.ServiceClient
+//providerClientImpl is the implementation for the ProviderClient interface.
+type providerClientImpl struct {
+	pc           *gophercloud.ProviderClient
+	ao           gophercloud.AuthOptions
+	eo           gophercloud.EndpointOpts
 	projectCache map[string]*CachedProject //key = UUID, nil value = project does not exist
 	domainCache  map[string]*CachedDomain  //key = UUID, nil value = domain does not exist
 	cacheMutex   *sync.RWMutex
 }
+
+//ServiceClientFactory is a typedef that appears in type ProviderClient.
+type ServiceClientFactory func(*gophercloud.ProviderClient, gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error)
 
 //CachedProject contains cached information about a Keystone project.
 type CachedProject struct {
@@ -54,24 +69,36 @@ type CachedDomain struct {
 	Name string
 }
 
-//WrapProviderClient constructs a new ProviderClient instance.
-func WrapProviderClient(provider *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*ProviderClient, error) {
-	keystoneV3, err := openstack.NewIdentityV3(provider, eo)
+//NewProviderClient constructs a new ProviderClient instance.
+func NewProviderClient(ao gophercloud.AuthOptions, eo gophercloud.EndpointOpts) (ProviderClient, error) {
+	pc, err := openstack.AuthenticatedClient(ao)
 	if err != nil {
 		return nil, err
 	}
-	return &ProviderClient{
-		ProviderClient: provider,
-		KeystoneV3:     keystoneV3,
-		projectCache:   make(map[string]*CachedProject),
-		domainCache:    make(map[string]*CachedDomain),
-		cacheMutex:     new(sync.RWMutex),
+	pc.UserAgent.Prepend("castellum")
+
+	return &providerClientImpl{
+		pc:           pc,
+		ao:           ao,
+		eo:           eo,
+		projectCache: make(map[string]*CachedProject),
+		domainCache:  make(map[string]*CachedDomain),
+		cacheMutex:   new(sync.RWMutex),
 	}, nil
 }
 
-//GetProject queries the given project ID in Keystone, unless it is already cached.
-//When the project does not exist, nil is returned instead of an error.
-func (p *ProviderClient) GetProject(projectID string) (*CachedProject, error) {
+//GetProject implements the ProviderClient interface.
+func (p *providerClientImpl) CloudAdminClient(factory ServiceClientFactory) (*gophercloud.ServiceClient, error) {
+	return factory(p.pc, p.eo)
+}
+
+//GetAuthResult implements the ProviderClient interface.
+func (p *providerClientImpl) GetAuthResult() gophercloud.AuthResult {
+	return p.pc.GetAuthResult()
+}
+
+//GetProject implements the ProviderClient interface.
+func (p *providerClientImpl) GetProject(projectID string) (*CachedProject, error) {
 	p.cacheMutex.RLock()
 	result, ok := p.projectCache[projectID]
 	p.cacheMutex.RUnlock()
@@ -79,7 +106,11 @@ func (p *ProviderClient) GetProject(projectID string) (*CachedProject, error) {
 		return result, nil
 	}
 
-	project, err := projects.Get(p.KeystoneV3, projectID).Extract()
+	identityV3, err := p.CloudAdminClient(openstack.NewIdentityV3)
+	if err != nil {
+		return nil, err
+	}
+	project, err := projects.Get(identityV3, projectID).Extract()
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
 			p.cacheMutex.Lock()
@@ -97,9 +128,8 @@ func (p *ProviderClient) GetProject(projectID string) (*CachedProject, error) {
 	return result, nil
 }
 
-//GetDomain queries the given domain ID in Keystone, unless it is already cached.
-//When the project does not exist, nil is returned instead of an error.
-func (p *ProviderClient) GetDomain(domainID string) (*CachedDomain, error) {
+//GetDomain implements the ProviderClient interface.
+func (p *providerClientImpl) GetDomain(domainID string) (*CachedDomain, error) {
 	p.cacheMutex.RLock()
 	result, ok := p.domainCache[domainID]
 	p.cacheMutex.RUnlock()
@@ -107,7 +137,11 @@ func (p *ProviderClient) GetDomain(domainID string) (*CachedDomain, error) {
 		return result, nil
 	}
 
-	domain, err := domains.Get(p.KeystoneV3, domainID).Extract()
+	identityV3, err := p.CloudAdminClient(openstack.NewIdentityV3)
+	if err != nil {
+		return nil, err
+	}
+	domain, err := domains.Get(identityV3, domainID).Extract()
 	if err != nil {
 		if _, ok := err.(gophercloud.ErrDefault404); ok {
 			p.cacheMutex.Lock()

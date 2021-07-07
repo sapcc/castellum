@@ -24,6 +24,7 @@ import (
 	"time"
 
 	policy "github.com/databus23/goslo.policy"
+	"github.com/gophercloud/gophercloud"
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
@@ -91,6 +92,14 @@ func (mv *MockValidator) Enforce(rule string, ctx policy.Context) bool {
 
 //MockProviderClient implements the core.ProviderClientInterface.
 type MockProviderClient struct{}
+
+func (c MockProviderClient) CloudAdminClient(factory core.ServiceClientFactory) (*gophercloud.ServiceClient, error) {
+	panic("CloudAdminClient is not implemented in MockProviderClient")
+}
+
+func (c MockProviderClient) GetAuthResult() gophercloud.AuthResult {
+	panic("GetAuthResult is not implemented in MockProviderClient")
+}
 
 func (c MockProviderClient) GetProject(projectID string) (*core.CachedProject, error) {
 	switch projectID {

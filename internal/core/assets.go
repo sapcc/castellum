@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/gophercloud/gophercloud"
 	"github.com/sapcc/castellum/internal/db"
 )
 
@@ -105,7 +104,7 @@ type AssetManager interface {
 //
 //The supplied ProviderClient should be stored inside the AssetManager instance
 //for later usage. It can also be used to query OpenStack capabilities.
-type AssetManagerFactory func(*ProviderClient, gophercloud.EndpointOpts) (AssetManager, error)
+type AssetManagerFactory func(ProviderClient) (AssetManager, error)
 
 var assetManagerFactories = make(map[string]AssetManagerFactory)
 
@@ -132,7 +131,7 @@ type AssetManagerTeam []AssetManager
 //CreateAssetManagers prepares a set of AssetManager instances for a single run
 //of Castellum. The first argument is the list of IDs of all factories that
 //shall be used to create asset managers.
-func CreateAssetManagers(factoryIDs []string, provider *ProviderClient, eo gophercloud.EndpointOpts) (AssetManagerTeam, error) {
+func CreateAssetManagers(factoryIDs []string, provider ProviderClient) (AssetManagerTeam, error) {
 	team := make(AssetManagerTeam, len(factoryIDs))
 	for idx, factoryID := range factoryIDs {
 		factory, exists := assetManagerFactories[factoryID]
@@ -140,7 +139,7 @@ func CreateAssetManagers(factoryIDs []string, provider *ProviderClient, eo gophe
 			return nil, fmt.Errorf("unknown asset manager: %q", factoryID)
 		}
 		var err error
-		team[idx], err = factory(provider, eo)
+		team[idx], err = factory(provider)
 		if err != nil {
 			return nil, fmt.Errorf("cannot initialize asset manager %q: %s", factoryID, err.Error())
 		}

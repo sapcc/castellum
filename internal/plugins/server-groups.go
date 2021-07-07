@@ -22,7 +22,6 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/gophercloud/gophercloud"
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 )
@@ -30,7 +29,7 @@ import (
 type assetManagerServerGroups struct{}
 
 func init() {
-	core.RegisterAssetManagerFactory("server-groups", func(provider *core.ProviderClient, eo gophercloud.EndpointOpts) (core.AssetManager, error) {
+	core.RegisterAssetManagerFactory("server-groups", func(provider core.ProviderClient) (core.AssetManager, error) {
 		//TODO parse CASTELLUM_SERVERGROUPS_PROMETHEUS_URL
 		//TODO parse CASTELLUM_SERVERGROUPS_LOCAL_ROLES
 		return &assetManagerServerGroups{}, nil

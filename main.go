@@ -92,19 +92,13 @@ func main() {
 		logg.Fatal("cannot find OpenStack credentials: " + err.Error())
 	}
 	ao.AllowReauth = true
-	baseProvider, err := openstack.AuthenticatedClient(*ao)
-	if err != nil {
-		logg.Fatal("cannot connect to OpenStack: " + err.Error())
-	}
-	baseProvider.UserAgent.Prepend("castellum")
-	eo := gophercloud.EndpointOpts{
+	providerClient, err := core.NewProviderClient(*ao, gophercloud.EndpointOpts{
 		//note that empty values are acceptable in both fields
 		Region:       os.Getenv("OS_REGION_NAME"),
 		Availability: gophercloud.Availability(os.Getenv("OS_INTERFACE")),
-	}
-	providerClient, err := core.WrapProviderClient(baseProvider, eo)
+	})
 	if err != nil {
-		logg.Fatal("cannot find Keystone V3 API: " + err.Error())
+		logg.Fatal("cannot connect to OpenStack: " + err.Error())
 	}
 
 	//get HTTP listen address
@@ -116,7 +110,7 @@ func main() {
 	//initialize asset managers
 	team, err := core.CreateAssetManagers(
 		strings.Split(mustGetenv("CASTELLUM_ASSET_MANAGERS"), ","),
-		providerClient, eo,
+		providerClient,
 	)
 	if err != nil {
 		logg.Fatal(err.Error())
@@ -159,7 +153,7 @@ func main() {
 		if len(os.Args) != 2 {
 			usage()
 		}
-		runAPI(&cfg, dbi, team, providerClient, eo, httpListenAddr)
+		runAPI(&cfg, dbi, team, providerClient, httpListenAddr)
 	case "observer":
 		if len(os.Args) != 2 {
 			usage()
@@ -199,12 +193,16 @@ func envOrDefault(key, defaultVal string) string {
 ////////////////////////////////////////////////////////////////////////////////
 // task: API
 
-func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient *core.ProviderClient, eo gophercloud.EndpointOpts, httpListenAddr string) {
+func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
+	identityV3, err := providerClient.CloudAdminClient(openstack.NewIdentityV3)
+	if err != nil {
+		logg.Fatal("cannot find Keystone V3 API: " + err.Error())
+	}
 	tv := gopherpolicy.TokenValidator{
-		IdentityV3: providerClient.KeystoneV3,
+		IdentityV3: identityV3,
 		Cacher:     gopherpolicy.InMemoryCacher(),
 	}
-	err := tv.LoadPolicyFile(mustGetenv("CASTELLUM_OSLO_POLICY_PATH"))
+	err = tv.LoadPolicyFile(mustGetenv("CASTELLUM_OSLO_POLICY_PATH"))
 	if err != nil {
 		logg.Fatal("cannot load oslo.policy: " + err.Error())
 	}
