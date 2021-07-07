@@ -19,12 +19,15 @@
 package core
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/domains"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/roles"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 )
 
 //ProviderClient is an interface for an internal type that wraps
@@ -34,6 +37,10 @@ type ProviderClient interface {
 	//CloudAdminClient returns a service client in the provider client's default scope.
 	//The argument is a function like `openstack.NewIdentityV3`.
 	CloudAdminClient(factory ServiceClientFactory) (*gophercloud.ServiceClient, error)
+	//ProjectScopedClient authenticates into the specified project scope and
+	//returns the ServiceClient identified by the given factory function, such as
+	//`openstack.NewIdentityV3`.
+	ProjectScopedClient(factory ServiceClientFactory, scope ProjectScope) (*gophercloud.ServiceClient, error)
 
 	//GetAuthResult has the same semantics as gophercloud.ProviderClient.GetAuthResult.
 	GetAuthResult() gophercloud.AuthResult
@@ -47,16 +54,25 @@ type ProviderClient interface {
 
 //providerClientImpl is the implementation for the ProviderClient interface.
 type providerClientImpl struct {
-	pc           *gophercloud.ProviderClient
-	ao           gophercloud.AuthOptions
-	eo           gophercloud.EndpointOpts
-	projectCache map[string]*CachedProject //key = UUID, nil value = project does not exist
-	domainCache  map[string]*CachedDomain  //key = UUID, nil value = domain does not exist
-	cacheMutex   *sync.RWMutex
+	pc            *gophercloud.ProviderClient
+	ao            gophercloud.AuthOptions
+	eo            gophercloud.EndpointOpts
+	roleIDForName map[string]string
+	projectCache  map[string]*CachedProject //key = UUID, nil value = project does not exist
+	domainCache   map[string]*CachedDomain  //key = UUID, nil value = domain does not exist
+	cacheMutex    *sync.RWMutex
 }
 
 //ServiceClientFactory is a typedef that appears in type ProviderClient.
 type ServiceClientFactory func(*gophercloud.ProviderClient, gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error)
+
+//ProjectScope defines the scope into which ProviderClient.ProjectScopedClient() will authenticate.
+type ProjectScope struct {
+	//The ID of the project to scope into.
+	ID string
+	//Before scoping into the project, assign these roles to ourselves.
+	RoleNames []string
+}
 
 //CachedProject contains cached information about a Keystone project.
 type CachedProject struct {
@@ -77,19 +93,111 @@ func NewProviderClient(ao gophercloud.AuthOptions, eo gophercloud.EndpointOpts) 
 	}
 	pc.UserAgent.Prepend("castellum")
 
+	//list all roles and remember the name -> ID mapping
+	identityV3, err := openstack.NewIdentityV3(pc, eo)
+	if err != nil {
+		return nil, err
+	}
+	page, err := roles.List(identityV3, roles.ListOpts{}).AllPages()
+	if err != nil {
+		return nil, err
+	}
+	allRoles, err := roles.ExtractRoles(page)
+	if err != nil {
+		return nil, err
+	}
+	roleIDForName := make(map[string]string, len(allRoles))
+	for _, role := range allRoles {
+		roleIDForName[role.Name] = role.ID
+	}
+
 	return &providerClientImpl{
-		pc:           pc,
-		ao:           ao,
-		eo:           eo,
-		projectCache: make(map[string]*CachedProject),
-		domainCache:  make(map[string]*CachedDomain),
-		cacheMutex:   new(sync.RWMutex),
+		pc:            pc,
+		ao:            ao,
+		eo:            eo,
+		roleIDForName: roleIDForName,
+		projectCache:  make(map[string]*CachedProject),
+		domainCache:   make(map[string]*CachedDomain),
+		cacheMutex:    new(sync.RWMutex),
 	}, nil
 }
 
-//GetProject implements the ProviderClient interface.
+//CloudAdminClient implements the ProviderClient interface.
 func (p *providerClientImpl) CloudAdminClient(factory ServiceClientFactory) (*gophercloud.ServiceClient, error) {
 	return factory(p.pc, p.eo)
+}
+
+//ProjectScopedClient implements the ProviderClient interface.
+func (p *providerClientImpl) ProjectScopedClient(factory ServiceClientFactory, scope ProjectScope) (*gophercloud.ServiceClient, error) {
+	return p.projectScopedClientImpl(factory, scope, true)
+}
+
+func (p *providerClientImpl) projectScopedClientImpl(factory ServiceClientFactory, scope ProjectScope, firstPass bool) (*gophercloud.ServiceClient, error) {
+	//auth into the target project
+	ao := p.ao
+	ao.Scope = &gophercloud.AuthScope{ProjectID: scope.ID}
+	pc, err := openstack.AuthenticatedClient(ao)
+	if err != nil {
+		return nil, fmt.Errorf("cannot authenticate into project %s: %w", scope.ID, err)
+	}
+	pc.UserAgent.Prepend("castellum")
+
+	//check that we have all required roles
+	if len(scope.RoleNames) == 0 {
+		//no checks to perform
+		return factory(pc, p.eo)
+	}
+	result, ok := pc.GetAuthResult().(tokens.CreateResult)
+	if !ok {
+		return nil, fmt.Errorf("unknown type for AuthResult: %T", p.pc.GetAuthResult())
+	}
+	assignedRoles, err := result.ExtractRoles()
+	if err != nil {
+		return nil, fmt.Errorf("cannot get role assignments for project scope: %w", err)
+	}
+	isRequestedRole := make(map[string]bool)
+	for _, roleName := range scope.RoleNames {
+		isRequestedRole[roleName] = true
+	}
+	for _, role := range assignedRoles {
+		delete(isRequestedRole, role.Name)
+	}
+	if len(isRequestedRole) == 0 {
+		//all required roles are assigned
+		return factory(pc, p.eo)
+	}
+
+	//not all roles present -> try at most once to assign missing roles
+	//(this check prevents an infinite loop in case of unforeseen problems)
+	if !firstPass {
+		return nil, fmt.Errorf("some roles in project %s are still missing despite successful assignment: %v",
+			scope.ID, isRequestedRole)
+	}
+	user, err := result.ExtractUser()
+	if err != nil {
+		return nil, fmt.Errorf("cannot get own user ID: %w", err)
+	}
+	identityV3, err := p.CloudAdminClient(openstack.NewIdentityV3)
+	if err != nil {
+		return nil, err
+	}
+	for roleName := range isRequestedRole {
+		roleID := p.roleIDForName[roleName]
+		if roleID == "" {
+			return nil, fmt.Errorf("no such role: %s", roleName)
+		}
+		opts := roles.AssignOpts{
+			UserID:    user.ID,
+			ProjectID: scope.ID,
+		}
+		err := roles.Assign(identityV3, roleID, opts).ExtractErr()
+		if err != nil {
+			return nil, fmt.Errorf("could not assign role %s in project %s: %w", roleName, scope.ID, err)
+		}
+	}
+
+	//restart call to reauthenticate and obtain the new role assignments
+	return p.projectScopedClientImpl(factory, scope, false)
 }
 
 //GetAuthResult implements the ProviderClient interface.

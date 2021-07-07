@@ -97,6 +97,10 @@ func (c MockProviderClient) CloudAdminClient(factory core.ServiceClientFactory) 
 	panic("CloudAdminClient is not implemented in MockProviderClient")
 }
 
+func (c MockProviderClient) ProjectScopedClient(factory core.ServiceClientFactory, scope core.ProjectScope) (*gophercloud.ServiceClient, error) {
+	panic("ProjectScopedClient is not implemented in MockProviderClient")
+}
+
 func (c MockProviderClient) GetAuthResult() gophercloud.AuthResult {
 	panic("GetAuthResult is not implemented in MockProviderClient")
 }
