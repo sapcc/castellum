@@ -57,7 +57,7 @@ import (
 
 func usage() {
 	fmt.Fprintf(os.Stderr,
-		"usage:\n\t%s [api|observer|worker]\n\t%s test-asset-type <type>\n",
+		"usage:\n\t%s [api|observer|worker]\n\t%s test-asset-type <type> [<resource-config-json>]\n",
 		os.Args[0], os.Args[0],
 	)
 	os.Exit(1)
@@ -178,10 +178,14 @@ func main() {
 		}
 		runWorker(dbi, team, httpListenAddr)
 	case "test-asset-type":
-		if len(os.Args) != 3 {
+		if len(os.Args) != 3 && len(os.Args) != 4 {
 			usage()
 		}
-		runAssetTypeTestShell(dbi, team, db.AssetType(os.Args[2]))
+		configJSON := ""
+		if len(os.Args) == 4 {
+			configJSON = os.Args[3]
+		}
+		runAssetTypeTestShell(dbi, team, db.AssetType(os.Args[2]), configJSON)
 	default:
 		usage()
 	}
@@ -368,7 +372,7 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 ////////////////////////////////////////////////////////////////////////////////
 // task: test-asset-type
 
-func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetType db.AssetType) {
+func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetType db.AssetType, configJSON string) {
 	manager, _ := team.ForAssetType(assetType)
 	if manager == nil {
 		logg.Fatal("no manager configured for asset type: %q", assetType)
@@ -402,6 +406,12 @@ PROMPT:
 		if len(fields) > 1 {
 			res.AssetType = assetType
 			res.ScopeUUID = fields[1]
+			res.ConfigJSON = configJSON
+			err := manager.CheckResourceAllowed(res.AssetType, res.ScopeUUID, res.ConfigJSON)
+			if err != nil {
+				logg.Error("CheckResourceAllowed failed: " + err.Error())
+				continue
+			}
 		}
 
 		switch fields[0] {
