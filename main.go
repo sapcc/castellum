@@ -22,6 +22,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"fmt"
 	"io"
@@ -64,6 +65,18 @@ func usage() {
 
 func main() {
 	logg.ShowDebug, _ = strconv.ParseBool(os.Getenv("CASTELLUM_DEBUG"))
+
+	//The CASTELLUM_INSECURE flag can be used to get Castellum to work through
+	//mitmproxy (which is very useful for development and debugging). (It's very
+	//important that this is not the standard "CASTELLUM_DEBUG" variable. That one
+	//is meant to be useful for production systems, where you definitely don't
+	//want to turn off certificate verification.)
+	if insecure, _ := strconv.ParseBool(os.Getenv("CASTELLUM_INSECURE")); insecure {
+		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+		http.DefaultClient.Transport = http.DefaultTransport
+	}
 
 	//initialize DB connection
 	dbUsername := envOrDefault("CASTELLUM_DB_USERNAME", "postgres")
