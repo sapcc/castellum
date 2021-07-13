@@ -31,8 +31,9 @@ githubWorkflows:
 
 verbatim: |
   # convenience targets for developers: `make run-api/run-collector/run-worker/test-asset-type-*`
-  # runs one of the components, with environment options sourced from $PWD/.env
+  # runs one of the components, with environment options sourced from $PWD/.env; and resource
+  # configuration optionally sourced from $PWD/test-config-$ASSET_TYPE.json
   run-%: build/castellum
     set -euo pipefail && source ./.env && ./build/castellum $*
   test-asset-type-%: build/castellum
-    set -euo pipefail && source ./.env && ./build/castellum test-asset-type $*
+    set -euo pipefail && source ./.env && ./build/castellum test-asset-type $* "$$(test -f "test-config-$*.json" && cat "test-config-$*.json")"
