@@ -464,7 +464,10 @@ PROMPT:
 				logg.Error(err.Error())
 				continue
 			}
-			logg.Info("size = %d, usage = %g", result.Size, result.Usage)
+			logg.Info("size = %d", result.Size)
+			for metric, value := range result.Usage {
+				logg.Info("usage[%s] = %g", metric, value)
+			}
 
 		case "resize":
 			if len(fields) != 5 {
