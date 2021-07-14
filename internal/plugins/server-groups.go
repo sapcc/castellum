@@ -57,6 +57,15 @@ const (
 	ServerPollInterval = 10 * time.Second
 )
 
+//NOTE 1: The `virtualmachine` labels look like `$NAME ($ID)` or just `$ID`, the
+//latter without parentheses around the ID.
+//
+//NOTE 2: These queries return fractional values in the range 0..1, NOT percentages in the range 0..100.
+var serverUsageQueries = map[db.UsageMetric]string{
+	"cpu": `vrops_virtualmachine_cpu_usage_ratio{virtualmachine=~".*${ID}.*"} / 100`,
+	"ram": `vrops_virtualmachine_memory_consumed_kilobytes{virtualmachine=~".*${ID}.*"} / vrops_virtualmachine_memory_kilobytes{virtualmachine=~".*${ID}.*"}`,
+}
+
 type assetManagerServerGroups struct {
 	Provider       core.ProviderClient
 	Prometheus     prom_v1.API
@@ -127,9 +136,62 @@ func (m *assetManagerServerGroups) ListAssets(res db.Resource) ([]string, error)
 
 //GetAssetStatus implements the core.AssetManager interface.
 func (m *assetManagerServerGroups) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
-	//TODO check instance status, fail loudly if any have status ERROR
-	//TODO get usage values
-	return core.AssetStatus{}, errors.New("unimplemented")
+	computeV2, err := m.Provider.CloudAdminClient(openstack.NewComputeV2)
+	if err != nil {
+		return core.AssetStatus{}, err
+	}
+
+	groupID := strings.TrimPrefix(string(res.AssetType), "server-group:")
+	group, err := m.getServerGroup(groupID)
+	if err != nil {
+		return core.AssetStatus{}, fmt.Errorf("cannot GET server group: %w", err)
+	}
+
+	//check instance status
+	isNewServer := make(map[string]bool)
+	for _, serverID := range group.Members {
+		server, err := servers.Get(computeV2, serverID).Extract()
+		if err != nil {
+			return core.AssetStatus{}, fmt.Errorf("cannot inspect server %s: %w", serverID, err)
+		}
+		//if any instance is not in a running state, that's a huge red flag and we
+		//should not attempt any autoscaling until all servers are back into a
+		//running state
+		if server.Status == "ERROR" || server.Status == "SHUTOFF" {
+			return core.AssetStatus{}, fmt.Errorf("server %s is in status %s", serverID, server.Status)
+		}
+		//for new servers, we will be more lenient wrt metric availability
+		if time.Since(server.Created) < 10*time.Minute {
+			isNewServer[server.ID] = true
+		}
+	}
+
+	//get usage values for all servers
+	result := core.AssetStatus{
+		Size:  uint64(len(group.Members)),
+		Usage: make(db.UsageValues),
+	}
+	for metric := range serverUsageQueries {
+		result.Usage[metric] = 0
+	}
+	for _, serverID := range group.Members {
+		for metric, queryTemplate := range serverUsageQueries {
+			queryStr := strings.Replace(queryTemplate, "${ID}", serverID, -1)
+			value, err := prometheusGetSingleValue(m.Prometheus, queryStr)
+			if err != nil {
+				return core.AssetStatus{}, err
+			}
+			if value < 0 {
+				return core.AssetStatus{}, fmt.Errorf("expected value between 0..1, but got negative value from Prometheus query: %s", queryStr)
+			}
+			if value > 1 {
+				return core.AssetStatus{}, fmt.Errorf("expected value between 0..1, but got larger value from Prometheus query: %s", queryStr)
+			}
+			result.Usage[metric] += value
+		}
+	}
+
+	return result, nil
 }
 
 //SetAssetSize implements the core.AssetManager interface.
