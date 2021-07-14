@@ -18,14 +18,22 @@ those annotations.
 
 [limes-doc]: https://github.com/sapcc/limes/blob/master/docs/operators/config.md#resource-behavior
 
-## Required permissions
+## User considerations
+
+### Resource configuration
+
+The Castellum API does not accept any additional configuration for `project-quota:*` resources.
+
+## Operational considerations
+
+### Required permissions
 
 The Castellum service user must be able to:
 
 - retrieve information about any project from Keystone (to find the domain ID for a project), and
 - get/set any project quotas in Limes.
 
-## Policy considerations
+### Policy considerations
 
 - `project:show:project-quota` can be given to everyone who has read access to Limes quotas in the project.
 - `project:edit:project-quota` should only be given to users who can set project quota, i.e. usually only to domain

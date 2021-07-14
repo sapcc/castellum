@@ -13,8 +13,6 @@ This document uses the terminology defined in the [README.md](../README.md#termi
 * [GET /v1/projects/:id](#get-v1projectsid)
   * [Stepping strategies](#stepping-strategies)
   * [Multi-usage resources](#multi-usage-resources)
-  * [Asset-type-specific configuration](#asset-type-specific-configuration)
-    * [server-group:\*](#server-group)
 * [GET /v1/projects/:id/resources/:type](#get-v1projectsidresourcestype)
 * [PUT /v1/projects/:id/resources/:type](#put-v1projectsidresourcestype)
 * [DELETE /v1/projects/:id/resources/:type](#delete-v1projectsidresourcestype)
@@ -79,7 +77,7 @@ The following fields may be returned:
 | `resources.$type.checked.at` | timestamp | *Readonly.* When Castellum last _tried_ to scan this resource for new assets or deleted assets. Only shown when different from `scraped_at`, i.e. when the last check failed. |
 | `resources.$type.checked.error` | string | *Readonly.* When the last check failed (see above), this field contains the error message that was returned from the backend. |
 | `resources.$type.asset_count` | integer | *Readonly.* The number of assets in this resource. |
-| `resources.$type.config` | object or null | Type-specific configuration for this resource. Most resources don't take configuration here, in which case this field will be missing. If a resource accepts or requires configuration, [see below](#asset-type-specific-configuration) for the exact format. |
+| `resources.$type.config` | object or null | Type-specific configuration for this resource. Most resources don't take configuration here, in which case this field will be missing. Refer to the [asset manager's documentation](asset-managers/) for whether a resource accepts or requires configuration. |
 | `resources.$type.low_threshold`<br>`resources.$type.high_threshold`<br>`resources.$type.critical_threshold` | object | Configuration for thresholds that trigger an automated resize operation. Any of these may be missing if the threshold in question has not been enabled. |
 | `resources.$type.low_threshold.usage_percent`<br>`resources.$type.high_threshold.usage_percent`<br>`resources.$type.critical_threshold.usage_percent` | [float or object](#multi-usage-resources) | Automated operations will be triggered when usage crosses these thresholds, i.e. `usage <= threshold` for the low threshold and `usage >= threshold` for the high and critical thresholds. |
 | `resources.$type.low_threshold.delay_seconds`<br>`resources.$type.high_threshold.delay_seconds` | integer | How long usage must cross the threshold before the operation is confirmed. Critical operations don't have a delay; they are always confirmed immediately. |
@@ -118,27 +116,6 @@ Most resources only have a single usage metric, so all fields called `usage_perc
 ```
 
 This is why `usage_percent` fields are listed throughout this spec with a data type of "float or object".
-
-### Asset-type-specific configuration
-
-Resources with an asset type of `nfs-shares` or `project-quota:*` do not take configuration, so the `config` key will always be absent in GET operations, and providing the `config` key in PUT operations is an error.
-
-#### server-group:\*
-
-Resources with an asset type of `server-group:*` present (in GET) and expect (in PUT) the following configuration at `resources.$type.config`:
-
-| Field | Type | Explanation |
-| ----- | ---- | ----------- |
-| `template.availability_zone` | string | If not empty, new instances will be created in this availability zone. |
-| `template.flavor.name` | string<br>*(required)* | The name of the flavor that will be used for new instances. |
-| `template.image.name` | string<br>*(required)* | The name of the image that new instances will be booted with. |
-| `template.metadata` | object of strings | Metadata key and value pairs that will be provided to new instances. The maximum size of keys and values is 255 bytes each. |
-| `template.networks` | array of objects<br>*(required)* | Which networks the new instances will be connected to. |
-| `template.networks[].uuid` | string<br>*(required)* | The ID of the network. |
-| `template.networks[].tag` | string | A device role tag that can be applied to a network interface. The guest OS of a server that has devices tagged in this manner can access hardware metadata about the tagged devices from the metadata API and on the config drive, if enabled. |
-| `template.public_key.barbican_uuid` | string<br>*(required)* | A UUID under which an SSH public key is stored in Barbican. This public key will be used when booting new instances. |
-| `template.security_groups` | array of strings<br>*(required)* | New instances will be created in these security groups. |
-| `template.user_data` | string | Configuration information or scripts to use when booting new instances. The maximum size is 65535 bytes. |
 
 ## GET /v1/projects/:id/resources/:type
 
@@ -239,7 +216,7 @@ For each asset, the following fields may be returned:
 | Field | Type | Explanation |
 | ----- | ---- | ----------- |
 | `id` | string | UUID of asset. |
-| `size` | integer | Size of asset. The unit depends on the asset type. See [README.md](../README.md#supported-asset-types) for more information. |
+| `size` | integer | Size of asset. The unit depends on the asset type. Refer to the [asset managers' documentation](asset-managers/) for more information. |
 | `usage_percent` | [float or object](#multi-usage-resources) | Usage of asset as percentage of size. When the asset has multiple usage types (e.g. instances have both CPU usage and RAM usage), usually the higher value is reported here. |
 | `scraped_at` | timestamp | When the size and usage of the asset was last retrieved by Castellum. |
 | `checked.at` | timestamp | When Castellum last tried to retrieve the size and usage of the asset. Only shown when different from `scraped_at`, i.e. when the last check failed. |
