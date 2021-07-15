@@ -179,7 +179,15 @@ func (m *assetManagerServerGroups) GetAssetStatus(res db.Resource, assetUUID str
 			queryStr := strings.Replace(queryTemplate, "${ID}", serverID, -1)
 			value, err := prometheusGetSingleValue(m.Prometheus, queryStr)
 			if err != nil {
-				return core.AssetStatus{}, err
+				if _, ok := err.(emptyPrometheusResultErr); ok && isNewServer[serverID] {
+					//within a few minutes of instance creation, it's not a hard error if
+					//the vrops metric has not showed up in Prometheus yet; we'll just
+					//assume zero usage for now, which should be okay since downscaling
+					//usually has a delay of way more than those few minutes
+					value = 0
+				} else {
+					return core.AssetStatus{}, err
+				}
 			}
 			if value < 0 {
 				return core.AssetStatus{}, fmt.Errorf("expected value between 0..1, but got negative value from Prometheus query: %s", queryStr)
