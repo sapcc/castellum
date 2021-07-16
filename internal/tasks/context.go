@@ -52,7 +52,7 @@ func (c *Context) ApplyDefaults() {
 //to signal to the caller to slow down the polling.
 type JobPoller func() (Job, error)
 
-//Job is a job that can be transfered to a worker goroutine to be executed
+//Job is a job that can be transferred to a worker goroutine to be executed
 //there.
 type Job interface {
 	Execute() error
