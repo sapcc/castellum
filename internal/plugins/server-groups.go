@@ -339,10 +339,7 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 	//build creation request template
 	var networkOpts []servers.Network
 	for _, net := range cfg.Template.Networks {
-		if net.Tag != "" {
-			return db.OperationOutcomeErrored, errors.New("network tags are not supported in Gophercloud") //TODO
-		}
-		networkOpts = append(networkOpts, servers.Network{UUID: net.UUID})
+		networkOpts = append(networkOpts, servers.Network{UUID: net.UUID, Tag: net.Tag})
 	}
 	opts := func(name string) servers.CreateOptsBuilder {
 		opts1 := servers.CreateOpts{
@@ -596,7 +593,7 @@ func (m *assetManagerServerGroups) resolveFlavorIntoID(computeV2 *gophercloud.Se
 func (m *assetManagerServerGroups) pullKeypairFromBarbican(computeV2, keymgrV1 *gophercloud.ServiceClient, secretID string) (string, error) {
 	//check if present in Nova already
 	nameInNova := fmt.Sprintf("from-barbican-%s", secretID)
-	_, err := keypairs.Get(computeV2, nameInNova).Extract()
+	_, err := keypairs.Get(computeV2, nameInNova, nil).Extract()
 	switch err.(type) {
 	case nil:
 		//keypair exists -> nothing to do

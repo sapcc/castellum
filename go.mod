@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/databus23/goslo.policy v0.0.0-20170317131957-3ae74dd07ebf
 	github.com/dlmiddlecote/sqlstats v1.0.2
-	github.com/gophercloud/gophercloud v0.17.0
+	github.com/gophercloud/gophercloud v0.18.1-0.20210715174239-2509091608e7
 	github.com/gophercloud/utils v0.0.0-20210323225332-7b186010c04f
 	github.com/gorilla/mux v1.8.0
 	github.com/majewsky/sqlproxy v0.0.0-20190524080451-ba724456c4af
