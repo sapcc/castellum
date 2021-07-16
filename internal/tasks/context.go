@@ -44,3 +44,27 @@ type Context struct {
 func (c *Context) ApplyDefaults() {
 	c.TimeNow = time.Now
 }
+
+//JobPoller is a function, usually a member function of type Context, that can
+//be called repeatedly to obtain Job instances.
+//
+//If there are no jobs to work on right now, sql.ErrNoRows shall be returned
+//to signal to the caller to slow down the polling.
+type JobPoller func() (Job, error)
+
+//Job is a job that can be transfered to a worker goroutine to be executed
+//there.
+type Job interface {
+	Execute() error
+}
+
+//ExecuteOne is used by unit tests to find and execute exactly one instance of
+//the given type of Job. sql.ErrNoRows is returned when there are no jobs of
+//that type waiting.
+func ExecuteOne(p JobPoller) error {
+	j, err := p()
+	if err != nil {
+		return err
+	}
+	return j.Execute()
+}

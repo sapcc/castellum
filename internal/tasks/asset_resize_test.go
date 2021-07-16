@@ -77,9 +77,9 @@ func TestSuccessfulResize(baseT *testing.T) {
 		}
 		t.Must(c.DB.Insert(&pendingOp))
 
-		//ExecuteNextResize() should do nothing right now because that operation is
+		//ExecuteOne(AssetResizeJob{}) should do nothing right now because that operation is
 		//only greenlit in the future, but not right now
-		_, err := c.ExecuteNextResize()
+		err := ExecuteOne(c.PollForAssetResizes)
 		if err != sql.ErrNoRows {
 			t.Fatalf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
@@ -88,7 +88,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 
 		//go into the future and check that the operation gets executed
 		clock.StepBy(10 * time.Minute)
-		_, err = c.ExecuteNextResize()
+		err = ExecuteOne(c.PollForAssetResizes)
 		t.Must(err)
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
@@ -138,8 +138,7 @@ func TestFailingResize(tBase *testing.T) {
 		t.Must(c.DB.Insert(&pendingOp))
 
 		amStatic.SetAssetSizeFails = true
-		_, err := c.ExecuteNextResize()
-		t.Must(err)
+		t.Must(ExecuteOne(c.PollForAssetResizes))
 
 		//check that resizing fails as expected
 		t.ExpectPendingOperations(c.DB /*, nothing */)
@@ -192,8 +191,7 @@ func TestErroringResize(tBase *testing.T) {
 		//when the outcome of the resize is "errored", we can retry several times
 		for try := 0; try < maxRetries; try++ {
 			clock.StepBy(10 * time.Minute)
-			_, err := c.ExecuteNextResize()
-			t.Must(err)
+			t.Must(ExecuteOne(c.PollForAssetResizes))
 
 			pendingOp.ID++
 			pendingOp.ErroredAttempts++
@@ -202,9 +200,9 @@ func TestErroringResize(tBase *testing.T) {
 			t.ExpectFinishedOperations(c.DB /*, nothing */)
 		}
 
-		//ExecuteNextResize() should do nothing right now because, although the
+		//ExecuteOne(AssetResizeJob{}) should do nothing right now because, although the
 		//operation is greenlit, its retry_at timestamp is in the future
-		_, err := c.ExecuteNextResize()
+		err := ExecuteOne(c.PollForAssetResizes)
 		if err != sql.ErrNoRows {
 			t.Fatalf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
@@ -213,8 +211,7 @@ func TestErroringResize(tBase *testing.T) {
 
 		//check that resizing errors as expected once the retry budget is exceeded
 		clock.StepBy(10 * time.Minute)
-		_, err = c.ExecuteNextResize()
-		t.Must(err)
+		t.Must(ExecuteOne(c.PollForAssetResizes))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
 			AssetID:         1,
@@ -279,8 +276,7 @@ func TestOperationQueueBehavior(baseT *testing.T) {
 		for idx := 0; idx < 10; idx++ {
 			go func() {
 				defer wg.Done()
-				_, err := c.ExecuteNextResize()
-				t.Must(err)
+				t.Must(ExecuteOne(c.PollForAssetResizes))
 			}()
 		}
 

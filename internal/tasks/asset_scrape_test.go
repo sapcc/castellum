@@ -33,7 +33,7 @@ func runAssetScrapeTest(t test.T, resourceIsSingleStep bool, action func(*Contex
 	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock) {
 
 		//ScrapeNextAsset() without any resources just does nothing
-		err := c.ScrapeNextAsset(c.TimeNow())
+		err := ExecuteOne(c.PollForAssetScrapes(0))
 		if err != sql.ErrNoRows {
 			t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
@@ -98,7 +98,7 @@ func TestNoOperationWhenNoThreshold(baseT *testing.T) {
 
 		//when no threshold is crossed, no operation gets created
 		clock.StepBy(10 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -118,7 +118,7 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 		//state "created"
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 800})
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		expectedOp := db.PendingOperation{
 			ID:        1,
@@ -138,7 +138,7 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 		//threshold again)
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 820})
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		if res.SingleStep {
 			expectedOp.NewSize = 1026
 		}
@@ -148,7 +148,7 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 		//when the delay is over, the next scrape moves into state "Confirmed/Greenlit"
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 840})
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		expectedOp.ConfirmedAt = p2time(c.TimeNow())
 		expectedOp.GreenlitAt = p2time(c.TimeNow())
 		if res.SingleStep {
@@ -161,7 +161,7 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 		//moment, we should not touch it anymore even if the reason disappears
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 780})
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -176,7 +176,7 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 		//state "created"
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 800})
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:        1,
@@ -192,7 +192,7 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 		//when the reason disappears within the delay, the operation is cancelled
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 790})
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
@@ -222,7 +222,7 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 		//state "created"
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 200})
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		expectedOp := db.PendingOperation{
 			ID:        1,
@@ -242,7 +242,7 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 		//again)
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 180})
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		if res.SingleStep {
 			expectedOp.NewSize = 899
 		}
@@ -252,7 +252,7 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 		//when the delay is over, the next scrape moves into state "Confirmed/Greenlit"
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 160})
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		if res.SingleStep {
 			expectedOp.NewSize = 799
 		}
@@ -265,7 +265,7 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 		//moment, we should not touch it anymore even if the reason disappears
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 220})
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -280,7 +280,7 @@ func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 		//state "created"
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 200})
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:        1,
@@ -296,7 +296,7 @@ func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 		//when the reason disappears within the delay, the operation is cancelled
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 210})
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
@@ -321,7 +321,7 @@ func TestCriticalUpsizeTowardsGreenlight(baseT *testing.T) {
 		//created and immediately confirmed/greenlit
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 950})
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		expectedOp := db.PendingOperation{
 			ID:          1,
@@ -348,7 +348,7 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 		//state "created"
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 900})
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:        1,
@@ -366,7 +366,7 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 		//operation replaces it
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 960})
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:          2,
@@ -451,11 +451,11 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 
 		//this should scrape each asset once, in order
 		clock.StepBy(time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		clock.StepBy(time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		clock.StepBy(time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		//so the asset table should look like this now
 		assets[0].CheckedAt = c.TimeNow().Add(-2 * time.Minute)
@@ -471,11 +471,11 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 
 		//next scrape should work identically
 		clock.StepBy(time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		clock.StepBy(time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		clock.StepBy(time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		assets[0].CheckedAt = c.TimeNow().Add(-2 * time.Minute)
 		assets[1].CheckedAt = c.TimeNow().Add(-time.Minute)
 		assets[2].CheckedAt = c.TimeNow()
@@ -500,7 +500,7 @@ func TestNoOperationWhenNoSizeChange(baseT *testing.T) {
 		//just nothing to resize to
 		clock.StepBy(5 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1, Usage: 0})
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 
 	})
@@ -533,7 +533,7 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 		//any operations (even though it could because of the currently high usage)
 		//because the backend does not yet reflect the changed size
 		clock.StepBy(5 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		asset.CheckedAt = c.TimeNow()
 		asset.ScrapedAt = p2time(c.TimeNow())
@@ -545,7 +545,7 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 		//it will also create an operation because the usage is still above 80% after
 		//the resize
 		clock.StepBy(5 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		asset.Size = 1100
 		asset.Usage = db.UsageValues{db.SingularUsageMetric: 1000}
@@ -583,7 +583,7 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
 		})
 
 		clock.StepBy(5 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectAssets(c.DB, db.Asset{
 			ID:           1,
 			ResourceID:   1,
@@ -615,7 +615,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 		})
 
 		clock.StepBy(5 * time.Minute)
-		err := c.ScrapeNextAsset(c.TimeNow())
+		err := ExecuteOne(c.PollForAssetScrapes(0))
 		expectedMsg := "cannot query status of foo asset1: GetAssetStatus failing as requested"
 		if err == nil {
 			t.Error("ScrapeNextAsset should have failed here")
@@ -639,7 +639,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 		//the error field
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 600})
 		clock.StepBy(5 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		t.ExpectAssets(c.DB, db.Asset{
 			ID:                 1,
@@ -658,7 +658,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 		//ScrapeNextAsset should delete the asset from the db.
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 600, CannotFindAsset: true})
 		clock.StepBy(5 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectAssets(c.DB)
 
 	})
@@ -677,7 +677,7 @@ func TestSkipDownsizeBecauseOfMinimumSize(baseT *testing.T) {
 		//ScrapeNextAsset should *not* create a downsize operation because the
 		//minimum size would be crossed
 		clock.StepBy(5 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -697,7 +697,7 @@ func TestRestrictDownsizeBecauseOfMinimumSize(baseT *testing.T) {
 		//ScrapeNextAsset should create a downsize operation with new size 900,
 		//even though percentage-step resizing would like to go to 800
 		clock.StepBy(5 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
@@ -725,7 +725,7 @@ func TestSkipUpsizeBecauseOfMaximumSize(baseT *testing.T) {
 		//ScrapeNextAsset should *not* create any operations because the
 		//maximum size would be crossed
 		clock.StepBy(5 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -746,7 +746,7 @@ func TestRestrictUpsizeBecauseOfMaximumSize(baseT *testing.T) {
 		//stepping strategy, the desired target size is greater than the max_size,
 		//so the max_size is chosen instead.
 		clock.StepBy(5 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:          1,
 			AssetID:     1,
@@ -770,7 +770,7 @@ func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 		//create a "High" operation
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 900})
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		expectedOp := db.PendingOperation{
 			ID:        1,
@@ -788,7 +788,7 @@ func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 		//being performed by an unrelated user
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1100, Usage: 900}) // bigger, but still >80% usage
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		//ScrapeNextAsset should have adjusted the NewSize to CurrentSize + SizeStep
 		expectedOp.NewSize = ifthenelseU64(res.SingleStep, 1126, 1320)
@@ -811,7 +811,7 @@ func TestDownsizeAllowedByMinimumFreeSize(baseT *testing.T) {
 
 		//ScrapeNextAsset should create a downsize operation
 		clock.StepBy(10 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
@@ -839,7 +839,7 @@ func TestDownsizeRestrictedByMinimumFreeSize(baseT *testing.T) {
 
 		//ScrapeNextAsset should NOT create a downsize operation
 		clock.StepBy(10 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
@@ -865,7 +865,7 @@ func TestDownsizeForbiddenByMinimumFreeSize(baseT *testing.T) {
 
 		//ScrapeNextAsset should NOT create a downsize operation
 		clock.StepBy(10 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 
 	})
@@ -882,7 +882,7 @@ func TestUpsizeForcedByMinimumFreeSize(baseT *testing.T) {
 
 		//ScrapeNextAsset should therefore create an upsize operation
 		clock.StepBy(10 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
@@ -898,7 +898,7 @@ func TestUpsizeForcedByMinimumFreeSize(baseT *testing.T) {
 
 		//ScrapeNextAsset should cancel the operation
 		clock.StepBy(10 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 
 	})
@@ -927,7 +927,7 @@ func TestCriticalUpsizeTakingMultipleStepsAtOnce(baseT *testing.T) {
 		//A size of 1420 would lead to 95% usage (or rather, 95.07%) which is still
 		//above the critical threshold.
 		clock.StepBy(10 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:          1,
@@ -956,7 +956,7 @@ func TestZeroSizedAssetWithoutUsage(baseT *testing.T) {
 		setAsset(plugins.StaticAsset{Size: 0, Usage: 0})
 
 		clock.StepBy(10 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		t.ExpectAssets(c.DB, db.Asset{
 			ID:           1,
@@ -983,7 +983,7 @@ func TestZeroSizedAssetWithUsage(baseT *testing.T) {
 		setAsset(plugins.StaticAsset{Size: 0, Usage: 5})
 
 		clock.StepBy(10 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		t.ExpectAssets(c.DB, db.Asset{
 			ID:             1,
@@ -1022,7 +1022,7 @@ func TestDownsizeShouldNotGoIntoHighThreshold(baseT *testing.T) {
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 700})
 
 		clock.StepBy(10 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:      1,
@@ -1050,7 +1050,7 @@ func TestDownsizeShouldNotGoIntoCriticalThreshold(baseT *testing.T) {
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 800})
 
 		clock.StepBy(10 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:      1,
@@ -1079,7 +1079,7 @@ func TestUpsizeShouldNotGoIntoHighThreshold(baseT *testing.T) {
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 230})
 
 		clock.StepBy(10 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:      1,
@@ -1116,7 +1116,7 @@ func TestResizesEndingUpInLowThreshold(baseT *testing.T) {
 		//we are now below the low threshold, but no downsize should be generated
 		//because downizing would put us above the high and critical thresholds
 		clock.StepBy(10 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -1126,7 +1126,7 @@ func TestResizesEndingUpInLowThreshold(baseT *testing.T) {
 		//small
 		setAsset(plugins.StaticAsset{Size: 14, Usage: 14})
 		clock.StepBy(10 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:          1,
 			AssetID:     1,
@@ -1158,7 +1158,7 @@ func TestUpsizeBecauseOfMinFreeSizePassingLowThreshold(baseT *testing.T) {
 		}
 
 		clock.StepBy(10 * time.Minute)
-		t.Must(c.ScrapeNextAsset(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:        1,

@@ -33,7 +33,7 @@ func TestResourceScraping(baseT *testing.T) {
 	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock) {
 
 		//ScrapeNextResource() without any resources just does nothing
-		err := c.ScrapeNextResource(c.TimeNow())
+		err := ExecuteOne(c.PollForResourceScrapes(0))
 		if err != sql.ErrNoRows {
 			t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
@@ -75,7 +75,7 @@ func TestResourceScraping(baseT *testing.T) {
 
 		//first ScrapeNextResource() should scrape project1/foo
 		clock.Step()
-		t.Must(c.ScrapeNextResource(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForResourceScrapes(0)))
 		tr.DBChanges().AssertEqualf(`
 				INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage, critical_usages) VALUES (1, 1, 'asset1', 1000, %[1]d, NULL, %[1]d, '', '{"singular":400}', '');
 				INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage, critical_usages) VALUES (2, 1, 'asset2', 2000, %[1]d, NULL, %[1]d, '', '{"singular":1000}', '');
@@ -87,7 +87,7 @@ func TestResourceScraping(baseT *testing.T) {
 		//first ScrapeNextResource() should scrape project3/foo
 		//(NOT project2 because its resource has a different asset type)
 		clock.Step()
-		t.Must(c.ScrapeNextResource(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForResourceScrapes(0)))
 		tr.DBChanges().AssertEqualf(`
 				INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage, critical_usages) VALUES (3, 2, 'asset5', 5000, %[1]d, NULL, %[1]d, '', '{"singular":2500}', '');
 				INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage, critical_usages) VALUES (4, 2, 'asset6', 6000, %[1]d, NULL, %[1]d, '', '{"singular":2520}', '');
@@ -100,7 +100,7 @@ func TestResourceScraping(baseT *testing.T) {
 		//scraped_at timestamp is the smallest; there should be no changes except for
 		//resources.scraped_at and resource.checked_at
 		clock.Step()
-		t.Must(c.ScrapeNextResource(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForResourceScrapes(0)))
 		tr.DBChanges().AssertEqualf(`
 				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 			`,
@@ -110,7 +110,7 @@ func TestResourceScraping(baseT *testing.T) {
 		//simulate deletion of an asset
 		delete(amStatic.Assets["project3"], "asset6")
 		clock.Step()
-		t.Must(c.ScrapeNextResource(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForResourceScrapes(0)))
 		tr.DBChanges().AssertEqualf(`
 				DELETE FROM assets WHERE id = 4 AND resource_id = 2 AND uuid = 'asset6';
 				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d WHERE id = 2 AND scope_uuid = 'project3' AND asset_type = 'foo';
@@ -121,7 +121,7 @@ func TestResourceScraping(baseT *testing.T) {
 		//simulate addition of a new asset
 		amStatic.Assets["project1"]["asset7"] = plugins.StaticAsset{Size: 10, Usage: 3}
 		clock.Step()
-		t.Must(c.ScrapeNextResource(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForResourceScrapes(0)))
 		tr.DBChanges().AssertEqualf(`
 				INSERT INTO assets (id, resource_id, uuid, size, scraped_at, expected_size, checked_at, scrape_error_message, usage, critical_usages) VALUES (5, 1, 'asset7', 10, %[1]d, NULL, %[1]d, '', '{"singular":3}', '');
 				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
@@ -138,7 +138,7 @@ func TestResourceScraping(baseT *testing.T) {
 		}))
 		amStatic.Assets["project2"] = nil
 		clock.Step()
-		t.Must(c.ScrapeNextResource(c.TimeNow()))
+		t.Must(ExecuteOne(c.PollForResourceScrapes(0)))
 		tr.DBChanges().AssertEqualf(`
 				INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_size, max_size, min_free_size, single_step, domain_uuid, checked_at, scrape_error_message, config_json) VALUES (3, 'project2', 'foo', %[1]d, '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":0}', 0, NULL, NULL, NULL, FALSE, 'domain1', %[1]d, '', '');
 			`,

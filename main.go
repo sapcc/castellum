@@ -284,6 +284,8 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 // task: observer
 
 func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
+	ctx := httpee.ContextWithSIGINT(context.Background(), 1*time.Second)
+
 	c := tasks.Context{DB: dbi, Team: team}
 	c.ApplyDefaults()
 	prometheus.MustRegister(tasks.StateMetricsCollector{Context: c})
@@ -291,16 +293,8 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	//The observer process has a budget of 16 DB connections. Since there are
 	//much more assets than resources, we give most of these (12 of 16) to asset
 	//scraping. The rest is split between resource scrape and garbage collection.
-	for idx := 0; idx < 12; idx++ {
-		go queuedJobLoop(func() error {
-			return c.ScrapeNextAsset(time.Now().Add(-5 * time.Minute))
-		})
-	}
-	for idx := 0; idx < 3; idx++ {
-		go queuedJobLoop(func() error {
-			return c.ScrapeNextResource(time.Now().Add(-30 * time.Minute))
-		})
-	}
+	goQueuedJobLoop(ctx, 12, c.PollForAssetScrapes(5*time.Minute))
+	goQueuedJobLoop(ctx, 3, c.PollForResourceScrapes(30*time.Minute))
 	go cronJobLoop(3*time.Minute, c.EnsureScrapingCounters)
 	go cronJobLoop(1*time.Hour, func() error {
 		return tasks.CollectGarbage(dbi, time.Now().Add(-14*24*time.Hour)) //14 days
@@ -310,7 +304,7 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/healthcheck", http.HandlerFunc(healthCheckHandler))
 	logg.Info("listening on " + httpListenAddr)
-	err := httpee.ListenAndServeContext(httpee.ContextWithSIGINT(context.Background(), 10*time.Second), httpListenAddr, nil)
+	err := httpee.ListenAndServeContext(ctx, httpListenAddr, nil)
 	if err != nil {
 		logg.Error(err.Error())
 	}
@@ -319,18 +313,41 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 //Execute a task repeatedly, but slow down when sql.ErrNoRows is returned by it.
 //(Tasks use this error value to indicate that nothing needs scraping, so we
 //can back off a bit to avoid useless database load.)
-func queuedJobLoop(task func() error) {
-	for {
-		err := task()
-		switch err {
-		case nil:
-			//nothing to do here
-		case sql.ErrNoRows:
-			//nothing to do right now - slow down a bit to avoid useless DB load
-			time.Sleep(10 * time.Second)
-		default:
-			logg.Error(err.Error())
+func goQueuedJobLoop(ctx context.Context, numGoroutines int, poll tasks.JobPoller) {
+	ch := make(chan tasks.Job) //unbuffered!
+
+	//one goroutine to select tasks from the DB
+	go func(ch chan<- tasks.Job) {
+		for ctx.Err() == nil {
+			job, err := poll()
+			switch err {
+			case nil:
+				ch <- job
+			case sql.ErrNoRows:
+				//no jobs waiting right now - slow down a bit to avoid useless DB load
+				time.Sleep(3 * time.Second)
+			default:
+				logg.Error(err.Error())
+			}
 		}
+
+		//`ctx` has expired -> tell workers to shutdown
+		close(ch)
+	}(ch)
+
+	//multiple goroutines to execute tasks
+	//
+	//We use `numGoroutines-1` here since we already have spawned one goroutine
+	//for the polling above.
+	for i := 0; i < numGoroutines-1; i++ {
+		go func(ch <-chan tasks.Job) {
+			for job := range ch {
+				err := job.Execute()
+				if err != nil {
+					logg.Error(err.Error())
+				}
+			}
+		}(ch)
 	}
 }
 
@@ -350,20 +367,22 @@ func cronJobLoop(interval time.Duration, task func() error) {
 // task: worker
 
 func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
+	ctx := httpee.ContextWithSIGINT(context.Background(), 1*time.Second)
+
 	c := tasks.Context{DB: dbi, Team: team}
 	c.ApplyDefaults()
 
-	go queuedJobLoop(func() error {
-		_, err := c.ExecuteNextResize()
-		return err
-	})
+	//The worker process has a budget of 16 DB connections. We need one of that
+	//for polling, the rest can go towards resizing workers. Therefore, 12 resize
+	//workers is a safe number that even leaves some headroom for future tasks.
+	goQueuedJobLoop(ctx, 12, c.PollForAssetResizes)
 	go cronJobLoop(3*time.Minute, c.EnsureResizingCounters)
 
 	//use main goroutine to emit Prometheus metrics
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/healthcheck", http.HandlerFunc(healthCheckHandler))
 	logg.Info("listening on " + httpListenAddr)
-	err := httpee.ListenAndServeContext(httpee.ContextWithSIGINT(context.Background(), 10*time.Second), httpListenAddr, nil)
+	err := httpee.ListenAndServeContext(ctx, httpListenAddr, nil)
 	if err != nil {
 		logg.Error(err.Error())
 	}
