@@ -50,7 +50,7 @@ const (
 //"greenlit" to either "succeeded", "failed" or "errored".
 func (c *Context) PollForAssetResizes() (j Job, returnedError error) {
 	defer func() {
-		if returnedError != nil {
+		if returnedError != nil && returnedError != sql.ErrNoRows {
 			labels := prometheus.Labels{"asset": "early-db-access"}
 			assetResizeErroredCounter.With(labels).Inc()
 		}

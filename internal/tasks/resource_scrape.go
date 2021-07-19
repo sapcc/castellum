@@ -49,7 +49,7 @@ var scrapeResourceSearchQuery = db.SimplifyWhitespaceInSQL(`
 func (c *Context) PollForResourceScrapes(minAge time.Duration) JobPoller {
 	return func() (j Job, returnedError error) {
 		defer func() {
-			if returnedError != nil {
+			if returnedError != nil && returnedError != sql.ErrNoRows {
 				labels := prometheus.Labels{"asset": "early-db-access"}
 				resourceScrapeFailedCounter.With(labels).Inc()
 			}

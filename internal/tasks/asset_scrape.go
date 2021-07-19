@@ -58,7 +58,7 @@ func init() {
 func (c *Context) PollForAssetScrapes(minAge time.Duration) JobPoller {
 	return func() (j Job, returnedError error) {
 		defer func() {
-			if returnedError != nil {
+			if returnedError != nil && returnedError != sql.ErrNoRows {
 				labels := prometheus.Labels{"asset": "early-db-access"}
 				assetScrapeFailedCounter.With(labels).Inc()
 			}
