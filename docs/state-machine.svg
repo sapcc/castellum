@@ -149,11 +149,11 @@
      pagecolor="#ffffff"
      bordercolor="#666666"
      borderopacity="1.0"
-     inkscape:pageopacity="1"
+     inkscape:pageopacity="0"
      inkscape:pageshadow="2"
      inkscape:zoom="1.7523293"
-     inkscape:cx="243.39033"
-     inkscape:cy="196.8808"
+     inkscape:cx="293.6092"
+     inkscape:cy="184.89675"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -185,6 +185,13 @@
      inkscape:groupmode="layer"
      id="layer1"
      transform="translate(2.1393586e-8,-220.27084)">
+    <rect
+       id="rect85"
+       width="97.895836"
+       height="76.729164"
+       x="-2.1393586e-08"
+       y="220.27084"
+       style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.264583" />
     <g
        id="g3722"
        transform="translate(-9.1235016,104.38317)">
