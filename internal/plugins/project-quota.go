@@ -214,6 +214,7 @@ func (m *assetManagerProjectQuota) getQuotaStatus(assetType db.AssetType, projec
 			return res, nil
 		}
 	}
+	//lint:ignore ST1005 Limes is a proper name
 	return nil, fmt.Errorf("Limes does not report %s/%s quota for project %s",
 		info.ServiceType, info.ResourceName, projectID)
 }

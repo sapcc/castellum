@@ -300,10 +300,12 @@ func prometheusGetVector(api prom_v1.API, queryStr string) (model.Vector, error)
 		logg.Info("Prometheus query produced warning: %s", warning)
 	}
 	if err != nil {
+		//lint:ignore ST1005 Prometheus is a proper name
 		return nil, fmt.Errorf("Prometheus query failed: %s: %s", queryStr, err.Error())
 	}
 	resultVector, ok := value.(model.Vector)
 	if !ok {
+		//lint:ignore ST1005 Prometheus is a proper name
 		return nil, fmt.Errorf("Prometheus query failed: %s: unexpected type %T", queryStr, value)
 	}
 	return resultVector, nil
