@@ -203,7 +203,7 @@ func (m *assetManagerServerGroups) GetAssetStatus(res db.Resource, assetUUID str
 }
 
 //SetAssetSize implements the core.AssetManager interface.
-func (m *assetManagerServerGroups) SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (db.OperationOutcome, error) {
+func (m *assetManagerServerGroups) SetAssetSize(res db.Resource, assetUUID string, _, newSize uint64) (db.OperationOutcome, error) {
 	cfg, err := m.parseAndValidateConfig(res.ConfigJSON)
 	if err != nil {
 		//if validation fails here, we should not have accepted the configuration
@@ -218,7 +218,7 @@ func (m *assetManagerServerGroups) SetAssetSize(res db.Resource, assetUUID strin
 	if err != nil {
 		return db.OperationOutcomeErrored, err
 	}
-	oldSize = uint64(len(group.Members))
+	oldSize := uint64(len(group.Members))
 
 	//perform server creations/deletions
 	if oldSize > newSize {
