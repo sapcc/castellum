@@ -231,10 +231,8 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 		if _, ok := err.(emptyPrometheusResultErr); ok {
 			//check if the share still exists in the backend
 			_, getErr := shares.Get(m.Manila, assetUUID).Extract()
-			if getErr != nil {
-				if _, ok := getErr.(gophercloud.ErrDefault404); ok {
-					return core.AssetStatus{}, core.AssetNotFoundErr{InnerError: fmt.Errorf("share not found in Manila: %s", getErr.Error())}
-				}
+			if _, ok := getErr.(gophercloud.ErrDefault404); ok {
+				return core.AssetStatus{}, core.AssetNotFoundErr{InnerError: fmt.Errorf("share not found in Manila: %s", getErr.Error())}
 			}
 		}
 		return core.AssetStatus{}, err
