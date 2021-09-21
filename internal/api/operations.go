@@ -154,7 +154,7 @@ func (h handler) GetPendingOperations(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondwith.JSON(w, http.StatusOK, struct {
-		PendingOperations []Operation `json:"pending_operations,keepempty"`
+		PendingOperations []Operation `json:"pending_operations"`
 	}{allOps})
 }
 
@@ -219,7 +219,7 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 	}
 
 	respondwith.JSON(w, http.StatusOK, struct {
-		Operations []Operation `json:"recently_failed_operations,keepempty"`
+		Operations []Operation `json:"recently_failed_operations"`
 	}{relevantOps})
 }
 
@@ -266,7 +266,7 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 	}
 
 	respondwith.JSON(w, http.StatusOK, struct {
-		Operations []Operation `json:"recently_succeeded_operations,keepempty"`
+		Operations []Operation `json:"recently_succeeded_operations"`
 	}{relevantOps})
 }
 

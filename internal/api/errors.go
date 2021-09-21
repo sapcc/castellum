@@ -94,7 +94,7 @@ func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request)
 	}
 
 	respondwith.JSON(w, http.StatusOK, struct {
-		ResourceScrapeErrors []ResourceScrapeError `json:"resource_scrape_errors,keepempty"`
+		ResourceScrapeErrors []ResourceScrapeError `json:"resource_scrape_errors"`
 	}{resScrapeErrs})
 }
 
@@ -149,7 +149,7 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondwith.JSON(w, http.StatusOK, struct {
-		AssetScrapeErrors []AssetError `json:"asset_scrape_errors,keepempty"`
+		AssetScrapeErrors []AssetError `json:"asset_scrape_errors"`
 	}{assetScrapeErrs})
 }
 
@@ -219,6 +219,6 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondwith.JSON(w, http.StatusOK, struct {
-		AssetScrapeErrors []AssetError `json:"asset_resize_errors,keepempty"`
+		AssetScrapeErrors []AssetError `json:"asset_resize_errors"`
 	}{assetResizeErrs})
 }
