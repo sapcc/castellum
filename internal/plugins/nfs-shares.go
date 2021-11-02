@@ -216,7 +216,7 @@ func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useR
 //GetAssetStatus implements the core.AssetManager interface.
 func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
 	//check status in Prometheus
-	var bytesReservedBySnapshots, bytesUsed, bytesUsedBySnapshots float64
+	var bytesReservedBySnapshots, bytesUsed, bytesUsedBySnapshots, snapshotReservePercent float64
 	bytesTotal, err := m.getMetricForShare("netapp_volume_total_bytes", res.ScopeUUID, assetUUID)
 	if err == nil {
 		bytesReservedBySnapshots, err = m.getMetricForShare("netapp_volume_snapshot_reserved_bytes", res.ScopeUUID, assetUUID)
@@ -224,6 +224,9 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 			bytesUsed, err = m.getMetricForShare("netapp_volume_used_bytes", res.ScopeUUID, assetUUID)
 			if err == nil {
 				bytesUsedBySnapshots, err = m.getMetricForShare("netapp_volume_snapshot_used_bytes", res.ScopeUUID, assetUUID)
+				if err == nil {
+					snapshotReservePercent, err = m.getMetricForShare("netapp_volume_percentage_snapshot_reserve", res.ScopeUUID, assetUUID)
+				}
 			}
 		}
 	}
@@ -240,21 +243,47 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 
 	//compute asset status from Prometheus metrics
 	//
+	//Option 1: For old shares, we have 5% snapshot reserve that gets allocated
+	//*AS PART OF* the target share size, so we need to count the snapshot
+	//reserve into the size and the snapshot usage into the usage, i.e.
+	//
 	//    size  = total + reserved_by_snapshots
 	//    usage = used  + max(reserved_by_snapshots, used_by_snapshots)
 	//
-	if bytesUsedBySnapshots < bytesReservedBySnapshots {
-		bytesUsedBySnapshots = bytesReservedBySnapshots
-	}
-	sizeBytes := bytesTotal + bytesReservedBySnapshots
-	usageBytes := bytesUsed + bytesUsedBySnapshots
-	usageGiB := usageBytes / 1024 / 1024 / 1024
-	if usageBytes <= 0 {
-		usageGiB = 0
-	}
-	status := core.AssetStatus{
-		Size:  uint64(math.Round(sizeBytes / 1024 / 1024 / 1024)),
-		Usage: db.UsageValues{db.SingularUsageMetric: usageGiB},
+	//Option 2: For newer shares, we have a much larger snapshot reserve (usually
+	//50%) that gets allocated *IN ADDITION TO* the target share size, and
+	//therefore snapshot usage usually does not eat into the main share size, i.e.
+	//
+	//    size  = total
+	//    usage = used
+	//
+	//TODO Remove option 1 once all shares have migrated to the new layout.
+	var status core.AssetStatus
+	if snapshotReservePercent == 5.0 {
+		//option 1
+		if bytesUsedBySnapshots < bytesReservedBySnapshots {
+			bytesUsedBySnapshots = bytesReservedBySnapshots
+		}
+		sizeBytes := bytesTotal + bytesReservedBySnapshots
+		usageBytes := bytesUsed + bytesUsedBySnapshots
+		usageGiB := usageBytes / 1024 / 1024 / 1024
+		if usageBytes <= 0 {
+			usageGiB = 0
+		}
+		status = core.AssetStatus{
+			Size:  uint64(math.Round(sizeBytes / 1024 / 1024 / 1024)),
+			Usage: db.UsageValues{db.SingularUsageMetric: usageGiB},
+		}
+	} else {
+		//option 2
+		usageGiB := bytesUsed / 1024 / 1024 / 1024
+		if bytesUsed <= 0 {
+			usageGiB = 0
+		}
+		status = core.AssetStatus{
+			Size:  uint64(math.Round(bytesTotal / 1024 / 1024 / 1024)),
+			Usage: db.UsageValues{db.SingularUsageMetric: usageGiB},
+		}
 	}
 
 	//when size has changed compared to last time, double-check with the Manila
