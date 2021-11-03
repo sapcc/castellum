@@ -31,6 +31,7 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/schedulerhints"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups"
@@ -349,8 +350,8 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 	for _, net := range cfg.Template.Networks {
 		networkOpts = append(networkOpts, servers.Network{UUID: net.UUID, Tag: net.Tag})
 	}
-	opts := func(name string) servers.CreateOptsBuilder {
-		opts1 := servers.CreateOpts{
+	opts := func(name string) (opts servers.CreateOptsBuilder) {
+		opts = servers.CreateOpts{
 			AvailabilityZone: cfg.Template.AvailabilityZone,
 			FlavorRef:        resolvedFlavorID,
 			ImageRef:         resolvedImageID,
@@ -360,16 +361,23 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 			SecurityGroups:   cfg.Template.SecurityGroupNames,
 			UserData:         cfg.Template.UserData,
 		}
-		opts2 := keypairs.CreateOptsExt{
-			CreateOptsBuilder: opts1,
+		opts = keypairs.CreateOptsExt{
+			CreateOptsBuilder: opts,
 			KeyName:           resolvedKeypairName,
 		}
-		return schedulerhints.CreateOptsExt{
-			CreateOptsBuilder: opts2,
+		opts = schedulerhints.CreateOptsExt{
+			CreateOptsBuilder: opts,
 			SchedulerHints: schedulerhints.SchedulerHints{
 				Group: group.ID,
 			},
 		}
+		if len(cfg.Template.BlockDeviceMappings) > 0 {
+			opts = bootfromvolume.CreateOptsExt{
+				CreateOptsBuilder: opts,
+				BlockDevice:       cfg.Template.BlockDeviceMappings,
+			}
+		}
+		return opts
 	}
 
 	//create servers
@@ -456,8 +464,9 @@ func makeNameDisambiguator() string {
 type configForServerGroup struct {
 	DeleteNewestFirst bool `json:"delete_newest_first"`
 	Template          struct {
-		AvailabilityZone string `json:"availability_zone"`
-		Flavor           struct {
+		AvailabilityZone    string                       `json:"availability_zone"`
+		BlockDeviceMappings []bootfromvolume.BlockDevice `json:"block_device_mapping_v2,omitempty"`
+		Flavor              struct {
 			Name string `json:"name"`
 		} `json:"flavor"`
 		Image struct {
@@ -474,6 +483,19 @@ type configForServerGroup struct {
 		SecurityGroupNames []string `json:"security_groups"`
 		UserData           []byte   `json:"user_data"`
 	} `json:"template"`
+}
+
+//TODO Go 1.18: change type to slice of actual type, write containsString() with generics instead
+var validBDMSourceTypes = []string{
+	string(bootfromvolume.SourceBlank),
+	string(bootfromvolume.SourceImage),
+	string(bootfromvolume.SourceSnapshot),
+	string(bootfromvolume.SourceVolume),
+}
+
+var validBDMDestinationTypes = []string{
+	string(bootfromvolume.DestinationLocal),
+	string(bootfromvolume.DestinationVolume),
 }
 
 func (m *assetManagerServerGroups) parseAndValidateConfig(configJSON string) (configForServerGroup, error) {
@@ -493,6 +515,20 @@ func (m *assetManagerServerGroups) parseAndValidateConfig(configJSON string) (co
 		errs = append(errs, msg)
 	}
 
+	for idx, bd := range cfg.Template.BlockDeviceMappings {
+		if bd.SourceType == "" {
+			complain("template.block_device_mapping_v2[%d].source_type is missing", idx)
+		} else if !containsString(validBDMSourceTypes, string(bd.SourceType)) {
+			complain("value for template.block_device_mapping_v2[%d].source_type must be one of: %q",
+				idx, strings.Join(validBDMSourceTypes, `", "`))
+		}
+		if bd.DestinationType == "" {
+			//this is acceptable apparently
+		} else if !containsString(validBDMDestinationTypes, string(bd.DestinationType)) {
+			complain("value for template.block_device_mapping_v2[%d].destination_type must be one of: %q",
+				idx, strings.Join(validBDMDestinationTypes, `", "`))
+		}
+	}
 	if cfg.Template.Flavor.Name == "" {
 		complain("template.flavor.name is missing")
 	}
@@ -529,6 +565,15 @@ func (m *assetManagerServerGroups) parseAndValidateConfig(configJSON string) (co
 		return configForServerGroup{}, fmt.Errorf("configuration is invalid: %s", strings.Join(errs, ", "))
 	}
 	return cfg, nil
+}
+
+func containsString(list []string, val string) bool {
+	for _, elem := range list {
+		if elem == val {
+			return true
+		}
+	}
+	return false
 }
 
 ////////////////////////////////////////////////////////////////////////////////
