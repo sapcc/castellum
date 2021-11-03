@@ -15,6 +15,7 @@ The Castellum API requires additional configuration for `server-group:*` resourc
 
 | Field | Type | Explanation |
 | ----- | ---- | ----------- |
+| `delete_newest_first` | boolean | When true, downscaling will terminate the instances with the newest `created_at` timestamp. The default value is `false`, which means that downscaling will terminate the oldest instances instead. Both behaviors can make sense: Set this to true if you prefer to keep old instances that are known to work well, or leave it at false to use scaling events as an opportunity to gradually replace old instances with fresh ones. |
 | `template` | object | Configuration for new instances that are created by upscaling operations. |
 | `template.availability_zone` | string | If not empty, new instances will be created in this availability zone. |
 | `template.flavor.name` | string<br>*(required)* | The name of the flavor that will be used for new instances. |

@@ -251,9 +251,17 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 		}
 		allServers = append(allServers, server)
 	}
-	sort.Slice(allServers, func(i, j int) bool {
-		return allServers[i].Created.Before(allServers[j].Created)
-	})
+
+	//sort servers such that those that we want to delete are in front
+	if cfg.DeleteNewestFirst {
+		sort.Slice(allServers, func(i, j int) bool {
+			return allServers[i].Created.After(allServers[j].Created)
+		})
+	} else {
+		sort.Slice(allServers, func(i, j int) bool {
+			return allServers[i].Created.Before(allServers[j].Created)
+		})
+	}
 
 	//delete oldest servers
 	serversInDeletion := make(map[string]string)
@@ -446,7 +454,8 @@ func makeNameDisambiguator() string {
 // resource configuration
 
 type configForServerGroup struct {
-	Template struct {
+	DeleteNewestFirst bool `json:"delete_newest_first"`
+	Template          struct {
 		AvailabilityZone string `json:"availability_zone"`
 		Flavor           struct {
 			Name string `json:"name"`
