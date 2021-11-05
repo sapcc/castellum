@@ -39,6 +39,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/gophercloud/gophercloud/openstack/keymanager/v1/secrets"
+	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/pools"
 	prom_api "github.com/prometheus/client_golang/api"
 	prom_v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/sapcc/castellum/internal/core"
@@ -234,11 +235,18 @@ func (m *assetManagerServerGroups) SetAssetSize(res db.Resource, assetUUID strin
 }
 
 func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configForServerGroup, group serverGroup, countToDelete uint64) (db.OperationOutcome, error) {
-	//NOTE: We always terminate the oldest servers. This enables the user to roll
-	//out config changes by updating the resource config, scaling up to make new
-	//servers, then scaling down to remove the old servers.
-
 	computeV2, err := m.Provider.CloudAdminClient(openstack.NewComputeV2)
+	if err != nil {
+		return db.OperationOutcomeErrored, err
+	}
+	provider, eo, err := m.Provider.ProjectScopedClient(core.ProjectScope{
+		ID:        res.ScopeUUID,
+		RoleNames: m.LocalRoleNames,
+	})
+	if err != nil {
+		return db.OperationOutcomeErrored, err
+	}
+	loadbalancerV2, err := openstack.NewLoadBalancerV2(provider, eo)
 	if err != nil {
 		return db.OperationOutcomeErrored, err
 	}
@@ -255,10 +263,16 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 
 	//sort servers such that those that we want to delete are in front
 	if cfg.DeleteNewestFirst {
+		//The non-default behavior is to terminate the newest servers. This has
+		//been requested by customers who prefer to keep their old servers because
+		//they're tried and true.
 		sort.Slice(allServers, func(i, j int) bool {
 			return allServers[i].Created.After(allServers[j].Created)
 		})
 	} else {
+		//The default behavior is to terminate the oldest servers. This enables the
+		//user to roll out config changes by updating the resource config, scaling
+		//up to make new servers, then scaling down to remove the old servers.
 		sort.Slice(allServers, func(i, j int) bool {
 			return allServers[i].Created.Before(allServers[j].Created)
 		})
@@ -269,6 +283,13 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 	for idx := 0; uint64(idx) < countToDelete && idx < len(allServers); idx++ {
 		server := allServers[idx]
 		logg.Info("deleting server %s from %s", server.ID, res.AssetType)
+		for _, lb := range cfg.LoadbalancerPoolMemberships {
+			err := m.removeServerFromLoadbalancer(server, lb, loadbalancerV2)
+			if err != nil {
+				err = fmt.Errorf("cannot remove server %s in %s from LB pool %s: %w", server.ID, res.AssetType, lb.PoolUUID, err)
+				return db.OperationOutcomeErrored, err
+			}
+		}
 		err := servers.Delete(computeV2, server.ID).ExtractErr()
 		if err != nil {
 			return db.OperationOutcomeErrored, fmt.Errorf("cannot delete server %s in %s: %w", server.ID, res.AssetType, err)
@@ -328,6 +349,10 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 		return db.OperationOutcomeErrored, err
 	}
 	keymgrV1, err := openstack.NewKeyManagerV1(provider, eo)
+	if err != nil {
+		return db.OperationOutcomeErrored, err
+	}
+	loadbalancerV2, err := openstack.NewLoadBalancerV2(provider, eo)
 	if err != nil {
 		return db.OperationOutcomeErrored, err
 	}
@@ -393,7 +418,7 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 		serversInCreation[server.ID] = server.Status
 	}
 
-	//wait for servers to get into ACTIVE, terminate if status ERROR
+	//wait for servers to get into ACTIVE
 	start := time.Now()
 	var msgs []string //accumulates all errors during the following loop
 	for len(serversInCreation) > 0 {
@@ -430,6 +455,12 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 			switch server.Status {
 			case "ACTIVE":
 				logg.Info("server %s in %s has entered status ACTIVE", serverID, res.AssetType)
+				for _, lb := range cfg.LoadbalancerPoolMemberships {
+					err := m.addServerToLoadbalancer(server, lb, loadbalancerV2)
+					if err != nil {
+						msgs = append(msgs, fmt.Sprintf("cannot add server %s to LB pool %s: %s", serverID, lb.PoolUUID, err.Error()))
+					}
+				}
 				delete(serversInCreation, serverID)
 			case "ERROR":
 				msgs = append(msgs, fmt.Sprintf("server %s has entered status ERROR with message %q", serverID, server.Fault.Code))
@@ -458,8 +489,76 @@ func makeNameDisambiguator() string {
 	return base32.StdEncoding.EncodeToString(buf[:])
 }
 
+func (m *assetManagerServerGroups) findServerIPForLoadbalancer(server *servers.Server, cfg configForLBPoolMembership) (string, error) {
+	//TODO: We should probably check that the IP address is from a subnet that
+	//the LB can actually reach. For now, I'll just assume that the user will
+	//only configure one private network on the auto-created instances, which
+	//means that there is no question which IP to choose.
+	for _, entry := range server.Addresses {
+		addrInfos, ok := entry.([]interface{})
+		if ok {
+			for _, info := range addrInfos {
+				addrInfo, ok := info.(map[string]interface{})
+				if ok && addrInfo["OS-EXT-IPS:type"] == "fixed" {
+					ip, ok := addrInfo["addr"].(string)
+					if ok && ip != "" {
+						return ip, nil
+					}
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("cannot find IP address for server")
+}
+
+func (m *assetManagerServerGroups) addServerToLoadbalancer(server *servers.Server, cfg configForLBPoolMembership, loadbalancerV2 *gophercloud.ServiceClient) error {
+	serverIP, err := m.findServerIPForLoadbalancer(server, cfg)
+	if err != nil {
+		return err
+	}
+	opts := pools.CreateMemberOpts{
+		Name:         server.Name,
+		Address:      serverIP,
+		ProtocolPort: int(cfg.ProtocolPort),
+	}
+	if cfg.MonitorPort != 0 {
+		val := int(cfg.MonitorPort)
+		opts.MonitorAddress = serverIP
+		opts.MonitorPort = &val
+	}
+	_, err = pools.CreateMember(loadbalancerV2, cfg.PoolUUID, opts).Extract()
+	return err
+}
+
+func (m *assetManagerServerGroups) removeServerFromLoadbalancer(server *servers.Server, cfg configForLBPoolMembership, loadbalancerV2 *gophercloud.ServiceClient) error {
+	listOpts := pools.ListMembersOpts{
+		Name: server.Name,
+	}
+	pager, err := pools.ListMembers(loadbalancerV2, cfg.PoolUUID, listOpts).AllPages()
+	if err != nil {
+		return err
+	}
+	members, err := pools.ExtractMembers(pager)
+	if err != nil {
+		return err
+	}
+	for _, member := range members {
+		err := pools.DeleteMember(loadbalancerV2, cfg.PoolUUID, member.ID).ExtractErr()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // resource configuration
+
+type configForLBPoolMembership struct {
+	PoolUUID     string `json:"pool_uuid"`
+	ProtocolPort uint16 `json:"protocol_port"`
+	MonitorPort  uint16 `json:"monitor_port"`
+}
 
 type configForServerGroup struct {
 	DeleteNewestFirst bool `json:"delete_newest_first"`
@@ -483,6 +582,7 @@ type configForServerGroup struct {
 		SecurityGroupNames []string `json:"security_groups"`
 		UserData           []byte   `json:"user_data"`
 	} `json:"template"`
+	LoadbalancerPoolMemberships []configForLBPoolMembership `json:"loadbalancer_pool_memberships"`
 }
 
 //TODO Go 1.18: change type to slice of actual type, write containsString() with generics instead
@@ -527,6 +627,14 @@ func (m *assetManagerServerGroups) parseAndValidateConfig(configJSON string) (co
 		} else if !containsString(validBDMDestinationTypes, string(bd.DestinationType)) {
 			complain("value for template.block_device_mapping_v2[%d].destination_type must be one of: %q",
 				idx, strings.Join(validBDMDestinationTypes, `", "`))
+		}
+	}
+	for idx, lb := range cfg.LoadbalancerPoolMemberships {
+		if lb.PoolUUID == "" {
+			complain("loadbalancer_pool_memberships[%d].pool_uuid is missing", idx)
+		}
+		if lb.ProtocolPort == 0 {
+			complain("loadbalancer_pool_memberships[%d].protocol_port is missing", idx)
 		}
 	}
 	if cfg.Template.Flavor.Name == "" {

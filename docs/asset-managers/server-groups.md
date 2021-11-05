@@ -16,6 +16,10 @@ The Castellum API requires additional configuration for `server-group:*` resourc
 | Field | Type | Explanation |
 | ----- | ---- | ----------- |
 | `delete_newest_first` | boolean | When true, downscaling will terminate the instances with the newest `created_at` timestamp. The default value is `false`, which means that downscaling will terminate the oldest instances instead. Both behaviors can make sense: Set this to true if you prefer to keep old instances that are known to work well, or leave it at false to use scaling events as an opportunity to gradually replace old instances with fresh ones. |
+| `loadbalancer_pool_memberships` | array of objects | Configuration for LB pool memberships. When configured, upscaling will automatically add all new instances as members to these LB pools after creation, and downscaling will remove instances from these LB pools before deleting them. |
+| `loadbalancer_pool_memberships[].pool_uuid` | string<br>*(required)* | The UUID of the pool. |
+| `loadbalancer_pool_memberships[].protocol_port` | integer<br>*(required)* | The port where each instance answers load-balanced requests. |
+| `loadbalancer_pool_memberships[].monitor_port` | integer | The port where the LB's health monitor will probe this instance. If set to zero, the `protocol_port` will be used for monitors, too. |
 | `template` | object | Configuration for new instances that are created by upscaling operations. |
 | `template.availability_zone` | string | If not empty, new instances will be created in this availability zone. |
 | `template.block_device_mapping_v2` | array of objects | If given, block devices will be attached to all new instances as defined in this key. The structure of this field is identical to the respective field on [the instance creation request body in the Nova API](https://docs.openstack.org/api-ref/compute/?expanded=create-server-detail#create-server). It is **highly recommended** to set `delete_on_termination` to true on all block device mappings defined herein, to prevent left-over volumes from piling up. |
