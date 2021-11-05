@@ -290,6 +290,10 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 				return db.OperationOutcomeErrored, err
 			}
 		}
+		if len(cfg.LoadbalancerPoolMemberships) > 0 {
+			//give some extra time for the server to answer its last outstanding client requests
+			time.Sleep(5 * time.Second)
+		}
 		err := servers.Delete(computeV2, server.ID).ExtractErr()
 		if err != nil {
 			return db.OperationOutcomeErrored, fmt.Errorf("cannot delete server %s in %s: %w", server.ID, res.AssetType, err)
