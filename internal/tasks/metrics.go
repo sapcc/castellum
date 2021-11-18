@@ -139,7 +139,12 @@ func (c Context) foreachAssetType(action func(db.AssetType)) (err error) {
 		}
 		action(assetType)
 	}
-	return nil
+	err = rows.Err()
+	if err != nil {
+		rows.Close()
+		return err
+	}
+	return rows.Close()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
