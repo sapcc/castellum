@@ -185,7 +185,7 @@ func main() {
 		if len(os.Args) == 4 {
 			configJSON = os.Args[3]
 		}
-		runAssetTypeTestShell(dbi, team, db.AssetType(os.Args[2]), configJSON)
+		runAssetTypeTestShell(team, db.AssetType(os.Args[2]), configJSON)
 	default:
 		usage()
 	}
@@ -391,7 +391,7 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 ////////////////////////////////////////////////////////////////////////////////
 // task: test-asset-type
 
-func runAssetTypeTestShell(dbi *gorp.DbMap, team core.AssetManagerTeam, assetType db.AssetType, configJSON string) {
+func runAssetTypeTestShell(team core.AssetManagerTeam, assetType db.AssetType, configJSON string) {
 	manager, _ := team.ForAssetType(assetType)
 	if manager == nil {
 		logg.Fatal("no manager configured for asset type: %q", assetType)
