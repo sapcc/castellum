@@ -493,7 +493,7 @@ func makeNameDisambiguator() string {
 	return base32.StdEncoding.EncodeToString(buf[:])
 }
 
-func (m *assetManagerServerGroups) findServerIPForLoadbalancer(server *servers.Server, cfg configForLBPoolMembership) (string, error) {
+func (m *assetManagerServerGroups) findServerIPForLoadbalancer(server *servers.Server, _ configForLBPoolMembership) (string, error) {
 	//TODO: We should probably check that the IP address is from a subnet that
 	//the LB can actually reach. For now, I'll just assume that the user will
 	//only configure one private network on the auto-created instances, which
