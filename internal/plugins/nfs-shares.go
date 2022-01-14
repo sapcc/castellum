@@ -49,7 +49,7 @@ func init() {
 		if err != nil {
 			return nil, err
 		}
-		manila.Microversion = "2.23"
+		manila.Microversion = "2.64" //for "force" field on .Extend(), requires Manila at least on Xena
 
 		prometheusURL := os.Getenv("CASTELLUM_NFS_PROMETHEUS_URL")
 		if prometheusURL == "" {
@@ -208,7 +208,7 @@ func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSiz
 
 func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useReverseOperation bool) error {
 	if (oldSize < newSize && !useReverseOperation) || (oldSize >= newSize && useReverseOperation) {
-		return shares.Extend(m.Manila, assetUUID, shares.ExtendOpts{NewSize: int(newSize)}).ExtractErr()
+		return shares.Extend(m.Manila, assetUUID, shareExtendOpts{NewSize: int(newSize), Force: true}).ExtractErr()
 	}
 	return shares.Shrink(m.Manila, assetUUID, shares.ShrinkOpts{NewSize: int(newSize)}).ExtractErr()
 }
@@ -366,4 +366,16 @@ func prometheusGetSingleValue(api prom_v1.API, queryStr string) (float64, error)
 	case 1:
 		return float64(resultVector[0].Value), nil
 	}
+}
+
+//shareExtendOpts is like shares.ExtendOpts, but supports the new "force" option.
+//TODO: merge into upstream
+type shareExtendOpts struct {
+	NewSize int  `json:"new_size"`
+	Force   bool `json:"force"`
+}
+
+// ToShareExtendMap implements the shares.ExtendOptsBuilder interface.
+func (opts shareExtendOpts) ToShareExtendMap() (map[string]interface{}, error) {
+	return gophercloud.BuildRequestBody(opts, "extend")
 }
