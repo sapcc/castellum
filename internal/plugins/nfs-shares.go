@@ -152,17 +152,30 @@ func (m *assetManagerNFS) ignoreShare(share shares.Share) bool {
 	}
 
 	//ignore "shares" that are actually snapmirror targets (sapcc-specific
-	//extension); new-style check: check for volume_type="dp" label on share metrics
+	//extension); new-style check: check for volume_type!="dp" label on share
+	//metrics (it's possible that we have both metrics with volume_type="dp" and
+	//other volume_type values, in which case we will only use the non-dp
+	//metrics)
 	query := fmt.Sprintf(`netapp_volume_total_bytes{project_id=%q,share_id=%q}`, share.ProjectID, share.ID)
 	resultVector, err := prometheusGetVector(m.Prometheus, query)
 	if err != nil {
 		logg.Error("cannot check volume_type for share %q: %s", share.ID, err.Error())
 	}
+	hasDPMetrics := false
+	hasNonDPMetrics := false
 	for _, sample := range resultVector {
 		if sample.Metric["volume_type"] == "dp" {
-			return true
+			hasDPMetrics = true
+		} else {
+			hasNonDPMetrics = true
 		}
 	}
+	if hasDPMetrics && !hasNonDPMetrics {
+		return true
+	}
+	//NOTE: Not having any useful metrics at all is not a valid reason for
+	//ignoring the share. If we lack metrics about a share, we want to be alerted
+	//by the failing scrape.
 
 	return false
 }
@@ -316,7 +329,7 @@ func (e emptyPrometheusResultErr) Error() string {
 func (m *assetManagerNFS) getMetricForShare(metric, projectUUID, shareUUID string) (float64, error) {
 	//NOTE: The `max by (share_id)` is necessary for when a share is being
 	//migrated to another shareserver and thus appears in the metrics twice.
-	query := fmt.Sprintf(`max by (share_id) (%s{project_id=%q,share_id=%q})`,
+	query := fmt.Sprintf(`max by (share_id) (%s{project_id=%q,share_id=%q,volume_type!="dp"})`,
 		metric, projectUUID, shareUUID)
 	return prometheusGetSingleValue(m.Prometheus, query)
 }
