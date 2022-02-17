@@ -12,9 +12,9 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/common v0.32.1
 	github.com/rs/cors v1.8.2
-	github.com/sapcc/go-bits v0.0.0-20211217092338-513915db49d4
+	github.com/sapcc/go-bits v0.0.0-20220217100829-b28780f98e51
 	github.com/sapcc/gophercloud-limes v0.0.0-20200819120227-33ee0896b7e8
-	github.com/sapcc/hermes v0.0.0-20211212013121-4426e1b79ccc
+	github.com/sapcc/hermes v0.0.0-20220216215340-12b4f661924a
 	github.com/sapcc/limes v0.0.0-20220103121537-cf5aa78fd02d
 	github.com/streadway/amqp v1.0.0
 	gopkg.in/gorp.v2 v2.2.0
@@ -37,8 +37,8 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
-	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
+	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
 	golang.org/x/text v0.3.6 // indirect
-	google.golang.org/protobuf v1.26.0 // indirect
+	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
