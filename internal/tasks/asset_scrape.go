@@ -227,6 +227,10 @@ func (j assetScrapeJob) Execute() (returnedError error) {
 		//we are waiting for a resize operation to reflect in the backend, but
 		//the backend is still reporting the old size -> do not touch anything until the backend is showing the new size
 		canTouchPendingOperations = false
+		logg.Info("still waiting for resize of %s %s from size = %d to size = %d to be completed in the backend",
+			res.AssetType, asset.UUID,
+			asset.Size, *asset.ExpectedSize,
+		)
 	}
 
 	//compute value of `asset.CriticalUsages` field (for reporting to admin only)
