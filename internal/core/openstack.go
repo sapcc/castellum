@@ -90,7 +90,7 @@ func NewProviderClient(ao gophercloud.AuthOptions, eo gophercloud.EndpointOpts) 
 	if err != nil {
 		return nil, err
 	}
-	pc.UserAgent.Prepend("castellum")
+	pc.UserAgent.Prepend(Component)
 
 	//list all roles and remember the name -> ID mapping
 	identityV3, err := openstack.NewIdentityV3(pc, eo)
@@ -147,7 +147,7 @@ func (p *providerClientImpl) projectScopedClientImpl(scope ProjectScope, firstPa
 		}
 	}
 	if pc != nil {
-		pc.UserAgent.Prepend("castellum")
+		pc.UserAgent.Prepend(Component)
 	}
 
 	//get currently assigned roles

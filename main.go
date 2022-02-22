@@ -64,6 +64,12 @@ func usage() {
 }
 
 func main() {
+	if len(os.Args) < 2 {
+		usage()
+	}
+	taskName := os.Args[1]
+	core.Component = "castellum-" + taskName
+
 	logg.ShowDebug, _ = strconv.ParseBool(os.Getenv("CASTELLUM_DEBUG"))
 
 	//The CASTELLUM_INSECURE flag can be used to get Castellum to work through
@@ -84,14 +90,24 @@ func main() {
 	dbHost := envOrDefault("CASTELLUM_DB_HOSTNAME", "localhost")
 	dbPort := envOrDefault("CASTELLUM_DB_PORT", "5432")
 	dbName := envOrDefault("CASTELLUM_DB_NAME", "castellum")
-	dbConnOpts := os.Getenv("CASTELLUM_DB_CONNECTION_OPTIONS")
+
+	dbConnOpts, err := url.ParseQuery(os.Getenv("CASTELLUM_DB_CONNECTION_OPTIONS"))
+	if err != nil {
+		logg.Fatal("while parsing CASTELLUM_DB_CONNECTION_OPTIONS: %w", err)
+	}
+	hostname, err := os.Hostname()
+	if err == nil {
+		dbConnOpts.Set("application_name", fmt.Sprintf("%s@%s", core.Component, hostname))
+	} else {
+		dbConnOpts.Set("application_name", core.Component)
+	}
 
 	dbURL := &url.URL{
 		Scheme:   "postgres",
 		User:     url.UserPassword(dbUsername, dbPass),
 		Host:     net.JoinHostPort(dbHost, dbPort),
 		Path:     dbName,
-		RawQuery: dbConnOpts,
+		RawQuery: dbConnOpts.Encode(),
 	}
 	dbi, err := db.Init(dbURL)
 	if err != nil {
@@ -158,10 +174,7 @@ func main() {
 		}
 	}
 
-	if len(os.Args) < 2 {
-		usage()
-	}
-	switch os.Args[1] {
+	switch taskName {
 	case "api":
 		if len(os.Args) != 2 {
 			usage()
