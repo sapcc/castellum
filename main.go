@@ -48,7 +48,6 @@ import (
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpee"
 	"github.com/sapcc/go-bits/logg"
-	"github.com/streadway/amqp"
 	"gopkg.in/gorp.v2"
 
 	//load asset managers
@@ -258,13 +257,11 @@ func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provi
 		if err != nil {
 			logg.Fatal("invalid value for CASTELLUM_RABBITMQ_PORT: " + err.Error())
 		}
-		rabbitURI := amqp.URI{
-			Scheme:   "amqp",
-			Host:     hostname,
-			Port:     port,
-			Username: username,
-			Password: pass,
-			Vhost:    "/",
+		rabbitURI := url.URL{
+			Scheme: "amqp",
+			Host:   net.JoinHostPort(hostname, strconv.Itoa(port)),
+			User:   url.UserPassword(username, pass),
+			Path:   "/",
 		}
 		api.StartAuditLogging(rabbitQueueName, rabbitURI)
 	}

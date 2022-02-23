@@ -12,7 +12,7 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/common v0.32.1
 	github.com/rs/cors v1.8.2
-	github.com/sapcc/go-bits v0.0.0-20220217100829-b28780f98e51
+	github.com/sapcc/go-bits v0.0.0-20220223123017-b00971956813
 	github.com/sapcc/gophercloud-limes v0.0.0-20200819120227-33ee0896b7e8
 	github.com/sapcc/hermes v0.0.0-20220216215340-12b4f661924a
 	github.com/sapcc/limes v0.0.0-20220103121537-cf5aa78fd02d
