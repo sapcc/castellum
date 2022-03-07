@@ -23,16 +23,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sapcc/go-bits/assert"
+
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/test"
-	"github.com/sapcc/go-bits/assert"
 )
 
 func TestGetPendingOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
-
 		testCommonEndpointBehavior(t, hh, mv,
 			"/v1/projects/%s/resources/%s/operations/pending")
 
@@ -109,7 +109,6 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 		req.Check(t.T, hh)
 		req.Path = "/v1/operations/pending?domain=domain1&asset-type=unknown"
 		req.Check(t.T, hh)
-
 	})
 }
 
@@ -126,7 +125,6 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withEitherFailedOrErroredOperation(func(failedOperationOutcome db.OperationOutcome) {
 		withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
-
 			testCommonEndpointBehavior(t, hh, mv,
 				"/v1/projects/%s/resources/%s/operations/recently-failed")
 
@@ -238,7 +236,6 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 			req.Check(t.T, hh)
 			req.Path = "/v1/operations/recently-failed?domain=domain1&asset-type=unknown"
 			req.Check(t.T, hh)
-
 		})
 	})
 }
@@ -248,7 +245,6 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 	clock := test.FakeClock(3600)
 	withEitherFailedOrErroredOperation(func(failedOperationOutcome db.OperationOutcome) {
 		withHandler(t, core.Config{}, clock.Now, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
-
 			testCommonEndpointBehavior(t, hh, mv,
 				"/v1/projects/%s/resources/%s/operations/recently-succeeded")
 
@@ -342,7 +338,6 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 				ExpectStatus: http.StatusOK,
 				ExpectBody:   assert.JSONObject{"recently_succeeded_operations": []assert.JSONObject{}},
 			}.Check(t.T, hh)
-
 		})
 	})
 }

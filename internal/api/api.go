@@ -29,13 +29,14 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/sapcc/castellum/internal/core"
-	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/respondwith"
 	"github.com/sapcc/go-bits/sre"
 	"gopkg.in/gorp.v2"
+
+	"github.com/sapcc/castellum/internal/core"
+	"github.com/sapcc/castellum/internal/db"
 )
 
 type handler struct {

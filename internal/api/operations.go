@@ -24,12 +24,13 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/sapcc/castellum/internal/core"
-	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/respondwith"
 	"github.com/sapcc/go-bits/sre"
 	"gopkg.in/gorp.v2"
+
+	"github.com/sapcc/castellum/internal/core"
+	"github.com/sapcc/castellum/internal/db"
 )
 
 func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (map[int64]db.Resource, bool) {
@@ -129,7 +130,6 @@ func (h handler) GetPendingOperations(w http.ResponseWriter, r *http.Request) {
 
 	allOps := []Operation{}
 	for _, dbResource := range dbResources {
-
 		//find operations
 		var ops []db.PendingOperation
 		_, err := h.DB.Select(&ops, `

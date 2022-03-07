@@ -41,14 +41,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
-	"github.com/sapcc/castellum/internal/api"
-	"github.com/sapcc/castellum/internal/core"
-	"github.com/sapcc/castellum/internal/db"
-	"github.com/sapcc/castellum/internal/tasks"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpee"
 	"github.com/sapcc/go-bits/logg"
 	"gopkg.in/gorp.v2"
+
+	"github.com/sapcc/castellum/internal/api"
+	"github.com/sapcc/castellum/internal/core"
+	"github.com/sapcc/castellum/internal/db"
+	"github.com/sapcc/castellum/internal/tasks"
 
 	//load asset managers
 	_ "github.com/sapcc/castellum/internal/plugins"

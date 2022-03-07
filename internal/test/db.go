@@ -23,9 +23,10 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/easypg"
 	"gopkg.in/gorp.v2"
+
+	"github.com/sapcc/castellum/internal/db"
 )
 
 //WithDB prepares a DB reference for this test, or fails the test if the DB

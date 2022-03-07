@@ -21,9 +21,10 @@ package api
 import (
 	"net/http"
 
-	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/respondwith"
 	"github.com/sapcc/go-bits/sre"
+
+	"github.com/sapcc/castellum/internal/db"
 )
 
 ///////////////////////////////////////////////////////////////////////////////

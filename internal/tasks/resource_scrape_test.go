@@ -22,16 +22,16 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/sapcc/go-bits/easypg"
+
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
-	"github.com/sapcc/go-bits/easypg"
 )
 
 func TestResourceScraping(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock) {
-
 		//ScrapeNextResource() without any resources just does nothing
 		err := ExecuteOne(c.PollForResourceScrapes(0))
 		if err != sql.ErrNoRows {

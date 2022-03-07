@@ -21,10 +21,11 @@ package tasks
 import (
 	"time"
 
+	"gopkg.in/gorp.v2"
+
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
-	"gopkg.in/gorp.v2"
 )
 
 func withContext(t test.T, action func(*Context, *plugins.AssetManagerStatic, *test.FakeClock)) {

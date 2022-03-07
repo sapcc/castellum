@@ -21,8 +21,9 @@ package tasks
 import (
 	"time"
 
-	"github.com/sapcc/castellum/internal/core"
 	"gopkg.in/gorp.v2"
+
+	"github.com/sapcc/castellum/internal/core"
 )
 
 //Context holds things used by the various task implementations in this

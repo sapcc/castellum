@@ -22,8 +22,9 @@ import (
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/logg"
+
+	"github.com/sapcc/castellum/internal/db"
 )
 
 var (

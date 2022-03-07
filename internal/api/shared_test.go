@@ -25,13 +25,14 @@ import (
 
 	policy "github.com/databus23/goslo.policy"
 	"github.com/gophercloud/gophercloud"
+	"github.com/sapcc/go-bits/assert"
+	"github.com/sapcc/go-bits/gopherpolicy"
+	"gopkg.in/gorp.v2"
+
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
-	"github.com/sapcc/go-bits/assert"
-	"github.com/sapcc/go-bits/gopherpolicy"
-	"gopkg.in/gorp.v2"
 )
 
 func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action func(*handler, http.Handler, *MockValidator, []db.Resource, []db.Asset)) {
