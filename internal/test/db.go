@@ -129,8 +129,8 @@ func (t T) ExpectFinishedOperations(dbi *gorp.DbMap, ops ...db.FinishedOperation
 //AssertJSONEqual checks that both given values have identical JSON serializations.
 func (t T) AssertJSONEqual(variable string, actual, expected interface{}) {
 	t.Helper()
-	expectedJSON, _ := json.Marshal(expected)
-	actualJSON, _ := json.Marshal(actual)
+	expectedJSON, _ := json.Marshal(expected) //nolint:errcheck
+	actualJSON, _ := json.Marshal(actual)     //nolint:errcheck
 	if string(expectedJSON) != string(actualJSON) {
 		t.Errorf("expected %s = %s", variable, string(expectedJSON))
 		t.Errorf("  actual %s = %s", variable, string(actualJSON))

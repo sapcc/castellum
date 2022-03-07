@@ -70,6 +70,7 @@ func main() {
 	taskName := os.Args[1]
 	core.Component = "castellum-" + taskName
 
+	//nolint:errcheck
 	logg.ShowDebug, _ = strconv.ParseBool(os.Getenv("CASTELLUM_DEBUG"))
 
 	//The CASTELLUM_INSECURE flag can be used to get Castellum to work through
@@ -77,6 +78,7 @@ func main() {
 	//important that this is not the standard "CASTELLUM_DEBUG" variable. That one
 	//is meant to be useful for production systems, where you definitely don't
 	//want to turn off certificate verification.)
+	//nolint:errcheck
 	if insecure, _ := strconv.ParseBool(os.Getenv("CASTELLUM_INSECURE")); insecure {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true,
@@ -284,10 +286,10 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	if r.URL.Path == "/healthcheck" && r.Method == "GET" {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		w.Write([]byte("ok")) //nolint:errcheck
 	} else {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("not found"))
+		w.Write([]byte("not found")) //nolint:errcheck
 	}
 }
 

@@ -128,13 +128,13 @@ func RequireJSON(w http.ResponseWriter, r *http.Request, data interface{}) bool 
 func respondWithForbidden(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusForbidden)
-	w.Write([]byte("403 Forbidden"))
+	w.Write([]byte("403 Forbidden")) //nolint:errcheck
 }
 
 func respondWithNotFound(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusNotFound)
-	w.Write([]byte("404 Not found"))
+	w.Write([]byte("404 Not found")) //nolint:errcheck
 }
 
 func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *gopherpolicy.Token) {

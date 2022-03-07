@@ -79,7 +79,10 @@ func init() {
 		}
 
 		//list all resources that exist, by looking at the current project
-		report, _ := projects.Get(limes, currentProjectDomainID, currentProjectID, nil).Extract()
+		report, err := projects.Get(limes, currentProjectDomainID, currentProjectID, nil).Extract()
+		if err != nil {
+			return nil, fmt.Errorf("could not get project report for %s", currentProjectID)
+		}
 		var knownResources []limesResourceInfo
 		for _, srv := range report.Services {
 			for _, res := range srv.Resources {
