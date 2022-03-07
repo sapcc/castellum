@@ -164,6 +164,10 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 	})
 }
 
+//nolint:dupl //dupl checks the functions/methods used and reports that there are
+//duplicates. We can't refactor because although the methods used in unit tests might be
+//similar, however they contain helpful comments in-place that are specific to that
+//particular unit test.
 func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
@@ -264,6 +268,7 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 	})
 }
 
+//nolint:dupl
 func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
@@ -640,6 +645,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 	})
 }
 
+//nolint:dupl
 func TestSkipDownsizeBecauseOfMinimumSize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
@@ -684,6 +690,7 @@ func TestRestrictDownsizeBecauseOfMinimumSize(baseT *testing.T) {
 	})
 }
 
+//nolint:dupl
 func TestSkipUpsizeBecauseOfMaximumSize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
@@ -702,6 +709,7 @@ func TestSkipUpsizeBecauseOfMaximumSize(baseT *testing.T) {
 	})
 }
 
+//nolint:dupl
 func TestRestrictUpsizeBecauseOfMaximumSize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
@@ -862,6 +870,7 @@ func TestUpsizeForcedByMinimumFreeSize(baseT *testing.T) {
 	})
 }
 
+//nolint:dupl
 func TestCriticalUpsizeTakingMultipleStepsAtOnce(baseT *testing.T) {
 	t := test.T{T: baseT}
 	//This test is specific to percentage-step resizing because single-step
@@ -966,6 +975,7 @@ func TestZeroSizedAssetWithUsage(baseT *testing.T) {
 	})
 }
 
+//nolint:dupl
 func TestDownsizeShouldNotGoIntoHighThreshold(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
@@ -991,6 +1001,7 @@ func TestDownsizeShouldNotGoIntoHighThreshold(baseT *testing.T) {
 	})
 }
 
+//nolint:dupl
 func TestDownsizeShouldNotGoIntoCriticalThreshold(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
@@ -1018,6 +1029,7 @@ func TestDownsizeShouldNotGoIntoCriticalThreshold(baseT *testing.T) {
 	})
 }
 
+//nolint:dupl
 func TestUpsizeShouldNotGoIntoHighThreshold(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
