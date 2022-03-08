@@ -93,8 +93,9 @@ func logAndPublishEvent(time time.Time, req *http.Request, token *gopherpolicy.T
 		msg, err := json.Marshal(event)
 		if err != nil {
 			logg.Error("could not marshal audit event: %s", err.Error())
+		} else {
+			logg.Other("AUDIT", string(msg))
 		}
-		logg.Other("AUDIT", string(msg))
 	}
 
 	if eventSink != nil {
