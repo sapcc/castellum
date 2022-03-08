@@ -23,15 +23,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sapcc/go-bits/easypg"
+
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
-	"github.com/sapcc/go-bits/easypg"
 )
 
 func runAssetScrapeTest(t test.T, resourceIsSingleStep bool, action func(*Context, func(plugins.StaticAsset), *test.FakeClock)) {
 	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock) {
-
 		//ScrapeNextAsset() without any resources just does nothing
 		err := ExecuteOne(c.PollForAssetScrapes(0))
 		if err != sql.ErrNoRows {
@@ -95,20 +95,17 @@ func forAllSteppingStrategies(t test.T, action func(*Context, db.Resource, func(
 func TestNoOperationWhenNoThreshold(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//when no threshold is crossed, no operation gets created
 		clock.StepBy(10 * time.Minute)
 		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
-
 	})
 }
 
 func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//set a maximum size that does not contradict the following operations
 		//(down below, there's a separate test for when the maximum size actually
 		//inhibits upsizing)
@@ -164,14 +161,16 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
-
 	})
 }
 
+//nolint:dupl //dupl checks the functions/methods used and reports that there are
+//duplicates. We can't refactor because although the methods used in unit tests might be
+//similar, however they contain helpful comments in-place that are specific to that
+//particular unit test.
 func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//when the "High" threshold gets crossed, a "High" operation gets created in
 		//state "created"
 		clock.StepBy(10 * time.Minute)
@@ -205,14 +204,12 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 			CreatedAt:  c.TimeNow().Add(-40 * time.Minute),
 			FinishedAt: c.TimeNow(),
 		})
-
 	})
 }
 
 func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//set a minimum size that does not contradict the following operations
 		//(down below, there's a separate test for when the minimum size actually
 		//inhibits upsizing)
@@ -268,14 +265,13 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
-
 	})
 }
 
+//nolint:dupl
 func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//when the "Low" threshold gets crossed, a "Low" operation gets created in
 		//state "created"
 		clock.StepBy(10 * time.Minute)
@@ -309,14 +305,12 @@ func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 			CreatedAt:  c.TimeNow().Add(-40 * time.Minute),
 			FinishedAt: c.TimeNow(),
 		})
-
 	})
 }
 
 func TestCriticalUpsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//when the "Critical" threshold gets crossed, a "Critical" operation gets
 		//created and immediately confirmed/greenlit
 		clock.StepBy(10 * time.Minute)
@@ -336,14 +330,12 @@ func TestCriticalUpsizeTowardsGreenlight(baseT *testing.T) {
 		}
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
-
 	})
 }
 
 func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//when the "High" threshold gets crossed, a "High" operation gets created in
 		//state "created"
 		clock.StepBy(10 * time.Minute)
@@ -389,14 +381,12 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 			CreatedAt:  c.TimeNow().Add(-10 * time.Minute),
 			FinishedAt: c.TimeNow(),
 		})
-
 	})
 }
 
 func TestAssetScrapeOrdering(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock) {
-
 		//create a resource and multiple assets to test with
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",
@@ -487,14 +477,12 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 		//and all of this should not have created any operations
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
-
 	})
 }
 
 func TestNoOperationWhenNoSizeChange(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//when size is already at the lowest possible value (1), no new operation
 		//shall be created even if the usage is below the "low" threshold -- there is
 		//just nothing to resize to
@@ -502,14 +490,12 @@ func TestNoOperationWhenNoSizeChange(baseT *testing.T) {
 		setAsset(plugins.StaticAsset{Size: 1, Usage: 0})
 		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
-
 	})
 }
 
 func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//make asset look like it just completed a resize operation
 		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100`)
 		setAsset(plugins.StaticAsset{
@@ -563,7 +549,6 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 			Usage:     db.UsageValues{db.SingularUsageMetric: 1000},
 			CreatedAt: c.TimeNow(),
 		})
-
 	})
 }
 
@@ -574,7 +559,6 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
 	//that's different from the expected size.
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//make asset look like it just completed a resize operation
 		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100`)
 		setAsset(plugins.StaticAsset{
@@ -594,7 +578,6 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
 			ScrapedAt:    p2time(c.TimeNow()),
 			ExpectedSize: nil,
 		})
-
 	})
 }
 
@@ -607,7 +590,6 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 	//main loop progresses to the next asset.
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		setAsset(plugins.StaticAsset{
 			Size:                 1000,
 			Usage:                600,
@@ -660,14 +642,13 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 		clock.StepBy(5 * time.Minute)
 		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectAssets(c.DB)
-
 	})
 }
 
+//nolint:dupl
 func TestSkipDownsizeBecauseOfMinimumSize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//configure a minimum size on the resource
 		t.MustExec(c.DB, `UPDATE resources SET min_size = 1000`)
 
@@ -680,14 +661,12 @@ func TestSkipDownsizeBecauseOfMinimumSize(baseT *testing.T) {
 		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
-
 	})
 }
 
 func TestRestrictDownsizeBecauseOfMinimumSize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//configure a minimum size on the resource
 		t.MustExec(c.DB, `UPDATE resources SET min_size = 900`)
 
@@ -708,14 +687,13 @@ func TestRestrictDownsizeBecauseOfMinimumSize(baseT *testing.T) {
 			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
-
 	})
 }
 
+//nolint:dupl
 func TestSkipUpsizeBecauseOfMaximumSize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//configure a maximum size on the resource
 		t.MustExec(c.DB, `UPDATE resources SET max_size = 1000`)
 
@@ -728,14 +706,13 @@ func TestSkipUpsizeBecauseOfMaximumSize(baseT *testing.T) {
 		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
-
 	})
 }
 
+//nolint:dupl
 func TestRestrictUpsizeBecauseOfMaximumSize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//configure a maximum size on the resource
 		t.MustExec(c.DB, `UPDATE resources SET max_size = 1100`)
 
@@ -759,14 +736,12 @@ func TestRestrictUpsizeBecauseOfMaximumSize(baseT *testing.T) {
 			GreenlitAt:  p2time(c.TimeNow()),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
-
 	})
 }
 
 func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//create a "High" operation
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 900})
@@ -794,14 +769,12 @@ func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 		expectedOp.NewSize = ifthenelseU64(res.SingleStep, 1126, 1320)
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
-
 	})
 }
 
 func TestDownsizeAllowedByMinimumFreeSize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//set a very low usage that permits downsizing
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 100})
 
@@ -821,14 +794,12 @@ func TestDownsizeAllowedByMinimumFreeSize(baseT *testing.T) {
 			Usage:     db.UsageValues{db.SingularUsageMetric: 100},
 			CreatedAt: c.TimeNow(),
 		})
-
 	})
 }
 
 func TestDownsizeRestrictedByMinimumFreeSize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//set a very low usage that permits downsizing
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 100})
 
@@ -849,14 +820,12 @@ func TestDownsizeRestrictedByMinimumFreeSize(baseT *testing.T) {
 			Usage:     db.UsageValues{db.SingularUsageMetric: 100},
 			CreatedAt: c.TimeNow(),
 		})
-
 	})
 }
 
 func TestDownsizeForbiddenByMinimumFreeSize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//set a very low usage that permits downsizing
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 200})
 
@@ -867,14 +836,12 @@ func TestDownsizeForbiddenByMinimumFreeSize(baseT *testing.T) {
 		clock.StepBy(10 * time.Minute)
 		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
-
 	})
 }
 
 func TestUpsizeForcedByMinimumFreeSize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//the asset starts out at size = 1000, usage = 500, which wouldn't warrant an
 		//upsize; set a MinimumFreeSize larger than the current free size to force
 		//upsizing
@@ -900,16 +867,15 @@ func TestUpsizeForcedByMinimumFreeSize(baseT *testing.T) {
 		clock.StepBy(10 * time.Minute)
 		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
-
 	})
 }
 
+//nolint:dupl
 func TestCriticalUpsizeTakingMultipleStepsAtOnce(baseT *testing.T) {
 	t := test.T{T: baseT}
 	//This test is specific to percentage-step resizing because single-step
 	//resizing has no concept of "taking multiple steps at once".
 	runAssetScrapeTest(t, false, func(c *Context, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//set a very small step size
 		t.MustExec(c.DB, `UPDATE resources SET size_step_percent = 1`)
 
@@ -941,14 +907,12 @@ func TestCriticalUpsizeTakingMultipleStepsAtOnce(baseT *testing.T) {
 			GreenlitAt:  p2time(c.TimeNow()),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
-
 	})
 }
 
 func TestZeroSizedAssetWithoutUsage(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//This may occur e.g. in the project-quota asset manager, when the project
 		//in question has no quota at all. We expect Castellum to leave assets
 		//with 0 size and 0 usage alone. And more importantly, we expect Castellum
@@ -970,14 +934,12 @@ func TestZeroSizedAssetWithoutUsage(baseT *testing.T) {
 		})
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
-
 	})
 }
 
 func TestZeroSizedAssetWithUsage(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//This may occur e.g. in the project-quota asset manager when the quota
 		//setup is broken and there is usage without the requisite quota.
 		setAsset(plugins.StaticAsset{Size: 0, Usage: 5})
@@ -1010,14 +972,13 @@ func TestZeroSizedAssetWithUsage(baseT *testing.T) {
 			GreenlitAt:  p2time(c.TimeNow()),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
-
 	})
 }
 
+//nolint:dupl
 func TestDownsizeShouldNotGoIntoHighThreshold(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		t.MustExec(c.DB, `UPDATE resources SET low_threshold_percent = 75`)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 700})
 
@@ -1037,14 +998,13 @@ func TestDownsizeShouldNotGoIntoHighThreshold(baseT *testing.T) {
 			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
-
 	})
 }
 
+//nolint:dupl
 func TestDownsizeShouldNotGoIntoCriticalThreshold(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//same as above, but test without high threshold
 		t.MustExec(c.DB, `UPDATE resources SET low_threshold_percent = 90, high_threshold_percent = 0, high_delay_seconds = 0`)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 800})
@@ -1066,14 +1026,13 @@ func TestDownsizeShouldNotGoIntoCriticalThreshold(baseT *testing.T) {
 			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
-
 	})
 }
 
+//nolint:dupl
 func TestUpsizeShouldNotGoIntoHighThreshold(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//same as above, but in the opposite direction
 		t.MustExec(c.DB, `UPDATE resources SET high_threshold_percent = 22`)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 230})
@@ -1095,14 +1054,12 @@ func TestUpsizeShouldNotGoIntoHighThreshold(baseT *testing.T) {
 			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
-
 	})
 }
 
 func TestResizesEndingUpInLowThreshold(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//set thresholds very close to each other (this is what we recommend for
 		//quota autoscaling, e.g. low = 99% and critical = 100%) -- this is usually
 		//not a problem for large asset sizes because there is always a size value
@@ -1145,7 +1102,6 @@ func TestResizesEndingUpInLowThreshold(baseT *testing.T) {
 func TestUpsizeBecauseOfMinFreeSizePassingLowThreshold(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-
 		//test that min_free_size takes precedence over the low usage threshold: we
 		//should upsize the asset to guarantee the min_free_size, even if this puts
 		//usage below the threshold

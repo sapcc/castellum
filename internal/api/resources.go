@@ -26,10 +26,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sapcc/castellum/internal/core"
-	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/respondwith"
 	"github.com/sapcc/go-bits/sre"
+
+	"github.com/sapcc/castellum/internal/core"
+	"github.com/sapcc/castellum/internal/db"
 )
 
 ////////////////////////////////////////////////////////////////////////////////

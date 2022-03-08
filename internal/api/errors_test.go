@@ -23,16 +23,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sapcc/go-bits/assert"
+
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/test"
-	"github.com/sapcc/go-bits/assert"
 )
 
 func TestGetResourceScrapeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
-
 		//endpoint requires a token with cluster access
 		mv.Forbid("cluster:access")
 		assert.HTTPRequest{
@@ -76,7 +76,6 @@ func TestGetResourceScrapeErrors(baseT *testing.T) {
 func TestGetAssetScrapeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
-
 		//endpoint requires a token with cluster access
 		mv.Forbid("cluster:access")
 		assert.HTTPRequest{
@@ -111,7 +110,6 @@ func TestGetAssetScrapeErrors(baseT *testing.T) {
 func TestGetAssetResizeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
-
 		//endpoint requires a token with cluster access
 		mv.Forbid("cluster:access")
 		assert.HTTPRequest{

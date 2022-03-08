@@ -29,13 +29,14 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/sapcc/castellum/internal/core"
-	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/respondwith"
 	"github.com/sapcc/go-bits/sre"
 	"gopkg.in/gorp.v2"
+
+	"github.com/sapcc/castellum/internal/core"
+	"github.com/sapcc/castellum/internal/db"
 )
 
 type handler struct {
@@ -127,13 +128,13 @@ func RequireJSON(w http.ResponseWriter, r *http.Request, data interface{}) bool 
 func respondWithForbidden(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusForbidden)
-	w.Write([]byte("403 Forbidden"))
+	w.Write([]byte("403 Forbidden")) //nolint:errcheck
 }
 
 func respondWithNotFound(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusNotFound)
-	w.Write([]byte("404 Not found"))
+	w.Write([]byte("404 Not found")) //nolint:errcheck
 }
 
 func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *gopherpolicy.Token) {

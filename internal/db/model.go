@@ -316,6 +316,7 @@ func Init(dbURL *url.URL) (*gorp.DbMap, error) {
 		PostgresURL: dbURL,
 		Migrations:  SQLMigrations,
 	}
+	//nolint:errcheck
 	if logStatements, _ := strconv.ParseBool(os.Getenv("CASTELLUM_DEBUG_SQL")); logStatements {
 		cfg.OverrideDriverName = "postgres-with-logging"
 	}

@@ -23,11 +23,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sapcc/go-bits/assert"
+
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
-	"github.com/sapcc/go-bits/assert"
 )
 
 //JSON serializations of the records in internal/api/fixtures/start-data.sql
@@ -75,7 +76,6 @@ var (
 func TestGetProject(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
-
 		//endpoint requires a token with project access
 		mv.Forbid("project:access")
 		assert.HTTPRequest{
@@ -121,14 +121,12 @@ func TestGetProject(baseT *testing.T) {
 				},
 			},
 		}.Check(t.T, hh)
-
 	})
 }
 
 func TestGetResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
-
 		//endpoint requires a token with project access
 		mv.Forbid("project:access")
 		assert.HTTPRequest{
@@ -181,14 +179,12 @@ func TestGetResource(baseT *testing.T) {
 			ExpectStatus: http.StatusOK,
 			ExpectBody:   initialBarResourceJSON,
 		}.Check(t.T, hh)
-
 	})
 }
 
 func TestPutResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, _ []db.Asset) {
-
 		//mostly like `initialFooResourceJSON`, but with some delays changed and
 		//single-step resizing instead of percentage-based resizing
 		newFooResourceJSON1 := assert.JSONObject{
@@ -405,7 +401,6 @@ func TestPutResource(baseT *testing.T) {
 			}
 		}
 		t.ExpectResources(h.DB, newResources3...)
-
 	})
 }
 
@@ -420,7 +415,6 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 	}
 
 	withHandler(t, cfg, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, _ []db.Asset) {
-
 		expectErrors := func(assetType string, body assert.JSONObject, errors ...string) {
 			t.T.Helper()
 			assert.HTTPRequest{
@@ -590,14 +584,12 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 
 		//none of this should have touched the DB
 		t.ExpectResources(h.DB, allResources...)
-
 	})
 }
 
 func TestDeleteResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, allAssets []db.Asset) {
-
 		//endpoint requires a token with project access
 		mv.Forbid("project:access")
 		assert.HTTPRequest{
@@ -672,6 +664,5 @@ func TestDeleteResource(baseT *testing.T) {
 			}
 		}
 		t.ExpectAssets(h.DB, remainingAssets...)
-
 	})
 }

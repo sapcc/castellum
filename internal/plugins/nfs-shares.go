@@ -33,9 +33,10 @@ import (
 	prom_api "github.com/prometheus/client_golang/api"
 	prom_v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
+	"github.com/sapcc/go-bits/logg"
+
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
-	"github.com/sapcc/go-bits/logg"
 )
 
 type assetManagerNFS struct {
@@ -340,13 +341,11 @@ func prometheusGetVector(api prom_v1.API, queryStr string) (model.Vector, error)
 		logg.Info("Prometheus query produced warning: %s", warning)
 	}
 	if err != nil {
-		//lint:ignore ST1005 Prometheus is a proper name
-		return nil, fmt.Errorf("Prometheus query failed: %s: %s", queryStr, err.Error())
+		return nil, fmt.Errorf("could not execute Prometheus query: %s: %s", queryStr, err.Error())
 	}
 	resultVector, ok := value.(model.Vector)
 	if !ok {
-		//lint:ignore ST1005 Prometheus is a proper name
-		return nil, fmt.Errorf("Prometheus query failed: %s: unexpected type %T", queryStr, value)
+		return nil, fmt.Errorf("could not execute Prometheus query: %s: unexpected type %T", queryStr, value)
 	}
 	return resultVector, nil
 }
@@ -360,6 +359,8 @@ func prometheusGetSingleValue(api prom_v1.API, queryStr string) (float64, error)
 	switch resultVector.Len() {
 	case 0:
 		return 0, emptyPrometheusResultErr{Query: queryStr}
+	case 1:
+		return float64(resultVector[0].Value), nil
 	default:
 		//suppress the log message when all values are the same (this can happen
 		//when an adventurous Prometheus configuration causes the NetApp exporter
@@ -375,8 +376,6 @@ func prometheusGetSingleValue(api prom_v1.API, queryStr string) (float64, error)
 		if !allTheSame {
 			logg.Info("Prometheus query returned more than one result: %s (only the first value will be used)", queryStr)
 		}
-		fallthrough
-	case 1:
 		return float64(resultVector[0].Value), nil
 	}
 }

@@ -23,10 +23,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sapcc/go-bits/assert"
+
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/test"
-	"github.com/sapcc/go-bits/assert"
 )
 
 func TestGetAssets(baseT *testing.T) {

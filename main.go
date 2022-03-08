@@ -41,14 +41,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
-	"github.com/sapcc/castellum/internal/api"
-	"github.com/sapcc/castellum/internal/core"
-	"github.com/sapcc/castellum/internal/db"
-	"github.com/sapcc/castellum/internal/tasks"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpee"
 	"github.com/sapcc/go-bits/logg"
 	"gopkg.in/gorp.v2"
+
+	"github.com/sapcc/castellum/internal/api"
+	"github.com/sapcc/castellum/internal/core"
+	"github.com/sapcc/castellum/internal/db"
+	"github.com/sapcc/castellum/internal/tasks"
 
 	//load asset managers
 	_ "github.com/sapcc/castellum/internal/plugins"
@@ -69,6 +70,7 @@ func main() {
 	taskName := os.Args[1]
 	core.Component = "castellum-" + taskName
 
+	//nolint:errcheck
 	logg.ShowDebug, _ = strconv.ParseBool(os.Getenv("CASTELLUM_DEBUG"))
 
 	//The CASTELLUM_INSECURE flag can be used to get Castellum to work through
@@ -76,6 +78,7 @@ func main() {
 	//important that this is not the standard "CASTELLUM_DEBUG" variable. That one
 	//is meant to be useful for production systems, where you definitely don't
 	//want to turn off certificate verification.)
+	//nolint:errcheck
 	if insecure, _ := strconv.ParseBool(os.Getenv("CASTELLUM_INSECURE")); insecure {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true,
@@ -283,10 +286,10 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	if r.URL.Path == "/healthcheck" && r.Method == "GET" {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		w.Write([]byte("ok")) //nolint:errcheck
 	} else {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("not found"))
+		w.Write([]byte("not found")) //nolint:errcheck
 	}
 }
 

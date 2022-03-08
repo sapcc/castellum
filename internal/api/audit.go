@@ -39,6 +39,7 @@ var showAuditOnStdout bool
 
 // StartAuditLogging starts audit logging for the API.
 func StartAuditLogging(rabbitQueueName string, rabbitURI url.URL) {
+	//nolint:errcheck
 	silenceAuditLogging, _ := strconv.ParseBool(os.Getenv("CASTELLUM_AUDIT_SILENT"))
 	showAuditOnStdout = !silenceAuditLogging
 
@@ -89,7 +90,10 @@ func logAndPublishEvent(time time.Time, req *http.Request, token *gopherpolicy.T
 	event := audittools.NewEvent(p)
 
 	if showAuditOnStdout {
-		msg, _ := json.Marshal(event)
+		msg, err := json.Marshal(event)
+		if err != nil {
+			logg.Error("could not marshal audit event: %s", err.Error())
+		}
 		logg.Other("AUDIT", string(msg))
 	}
 

@@ -30,7 +30,6 @@ import (
 func TestCollectGarbage(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withContext(t, func(c *Context, _ *plugins.AssetManagerStatic, _ *test.FakeClock) {
-
 		fakeNow := time.Unix(0, 0).UTC()
 
 		//setup some minimal scaffolding (we can only insert finished_operations
@@ -89,6 +88,5 @@ func TestCollectGarbage(baseT *testing.T) {
 		t.ExpectFinishedOperations(c.DB, ops...)
 		t.Must(CollectGarbage(c.DB, fakeNow.Add(-15*time.Minute)))
 		t.ExpectFinishedOperations(c.DB, ops[2])
-
 	})
 }

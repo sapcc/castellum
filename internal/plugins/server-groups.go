@@ -42,9 +42,10 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/pools"
 	prom_api "github.com/prometheus/client_golang/api"
 	prom_v1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/sapcc/go-bits/logg"
+
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
-	"github.com/sapcc/go-bits/logg"
 )
 
 const (

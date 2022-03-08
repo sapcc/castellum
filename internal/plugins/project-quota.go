@@ -25,12 +25,13 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
-	"github.com/sapcc/castellum/internal/core"
-	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/gophercloud-limes/resources"
 	"github.com/sapcc/gophercloud-limes/resources/v1/projects"
 	"github.com/sapcc/limes"
+
+	"github.com/sapcc/castellum/internal/core"
+	"github.com/sapcc/castellum/internal/db"
 )
 
 //This asset manager has one asset type for each resource (i.e. each type of
@@ -78,7 +79,10 @@ func init() {
 		}
 
 		//list all resources that exist, by looking at the current project
-		report, _ := projects.Get(limes, currentProjectDomainID, currentProjectID, nil).Extract()
+		report, err := projects.Get(limes, currentProjectDomainID, currentProjectID, nil).Extract()
+		if err != nil {
+			return nil, fmt.Errorf("could not get project report for %s", currentProjectID)
+		}
 		var knownResources []limesResourceInfo
 		for _, srv := range report.Services {
 			for _, res := range srv.Resources {
@@ -214,8 +218,7 @@ func (m *assetManagerProjectQuota) getQuotaStatus(assetType db.AssetType, projec
 			return res, nil
 		}
 	}
-	//lint:ignore ST1005 Limes is a proper name
-	return nil, fmt.Errorf("Limes does not report %s/%s quota for project %s",
+	return nil, fmt.Errorf("%s/%s quota for project %s is not reported by Limes",
 		info.ServiceType, info.ResourceName, projectID)
 }
 
