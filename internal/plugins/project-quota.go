@@ -218,7 +218,7 @@ func (m *assetManagerProjectQuota) getQuotaStatus(assetType db.AssetType, projec
 			return res, nil
 		}
 	}
-	return nil, fmt.Errorf("%s/%s quota for project %s isn't reported by Limes",
+	return nil, fmt.Errorf("%s/%s quota for project %s is not reported by Limes",
 		info.ServiceType, info.ResourceName, projectID)
 }
 

@@ -341,11 +341,11 @@ func prometheusGetVector(api prom_v1.API, queryStr string) (model.Vector, error)
 		logg.Info("Prometheus query produced warning: %s", warning)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("query failed for Prometheus: %s: %s", queryStr, err.Error())
+		return nil, fmt.Errorf("could not execute Prometheus query: %s: %s", queryStr, err.Error())
 	}
 	resultVector, ok := value.(model.Vector)
 	if !ok {
-		return nil, fmt.Errorf("query failed for Prometheus: %s: unexpected type %T", queryStr, value)
+		return nil, fmt.Errorf("could not execute Prometheus query: %s: unexpected type %T", queryStr, value)
 	}
 	return resultVector, nil
 }
