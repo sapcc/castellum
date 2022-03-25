@@ -221,6 +221,9 @@ func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSiz
 }
 
 func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useReverseOperation bool) error {
+	if newSize > math.MaxInt { // we need to convert `newSize` to int to satisfy the Gophercloud API
+		return fmt.Errorf("newSize out of bounds: %d", newSize)
+	}
 	if (oldSize < newSize && !useReverseOperation) || (oldSize >= newSize && useReverseOperation) {
 		return shares.Extend(m.Manila, assetUUID, shareExtendOpts{NewSize: int(newSize), Force: true}).ExtractErr()
 	}
