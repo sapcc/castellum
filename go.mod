@@ -12,7 +12,7 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/common v0.34.0
 	github.com/rs/cors v1.8.2
-	github.com/sapcc/go-bits v0.0.0-20220223123017-b00971956813
+	github.com/sapcc/go-bits v0.0.0-20220420152706-c002200421a4
 	github.com/sapcc/gophercloud-limes v0.0.0-20200819120227-33ee0896b7e8
 	github.com/sapcc/hermes v0.0.0-20220325003036-ae3739880b29
 	github.com/sapcc/limes v0.0.0-20220420134608-60e551104a7c
@@ -28,15 +28,15 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/lib/pq v1.10.4 // indirect
+	github.com/lib/pq v1.10.5 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
+	github.com/rabbitmq/amqp091-go v1.3.4 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
-	github.com/streadway/amqp v1.0.0 // indirect
 	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
