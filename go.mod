@@ -6,7 +6,7 @@ require (
 	github.com/databus23/goslo.policy v0.0.0-20210929125152-81bf2876dbdb
 	github.com/dlmiddlecote/sqlstats v1.0.2
 	github.com/gophercloud/gophercloud v0.24.0
-	github.com/gophercloud/utils v0.0.0-20210909165623-d7085207ff6d
+	github.com/gophercloud/utils v0.0.0-20220307143606-8e7800759d16
 	github.com/gorilla/mux v1.8.0
 	github.com/majewsky/sqlproxy v0.0.0-20190524080451-ba724456c4af
 	github.com/prometheus/client_golang v1.12.1
@@ -16,7 +16,6 @@ require (
 	github.com/sapcc/gophercloud-limes v0.0.0-20200819120227-33ee0896b7e8
 	github.com/sapcc/hermes v0.0.0-20220216215340-12b4f661924a
 	github.com/sapcc/limes v0.0.0-20220103121537-cf5aa78fd02d
-	github.com/streadway/amqp v1.0.0
 	gopkg.in/gorp.v2 v2.2.0
 )
 
@@ -37,6 +36,7 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
+	github.com/streadway/amqp v1.0.0 // indirect
 	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
 	golang.org/x/text v0.3.6 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
