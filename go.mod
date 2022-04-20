@@ -14,7 +14,7 @@ require (
 	github.com/rs/cors v1.8.2
 	github.com/sapcc/go-bits v0.0.0-20220420164641-de8a04267267
 	github.com/sapcc/gophercloud-limes v0.0.0-20200819120227-33ee0896b7e8
-	github.com/sapcc/hermes v0.0.0-20220420153120-c379b6e9ec52
+	github.com/sapcc/hermes v0.0.0-20220420173150-ce9c7348dca6
 	github.com/sapcc/limes v0.0.0-20220420172036-732db96cb7d3
 	gopkg.in/gorp.v2 v2.2.0
 )
