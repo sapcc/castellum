@@ -15,7 +15,7 @@ require (
 	github.com/sapcc/go-bits v0.0.0-20220223123017-b00971956813
 	github.com/sapcc/gophercloud-limes v0.0.0-20200819120227-33ee0896b7e8
 	github.com/sapcc/hermes v0.0.0-20220325003036-ae3739880b29
-	github.com/sapcc/limes v0.0.0-20220103121537-cf5aa78fd02d
+	github.com/sapcc/limes v0.0.0-20220420134608-60e551104a7c
 	gopkg.in/gorp.v2 v2.2.0
 )
 

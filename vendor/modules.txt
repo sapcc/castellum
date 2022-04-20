@@ -131,7 +131,7 @@ github.com/sapcc/gophercloud-limes/resources/v1/projects
 # github.com/sapcc/hermes v0.0.0-20220325003036-ae3739880b29
 ## explicit; go 1.13
 github.com/sapcc/hermes/pkg/cadf
-# github.com/sapcc/limes v0.0.0-20220103121537-cf5aa78fd02d
+# github.com/sapcc/limes v0.0.0-20220420134608-60e551104a7c
 ## explicit; go 1.17
 github.com/sapcc/limes
 # github.com/sergi/go-diff v1.2.0
