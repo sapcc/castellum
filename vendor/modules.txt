@@ -128,7 +128,7 @@ github.com/sapcc/go-bits/sre
 ## explicit; go 1.12
 github.com/sapcc/gophercloud-limes/resources
 github.com/sapcc/gophercloud-limes/resources/v1/projects
-# github.com/sapcc/hermes v0.0.0-20220216215340-12b4f661924a
+# github.com/sapcc/hermes v0.0.0-20220325003036-ae3739880b29
 ## explicit; go 1.13
 github.com/sapcc/hermes/pkg/cadf
 # github.com/sapcc/limes v0.0.0-20220103121537-cf5aa78fd02d

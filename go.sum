@@ -306,8 +306,8 @@ github.com/sapcc/go-bits v0.0.0-20220223123017-b00971956813/go.mod h1:v3z6vEhw5x
 github.com/sapcc/gophercloud-limes v0.0.0-20200819120227-33ee0896b7e8 h1:oeLSkpv6DhRiNmMnYPwlCm/HeGfogYslFQDdLSWhRTY=
 github.com/sapcc/gophercloud-limes v0.0.0-20200819120227-33ee0896b7e8/go.mod h1:8/BIFprjDN70kq0r6GyFgBmZHEWF6/8+q6wmcvSmHmM=
 github.com/sapcc/hermes v0.0.0-20190722215605-d772f40f9fc6/go.mod h1:WM5CVlqFCGM+AUE7lQgkLmPE89PWqJS3i+oRXaSztR8=
-github.com/sapcc/hermes v0.0.0-20220216215340-12b4f661924a h1:eugynT9mfMvVlEqt+EF3IlP2wC8OXSAfyPEjliP3vxs=
-github.com/sapcc/hermes v0.0.0-20220216215340-12b4f661924a/go.mod h1:1fxCUJjYnq0n63o61aXG+5G1oCKApPb667aiGawNvHQ=
+github.com/sapcc/hermes v0.0.0-20220325003036-ae3739880b29 h1:uiIoISLYfwNg/kKQOz5Y5fh2q+x1YWQ2yqCOcAnw7/g=
+github.com/sapcc/hermes v0.0.0-20220325003036-ae3739880b29/go.mod h1:1fxCUJjYnq0n63o61aXG+5G1oCKApPb667aiGawNvHQ=
 github.com/sapcc/limes v0.0.0-20190311092800-fb212143c5f5/go.mod h1:Fq0sDroTbraRqiS+OWjf8GFMREFVgrF8nhvJ76SgAk4=
 github.com/sapcc/limes v0.0.0-20220103121537-cf5aa78fd02d h1:jYaEokjdXyF0FYL9XoImkDnBSyZSO+xbJntBfuEYO9o=
 github.com/sapcc/limes v0.0.0-20220103121537-cf5aa78fd02d/go.mod h1:ZI1v0ksoeWpHKMOkKgoMIXUR+RVyorHnZoNjExoVrws=
