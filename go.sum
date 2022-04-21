@@ -324,8 +324,8 @@ github.com/sapcc/go-bits v0.0.0-20190910095551-3863bd6b4943/go.mod h1:YpW83RbRSH
 github.com/sapcc/go-bits v0.0.0-20220420164641-de8a04267267/go.mod h1:dMmRruaiBr3+Y710I5ZldSo4QiVaq2bKmIN2jDbrVf0=
 github.com/sapcc/go-bits v0.0.0-20220421001326-5fc35d483379 h1:L0+tCCnbgOCqIepWpzEZp6CcR086TogTwLuROxMtw/U=
 github.com/sapcc/go-bits v0.0.0-20220421001326-5fc35d483379/go.mod h1:cDXXlfA5JDB2K2wJ/Y3mgkBabmXRJPHUkPrx4Jt8XD0=
-github.com/sapcc/gophercloud-sapcc v0.0.0-20220421122031-2222e245d6c9 h1:W5Gooa0f3O0K/v1a6ZyTWMpOC07P6EW6w5ipv+Jh5Po=
-github.com/sapcc/gophercloud-sapcc v0.0.0-20220421122031-2222e245d6c9/go.mod h1:4GS9VQ7uwEhLYdzLUfsurKIeRgAqs5pSyMpzmdx6vCo=
+github.com/sapcc/gophercloud-sapcc v0.0.0-20220421132727-e6970b19f27e h1:ysyoVJ8X2ZXkIUT/0h3vUAkJKOWU7Pz5gNRS5rI5F40=
+github.com/sapcc/gophercloud-sapcc v0.0.0-20220421132727-e6970b19f27e/go.mod h1:4GS9VQ7uwEhLYdzLUfsurKIeRgAqs5pSyMpzmdx6vCo=
 github.com/sapcc/hermes v0.0.0-20190722215605-d772f40f9fc6/go.mod h1:WM5CVlqFCGM+AUE7lQgkLmPE89PWqJS3i+oRXaSztR8=
 github.com/sapcc/hermes v0.0.0-20220325003036-ae3739880b29/go.mod h1:1fxCUJjYnq0n63o61aXG+5G1oCKApPb667aiGawNvHQ=
 github.com/sapcc/hermes v0.0.0-20220420173150-ce9c7348dca6 h1:0/ndvMIpDyuTk7FOVCTv9mYeBwPRuUTPsHCJLKzcco4=
