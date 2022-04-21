@@ -25,10 +25,10 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
+	"github.com/sapcc/go-api-declarations/limes"
 	"github.com/sapcc/go-bits/logg"
-	"github.com/sapcc/gophercloud-limes/resources"
-	"github.com/sapcc/gophercloud-limes/resources/v1/projects"
-	"github.com/sapcc/limes"
+	"github.com/sapcc/gophercloud-sapcc/clients"
+	"github.com/sapcc/gophercloud-sapcc/resources/v1/projects"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -56,7 +56,7 @@ func (info limesResourceInfo) AssetType() db.AssetType {
 
 func init() {
 	core.RegisterAssetManagerFactory("project-quota", func(provider core.ProviderClient) (core.AssetManager, error) {
-		limes, err := provider.CloudAdminClient(resources.NewLimesV1)
+		limes, err := provider.CloudAdminClient(clients.NewLimesV1)
 		if err != nil {
 			return nil, err
 		}
@@ -161,7 +161,7 @@ func (m *assetManagerProjectQuota) SetAssetSize(res db.Resource, projectID strin
 	quotaReq := limes.QuotaRequest{}
 	quotaReq[info.ServiceType] = srvQuotaReq
 
-	respBytes, err := projects.Update(m.Limes, project.DomainID, projectID, projects.UpdateOpts{Services: quotaReq})
+	respBytes, err := projects.Update(m.Limes, project.DomainID, projectID, projects.UpdateOpts{Services: quotaReq}).Extract()
 	if len(respBytes) > 0 {
 		logg.Info("encountered non-critical error while setting %s/%s quota on project %s: %q",
 			info.ServiceType, info.ResourceName, projectID, string(respBytes))
@@ -208,7 +208,7 @@ func (m *assetManagerProjectQuota) getQuotaStatus(assetType db.AssetType, projec
 		return nil, fmt.Errorf("project not found in Keystone: %s", projectID)
 	}
 
-	opts := projects.GetOpts{Service: info.ServiceType, Resource: info.ResourceName}
+	opts := projects.GetOpts{Services: []string{info.ServiceType}, Resources: []string{info.ResourceName}}
 	report, err := projects.Get(m.Limes, project.DomainID, projectID, opts).Extract()
 	if err != nil {
 		return nil, err

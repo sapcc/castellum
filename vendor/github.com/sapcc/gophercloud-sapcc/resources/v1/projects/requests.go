@@ -1,11 +1,21 @@
-// Package projects provides interaction with Limes at the project hierarchical level.
 package projects
 
 import (
-	"io/ioutil"
+	"io"
+	"net/http"
 
 	"github.com/gophercloud/gophercloud"
-	"github.com/sapcc/limes"
+	"github.com/sapcc/go-api-declarations/limes"
+)
+
+// RatesDisplay determines the presence of rate limits in a project's Get/List response.
+type RatesDisplay string
+
+const (
+	// WithoutRates is the default value, it is only here for documentation purposes.
+	WithoutRates RatesDisplay = ""
+	WithRates    RatesDisplay = "true"
+	OnlyRates    RatesDisplay = "only"
 )
 
 // ListOptsBuilder allows extensions to add additional parameters to the List request.
@@ -15,11 +25,11 @@ type ListOptsBuilder interface {
 
 // ListOpts contains parameters for filtering a List request.
 type ListOpts struct {
-	Cluster  string `h:"X-Limes-Cluster-Id"`
-	Detail   bool   `q:"detail"`
-	Area     string `q:"area"`
-	Service  string `q:"service"`
-	Resource string `q:"resource"`
+	Detail    bool         `q:"detail"`
+	Areas     []string     `q:"area"`
+	Services  []string     `q:"service"`
+	Resources []string     `q:"resource"`
+	Rates     RatesDisplay `q:"rates"`
 }
 
 // ToProjectListParams formats a ListOpts into a map of headers and a query string.
@@ -51,9 +61,10 @@ func List(c *gophercloud.ServiceClient, domainID string, opts ListOptsBuilder) (
 		url += q
 	}
 
-	_, r.Err = c.Get(url, &r.Body, &gophercloud.RequestOpts{
+	resp, err := c.Get(url, &r.Body, &gophercloud.RequestOpts{
 		MoreHeaders: headers,
 	})
+	_, r.Header, r.Err = gophercloud.ParseResponse(resp, err)
 	return
 }
 
@@ -64,11 +75,11 @@ type GetOptsBuilder interface {
 
 // GetOpts contains parameters for filtering a Get request.
 type GetOpts struct {
-	Cluster  string `h:"X-Limes-Cluster-Id"`
-	Detail   bool   `q:"detail"`
-	Area     string `q:"area"`
-	Service  string `q:"service"`
-	Resource string `q:"resource"`
+	Detail    bool         `q:"detail"`
+	Areas     []string     `q:"area"`
+	Services  []string     `q:"service"`
+	Resources []string     `q:"resource"`
+	Rates     RatesDisplay `q:"rates"`
 }
 
 // ToProjectGetParams formats a GetOpts into a map of headers and a query string.
@@ -100,9 +111,10 @@ func Get(c *gophercloud.ServiceClient, domainID string, projectID string, opts G
 		url += q
 	}
 
-	_, r.Err = c.Get(url, &r.Body, &gophercloud.RequestOpts{
+	resp, err := c.Get(url, &r.Body, &gophercloud.RequestOpts{
 		MoreHeaders: headers,
 	})
+	_, r.Header, r.Err = gophercloud.ParseResponse(resp, err)
 	return
 }
 
@@ -113,7 +125,6 @@ type UpdateOptsBuilder interface {
 
 // UpdateOpts contains parameters to update a project.
 type UpdateOpts struct {
-	Cluster  string             `h:"X-Limes-Cluster-Id"`
 	Services limes.QuotaRequest `json:"services"`
 }
 
@@ -133,60 +144,34 @@ func (opts UpdateOpts) ToProjectUpdateMap() (map[string]string, map[string]inter
 }
 
 // Update modifies the attributes of a project and returns the response body which contains non-fatal error messages.
-func Update(c *gophercloud.ServiceClient, domainID string, projectID string, opts UpdateOptsBuilder) ([]byte, error) {
+func Update(c *gophercloud.ServiceClient, domainID string, projectID string, opts UpdateOptsBuilder) (r UpdateResult) {
 	url := updateURL(c, domainID, projectID)
 	h, b, err := opts.ToProjectUpdateMap()
 	if err != nil {
-		return nil, err
+		r.Err = err
+		return
 	}
 	resp, err := c.Put(url, b, nil, &gophercloud.RequestOpts{
-		OkCodes:     []int{202},
-		MoreHeaders: h,
+		OkCodes:          []int{http.StatusAccepted},
+		MoreHeaders:      h,
+		KeepResponseBody: true,
 	})
-	if err != nil {
-		return nil, err
+	_, r.Header, r.Err = gophercloud.ParseResponse(resp, err)
+	if r.Err != nil {
+		return
 	}
-
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return body, nil
-}
-
-// SyncOptsBuilder allows extensions to add additional parameters to the Sync request.
-type SyncOptsBuilder interface {
-	ToProjectSyncParams() (map[string]string, error)
-}
-
-// SyncOpts contains parameters for filtering a Sync request.
-type SyncOpts struct {
-	Cluster string `h:"X-Limes-Cluster-Id"`
-}
-
-// ToProjectSyncParams formats a SyncOpts into a map of headers.
-func (opts SyncOpts) ToProjectSyncParams() (map[string]string, error) {
-	return gophercloud.BuildHeaders(opts)
+	r.Body, r.Err = io.ReadAll(resp.Body)
+	return
 }
 
 // Sync schedules a sync task that pulls a project's data from the backing services
 // into Limes' local database.
-func Sync(c *gophercloud.ServiceClient, domainID string, projectID string, opts SyncOptsBuilder) error {
+func Sync(c *gophercloud.ServiceClient, domainID string, projectID string) (r SyncResult) {
 	url := syncURL(c, domainID, projectID)
-	headers := make(map[string]string)
-	if opts != nil {
-		h, err := opts.ToProjectSyncParams()
-		if err != nil {
-			return err
-		}
-		headers = h
-	}
-
-	_, err := c.Post(url, nil, nil, &gophercloud.RequestOpts{
-		OkCodes:     []int{202},
-		MoreHeaders: headers,
+	resp, err := c.Post(url, nil, nil, &gophercloud.RequestOpts{
+		OkCodes: []int{http.StatusAccepted},
 	})
-	return err
+	_, r.Header, r.Err = gophercloud.ParseResponse(resp, err)
+	return
 }

@@ -10,6 +10,10 @@ github.com/databus23/goslo.policy
 # github.com/dlmiddlecote/sqlstats v1.0.2
 ## explicit; go 1.11
 github.com/dlmiddlecote/sqlstats
+# github.com/go-gorp/gorp v2.2.0+incompatible
+## explicit
+# github.com/go-sql-driver/mysql v1.6.0
+## explicit; go 1.10
 # github.com/gofrs/uuid v4.2.0+incompatible
 ## explicit
 github.com/gofrs/uuid
@@ -84,6 +88,8 @@ github.com/modern-go/concurrent
 # github.com/modern-go/reflect2 v1.0.2
 ## explicit; go 1.12
 github.com/modern-go/reflect2
+# github.com/poy/onpar v1.1.2
+## explicit; go 1.14
 # github.com/prometheus/client_golang v1.12.1
 ## explicit; go 1.13
 github.com/prometheus/client_golang/api
@@ -110,6 +116,9 @@ github.com/rabbitmq/amqp091-go
 # github.com/rs/cors v1.8.2
 ## explicit; go 1.13
 github.com/rs/cors
+# github.com/sapcc/go-api-declarations v1.0.0
+## explicit; go 1.17
+github.com/sapcc/go-api-declarations/limes
 # github.com/sapcc/go-bits v0.0.0-20220421001326-5fc35d483379
 ## explicit; go 1.17
 github.com/sapcc/go-bits/assert
@@ -127,19 +136,20 @@ github.com/sapcc/go-bits/httpext
 github.com/sapcc/go-bits/logg
 github.com/sapcc/go-bits/respondwith
 github.com/sapcc/go-bits/sre
-# github.com/sapcc/gophercloud-limes v0.0.0-20200819120227-33ee0896b7e8
-## explicit; go 1.12
-github.com/sapcc/gophercloud-limes/resources
-github.com/sapcc/gophercloud-limes/resources/v1/projects
+# github.com/sapcc/gophercloud-sapcc v0.0.0-20220421122031-2222e245d6c9
+## explicit; go 1.17
+github.com/sapcc/gophercloud-sapcc/clients
+github.com/sapcc/gophercloud-sapcc/resources/v1/projects
 # github.com/sapcc/hermes v0.0.0-20220420173150-ce9c7348dca6
 ## explicit; go 1.13
 github.com/sapcc/hermes/pkg/cadf
-# github.com/sapcc/limes v0.0.0-20220421001348-020b456956f7
-## explicit; go 1.17
-github.com/sapcc/limes
 # github.com/sergi/go-diff v1.2.0
 ## explicit; go 1.12
 github.com/sergi/go-diff/diffmatchpatch
+# github.com/ziutek/mymysql v1.5.4
+## explicit
+# golang.org/x/net v0.0.0-20220420153159-1850ba15e1be
+## explicit; go 1.17
 # golang.org/x/sys v0.0.0-20220209214540-3681064d5158
 ## explicit; go 1.17
 golang.org/x/sys/internal/unsafeheader
