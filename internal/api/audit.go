@@ -26,10 +26,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/sapcc/go-api-declarations/cadf"
 	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/logg"
-	"github.com/sapcc/hermes/pkg/cadf"
 )
 
 //eventSink is a channel that receives audit events.
@@ -66,9 +66,9 @@ var observerUUID = audittools.GenerateUUID()
 
 //logAndPublishEvent logs the audit event to stdout and publishes it to a RabbitMQ server.
 func logAndPublishEvent(time time.Time, req *http.Request, token *gopherpolicy.Token, reasonCode int, target audittools.TargetRenderer) {
-	action := "update"
+	action := cadf.UpdateAction
 	if v, ok := target.(scalingEventTarget); ok {
-		action = string(v.action) + "/" + v.resourceType
+		action = cadf.Action(string(v.action) + "/" + v.resourceType)
 	}
 	p := audittools.EventParameters{
 		Time:       time,
@@ -103,19 +103,9 @@ func logAndPublishEvent(time time.Time, req *http.Request, token *gopherpolicy.T
 	}
 }
 
-type auditAction string
-
-//Different type of actions that are used to create the appropriate value for
-//cadf.Event.Action.
-const (
-	updateAction  auditAction = "update"
-	enableAction  auditAction = "enable"
-	disableAction auditAction = "disable"
-)
-
 //EventParams contains parameters for creating an audit event.
 type scalingEventTarget struct {
-	action            auditAction
+	action            cadf.Action
 	projectID         string
 	resourceType      string
 	attachmentContent targetAttachmentContent //only used for enable/update action events

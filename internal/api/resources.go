@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sapcc/go-api-declarations/cadf"
 	"github.com/sapcc/go-bits/respondwith"
 	"github.com/sapcc/go-bits/sre"
 
@@ -371,9 +372,9 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	manager, info := h.Team.ForAssetType(dbResource.AssetType)
 	maxAssetSize := h.Config.MaxAssetSize[info.AssetType]
 
-	action := updateAction
+	action := cadf.UpdateAction
 	if dbResource.ID == 0 {
-		action = enableAction
+		action = cadf.EnableAction
 	}
 	// this allows to reuse the logAndPublishEvent() with same parameters except reasonCode
 	doAudit := func(statusCode int) {
@@ -425,7 +426,7 @@ func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
 	doAudit := func(statusCode int) {
 		logAndPublishEvent(requestTime, r, token, statusCode,
 			scalingEventTarget{
-				action:       disableAction,
+				action:       cadf.DisableAction,
 				projectID:    projectUUID,
 				resourceType: string(dbResource.AssetType),
 			})

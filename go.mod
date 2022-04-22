@@ -12,10 +12,9 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/common v0.34.0
 	github.com/rs/cors v1.8.2
-	github.com/sapcc/go-api-declarations v1.0.0
-	github.com/sapcc/go-bits v0.0.0-20220421231541-1cfaba4ec6dc
+	github.com/sapcc/go-api-declarations v1.1.0
+	github.com/sapcc/go-bits v0.0.0-20220422143146-28336182f358
 	github.com/sapcc/gophercloud-sapcc v0.0.0-20220421231341-11804ae1ac84
-	github.com/sapcc/hermes v0.0.0-20220421185221-22632bbd8e54
 	gopkg.in/gorp.v2 v2.2.0
 )
 
