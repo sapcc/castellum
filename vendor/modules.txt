@@ -90,7 +90,7 @@ github.com/modern-go/concurrent
 github.com/modern-go/reflect2
 # github.com/poy/onpar v1.1.2
 ## explicit; go 1.14
-# github.com/prometheus/client_golang v1.12.1
+# github.com/prometheus/client_golang v1.12.2
 ## explicit; go 1.13
 github.com/prometheus/client_golang/api
 github.com/prometheus/client_golang/api/prometheus/v1
