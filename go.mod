@@ -13,7 +13,7 @@ require (
 	github.com/prometheus/common v0.34.0
 	github.com/rs/cors v1.8.2
 	github.com/sapcc/go-api-declarations v1.1.0
-	github.com/sapcc/go-bits v0.0.0-20220512020827-9e756ac0a3ca
+	github.com/sapcc/go-bits v0.0.0-20220513163648-283c57b10c36
 	github.com/sapcc/gophercloud-sapcc v0.0.0-20220513163651-31b753538672
 	gopkg.in/gorp.v2 v2.2.0
 )
