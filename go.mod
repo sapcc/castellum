@@ -13,7 +13,7 @@ require (
 	github.com/prometheus/common v0.34.0
 	github.com/rs/cors v1.8.2
 	github.com/sapcc/go-api-declarations v1.1.0
-	github.com/sapcc/go-bits v0.0.0-20220513163648-283c57b10c36
+	github.com/sapcc/go-bits v0.0.0-20220517080651-baba74caa927
 	github.com/sapcc/gophercloud-sapcc v0.0.0-20220513163651-31b753538672
 	gopkg.in/gorp.v2 v2.2.0
 )
@@ -29,7 +29,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/lib/pq v1.10.5 // indirect
+	github.com/lib/pq v1.10.6 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
