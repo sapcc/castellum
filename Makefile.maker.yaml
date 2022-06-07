@@ -1,5 +1,8 @@
 # Configuration file for <https://github.com/sapcc/go-makefile-maker>
 
+metadata:
+  url: https://github.com/sapcc/castellum
+
 binaries:
   - name:        castellum
     fromPackage: .
@@ -13,6 +16,9 @@ variables:
   GO_TESTENV: 'CASTELLUM_AUDIT_SILENT=true'
 
 vendoring:
+  enabled: true
+
+dockerfile:
   enabled: true
 
 golangciLint:

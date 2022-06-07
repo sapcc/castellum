@@ -1,5 +1,19 @@
-# build artifacts
-.gopath/pkg/
+.dockerignore
+# TODO: uncomment when applications no longer use git to get version information
+#.git/
+.github/
+.gitignore
+.goreleaser.yml
+/*.env*
+.golangci.yaml
 build/
-# testing artifacts
-testing/postgresql*
+CONTRIBUTING.md
+Dockerfile
+docs/
+LICENSE*
+Makefile.maker.yaml
+README.md
+report.html
+shell.nix
+/testing/
+
