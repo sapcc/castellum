@@ -1,9 +1,22 @@
 # Asset manager: `nfs-shares`
 
-The asset manager `nfs-shares` provides an asset type of the same name for resizing NFS shares
+The asset manager `nfs-shares` provides asset types for resizing NFS shares
 managed by [OpenStack Manila](https://wiki.openstack.org/wiki/Manila).
 
+* The asset type `nfs-shares` matches all Manila shares in the respective project.
+* Asset types of the form `nfs-shares-group:$NAME`, where `$NAME =~ /[A-Za-z0-9-]+/`,
+  match only those Manila shares that have the given name value in the metadata
+  key `autoscaling_group`.
+
 ## User considerations
+
+### Inter-resource constraints
+
+In each project, there can only be **either** an `nfs-shares` resource **or**
+any number of `nfs-shares-group:$NAME` resources. This ensures that each share
+only belongs to once resource at most. Having a share match both the
+`nfs-shares` resource and an `nfs-shares-group:$NAME` resource is not allowed
+because it could result in contradictory autoscaling behavior.
 
 ### Resource configuration
 
