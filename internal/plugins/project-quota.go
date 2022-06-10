@@ -115,7 +115,7 @@ func (m *assetManagerProjectQuota) InfoForAssetType(assetType db.AssetType) *cor
 var errNotAllowedForThisProject = errors.New("autoscaling is not permitted for this resource because of cluster-level policies")
 
 //CheckResourceAllowed implements the core.AssetManager interface.
-func (m *assetManagerProjectQuota) CheckResourceAllowed(assetType db.AssetType, projectID string, configJSON string) error {
+func (m *assetManagerProjectQuota) CheckResourceAllowed(assetType db.AssetType, projectID string, configJSON string, existingResources []db.AssetType) error {
 	if configJSON != "" {
 		return core.ErrNoConfigurationAllowed
 	}

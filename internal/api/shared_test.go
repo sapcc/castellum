@@ -41,6 +41,7 @@ func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action fun
 		team := core.AssetManagerTeam{
 			&plugins.AssetManagerStatic{AssetType: "foo"},
 			&plugins.AssetManagerStatic{AssetType: "bar", UsageMetrics: []db.UsageMetric{"first", "second"}, ExpectsConfiguration: true},
+			&plugins.AssetManagerStatic{AssetType: "qux", ConflictsWithAssetType: "foo"},
 		}
 		mv := &MockValidator{}
 

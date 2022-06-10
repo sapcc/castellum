@@ -78,7 +78,7 @@ func (m *assetManagerNFS) InfoForAssetType(assetType db.AssetType) *core.AssetTy
 }
 
 //CheckResourceAllowed implements the core.AssetManager interface.
-func (m *assetManagerNFS) CheckResourceAllowed(assetType db.AssetType, scopeUUID string, configJSON string) error {
+func (m *assetManagerNFS) CheckResourceAllowed(assetType db.AssetType, scopeUUID string, configJSON string, existingResources []db.AssetType) error {
 	if configJSON != "" {
 		return core.ErrNoConfigurationAllowed
 	}

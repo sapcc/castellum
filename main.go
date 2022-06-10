@@ -439,7 +439,7 @@ PROMPT:
 			res.AssetType = assetType
 			res.ScopeUUID = fields[1]
 			res.ConfigJSON = configJSON
-			err := manager.CheckResourceAllowed(res.AssetType, res.ScopeUUID, res.ConfigJSON)
+			err := manager.CheckResourceAllowed(res.AssetType, res.ScopeUUID, res.ConfigJSON, nil)
 			if err != nil {
 				logg.Error("CheckResourceAllowed failed: " + err.Error())
 				continue
