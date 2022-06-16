@@ -84,7 +84,7 @@ type AssetManager interface {
 	//  with a specific marker)
 	//- validating plugin-specific configuration in `configJSON`
 	//- allowing resources depending on which other resources exist in the same
-	//scope, by checking `isExistingResource`
+	//scope, by checking `existingResources`
 	//
 	//Simple implementations should return nil for empty `configJSON` and
 	//`core.ErrNoConfigurationAllowed` otherwise.

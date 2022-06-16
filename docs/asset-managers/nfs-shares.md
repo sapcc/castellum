@@ -14,7 +14,7 @@ managed by [OpenStack Manila](https://wiki.openstack.org/wiki/Manila).
 
 In each project, there can only be **either** an `nfs-shares` resource **or**
 any number of `nfs-shares-group:$NAME` resources. This ensures that each share
-only belongs to once resource at most. Having a share match both the
+only belongs to one resource at most. Having a share match both the
 `nfs-shares` resource and an `nfs-shares-group:$NAME` resource is not allowed
 because it could result in contradictory autoscaling behavior.
 
