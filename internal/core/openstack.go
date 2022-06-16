@@ -29,6 +29,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/roles"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
+	"github.com/sapcc/go-api-declarations/bininfo"
 )
 
 //ProviderClient is an interface for an internal type that wraps
@@ -90,7 +91,8 @@ func NewProviderClient(ao gophercloud.AuthOptions, eo gophercloud.EndpointOpts) 
 	if err != nil {
 		return nil, err
 	}
-	pc.UserAgent.Prepend(Component)
+	userAgent := fmt.Sprintf("%s@%s", bininfo.Component(), bininfo.VersionOr("rolling"))
+	pc.UserAgent.Prepend(userAgent)
 
 	//list all roles and remember the name -> ID mapping
 	identityV3, err := openstack.NewIdentityV3(pc, eo)
@@ -147,7 +149,8 @@ func (p *providerClientImpl) projectScopedClientImpl(scope ProjectScope, firstPa
 		}
 	}
 	if pc != nil {
-		pc.UserAgent.Prepend(Component)
+		userAgent := fmt.Sprintf("%s@%s", bininfo.Component(), bininfo.VersionOr("rolling"))
+		pc.UserAgent.Prepend(userAgent)
 	}
 
 	//get currently assigned roles

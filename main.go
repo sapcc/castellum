@@ -41,6 +41,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
+	"github.com/sapcc/go-api-declarations/bininfo"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpee"
 	"github.com/sapcc/go-bits/logg"
@@ -68,7 +69,7 @@ func main() {
 		usage()
 	}
 	taskName := os.Args[1]
-	core.Component = "castellum-" + taskName
+	bininfo.SetTaskName(taskName)
 
 	//nolint:errcheck
 	logg.ShowDebug, _ = strconv.ParseBool(os.Getenv("CASTELLUM_DEBUG"))
@@ -99,9 +100,9 @@ func main() {
 	}
 	hostname, err := os.Hostname()
 	if err == nil {
-		dbConnOpts.Set("application_name", fmt.Sprintf("%s@%s", core.Component, hostname))
+		dbConnOpts.Set("application_name", fmt.Sprintf("%s@%s", bininfo.Component(), hostname))
 	} else {
-		dbConnOpts.Set("application_name", core.Component)
+		dbConnOpts.Set("application_name", bininfo.Component())
 	}
 
 	dbURL := &url.URL{
