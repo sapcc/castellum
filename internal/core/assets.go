@@ -79,13 +79,16 @@ type AssetManager interface {
 	//A non-nil return value makes the API deny any attempts to create a resource
 	//with that scope and asset type with that error.
 	//
-	//The initial intended purpose is to allow resources for some scopes, but
-	//deny them for others. The second purpose is to validate plugin-specific
-	//configuration passed in the `configJSON` parameter.
+	//This can perform multiple types of validations:
+	//- allowing resources for some scopes, but not others (e.g. only projects
+	//  with a specific marker)
+	//- validating plugin-specific configuration in `configJSON`
+	//- allowing resources depending on which other resources exist in the same
+	//scope, by checking `existingResources`
 	//
 	//Simple implementations should return nil for empty `configJSON` and
 	//`core.ErrNoConfigurationAllowed` otherwise.
-	CheckResourceAllowed(assetType db.AssetType, scopeUUID string, configJSON string) error
+	CheckResourceAllowed(assetType db.AssetType, scopeUUID string, configJSON string, existingResources []db.AssetType) error
 
 	ListAssets(res db.Resource) ([]string, error)
 	//The returned Outcome should be either Succeeded, Failed or Errored, but not Cancelled.

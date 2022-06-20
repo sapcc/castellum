@@ -20,6 +20,7 @@ package plugins
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -57,6 +58,7 @@ type AssetManagerStatic struct {
 	CheckResourceAllowedFails bool
 	SetAssetSizeFails         bool
 	ExpectsConfiguration      bool
+	ConflictsWithAssetType    db.AssetType
 }
 
 //InfoForAssetType implements the core.AssetManager interface.
@@ -75,7 +77,7 @@ func (m AssetManagerStatic) InfoForAssetType(assetType db.AssetType) *core.Asset
 }
 
 //CheckResourceAllowed implements the core.AssetManager interface.
-func (m AssetManagerStatic) CheckResourceAllowed(assetType db.AssetType, scopeUUID string, configJSON string) error {
+func (m AssetManagerStatic) CheckResourceAllowed(assetType db.AssetType, scopeUUID string, configJSON string, existingResources []db.AssetType) error {
 	if m.ExpectsConfiguration {
 		if configJSON == "" {
 			return core.ErrNoConfigurationProvided
@@ -92,6 +94,15 @@ func (m AssetManagerStatic) CheckResourceAllowed(assetType db.AssetType, scopeUU
 	if m.CheckResourceAllowedFails {
 		return errSimulatedRejection
 	}
+
+	if m.ConflictsWithAssetType != "" {
+		for _, otherAssetType := range existingResources {
+			if otherAssetType == m.ConflictsWithAssetType {
+				return fmt.Errorf("cannot create %s resource because there is a %s resource", string(assetType), string(otherAssetType))
+			}
+		}
+	}
+
 	return nil
 }
 

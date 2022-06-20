@@ -582,6 +582,14 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 			"type-specific configuration must be provided for this asset type",
 		)
 
+		expectErrors("qux",
+			assert.JSONObject{
+				"critical_threshold": assert.JSONObject{"usage_percent": 90},
+				"size_steps":         assert.JSONObject{"percent": 10},
+			},
+			"cannot create qux resource because there is a foo resource",
+		)
+
 		//none of this should have touched the DB
 		t.ExpectResources(h.DB, allResources...)
 	})

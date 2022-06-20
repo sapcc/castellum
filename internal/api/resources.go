@@ -125,7 +125,7 @@ func (h handler) ResourceFromDB(res db.Resource) (Resource, error) {
 
 //UpdateDBResource updates the given db.Resource with the values provided in
 //this api.Resource.
-func (r Resource) UpdateDBResource(res *db.Resource, manager core.AssetManager, info core.AssetTypeInfo, maxAssetSize *uint64) (errors []string) {
+func (r Resource) UpdateDBResource(res *db.Resource, manager core.AssetManager, info core.AssetTypeInfo, maxAssetSize *uint64, existingResources []db.AssetType) (errors []string) {
 	complain := func(msg string, args ...interface{}) {
 		if len(args) > 0 {
 			msg = fmt.Sprintf(msg, args...)
@@ -138,7 +138,7 @@ func (r Resource) UpdateDBResource(res *db.Resource, manager core.AssetManager, 
 	} else {
 		res.ConfigJSON = string(*r.ConfigJSON)
 	}
-	err := manager.CheckResourceAllowed(res.AssetType, res.ScopeUUID, res.ConfigJSON)
+	err := manager.CheckResourceAllowed(res.AssetType, res.ScopeUUID, res.ConfigJSON, existingResources)
 	if err != nil {
 		complain(err.Error())
 	}
@@ -387,13 +387,19 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 			})
 	}
 
-	errs := input.UpdateDBResource(dbResource, manager, info, maxAssetSize)
+	existingResources, err := h.listExistingResourcesOnProject(projectUUID)
+	if respondwith.ErrorText(w, err) {
+		doAudit(http.StatusInternalServerError)
+		return
+	}
+
+	errs := input.UpdateDBResource(dbResource, manager, info, maxAssetSize, existingResources)
 	if len(errs) > 0 {
 		doAudit(http.StatusUnprocessableEntity)
 		http.Error(w, strings.Join(errs, "\n"), http.StatusUnprocessableEntity)
 		return
 	}
-	var err error
+
 	if dbResource.ID == 0 {
 		err = h.DB.Insert(dbResource)
 	} else {
@@ -406,6 +412,31 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 
 	doAudit(http.StatusAccepted)
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func (h handler) listExistingResourcesOnProject(projectUUID string) ([]db.AssetType, error) {
+	//TODO import ForeachRow() helper function from somewhere else (there are also other similar functions that can then be simplified)
+
+	rows, err := h.DB.Query(`SELECT asset_type FROM resources WHERE scope_uuid = $1`, projectUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []db.AssetType
+	for rows.Next() {
+		var assetType db.AssetType
+		err := rows.Scan(&assetType)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, assetType)
+	}
+	err = rows.Err()
+	if err != nil {
+		rows.Close()
+		return nil, err
+	}
+	return result, rows.Close()
 }
 
 func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
