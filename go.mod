@@ -10,7 +10,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/majewsky/sqlproxy v0.0.0-20190524080451-ba724456c4af
 	github.com/prometheus/client_golang v1.12.2
-	github.com/prometheus/common v0.34.0
+	github.com/prometheus/common v0.35.0
 	github.com/rs/cors v1.8.2
 	github.com/sapcc/go-api-declarations v1.2.0
 	github.com/sapcc/go-bits v0.0.0-20220615160326-b161539f0d95
