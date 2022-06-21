@@ -25,8 +25,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/sapcc/go-bits/gopherpolicy"
+	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/respondwith"
-	"github.com/sapcc/go-bits/sre"
 	"gopkg.in/gorp.v2"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -122,7 +122,7 @@ func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (
 }
 
 func (h handler) GetPendingOperations(w http.ResponseWriter, r *http.Request) {
-	sre.IdentifyEndpoint(r, "/v1/operations/pending")
+	httpapi.IdentifyEndpoint(r, "/v1/operations/pending")
 	dbResources, ok := h.LoadMatchingResources(w, r)
 	if !ok {
 		return
@@ -180,7 +180,7 @@ func (h handler) getAssetUUIDMap(res db.Resource) (map[int64]string, error) {
 }
 
 func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Request) {
-	sre.IdentifyEndpoint(r, "/v1/operations/recently-failed")
+	httpapi.IdentifyEndpoint(r, "/v1/operations/recently-failed")
 	dbResources, ok := h.LoadMatchingResources(w, r)
 	if !ok {
 		return
@@ -224,7 +224,7 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 }
 
 func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.Request) {
-	sre.IdentifyEndpoint(r, "/v1/operations/recently-succeeded")
+	httpapi.IdentifyEndpoint(r, "/v1/operations/recently-succeeded")
 	dbResources, ok := h.LoadMatchingResources(w, r)
 	if !ok {
 		return

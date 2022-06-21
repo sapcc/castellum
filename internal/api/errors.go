@@ -21,8 +21,8 @@ package api
 import (
 	"net/http"
 
+	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/respondwith"
-	"github.com/sapcc/go-bits/sre"
 
 	"github.com/sapcc/castellum/internal/db"
 )
@@ -58,7 +58,7 @@ type AssetError struct {
 // HTTP handlers
 
 func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request) {
-	sre.IdentifyEndpoint(r, "/v1/admin/resource-scrape-errors")
+	httpapi.IdentifyEndpoint(r, "/v1/admin/resource-scrape-errors")
 	_, token := h.CheckToken(w, r)
 	if token == nil {
 		return
@@ -100,7 +100,7 @@ func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request)
 }
 
 func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
-	sre.IdentifyEndpoint(r, "/v1/admin/asset-scrape-errors")
+	httpapi.IdentifyEndpoint(r, "/v1/admin/asset-scrape-errors")
 	_, token := h.CheckToken(w, r)
 	if token == nil {
 		return
@@ -155,7 +155,7 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
-	sre.IdentifyEndpoint(r, "/v1/admin/asset-resize-errors")
+	httpapi.IdentifyEndpoint(r, "/v1/admin/asset-resize-errors")
 	_, token := h.CheckToken(w, r)
 	if token == nil {
 		return

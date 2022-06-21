@@ -27,8 +27,8 @@ import (
 	"time"
 
 	"github.com/sapcc/go-api-declarations/cadf"
+	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/respondwith"
-	"github.com/sapcc/go-bits/sre"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -296,7 +296,7 @@ func (r Resource) UpdateDBResource(res *db.Resource, manager core.AssetManager, 
 // HTTP handlers
 
 func (h handler) GetProject(w http.ResponseWriter, r *http.Request) {
-	sre.IdentifyEndpoint(r, "/v1/projects/:id")
+	httpapi.IdentifyEndpoint(r, "/v1/projects/:id")
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
 		return
@@ -332,7 +332,7 @@ func (h handler) GetProject(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) GetResource(w http.ResponseWriter, r *http.Request) {
-	sre.IdentifyEndpoint(r, "/v1/projects/:id/resources/:type")
+	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/resources/:type")
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
 		return
@@ -350,7 +350,7 @@ func (h handler) GetResource(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
-	sre.IdentifyEndpoint(r, "/v1/projects/:id/resources/:type")
+	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/resources/:type")
 	requestTime := time.Now()
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
@@ -440,7 +440,7 @@ func (h handler) listExistingResourcesOnProject(projectUUID string) ([]db.AssetT
 }
 
 func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
-	sre.IdentifyEndpoint(r, "/v1/projects/:id/resources/:type")
+	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/resources/:type")
 	requestTime := time.Now()
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {

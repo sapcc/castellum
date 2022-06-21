@@ -30,9 +30,9 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/sapcc/go-bits/gopherpolicy"
+	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/respondwith"
-	"github.com/sapcc/go-bits/sre"
 	"gopkg.in/gorp.v2"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -50,14 +50,13 @@ type handler struct {
 	TimeNow func() time.Time
 }
 
-//NewHandler constructs the main http.Handler for this package.
-func NewHandler(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClient) http.Handler {
-	h := &handler{Config: cfg, DB: dbi, Team: team, Validator: validator, Provider: provider, TimeNow: time.Now}
-	return h.BuildRouter()
+//NewAPI constructs the main httpapi.API for this package.
+func NewHandler(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClient) httpapi.API {
+	return &handler{Config: cfg, DB: dbi, Team: team, Validator: validator, Provider: provider, TimeNow: time.Now}
 }
 
-func (h *handler) BuildRouter() http.Handler {
-	router := mux.NewRouter()
+//AddTo implements the httpapi.API interface.
+func (h *handler) AddTo(router *mux.Router) {
 	router.Methods("GET").
 		Path(`/v1/projects/{project_id}`).
 		HandlerFunc(h.GetProject)
@@ -108,8 +107,6 @@ func (h *handler) BuildRouter() http.Handler {
 	router.Methods("GET").
 		Path(`/v1/admin/asset-resize-errors`).
 		HandlerFunc(h.GetAssetResizeErrors)
-
-	return sre.Instrument(router)
 }
 
 //RequireJSON will parse the request body into the given data structure, or

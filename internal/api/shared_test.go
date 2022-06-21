@@ -27,6 +27,7 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/gopherpolicy"
+	"github.com/sapcc/go-bits/httpapi"
 	"gopkg.in/gorp.v2"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -57,7 +58,8 @@ func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action fun
 			timeNow = time.Now
 		}
 		h := &handler{Config: &cfg, DB: dbi, Team: team, Validator: mv, Provider: MockProviderClient{}, TimeNow: timeNow}
-		action(h, h.BuildRouter(), mv, resources, assets)
+		hh := httpapi.Compose(h, httpapi.WithoutLogging())
+		action(h, hh, mv, resources, assets)
 	})
 }
 

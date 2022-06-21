@@ -43,7 +43,8 @@ import (
 	"github.com/rs/cors"
 	"github.com/sapcc/go-api-declarations/bininfo"
 	"github.com/sapcc/go-bits/gopherpolicy"
-	"github.com/sapcc/go-bits/httpee"
+	"github.com/sapcc/go-bits/httpapi"
+	"github.com/sapcc/go-bits/httpext"
 	"github.com/sapcc/go-bits/logg"
 	"gopkg.in/gorp.v2"
 
@@ -243,13 +244,16 @@ func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provi
 	//wrap the main API handler in several layers of middleware (CORS is
 	//deliberately the outermost middleware, to exclude preflight checks from
 	//logging)
-	handler := api.NewHandler(cfg, dbi, team, &tv, providerClient)
-	handler = logg.Middleware{}.Wrap(handler)
-	handler = cors.New(cors.Options{
+	corsMiddleware := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{"HEAD", "GET", "POST", "PUT", "DELETE"},
 		AllowedHeaders: []string{"Content-Type", "User-Agent", "X-Auth-Token"},
-	}).Handler(handler)
+	})
+	handler := httpapi.Compose(
+		api.NewHandler(cfg, dbi, team, &tv, providerClient),
+		httpapi.HealthCheckAPI{SkipRequestLog: true},
+		httpapi.WithGlobalMiddleware(corsMiddleware.Handler),
+	)
 
 	//Start audit logging.
 	rabbitQueueName := os.Getenv("CASTELLUM_RABBITMQ_QUEUE_NAME")
@@ -274,10 +278,9 @@ func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provi
 	//middlewares - we do not want to log those requests
 	http.Handle("/", handler)
 	http.Handle("/metrics", promhttp.Handler())
-	http.Handle("/healthcheck", http.HandlerFunc(healthCheckHandler))
 
 	logg.Info("listening on " + httpListenAddr)
-	err = httpee.ListenAndServeContext(httpee.ContextWithSIGINT(context.Background(), 10*time.Second), httpListenAddr, nil)
+	err = httpext.ListenAndServeContext(httpext.ContextWithSIGINT(context.Background(), 10*time.Second), httpListenAddr, nil)
 	if err != nil {
 		logg.Error(err.Error())
 	}
@@ -298,7 +301,7 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 // task: observer
 
 func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
-	ctx := httpee.ContextWithSIGINT(context.Background(), 1*time.Second)
+	ctx := httpext.ContextWithSIGINT(context.Background(), 1*time.Second)
 
 	c := tasks.Context{DB: dbi, Team: team}
 	c.ApplyDefaults()
@@ -318,7 +321,7 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/healthcheck", http.HandlerFunc(healthCheckHandler))
 	logg.Info("listening on " + httpListenAddr)
-	err := httpee.ListenAndServeContext(ctx, httpListenAddr, nil)
+	err := httpext.ListenAndServeContext(ctx, httpListenAddr, nil)
 	if err != nil {
 		logg.Error(err.Error())
 	}
@@ -381,7 +384,7 @@ func cronJobLoop(interval time.Duration, task func() error) {
 // task: worker
 
 func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
-	ctx := httpee.ContextWithSIGINT(context.Background(), 1*time.Second)
+	ctx := httpext.ContextWithSIGINT(context.Background(), 1*time.Second)
 
 	c := tasks.Context{DB: dbi, Team: team}
 	c.ApplyDefaults()
@@ -396,7 +399,7 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/healthcheck", http.HandlerFunc(healthCheckHandler))
 	logg.Info("listening on " + httpListenAddr)
-	err := httpee.ListenAndServeContext(ctx, httpListenAddr, nil)
+	err := httpext.ListenAndServeContext(ctx, httpListenAddr, nil)
 	if err != nil {
 		logg.Error(err.Error())
 	}
