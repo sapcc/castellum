@@ -109,7 +109,7 @@ func (m *assetManagerNFS) CheckResourceAllowed(assetType db.AssetType, scopeUUID
 	parsed := m.parseAssetType(assetType)
 	for _, otherAssetType := range existingResources {
 		parsedOther := m.parseAssetType(otherAssetType)
-		if parsedOther != nil && (parsed.AllShares != !parsedOther.AllShares) {
+		if parsedOther != nil && (parsed.AllShares != parsedOther.AllShares) {
 			return fmt.Errorf("cannot create a %q resource because of possible contradiction with existing %q resource",
 				string(assetType), string(otherAssetType))
 		}
