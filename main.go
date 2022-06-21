@@ -241,9 +241,7 @@ func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provi
 		logg.Fatal("cannot load oslo.policy: " + err.Error())
 	}
 
-	//wrap the main API handler in several layers of middleware (CORS is
-	//deliberately the outermost middleware, to exclude preflight checks from
-	//logging)
+	//wrap the main API handler in several layers of middleware
 	corsMiddleware := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{"HEAD", "GET", "POST", "PUT", "DELETE"},
@@ -254,6 +252,8 @@ func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provi
 		httpapi.HealthCheckAPI{SkipRequestLog: true},
 		httpapi.WithGlobalMiddleware(corsMiddleware.Handler),
 	)
+	http.Handle("/", handler)
+	http.Handle("/metrics", promhttp.Handler())
 
 	//Start audit logging.
 	rabbitQueueName := os.Getenv("CASTELLUM_RABBITMQ_QUEUE_NAME")
@@ -274,26 +274,10 @@ func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provi
 		api.StartAuditLogging(rabbitQueueName, rabbitURI)
 	}
 
-	//metrics and healthcheck are deliberately not covered by any of the
-	//middlewares - we do not want to log those requests
-	http.Handle("/", handler)
-	http.Handle("/metrics", promhttp.Handler())
-
 	logg.Info("listening on " + httpListenAddr)
 	err = httpext.ListenAndServeContext(httpext.ContextWithSIGINT(context.Background(), 10*time.Second), httpListenAddr, nil)
 	if err != nil {
 		logg.Error(err.Error())
-	}
-}
-
-func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	if r.URL.Path == "/healthcheck" && r.Method == "GET" {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok")) //nolint:errcheck
-	} else {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("not found")) //nolint:errcheck
 	}
 }
 
@@ -318,8 +302,9 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	})
 
 	//use main goroutine to emit Prometheus metrics
+	handler := httpapi.Compose(httpapi.HealthCheckAPI{SkipRequestLog: true})
+	http.Handle("/", handler)
 	http.Handle("/metrics", promhttp.Handler())
-	http.Handle("/healthcheck", http.HandlerFunc(healthCheckHandler))
 	logg.Info("listening on " + httpListenAddr)
 	err := httpext.ListenAndServeContext(ctx, httpListenAddr, nil)
 	if err != nil {
@@ -396,8 +381,9 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 	go cronJobLoop(3*time.Minute, c.EnsureResizingCounters)
 
 	//use main goroutine to emit Prometheus metrics
+	handler := httpapi.Compose(httpapi.HealthCheckAPI{SkipRequestLog: true})
+	http.Handle("/", handler)
 	http.Handle("/metrics", promhttp.Handler())
-	http.Handle("/healthcheck", http.HandlerFunc(healthCheckHandler))
 	logg.Info("listening on " + httpListenAddr)
 	err := httpext.ListenAndServeContext(ctx, httpListenAddr, nil)
 	if err != nil {
