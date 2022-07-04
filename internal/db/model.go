@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -335,14 +334,4 @@ func Init(dbURL *url.URL) (*gorp.DbMap, error) {
 	gorpDB.AddTableWithName(PendingOperation{}, "pending_operations").SetKeys(true, "id")
 	gorpDB.AddTableWithName(FinishedOperation{}, "finished_operations")
 	return gorpDB, nil
-}
-
-var sqlWhitespaceOrCommentRx = regexp.MustCompile(`\s+(?m:--.*$)?`)
-
-//SimplifyWhitespaceInSQL takes an SQL query string that's hardcoded in the
-//program and simplifies all the whitespaces, esp. ensuring that there are no
-//comments and newlines. This makes the database log nicer when queries are
-//logged there (e.g. for running too long).
-func SimplifyWhitespaceInSQL(query string) string {
-	return sqlWhitespaceOrCommentRx.ReplaceAllString(query, " ")
 }

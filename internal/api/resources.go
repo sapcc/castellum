@@ -19,6 +19,7 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -29,6 +30,7 @@ import (
 	"github.com/sapcc/go-api-declarations/cadf"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/respondwith"
+	"github.com/sapcc/go-bits/sqlext"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -387,7 +389,18 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 			})
 	}
 
-	existingResources, err := h.listExistingResourcesOnProject(projectUUID)
+	var existingResources []db.AssetType
+	err := sqlext.ForeachRow(h.DB,
+		`SELECT asset_type FROM resources WHERE scope_uuid = $1`, []any{projectUUID},
+		func(rows *sql.Rows) error {
+			var assetType db.AssetType
+			err := rows.Scan(&assetType)
+			if err == nil {
+				existingResources = append(existingResources, assetType)
+			}
+			return err
+		},
+	)
 	if respondwith.ErrorText(w, err) {
 		doAudit(http.StatusInternalServerError)
 		return
@@ -412,31 +425,6 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 
 	doAudit(http.StatusAccepted)
 	w.WriteHeader(http.StatusAccepted)
-}
-
-func (h handler) listExistingResourcesOnProject(projectUUID string) ([]db.AssetType, error) {
-	//TODO import ForeachRow() helper function from somewhere else (there are also other similar functions that can then be simplified)
-
-	rows, err := h.DB.Query(`SELECT asset_type FROM resources WHERE scope_uuid = $1`, projectUUID)
-	if err != nil {
-		return nil, err
-	}
-
-	var result []db.AssetType
-	for rows.Next() {
-		var assetType db.AssetType
-		err := rows.Scan(&assetType)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, assetType)
-	}
-	err = rows.Err()
-	if err != nil {
-		rows.Close()
-		return nil, err
-	}
-	return result, rows.Close()
 }
 
 func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {

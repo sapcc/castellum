@@ -1,6 +1,6 @@
 /******************************************************************************
 *
-*  Copyright 2019 SAP SE
+*  Copyright 2022 SAP SE
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -16,29 +16,5 @@
 *
 ******************************************************************************/
 
-package core
-
-import (
-	"database/sql"
-
-	"github.com/sapcc/go-bits/logg"
-	"gopkg.in/gorp.v2"
-)
-
-//RollbackUnlessCommitted calls Rollback() on a transaction if it hasn't been
-//committed or rolled back yet. Use this with the defer keyword to make sure
-//that a transaction is automatically rolled back when a function fails.
-func RollbackUnlessCommitted(tx *gorp.Transaction) {
-	err := tx.Rollback()
-	switch err {
-	case nil:
-		//rolled back successfully
-		logg.Info("implicit rollback done")
-		return
-	case sql.ErrTxDone:
-		//already committed or rolled back - nothing to do
-		return
-	default:
-		logg.Error("implicit rollback failed: %s", err.Error())
-	}
-}
+//Package sqlext contains helper functions for SQL queries that are not specific to PostgreSQL.
+package sqlext

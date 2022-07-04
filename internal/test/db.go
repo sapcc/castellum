@@ -20,7 +20,6 @@ package test
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/url"
 
 	"github.com/sapcc/go-bits/easypg"
@@ -45,27 +44,12 @@ func (t T) WithDB(fixtureFile *string, action func(dbi *gorp.DbMap)) {
 		t.FailNow()
 	}
 
-	//wipe the DB clean if there are any leftovers from the previous test run
-	t.MustExec(dbi, "DELETE FROM resources")
-	t.MustExec(dbi, "DELETE FROM assets")
-	t.MustExec(dbi, "DELETE FROM pending_operations")
-	t.MustExec(dbi, "DELETE FROM finished_operations")
-
-	//populate with initial resources if a baseline fixture has been given
+	//reset the DB contents and populate with initial resources if requested
+	easypg.ClearTables(t.T, dbi.Db, "resources", "assets", "pending_operations", "finished_operations")
 	if fixtureFile != nil {
 		easypg.ExecSQLFile(t.T, dbi.Db, *fixtureFile)
 	}
-
-	//reset all primary key sequences for reproducible row IDs
-	for _, tableName := range []string{"resources", "assets", "pending_operations"} {
-		nextID, err := dbi.SelectInt(fmt.Sprintf(
-			"SELECT 1 + COALESCE(MAX(id), 0) FROM %s", tableName,
-		))
-		if err != nil {
-			t.Fatal(err.Error())
-		}
-		t.MustExec(dbi, fmt.Sprintf(`ALTER SEQUENCE %s_id_seq RESTART WITH %d`, tableName, nextID))
-	}
+	easypg.ResetPrimaryKeys(t.T, dbi.Db, "resources", "assets", "pending_operations")
 
 	action(dbi)
 

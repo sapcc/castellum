@@ -27,6 +27,7 @@ import (
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/respondwith"
+	"github.com/sapcc/go-bits/sqlext"
 	"gopkg.in/gorp.v2"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -280,7 +281,7 @@ type recentOperationQuery struct {
 //This returns the most recent finished operation with the outcomes `%[2]s` for
 //each asset with `resource_id = $1`, unless there is a newer finished
 //operation matching `%[1]s`.
-var recentOperationQueryStr = db.SimplifyWhitespaceInSQL(`
+var recentOperationQueryStr = sqlext.SimplifyWhitespace(`
 	WITH tmp AS (
 		SELECT asset_id, MAX(finished_at) AS max_finished_at
 		  FROM finished_operations
