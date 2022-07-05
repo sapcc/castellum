@@ -139,7 +139,7 @@ github.com/sapcc/go-bits/httpext
 github.com/sapcc/go-bits/logg
 github.com/sapcc/go-bits/respondwith
 github.com/sapcc/go-bits/sqlext
-# github.com/sapcc/gophercloud-sapcc v0.0.0-20220629144702-231fd82473b7
+# github.com/sapcc/gophercloud-sapcc v0.0.0-20220704225742-ec0766c21889
 ## explicit; go 1.18
 github.com/sapcc/gophercloud-sapcc/clients
 github.com/sapcc/gophercloud-sapcc/resources/v1/projects
