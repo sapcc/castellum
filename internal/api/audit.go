@@ -22,27 +22,22 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/sapcc/go-api-declarations/cadf"
 	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/logg"
+	"github.com/sapcc/go-bits/osext"
 )
 
 //eventSink is a channel that receives audit events.
 var eventSink chan<- cadf.Event
 
-var showAuditOnStdout bool
+var showAuditOnStdout = !osext.GetenvBool("CASTELLUM_AUDIT_SILENT")
 
 // StartAuditLogging starts audit logging for the API.
 func StartAuditLogging(rabbitQueueName string, rabbitURI url.URL) {
-	//nolint:errcheck
-	silenceAuditLogging, _ := strconv.ParseBool(os.Getenv("CASTELLUM_AUDIT_SILENT"))
-	showAuditOnStdout = !silenceAuditLogging
-
 	auditEventPublishSuccessCounter.Add(0)
 	auditEventPublishFailedCounter.Add(0)
 

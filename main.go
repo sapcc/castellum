@@ -75,8 +75,7 @@ func main() {
 	taskName := os.Args[1]
 	bininfo.SetTaskName(taskName)
 
-	//nolint:errcheck
-	logg.ShowDebug, _ = strconv.ParseBool(os.Getenv("CASTELLUM_DEBUG"))
+	logg.ShowDebug = osext.GetenvBool("CASTELLUM_DEBUG")
 
 	//The CASTELLUM_INSECURE flag can be used to get Castellum to work through
 	//mitmproxy (which is very useful for development and debugging). (It's very
@@ -84,7 +83,7 @@ func main() {
 	//is meant to be useful for production systems, where you definitely don't
 	//want to turn off certificate verification.)
 	//nolint:errcheck
-	if insecure, _ := strconv.ParseBool(os.Getenv("CASTELLUM_INSECURE")); insecure {
+	if osext.GetenvBool("CASTELLUM_INSECURE") {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true,
 		}
@@ -118,36 +117,24 @@ func main() {
 		logg.Fatal("cannot connect to OpenStack: " + err.Error())
 	}
 
-	//get HTTP listen address
-	httpListenAddr := os.Getenv("CASTELLUM_HTTP_LISTEN_ADDRESS")
-	if httpListenAddr == "" {
-		httpListenAddr = ":8080"
-	}
-
 	//initialize asset managers
-	team, err := core.CreateAssetManagers(
-		strings.Split(mustGetenv("CASTELLUM_ASSET_MANAGERS"), ","),
+	team := must.Return(core.CreateAssetManagers(
+		strings.Split(osext.MustGetenv("CASTELLUM_ASSET_MANAGERS"), ","),
 		providerClient,
-	)
-	if err != nil {
-		logg.Fatal(err.Error())
-	}
+	))
 
 	//get max asset sizes
 	cfg := core.Config{
 		MaxAssetSize: make(map[db.AssetType]*uint64),
 	}
-	maxAssetSizes := strings.Split(mustGetenv("CASTELLUM_MAX_ASSET_SIZES"), ",")
+	maxAssetSizes := strings.Split(osext.MustGetenv("CASTELLUM_MAX_ASSET_SIZES"), ",")
 	for _, v := range maxAssetSizes {
 		sL := strings.Split(v, "=")
 		if len(sL) != 2 {
 			logg.Fatal("expected a max asset size configuration value in the format: '<asset-type>=<max-asset-size>', got: %s", v)
 		}
 		assetType := sL[0]
-		maxSize, err := strconv.ParseUint(sL[1], 10, 64)
-		if err != nil {
-			logg.Fatal(err.Error())
-		}
+		maxSize := must.Return(strconv.ParseUint(sL[1], 10, 64))
 
 		found := false
 		for _, assetManager := range team {
@@ -162,6 +149,7 @@ func main() {
 		}
 	}
 
+	httpListenAddr := osext.GetenvOrDefault("CASTELLUM_HTTP_LISTEN_ADDRESS", ":8080")
 	switch taskName {
 	case "api":
 		if len(os.Args) != 2 {
@@ -192,22 +180,6 @@ func main() {
 	}
 }
 
-func mustGetenv(key string) string {
-	val := os.Getenv(key)
-	if val == "" {
-		logg.Fatal("missing required environment variable: " + key)
-	}
-	return val
-}
-
-func envOrDefault(key, defaultVal string) string {
-	val := os.Getenv(key)
-	if val == "" {
-		val = defaultVal
-	}
-	return val
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // task: API
 
@@ -220,10 +192,7 @@ func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provi
 		IdentityV3: identityV3,
 		Cacher:     gopherpolicy.InMemoryCacher(),
 	}
-	err = tv.LoadPolicyFile(mustGetenv("CASTELLUM_OSLO_POLICY_PATH"))
-	if err != nil {
-		logg.Fatal("cannot load oslo.policy: " + err.Error())
-	}
+	must.Succeed(tv.LoadPolicyFile(osext.MustGetenv("CASTELLUM_OSLO_POLICY_PATH")))
 
 	//wrap the main API handler in several layers of middleware
 	corsMiddleware := cors.New(cors.Options{
@@ -242,10 +211,10 @@ func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provi
 	//Start audit logging.
 	rabbitQueueName := os.Getenv("CASTELLUM_RABBITMQ_QUEUE_NAME")
 	if rabbitQueueName != "" {
-		username := envOrDefault("CASTELLUM_RABBITMQ_USERNAME", "guest")
-		pass := envOrDefault("CASTELLUM_RABBITMQ_PASSWORD", "guest")
-		hostname := envOrDefault("CASTELLUM_RABBITMQ_HOSTNAME", "localhost")
-		port, err := strconv.Atoi(envOrDefault("CASTELLUM_RABBITMQ_PORT", "5672"))
+		username := osext.GetenvOrDefault("CASTELLUM_RABBITMQ_USERNAME", "guest")
+		pass := osext.GetenvOrDefault("CASTELLUM_RABBITMQ_PASSWORD", "guest")
+		hostname := osext.GetenvOrDefault("CASTELLUM_RABBITMQ_HOSTNAME", "localhost")
+		port, err := strconv.Atoi(osext.GetenvOrDefault("CASTELLUM_RABBITMQ_PORT", "5672"))
 		if err != nil {
 			logg.Fatal("invalid value for CASTELLUM_RABBITMQ_PORT: " + err.Error())
 		}

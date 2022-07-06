@@ -22,9 +22,7 @@ import (
 	"crypto/rand"
 	"encoding/base32"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -43,6 +41,8 @@ import (
 	prom_api "github.com/prometheus/client_golang/api"
 	prom_v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/sapcc/go-bits/logg"
+	"github.com/sapcc/go-bits/must"
+	"github.com/sapcc/go-bits/osext"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -77,20 +77,14 @@ type assetManagerServerGroups struct {
 
 func init() {
 	core.RegisterAssetManagerFactory("server-groups", func(provider core.ProviderClient) (core.AssetManager, error) {
-		prometheusURL := os.Getenv("CASTELLUM_SERVERGROUPS_PROMETHEUS_URL")
-		if prometheusURL == "" {
-			return nil, errors.New("missing required environment variable: CASTELLUM_SERVERGROUPS_PROMETHEUS_URL")
-		}
+		prometheusURL := osext.MustGetenv("CASTELLUM_SERVERGROUPS_PROMETHEUS_URL")
 		promClient, err := prom_api.NewClient(prom_api.Config{Address: prometheusURL})
 		if err != nil {
 			return nil, fmt.Errorf("cannot connect to Prometheus at %s: %s",
 				prometheusURL, err.Error())
 		}
 
-		localRoleNamesStr := os.Getenv("CASTELLUM_SERVERGROUPS_LOCAL_ROLES")
-		if localRoleNamesStr == "" {
-			return nil, errors.New("missing required environment variable: CASTELLUM_SERVERGROUPS_LOCAL_ROLES")
-		}
+		localRoleNamesStr := osext.MustGetenv("CASTELLUM_SERVERGROUPS_LOCAL_ROLES")
 		var localRoleNames []string
 		for _, roleName := range strings.Split(localRoleNamesStr, ",") {
 			roleName = strings.TrimSpace(roleName)
@@ -486,11 +480,7 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 func makeNameDisambiguator() string {
 	//5 bytes of data encode to exactly 8 base32 characters without padding
 	var buf [5]byte
-	_, err := rand.Read(buf[:])
-	if err != nil {
-		//reading from /dev/urandom should never fail
-		logg.Fatal(err.Error())
-	}
+	_ = must.Return(rand.Read(buf[:])) //ignores result value (number of bytes read)
 	return base32.StdEncoding.EncodeToString(buf[:])
 }
 
