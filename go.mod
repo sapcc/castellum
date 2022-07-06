@@ -8,12 +8,11 @@ require (
 	github.com/gophercloud/gophercloud v0.25.0
 	github.com/gophercloud/utils v0.0.0-20220704184730-55bdbbaec4ba
 	github.com/gorilla/mux v1.8.0
-	github.com/majewsky/sqlproxy v0.0.0-20190524080451-ba724456c4af
 	github.com/prometheus/client_golang v1.12.2
 	github.com/prometheus/common v0.35.0
 	github.com/rs/cors v1.8.2
 	github.com/sapcc/go-api-declarations v1.2.0
-	github.com/sapcc/go-bits v0.0.0-20220704133329-08fb282def7e
+	github.com/sapcc/go-bits v0.0.0-20220706183424-591e645cac86
 	github.com/sapcc/gophercloud-sapcc v0.0.0-20220704225742-ec0766c21889
 	gopkg.in/gorp.v2 v2.2.0
 )

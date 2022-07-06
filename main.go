@@ -42,10 +42,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
 	"github.com/sapcc/go-api-declarations/bininfo"
+	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/httpext"
 	"github.com/sapcc/go-bits/logg"
+	"github.com/sapcc/go-bits/must"
+	"github.com/sapcc/go-bits/osext"
 	"gopkg.in/gorp.v2"
 
 	"github.com/sapcc/castellum/internal/api"
@@ -89,34 +92,15 @@ func main() {
 	}
 
 	//initialize DB connection
-	dbUsername := envOrDefault("CASTELLUM_DB_USERNAME", "postgres")
-	dbPass := os.Getenv("CASTELLUM_DB_PASSWORD")
-	dbHost := envOrDefault("CASTELLUM_DB_HOSTNAME", "localhost")
-	dbPort := envOrDefault("CASTELLUM_DB_PORT", "5432")
-	dbName := envOrDefault("CASTELLUM_DB_NAME", "castellum")
-
-	dbConnOpts, err := url.ParseQuery(os.Getenv("CASTELLUM_DB_CONNECTION_OPTIONS"))
-	if err != nil {
-		logg.Fatal("while parsing CASTELLUM_DB_CONNECTION_OPTIONS: %w", err)
-	}
-	hostname, err := os.Hostname()
-	if err == nil {
-		dbConnOpts.Set("application_name", fmt.Sprintf("%s@%s", bininfo.Component(), hostname))
-	} else {
-		dbConnOpts.Set("application_name", bininfo.Component())
-	}
-
-	dbURL := &url.URL{
-		Scheme:   "postgres",
-		User:     url.UserPassword(dbUsername, dbPass),
-		Host:     net.JoinHostPort(dbHost, dbPort),
-		Path:     dbName,
-		RawQuery: dbConnOpts.Encode(),
-	}
-	dbi, err := db.Init(dbURL)
-	if err != nil {
-		logg.Fatal(err.Error())
-	}
+	dbURL := must.Return(easypg.URLFrom(easypg.URLParts{
+		HostName:          osext.GetenvOrDefault("CASTELLUM_DB_HOSTNAME", "localhost"),
+		Port:              osext.GetenvOrDefault("CASTELLUM_DB_PORT", "5432"),
+		UserName:          osext.GetenvOrDefault("CASTELLUM_DB_USERNAME", "postgres"),
+		Password:          os.Getenv("CASTELLUM_DB_PASSWORD"),
+		ConnectionOptions: os.Getenv("CASTELLUM_DB_CONNECTION_OPTIONS"),
+		DatabaseName:      osext.GetenvOrDefault("CASTELLUM_DB_NAME", "castellum"),
+	}))
+	dbi := must.Return(db.Init(dbURL))
 	prometheus.MustRegister(sqlstats.NewStatsCollector("castellum", dbi.Db))
 
 	//initialize OpenStack connection
