@@ -21,13 +21,12 @@ package tasks
 import (
 	"database/sql"
 	"fmt"
-	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-bits/logg"
+	"github.com/sapcc/go-bits/osext"
 	"github.com/sapcc/go-bits/sqlext"
 	"gopkg.in/gorp.v2"
 
@@ -48,12 +47,7 @@ var scrapeAssetSearchQuery = sqlext.SimplifyWhitespace(`
 	FOR UPDATE SKIP LOCKED LIMIT 1
 `)
 
-var logScrapes bool
-
-func init() {
-	//nolint:errcheck
-	logScrapes, _ = strconv.ParseBool(os.Getenv("CASTELLUM_LOG_SCRAPES"))
-}
+var logScrapes = osext.GetenvBool("CASTELLUM_LOG_SCRAPES")
 
 //PollForAssetScrapes returns a JobPoller that finds the next asset of the given
 //type that needs scraping. The returned Job scrapes the asset, i.e. checks its

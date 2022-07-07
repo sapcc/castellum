@@ -20,7 +20,6 @@ package core
 
 import (
 	"fmt"
-	"net/http"
 	"sync"
 
 	"github.com/gophercloud/gophercloud"
@@ -87,7 +86,7 @@ type CachedDomain struct {
 
 //NewProviderClient constructs a new ProviderClient instance.
 func NewProviderClient(ao gophercloud.AuthOptions, eo gophercloud.EndpointOpts) (ProviderClient, error) {
-	pc, err := createProviderClient(ao)
+	pc, err := openstack.AuthenticatedClient(ao)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +136,7 @@ func (p *providerClientImpl) projectScopedClientImpl(scope ProjectScope, firstPa
 	//auth into the target project
 	ao := p.ao
 	ao.Scope = &gophercloud.AuthScope{ProjectID: scope.ID}
-	pc, err := createProviderClient(ao)
+	pc, err := openstack.AuthenticatedClient(ao)
 	if err != nil {
 		//NOTE: If we don't have any roles assigned in the project yet, we will get
 		//a 401, even if the provided credentials are correct. This is not a fatal
@@ -294,14 +293,4 @@ func (p *providerClientImpl) GetDomain(domainID string) (*CachedDomain, error) {
 	p.domainCache[domainID] = result
 	p.cacheMutex.Unlock()
 	return result, nil
-}
-
-func createProviderClient(ao gophercloud.AuthOptions) (*gophercloud.ProviderClient, error) {
-	provider, err := openstack.NewClient(ao.IdentityEndpoint)
-	if err == nil {
-		//use http.DefaultClient, esp. to pick up the CASTELLUM_INSECURE flag
-		provider.HTTPClient = *http.DefaultClient
-		err = openstack.Authenticate(provider, ao)
-	}
-	return provider, err
 }

@@ -20,10 +20,8 @@ package plugins
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -35,6 +33,7 @@ import (
 	prom_v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 	"github.com/sapcc/go-bits/logg"
+	"github.com/sapcc/go-bits/osext"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -75,10 +74,7 @@ func init() {
 		}
 		manila.Microversion = "2.64" //for "force" field on .Extend(), requires Manila at least on Xena
 
-		prometheusURL := os.Getenv("CASTELLUM_NFS_PROMETHEUS_URL")
-		if prometheusURL == "" {
-			return nil, errors.New("missing required environment variable: CASTELLUM_NFS_PROMETHEUS_URL")
-		}
+		prometheusURL := osext.MustGetenv("CASTELLUM_NFS_PROMETHEUS_URL")
 		promClient, err := prom_api.NewClient(prom_api.Config{Address: prometheusURL})
 		if err != nil {
 			return nil, fmt.Errorf("cannot connect to Prometheus at %s: %s",

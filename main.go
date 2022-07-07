@@ -42,10 +42,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
 	"github.com/sapcc/go-api-declarations/bininfo"
+	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/httpext"
 	"github.com/sapcc/go-bits/logg"
+	"github.com/sapcc/go-bits/must"
+	"github.com/sapcc/go-bits/osext"
 	"gopkg.in/gorp.v2"
 
 	"github.com/sapcc/castellum/internal/api"
@@ -72,8 +75,7 @@ func main() {
 	taskName := os.Args[1]
 	bininfo.SetTaskName(taskName)
 
-	//nolint:errcheck
-	logg.ShowDebug, _ = strconv.ParseBool(os.Getenv("CASTELLUM_DEBUG"))
+	logg.ShowDebug = osext.GetenvBool("CASTELLUM_DEBUG")
 
 	//The CASTELLUM_INSECURE flag can be used to get Castellum to work through
 	//mitmproxy (which is very useful for development and debugging). (It's very
@@ -81,42 +83,22 @@ func main() {
 	//is meant to be useful for production systems, where you definitely don't
 	//want to turn off certificate verification.)
 	//nolint:errcheck
-	if insecure, _ := strconv.ParseBool(os.Getenv("CASTELLUM_INSECURE")); insecure {
+	if osext.GetenvBool("CASTELLUM_INSECURE") {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true,
 		}
-		http.DefaultClient.Transport = http.DefaultTransport
 	}
 
 	//initialize DB connection
-	dbUsername := envOrDefault("CASTELLUM_DB_USERNAME", "postgres")
-	dbPass := os.Getenv("CASTELLUM_DB_PASSWORD")
-	dbHost := envOrDefault("CASTELLUM_DB_HOSTNAME", "localhost")
-	dbPort := envOrDefault("CASTELLUM_DB_PORT", "5432")
-	dbName := envOrDefault("CASTELLUM_DB_NAME", "castellum")
-
-	dbConnOpts, err := url.ParseQuery(os.Getenv("CASTELLUM_DB_CONNECTION_OPTIONS"))
-	if err != nil {
-		logg.Fatal("while parsing CASTELLUM_DB_CONNECTION_OPTIONS: %w", err)
-	}
-	hostname, err := os.Hostname()
-	if err == nil {
-		dbConnOpts.Set("application_name", fmt.Sprintf("%s@%s", bininfo.Component(), hostname))
-	} else {
-		dbConnOpts.Set("application_name", bininfo.Component())
-	}
-
-	dbURL := &url.URL{
-		Scheme:   "postgres",
-		User:     url.UserPassword(dbUsername, dbPass),
-		Host:     net.JoinHostPort(dbHost, dbPort),
-		Path:     dbName,
-		RawQuery: dbConnOpts.Encode(),
-	}
-	dbi, err := db.Init(dbURL)
-	if err != nil {
-		logg.Fatal(err.Error())
-	}
+	dbURL := must.Return(easypg.URLFrom(easypg.URLParts{
+		HostName:          osext.GetenvOrDefault("CASTELLUM_DB_HOSTNAME", "localhost"),
+		Port:              osext.GetenvOrDefault("CASTELLUM_DB_PORT", "5432"),
+		UserName:          osext.GetenvOrDefault("CASTELLUM_DB_USERNAME", "postgres"),
+		Password:          os.Getenv("CASTELLUM_DB_PASSWORD"),
+		ConnectionOptions: os.Getenv("CASTELLUM_DB_CONNECTION_OPTIONS"),
+		DatabaseName:      osext.GetenvOrDefault("CASTELLUM_DB_NAME", "castellum"),
+	}))
+	dbi := must.Return(db.Init(dbURL))
 	prometheus.MustRegister(sqlstats.NewStatsCollector("castellum", dbi.Db))
 
 	//initialize OpenStack connection
@@ -134,36 +116,24 @@ func main() {
 		logg.Fatal("cannot connect to OpenStack: " + err.Error())
 	}
 
-	//get HTTP listen address
-	httpListenAddr := os.Getenv("CASTELLUM_HTTP_LISTEN_ADDRESS")
-	if httpListenAddr == "" {
-		httpListenAddr = ":8080"
-	}
-
 	//initialize asset managers
-	team, err := core.CreateAssetManagers(
-		strings.Split(mustGetenv("CASTELLUM_ASSET_MANAGERS"), ","),
+	team := must.Return(core.CreateAssetManagers(
+		strings.Split(osext.MustGetenv("CASTELLUM_ASSET_MANAGERS"), ","),
 		providerClient,
-	)
-	if err != nil {
-		logg.Fatal(err.Error())
-	}
+	))
 
 	//get max asset sizes
 	cfg := core.Config{
 		MaxAssetSize: make(map[db.AssetType]*uint64),
 	}
-	maxAssetSizes := strings.Split(mustGetenv("CASTELLUM_MAX_ASSET_SIZES"), ",")
+	maxAssetSizes := strings.Split(osext.MustGetenv("CASTELLUM_MAX_ASSET_SIZES"), ",")
 	for _, v := range maxAssetSizes {
 		sL := strings.Split(v, "=")
 		if len(sL) != 2 {
 			logg.Fatal("expected a max asset size configuration value in the format: '<asset-type>=<max-asset-size>', got: %s", v)
 		}
 		assetType := sL[0]
-		maxSize, err := strconv.ParseUint(sL[1], 10, 64)
-		if err != nil {
-			logg.Fatal(err.Error())
-		}
+		maxSize := must.Return(strconv.ParseUint(sL[1], 10, 64))
 
 		found := false
 		for _, assetManager := range team {
@@ -178,6 +148,7 @@ func main() {
 		}
 	}
 
+	httpListenAddr := osext.GetenvOrDefault("CASTELLUM_HTTP_LISTEN_ADDRESS", ":8080")
 	switch taskName {
 	case "api":
 		if len(os.Args) != 2 {
@@ -208,22 +179,6 @@ func main() {
 	}
 }
 
-func mustGetenv(key string) string {
-	val := os.Getenv(key)
-	if val == "" {
-		logg.Fatal("missing required environment variable: " + key)
-	}
-	return val
-}
-
-func envOrDefault(key, defaultVal string) string {
-	val := os.Getenv(key)
-	if val == "" {
-		val = defaultVal
-	}
-	return val
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // task: API
 
@@ -236,10 +191,7 @@ func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provi
 		IdentityV3: identityV3,
 		Cacher:     gopherpolicy.InMemoryCacher(),
 	}
-	err = tv.LoadPolicyFile(mustGetenv("CASTELLUM_OSLO_POLICY_PATH"))
-	if err != nil {
-		logg.Fatal("cannot load oslo.policy: " + err.Error())
-	}
+	must.Succeed(tv.LoadPolicyFile(osext.MustGetenv("CASTELLUM_OSLO_POLICY_PATH")))
 
 	//wrap the main API handler in several layers of middleware
 	corsMiddleware := cors.New(cors.Options{
@@ -258,10 +210,10 @@ func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provi
 	//Start audit logging.
 	rabbitQueueName := os.Getenv("CASTELLUM_RABBITMQ_QUEUE_NAME")
 	if rabbitQueueName != "" {
-		username := envOrDefault("CASTELLUM_RABBITMQ_USERNAME", "guest")
-		pass := envOrDefault("CASTELLUM_RABBITMQ_PASSWORD", "guest")
-		hostname := envOrDefault("CASTELLUM_RABBITMQ_HOSTNAME", "localhost")
-		port, err := strconv.Atoi(envOrDefault("CASTELLUM_RABBITMQ_PORT", "5672"))
+		username := osext.GetenvOrDefault("CASTELLUM_RABBITMQ_USERNAME", "guest")
+		pass := osext.GetenvOrDefault("CASTELLUM_RABBITMQ_PASSWORD", "guest")
+		hostname := osext.GetenvOrDefault("CASTELLUM_RABBITMQ_HOSTNAME", "localhost")
+		port, err := strconv.Atoi(osext.GetenvOrDefault("CASTELLUM_RABBITMQ_PORT", "5672"))
 		if err != nil {
 			logg.Fatal("invalid value for CASTELLUM_RABBITMQ_PORT: " + err.Error())
 		}
