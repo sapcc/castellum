@@ -269,28 +269,16 @@ func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useR
 //GetAssetStatus implements the core.AssetManager interface.
 func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
 	//check status in Prometheus
-	var bytesReservedBySnapshots, bytesUsed, bytesUsedBySnapshots, snapshotReservePercent float64
 	bytesTotal, err := m.getMetricForShare("netapp_volume_total_bytes", res.ScopeUUID, assetUUID)
-	if err == nil {
-		bytesReservedBySnapshots, err = m.getMetricForShare("netapp_volume_snapshot_reserved_bytes", res.ScopeUUID, assetUUID)
-		if err == nil {
-			bytesUsed, err = m.getMetricForShare("netapp_volume_used_bytes", res.ScopeUUID, assetUUID)
-			if err == nil {
-				bytesUsedBySnapshots, err = m.getMetricForShare("netapp_volume_snapshot_used_bytes", res.ScopeUUID, assetUUID)
-				if err == nil {
-					snapshotReservePercent, err = m.getMetricForShare("netapp_volume_percentage_snapshot_reserve", res.ScopeUUID, assetUUID)
-				}
-			}
-		}
-	}
 	if err != nil {
-		if _, ok := err.(emptyPrometheusResultErr); ok {
-			//check if the share still exists in the backend
-			_, getErr := shares.Get(m.Manila, assetUUID).Extract()
-			if _, ok := getErr.(gophercloud.ErrDefault404); ok {
-				return core.AssetStatus{}, core.AssetNotFoundErr{InnerError: fmt.Errorf("share not found in Manila: %s", getErr.Error())}
-			}
-		}
+		return core.AssetStatus{}, err
+	}
+	bytesUsed, err := m.getMetricForShare("netapp_volume_used_bytes", res.ScopeUUID, assetUUID)
+	if err != nil {
+		return core.AssetStatus{}, err
+	}
+	snapshotReservePercent, err := m.getMetricForShare("netapp_volume_percentage_snapshot_reserve", res.ScopeUUID, assetUUID)
+	if err != nil {
 		return core.AssetStatus{}, err
 	}
 
@@ -313,7 +301,16 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 	//TODO Remove option 1 once all shares have migrated to the new layout.
 	var status core.AssetStatus
 	if snapshotReservePercent == 5.0 {
-		//option 1
+		//option 1 (requires some more metrics)
+		bytesReservedBySnapshots, err := m.getMetricForShare("netapp_volume_snapshot_reserved_bytes", res.ScopeUUID, assetUUID)
+		if err != nil {
+			return core.AssetStatus{}, err
+		}
+		bytesUsedBySnapshots, err := m.getMetricForShare("netapp_volume_snapshot_used_bytes", res.ScopeUUID, assetUUID)
+		if err != nil {
+			return core.AssetStatus{}, err
+		}
+
 		if bytesUsedBySnapshots < bytesReservedBySnapshots {
 			bytesUsedBySnapshots = bytesReservedBySnapshots
 		}
@@ -371,7 +368,19 @@ func (m *assetManagerNFS) getMetricForShare(metric, projectUUID, shareUUID strin
 	//migrated to another shareserver and thus appears in the metrics twice.
 	query := fmt.Sprintf(`max by (share_id) (%s{project_id=%q,share_id=%q,volume_type!="dp"})`,
 		metric, projectUUID, shareUUID)
-	return prometheusGetSingleValue(m.Prometheus, query)
+
+	val, err := prometheusGetSingleValue(m.Prometheus, query)
+	if err != nil {
+		if _, ok := err.(emptyPrometheusResultErr); ok {
+			//check if the share still exists in the backend
+			_, getErr := shares.Get(m.Manila, shareUUID).Extract()
+			if _, ok := getErr.(gophercloud.ErrDefault404); ok {
+				return 0, core.AssetNotFoundErr{InnerError: fmt.Errorf("share not found in Manila: %s", getErr.Error())}
+			}
+		}
+		return 0, err
+	}
+	return val, nil
 }
 
 func prometheusGetVector(api prom_v1.API, queryStr string) (model.Vector, error) {
