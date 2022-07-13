@@ -268,64 +268,51 @@ func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useR
 
 //GetAssetStatus implements the core.AssetManager interface.
 func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
-	//check status in Prometheus
-	bytesTotal, err := m.getMetricForShare("netapp_volume_total_bytes", res.ScopeUUID, assetUUID)
-	if err != nil {
-		return core.AssetStatus{}, err
-	}
-	bytesUsed, err := m.getMetricForShare("netapp_volume_used_bytes", res.ScopeUUID, assetUUID)
-	if err != nil {
-		return core.AssetStatus{}, err
-	}
-	snapshotReservePercent, err := m.getMetricForShare("netapp_volume_percentage_snapshot_reserve", res.ScopeUUID, assetUUID)
-	if err != nil {
-		return core.AssetStatus{}, err
-	}
-
 	//compute asset status from Prometheus metrics
 	//
 	//Option 1: For old shares, we have 5% snapshot reserve that gets allocated
 	//*AS PART OF* the target share size, so we need to count the snapshot
 	//reserve into the size and the snapshot usage into the usage, i.e.
 	//
-	//    size  = total + reserved_by_snapshots
-	//    usage = used  + max(reserved_by_snapshots, used_by_snapshots)
+	//    cond  = netapp_volume_is_space_reporting_logical == 0 && netapp_volume_percentage_snapshot_reserve == 5
+	//    size  = netapp_volume_total_bytes + netapp_volume_snapshot_reserved_bytes
+	//    usage = netapp_volume_used_bytes  + max(netapp_volume_snapshot_reserved_bytes, netapp_volume_snapshot_used_bytes)
 	//
 	//Option 2: For newer shares, we have a much larger snapshot reserve (usually
 	//50%) that gets allocated *IN ADDITION TO* the target share size, and
 	//therefore snapshot usage usually does not eat into the main share size, i.e.
 	//
-	//    size  = total
-	//    usage = used
+	//    cond  = netapp_volume_is_space_reporting_logical == 0 && netapp_volume_percentage_snapshot_reserve > 5
+	//    size  = netapp_volume_total_bytes
+	//    usage = netapp_volume_used_bytes
+	//
+	//Option 3: Same as option 2, but if logical space reporting is used, we need
+	//to look at a different metric.
+	//
+	//    cond  = netapp_volume_is_space_reporting_logical == 1
+	//    size  = netapp_volume_total_bytes
+	//    usage = netapp_volume_logical_used_bytes
 	//
 	//TODO Remove option 1 once all shares have migrated to the new layout.
+
+	//pull metrics that are always required
+	bytesTotal, err := m.getMetricForShare("netapp_volume_total_bytes", res.ScopeUUID, assetUUID)
+	if err != nil {
+		return core.AssetStatus{}, err
+	}
+	isSpaceReportingLogical, err := m.getMetricForShare("netapp_volume_is_space_reporting_logical", res.ScopeUUID, assetUUID)
+	if err != nil {
+		return core.AssetStatus{}, err
+	}
+
 	var status core.AssetStatus
-	if snapshotReservePercent == 5.0 {
-		//option 1 (requires some more metrics)
-		bytesReservedBySnapshots, err := m.getMetricForShare("netapp_volume_snapshot_reserved_bytes", res.ScopeUUID, assetUUID)
-		if err != nil {
-			return core.AssetStatus{}, err
-		}
-		bytesUsedBySnapshots, err := m.getMetricForShare("netapp_volume_snapshot_used_bytes", res.ScopeUUID, assetUUID)
+	if isSpaceReportingLogical == 1.0 {
+		//option 3
+		bytesUsed, err := m.getMetricForShare("netapp_volume_logical_used_bytes", res.ScopeUUID, assetUUID)
 		if err != nil {
 			return core.AssetStatus{}, err
 		}
 
-		if bytesUsedBySnapshots < bytesReservedBySnapshots {
-			bytesUsedBySnapshots = bytesReservedBySnapshots
-		}
-		sizeBytes := bytesTotal + bytesReservedBySnapshots
-		usageBytes := bytesUsed + bytesUsedBySnapshots
-		usageGiB := usageBytes / 1024 / 1024 / 1024
-		if usageBytes <= 0 {
-			usageGiB = 0
-		}
-		status = core.AssetStatus{
-			Size:  uint64(math.Round(sizeBytes / 1024 / 1024 / 1024)),
-			Usage: db.UsageValues{db.SingularUsageMetric: usageGiB},
-		}
-	} else {
-		//option 2
 		usageGiB := bytesUsed / 1024 / 1024 / 1024
 		if bytesUsed <= 0 {
 			usageGiB = 0
@@ -333,6 +320,51 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 		status = core.AssetStatus{
 			Size:  uint64(math.Round(bytesTotal / 1024 / 1024 / 1024)),
 			Usage: db.UsageValues{db.SingularUsageMetric: usageGiB},
+		}
+	} else {
+		bytesUsed, err := m.getMetricForShare("netapp_volume_used_bytes", res.ScopeUUID, assetUUID)
+		if err != nil {
+			return core.AssetStatus{}, err
+		}
+		snapshotReservePercent, err := m.getMetricForShare("netapp_volume_percentage_snapshot_reserve", res.ScopeUUID, assetUUID)
+		if err != nil {
+			return core.AssetStatus{}, err
+		}
+
+		if snapshotReservePercent == 5.0 {
+			//option 1
+			bytesReservedBySnapshots, err := m.getMetricForShare("netapp_volume_snapshot_reserved_bytes", res.ScopeUUID, assetUUID)
+			if err != nil {
+				return core.AssetStatus{}, err
+			}
+			bytesUsedBySnapshots, err := m.getMetricForShare("netapp_volume_snapshot_used_bytes", res.ScopeUUID, assetUUID)
+			if err != nil {
+				return core.AssetStatus{}, err
+			}
+
+			if bytesUsedBySnapshots < bytesReservedBySnapshots {
+				bytesUsedBySnapshots = bytesReservedBySnapshots
+			}
+			sizeBytes := bytesTotal + bytesReservedBySnapshots
+			usageBytes := bytesUsed + bytesUsedBySnapshots
+			usageGiB := usageBytes / 1024 / 1024 / 1024
+			if usageBytes <= 0 {
+				usageGiB = 0
+			}
+			status = core.AssetStatus{
+				Size:  uint64(math.Round(sizeBytes / 1024 / 1024 / 1024)),
+				Usage: db.UsageValues{db.SingularUsageMetric: usageGiB},
+			}
+		} else {
+			//option 2
+			usageGiB := bytesUsed / 1024 / 1024 / 1024
+			if bytesUsed <= 0 {
+				usageGiB = 0
+			}
+			status = core.AssetStatus{
+				Size:  uint64(math.Round(bytesTotal / 1024 / 1024 / 1024)),
+				Usage: db.UsageValues{db.SingularUsageMetric: usageGiB},
+			}
 		}
 	}
 
