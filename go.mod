@@ -9,7 +9,7 @@ require (
 	github.com/gophercloud/utils v0.0.0-20220704184730-55bdbbaec4ba
 	github.com/gorilla/mux v1.8.0
 	github.com/prometheus/client_golang v1.12.2
-	github.com/prometheus/common v0.36.0
+	github.com/prometheus/common v0.37.0
 	github.com/rs/cors v1.8.2
 	github.com/sapcc/go-api-declarations v1.2.0
 	github.com/sapcc/go-bits v0.0.0-20220706183424-591e645cac86
