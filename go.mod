@@ -12,7 +12,7 @@ require (
 	github.com/prometheus/common v0.37.0
 	github.com/rs/cors v1.8.2
 	github.com/sapcc/go-api-declarations v1.2.0
-	github.com/sapcc/go-bits v0.0.0-20220801132244-1778c461b6c3
+	github.com/sapcc/go-bits v0.0.0-20220803132021-fd783720dde3
 	github.com/sapcc/gophercloud-sapcc v0.0.0-20220704225742-ec0766c21889
 	gopkg.in/gorp.v2 v2.2.0
 )
@@ -36,7 +36,7 @@ require (
 	github.com/poy/onpar v1.1.2 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
-	github.com/rabbitmq/amqp091-go v1.3.4 // indirect
+	github.com/rabbitmq/amqp091-go v1.4.0 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
 	github.com/ziutek/mymysql v1.5.4 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
