@@ -25,8 +25,8 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
-//GetUsagePercent calculates `100 * usage / size`, but has additional logic for
-//some corner cases like size = 0.
+// GetUsagePercent calculates `100 * usage / size`, but has additional logic for
+// some corner cases like size = 0.
 func GetUsagePercent(size uint64, usage float64) float64 {
 	if size == 0 {
 		if usage == 0 {
@@ -40,7 +40,7 @@ func GetUsagePercent(size uint64, usage float64) float64 {
 	return 100 * usage / float64(size)
 }
 
-//GetMultiUsagePercent is like GetUsagePercent, but converts multiple usage values at once.
+// GetMultiUsagePercent is like GetUsagePercent, but converts multiple usage values at once.
 func GetMultiUsagePercent(size uint64, usage db.UsageValues) db.UsageValues {
 	result := make(db.UsageValues, len(usage))
 	for k, v := range usage {
@@ -49,10 +49,10 @@ func GetMultiUsagePercent(size uint64, usage db.UsageValues) db.UsageValues {
 	return result
 }
 
-//GetEligibleOperations calculates which resizing operations the given asset
-//(within the given resource) is eligible for. In the result, each key-value
-//pair means that the asset has crossed the threshold `key` and thus should be
-//resized to `value`.
+// GetEligibleOperations calculates which resizing operations the given asset
+// (within the given resource) is eligible for. In the result, each key-value
+// pair means that the asset has crossed the threshold `key` and thus should be
+// resized to `value`.
 func GetEligibleOperations(res db.Resource, asset db.Asset, info AssetTypeInfo) map[db.OperationReason]uint64 {
 	//never touch a zero-sized asset unless it has non-zero usage
 	if asset.Size == 0 && !asset.Usage.IsNonZero() {

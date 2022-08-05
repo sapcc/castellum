@@ -278,9 +278,9 @@ type recentOperationQuery struct {
 	OverriddenBy string //contains a condition for an SQL WHERE clause
 }
 
-//This returns the most recent finished operation with the outcomes `%[2]s` for
-//each asset with `resource_id = $1`, unless there is a newer finished
-//operation matching `%[1]s`.
+// This returns the most recent finished operation with the outcomes `%[2]s` for
+// each asset with `resource_id = $1`, unless there is a newer finished
+// operation matching `%[1]s`.
 var recentOperationQueryStr = sqlext.SimplifyWhitespace(`
 	WITH tmp AS (
 		SELECT asset_id, MAX(finished_at) AS max_finished_at

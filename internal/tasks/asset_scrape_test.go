@@ -164,10 +164,7 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 	})
 }
 
-//nolint:dupl //dupl checks the functions/methods used and reports that there are
-//duplicates. We can't refactor because although the methods used in unit tests might be
-//similar, however they contain helpful comments in-place that are specific to that
-//particular unit test.
+//nolint:dupl //dupl checks the functions/methods used and reports that there are duplicates. We can't refactor because although the methods used in unit tests might be similar, however they contain helpful comments in-place that are specific to that particular unit test.
 func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {

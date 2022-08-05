@@ -34,10 +34,10 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
-//This asset manager has one asset type for each resource (i.e. each type of
-//quota).  For a given type of quota, there is only one quota per project, so
-//for each project resource, exactly one asset is reported, the project itself
-//(i.e. `asset.UUID == resource.ScopeUUID`).
+// This asset manager has one asset type for each resource (i.e. each type of
+// quota).  For a given type of quota, there is only one quota per project, so
+// for each project resource, exactly one asset is reported, the project itself
+// (i.e. `asset.UUID == resource.ScopeUUID`).
 type assetManagerProjectQuota struct {
 	Provider       core.ProviderClient
 	Limes          *gophercloud.ServiceClient
@@ -98,7 +98,7 @@ func init() {
 	})
 }
 
-//InfoForAssetType implements the core.AssetManager interface.
+// InfoForAssetType implements the core.AssetManager interface.
 func (m *assetManagerProjectQuota) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
 	for _, info := range m.KnownResources {
 		thisAssetType := info.AssetType()
@@ -114,7 +114,7 @@ func (m *assetManagerProjectQuota) InfoForAssetType(assetType db.AssetType) *cor
 
 var errNotAllowedForThisProject = errors.New("autoscaling is not permitted for this resource because of cluster-level policies")
 
-//CheckResourceAllowed implements the core.AssetManager interface.
+// CheckResourceAllowed implements the core.AssetManager interface.
 func (m *assetManagerProjectQuota) CheckResourceAllowed(assetType db.AssetType, projectID string, configJSON string, existingResources []db.AssetType) error {
 	if configJSON != "" {
 		return core.ErrNoConfigurationAllowed
@@ -137,13 +137,13 @@ func (m *assetManagerProjectQuota) CheckResourceAllowed(assetType db.AssetType, 
 	return errNotAllowedForThisProject
 }
 
-//ListAssets implements the core.AssetManager interface.
+// ListAssets implements the core.AssetManager interface.
 func (m *assetManagerProjectQuota) ListAssets(res db.Resource) ([]string, error) {
 	//see notes on type declaration above
 	return []string{res.ScopeUUID}, nil
 }
 
-//SetAssetSize implements the core.AssetManager interface.
+// SetAssetSize implements the core.AssetManager interface.
 func (m *assetManagerProjectQuota) SetAssetSize(res db.Resource, projectID string, oldSize, newSize uint64) (db.OperationOutcome, error) {
 	info, err := m.parseAssetType(res.AssetType)
 	if err != nil {
@@ -180,7 +180,7 @@ func isUserError(err error) bool {
 	return strings.Contains(msg, "got 409 instead") && (strings.Contains(msg, "domain quota exceeded") || strings.Contains(msg, "quota may not be lower than current usage"))
 }
 
-//GetAssetStatus implements the core.AssetManager interface.
+// GetAssetStatus implements the core.AssetManager interface.
 func (m *assetManagerProjectQuota) GetAssetStatus(res db.Resource, projectID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
 	resource, err := m.getQuotaStatus(res.AssetType, projectID)
 	if err != nil {

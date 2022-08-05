@@ -264,9 +264,9 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	}
 }
 
-//Execute a task repeatedly, but slow down when sql.ErrNoRows is returned by it.
-//(Tasks use this error value to indicate that nothing needs scraping, so we
-//can back off a bit to avoid useless database load.)
+// Execute a task repeatedly, but slow down when sql.ErrNoRows is returned by it.
+// (Tasks use this error value to indicate that nothing needs scraping, so we
+// can back off a bit to avoid useless database load.)
 func goQueuedJobLoop(ctx context.Context, numGoroutines int, poll tasks.JobPoller) {
 	ch := make(chan tasks.Job) //unbuffered!
 
@@ -305,8 +305,8 @@ func goQueuedJobLoop(ctx context.Context, numGoroutines int, poll tasks.JobPolle
 	}
 }
 
-//Execute a task repeatedly, in set intervals. Unlike queuedJobLoop(), this
-//does not change pace when errors are returned.
+// Execute a task repeatedly, in set intervals. Unlike queuedJobLoop(), this
+// does not change pace when errors are returned.
 func cronJobLoop(interval time.Duration, task func() error) {
 	for {
 		err := task()

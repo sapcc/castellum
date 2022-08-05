@@ -22,7 +22,7 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
-//Config contains the app-level configuration options.
+// Config contains the app-level configuration options.
 type Config struct {
 	MaxAssetSize map[db.AssetType]*uint64
 }

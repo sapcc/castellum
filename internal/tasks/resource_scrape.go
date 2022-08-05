@@ -31,10 +31,10 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
-//query that finds the next resource that needs to be scraped
+// query that finds the next resource that needs to be scraped
 //
-//WARNING: This must be run in a transaction, or else `FOR UPDATE SKIP LOCKED`
-//will not work as expected.
+// WARNING: This must be run in a transaction, or else `FOR UPDATE SKIP LOCKED`
+// will not work as expected.
 var scrapeResourceSearchQuery = sqlext.SimplifyWhitespace(`
 	SELECT * FROM resources
 	WHERE (scraped_at IS NULL or scraped_at < $1)
@@ -44,9 +44,9 @@ var scrapeResourceSearchQuery = sqlext.SimplifyWhitespace(`
 	FOR UPDATE SKIP LOCKED LIMIT 1
 `)
 
-//PollForResourceScrapes returns a JobPoller that finds the next resource of the
-//given asset type that needs scraping. The returned Job scrapes it, i.e. it
-//looks for new and deleted assets within that resource.
+// PollForResourceScrapes returns a JobPoller that finds the next resource of the
+// given asset type that needs scraping. The returned Job scrapes it, i.e. it
+// looks for new and deleted assets within that resource.
 func (c *Context) PollForResourceScrapes(minAge time.Duration) JobPoller {
 	return func() (j Job, returnedError error) {
 		defer func() {
@@ -92,7 +92,7 @@ type resourceScrapeJob struct {
 	res db.Resource
 }
 
-//Execute implements the Job interface.
+// Execute implements the Job interface.
 func (j resourceScrapeJob) Execute() (returnedError error) {
 	c := j.c
 	tx := j.tx

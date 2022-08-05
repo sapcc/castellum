@@ -25,19 +25,19 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
-//AssetStatus shows the current state of an asset. It is returned by AssetManager.GetAssetStatus().
+// AssetStatus shows the current state of an asset. It is returned by AssetManager.GetAssetStatus().
 type AssetStatus struct {
 	Size  uint64
 	Usage db.UsageValues
 }
 
-//AssetTypeInfo describes an AssetType supported by an AssetManager.
+// AssetTypeInfo describes an AssetType supported by an AssetManager.
 type AssetTypeInfo struct {
 	AssetType    db.AssetType
 	UsageMetrics []db.UsageMetric
 }
 
-//MakeZeroUsageValues is a convenience function to instantiate an all-zero UsageValues for this AssetType.
+// MakeZeroUsageValues is a convenience function to instantiate an all-zero UsageValues for this AssetType.
 func (info AssetTypeInfo) MakeZeroUsageValues() db.UsageValues {
 	vals := make(db.UsageValues, len(info.UsageMetrics))
 	for _, metric := range info.UsageMetrics {
@@ -46,8 +46,8 @@ func (info AssetTypeInfo) MakeZeroUsageValues() db.UsageValues {
 	return vals
 }
 
-//AssetNotFoundErr is returned by AssetManager.GetAssetStatus() if the
-//concerning asset can not be found in the respective backend.
+// AssetNotFoundErr is returned by AssetManager.GetAssetStatus() if the
+// concerning asset can not be found in the respective backend.
 type AssetNotFoundErr struct {
 	InnerError error
 }
@@ -67,10 +67,10 @@ var (
 	ErrNoConfigurationProvided = errors.New("type-specific configuration must be provided for this asset type")
 )
 
-//AssetManager is the main modularization interface in Castellum. It
-//provides a separation boundary between the plugins that implement the
-//concrete behavior for specific asset types, and the core logic of Castellum.
-//It is created by CreateAssetManagers() using AssetManagerFactory.
+// AssetManager is the main modularization interface in Castellum. It
+// provides a separation boundary between the plugins that implement the
+// concrete behavior for specific asset types, and the core logic of Castellum.
+// It is created by CreateAssetManagers() using AssetManagerFactory.
 type AssetManager interface {
 	//If this asset type is supported by this asset manager, return information
 	//about it. Otherwise return nil.
@@ -99,22 +99,22 @@ type AssetManager interface {
 	GetAssetStatus(res db.Resource, assetUUID string, previousStatus *AssetStatus) (AssetStatus, error)
 }
 
-//AssetManagerFactory is something that creates AssetManager instances. This
-//intermediate step is useful because Castellum should not always support all
-//types of assets. By having plugins register a factory instead of an
-//AssetManager instance, we can ensure that only the selected asset managers
-//get instantiated.
+// AssetManagerFactory is something that creates AssetManager instances. This
+// intermediate step is useful because Castellum should not always support all
+// types of assets. By having plugins register a factory instead of an
+// AssetManager instance, we can ensure that only the selected asset managers
+// get instantiated.
 //
-//The supplied ProviderClient should be stored inside the AssetManager instance
-//for later usage. It can also be used to query OpenStack capabilities.
+// The supplied ProviderClient should be stored inside the AssetManager instance
+// for later usage. It can also be used to query OpenStack capabilities.
 type AssetManagerFactory func(ProviderClient) (AssetManager, error)
 
 var assetManagerFactories = make(map[string]AssetManagerFactory)
 
-//RegisterAssetManagerFactory registers an AssetManagerFactory with this package.
-//The given ID must be unique among all factories. It appears in the
-//CASTELLUM_ASSET_MANAGERS environment variable that controls which factories
-//are used.
+// RegisterAssetManagerFactory registers an AssetManagerFactory with this package.
+// The given ID must be unique among all factories. It appears in the
+// CASTELLUM_ASSET_MANAGERS environment variable that controls which factories
+// are used.
 func RegisterAssetManagerFactory(id string, factory AssetManagerFactory) {
 	if id == "" {
 		panic("RegisterAssetManagerFactory called with empty ID!")
@@ -128,12 +128,12 @@ func RegisterAssetManagerFactory(id string, factory AssetManagerFactory) {
 	assetManagerFactories[id] = factory
 }
 
-//AssetManagerTeam is the set of AssetManager instances that Castellum is using.
+// AssetManagerTeam is the set of AssetManager instances that Castellum is using.
 type AssetManagerTeam []AssetManager
 
-//CreateAssetManagers prepares a set of AssetManager instances for a single run
-//of Castellum. The first argument is the list of IDs of all factories that
-//shall be used to create asset managers.
+// CreateAssetManagers prepares a set of AssetManager instances for a single run
+// of Castellum. The first argument is the list of IDs of all factories that
+// shall be used to create asset managers.
 func CreateAssetManagers(factoryIDs []string, provider ProviderClient) (AssetManagerTeam, error) {
 	team := make(AssetManagerTeam, len(factoryIDs))
 	for idx, factoryID := range factoryIDs {
@@ -150,8 +150,8 @@ func CreateAssetManagers(factoryIDs []string, provider ProviderClient) (AssetMan
 	return team, nil
 }
 
-//ForAssetType returns the asset manager for the given asset type, or nil if
-//the asset type is not supported.
+// ForAssetType returns the asset manager for the given asset type, or nil if
+// the asset type is not supported.
 func (team AssetManagerTeam) ForAssetType(assetType db.AssetType) (AssetManager, AssetTypeInfo) {
 	for _, manager := range team {
 		info := manager.InfoForAssetType(assetType)

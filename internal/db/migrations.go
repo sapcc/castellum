@@ -26,7 +26,7 @@ package db
 //
 //  ALTER TYPE op_outcome ADD VALUE IF NOT EXISTS 'errored' AFTER 'failed';
 
-//SQLMigrations must be public because it's also used by tests.
+// SQLMigrations must be public because it's also used by tests.
 var SQLMigrations = map[string]string{
 	"001_initial.down.sql": `
 		DROP TABLE resources;

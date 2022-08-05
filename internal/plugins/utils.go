@@ -21,25 +21,25 @@ package plugins
 
 import "github.com/sapcc/castellum/internal/db"
 
-//UserError is an error wrapper that simplifies
+// UserError is an error wrapper that simplifies
 //
-//TODO upstream this into internal/core and make
+// TODO upstream this into internal/core and make
 type UserError struct {
 	Inner error
 }
 
-//Error implements the builtin/error interface.
+// Error implements the builtin/error interface.
 func (e UserError) Error() string {
 	return e.Inner.Error()
 }
 
-//Cause implements the causer interface implied by errors.Cause().
+// Cause implements the causer interface implied by errors.Cause().
 func (e UserError) Cause() error {
 	return e.Inner
 }
 
-//Classify inspects the given error, unwraps UserError if possible, and adds an
-//appropriate db.OperationOutcome to the result.
+// Classify inspects the given error, unwraps UserError if possible, and adds an
+// appropriate db.OperationOutcome to the result.
 func Classify(err error) (db.OperationOutcome, error) {
 	switch err := err.(type) {
 	case nil:

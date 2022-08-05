@@ -50,12 +50,12 @@ type handler struct {
 	TimeNow func() time.Time
 }
 
-//NewAPI constructs the main httpapi.API for this package.
+// NewAPI constructs the main httpapi.API for this package.
 func NewHandler(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClient) httpapi.API {
 	return &handler{Config: cfg, DB: dbi, Team: team, Validator: validator, Provider: provider, TimeNow: time.Now}
 }
 
-//AddTo implements the httpapi.API interface.
+// AddTo implements the httpapi.API interface.
 func (h *handler) AddTo(router *mux.Router) {
 	router.Methods("GET").
 		Path(`/v1/projects/{project_id}`).
@@ -109,8 +109,8 @@ func (h *handler) AddTo(router *mux.Router) {
 		HandlerFunc(h.GetAssetResizeErrors)
 }
 
-//RequireJSON will parse the request body into the given data structure, or
-//write an error response if that fails.
+// RequireJSON will parse the request body into the given data structure, or
+// write an error response if that fails.
 func RequireJSON(w http.ResponseWriter, r *http.Request, data interface{}) bool {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
@@ -263,8 +263,8 @@ var (
 	}
 )
 
-//ParseAge parses a query parameter containing an age specification
-//like `30m`, `12h` or `7d`.
+// ParseAge parses a query parameter containing an age specification
+// like `30m`, `12h` or `7d`.
 func ParseAge(query url.Values, key, defaultValue string) (time.Duration, error) {
 	spec := query.Get(key)
 	if spec == "" {

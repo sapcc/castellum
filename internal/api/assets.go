@@ -34,7 +34,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 // data types
 
-//Asset is how a db.Asset looks like in the API.
+// Asset is how a db.Asset looks like in the API.
 type Asset struct {
 	UUID               string         `json:"id"`
 	Size               uint64         `json:"size,omitempty"`
@@ -46,14 +46,14 @@ type Asset struct {
 	FinishedOperations *[]Operation   `json:"finished_operations,omitempty"`
 }
 
-//Checked appears in type Asset and Resource.
+// Checked appears in type Asset and Resource.
 type Checked struct {
 	AtUnix       int64  `json:"at"`
 	ErrorMessage string `json:"error,omitempty"`
 }
 
-//Operation is how a db.PendingOperation or db.FinishedOperation looks like in
-//the API.
+// Operation is how a db.PendingOperation or db.FinishedOperation looks like in
+// the API.
 type Operation struct {
 	ProjectUUID string       `json:"project_id,omitempty"`
 	AssetType   db.AssetType `json:"asset_type,omitempty"`
@@ -69,24 +69,24 @@ type Operation struct {
 	Finished  *OperationFinish       `json:"finished,omitempty"`
 }
 
-//OperationCreation appears in type Operation.
+// OperationCreation appears in type Operation.
 type OperationCreation struct {
 	AtUnix       int64          `json:"at"`
 	UsagePercent db.UsageValues `json:"usage_percent"`
 }
 
-//OperationConfirmation appears in type Operation.
+// OperationConfirmation appears in type Operation.
 type OperationConfirmation struct {
 	AtUnix int64 `json:"at"`
 }
 
-//OperationGreenlight appears in type Operation.
+// OperationGreenlight appears in type Operation.
 type OperationGreenlight struct {
 	AtUnix     int64   `json:"at"`
 	ByUserUUID *string `json:"by_user,omitempty"`
 }
 
-//OperationFinish appears in type Operation.
+// OperationFinish appears in type Operation.
 type OperationFinish struct {
 	AtUnix       int64  `json:"at"`
 	ErrorMessage string `json:"error,omitempty"`
@@ -95,7 +95,7 @@ type OperationFinish struct {
 ////////////////////////////////////////////////////////////////////////////////
 // conversion and validation methods
 
-//AssetFromDB converts a db.Asset into an api.Asset.
+// AssetFromDB converts a db.Asset into an api.Asset.
 func AssetFromDB(asset db.Asset) Asset {
 	a := Asset{
 		UUID:          asset.UUID,
@@ -113,7 +113,7 @@ func AssetFromDB(asset db.Asset) Asset {
 	return a
 }
 
-//PendingOperationFromDB converts a db.PendingOperation into an api.Operation.
+// PendingOperationFromDB converts a db.PendingOperation into an api.Operation.
 func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, res *db.Resource) Operation {
 	op := Operation{
 		AssetID: assetID,
@@ -145,7 +145,7 @@ func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, res *db.Re
 	return op
 }
 
-//FinishedOperationFromDB converts a db.FinishedOperation into an api.Operation.
+// FinishedOperationFromDB converts a db.FinishedOperation into an api.Operation.
 func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string, res *db.Resource) Operation {
 	op := Operation{
 		AssetID: assetID,

@@ -39,7 +39,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 // data types
 
-//Resource is how a db.Resource looks like in the API.
+// Resource is how a db.Resource looks like in the API.
 type Resource struct {
 	ScrapedAtUnix     *int64           `json:"scraped_at,omitempty"`
 	Checked           *Checked         `json:"checked,omitempty"`
@@ -52,19 +52,19 @@ type Resource struct {
 	SizeSteps         SizeSteps        `json:"size_steps"`
 }
 
-//Threshold appears in type Resource.
+// Threshold appears in type Resource.
 type Threshold struct {
 	UsagePercent db.UsageValues `json:"usage_percent"`
 	DelaySeconds uint32         `json:"delay_seconds,omitempty"`
 }
 
-//SizeSteps appears in type Resource.
+// SizeSteps appears in type Resource.
 type SizeSteps struct {
 	Percent float64 `json:"percent,omitempty"`
 	Single  bool    `json:"single,omitempty"`
 }
 
-//SizeConstraints appears in type Resource.
+// SizeConstraints appears in type Resource.
 type SizeConstraints struct {
 	Minimum     *uint64 `json:"minimum,omitempty"`
 	Maximum     *uint64 `json:"maximum,omitempty"`
@@ -74,7 +74,7 @@ type SizeConstraints struct {
 ////////////////////////////////////////////////////////////////////////////////
 // conversion and validation methods
 
-//ResourceFromDB converts a db.Resource into an api.Resource.
+// ResourceFromDB converts a db.Resource into an api.Resource.
 func (h handler) ResourceFromDB(res db.Resource) (Resource, error) {
 	assetCount, err := h.DB.SelectInt(
 		`SELECT COUNT(*) FROM assets WHERE resource_id = $1`,
@@ -125,8 +125,8 @@ func (h handler) ResourceFromDB(res db.Resource) (Resource, error) {
 	return result, nil
 }
 
-//UpdateDBResource updates the given db.Resource with the values provided in
-//this api.Resource.
+// UpdateDBResource updates the given db.Resource with the values provided in
+// this api.Resource.
 func (r Resource) UpdateDBResource(res *db.Resource, manager core.AssetManager, info core.AssetTypeInfo, maxAssetSize *uint64, existingResources []db.AssetType) (errors []string) {
 	complain := func(msg string, args ...interface{}) {
 		if len(args) > 0 {

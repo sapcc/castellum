@@ -28,8 +28,8 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
-//WithDB prepares a DB reference for this test, or fails the test if the DB
-//is not ready.
+// WithDB prepares a DB reference for this test, or fails the test if the DB
+// is not ready.
 func (t T) WithDB(fixtureFile *string, action func(dbi *gorp.DbMap)) {
 	postgresURLStr := "postgres://postgres:postgres@localhost:54321/castellum?sslmode=disable"
 	dbURL, err := url.Parse(postgresURLStr)
@@ -56,13 +56,13 @@ func (t T) WithDB(fixtureFile *string, action func(dbi *gorp.DbMap)) {
 	t.Must(dbi.Db.Close())
 }
 
-//MustUpdate aborts the test if dbi.Update(row) throws an error.
+// MustUpdate aborts the test if dbi.Update(row) throws an error.
 func (t T) MustUpdate(dbi *gorp.DbMap, row interface{}) {
 	_, err := dbi.Update(row)
 	t.Must(err)
 }
 
-//ExpectResources checks that the DB contains exactly the given resources.
+// ExpectResources checks that the DB contains exactly the given resources.
 func (t T) ExpectResources(dbi *gorp.DbMap, resources ...db.Resource) {
 	t.Helper()
 	var dbResources []db.Resource
@@ -74,7 +74,7 @@ func (t T) ExpectResources(dbi *gorp.DbMap, resources ...db.Resource) {
 	t.AssertJSONEqual("resources", dbResources, resources)
 }
 
-//ExpectAssets checks that the DB contains exactly the given assets.
+// ExpectAssets checks that the DB contains exactly the given assets.
 func (t T) ExpectAssets(dbi *gorp.DbMap, assets ...db.Asset) {
 	t.Helper()
 	var dbAssets []db.Asset
@@ -86,7 +86,7 @@ func (t T) ExpectAssets(dbi *gorp.DbMap, assets ...db.Asset) {
 	t.AssertJSONEqual("assets", dbAssets, assets)
 }
 
-//ExpectPendingOperations checks that the DB contains exactly the given pending ops.
+// ExpectPendingOperations checks that the DB contains exactly the given pending ops.
 func (t T) ExpectPendingOperations(dbi *gorp.DbMap, ops ...db.PendingOperation) {
 	t.Helper()
 	var dbOps []db.PendingOperation
@@ -98,7 +98,7 @@ func (t T) ExpectPendingOperations(dbi *gorp.DbMap, ops ...db.PendingOperation) 
 	t.AssertJSONEqual("pending operations", dbOps, ops)
 }
 
-//ExpectFinishedOperations checks that the DB contains exactly the given finished ops.
+// ExpectFinishedOperations checks that the DB contains exactly the given finished ops.
 func (t T) ExpectFinishedOperations(dbi *gorp.DbMap, ops ...db.FinishedOperation) {
 	t.Helper()
 	var dbOps []db.FinishedOperation
@@ -110,7 +110,7 @@ func (t T) ExpectFinishedOperations(dbi *gorp.DbMap, ops ...db.FinishedOperation
 	t.AssertJSONEqual("finished operations", dbOps, ops)
 }
 
-//AssertJSONEqual checks that both given values have identical JSON serializations.
+// AssertJSONEqual checks that both given values have identical JSON serializations.
 func (t T) AssertJSONEqual(variable string, actual, expected interface{}) {
 	t.Helper()
 	expectedJSON, _ := json.Marshal(expected) //nolint:errcheck

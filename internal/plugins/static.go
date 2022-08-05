@@ -27,8 +27,8 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
-//StaticAsset represents an asset managed by AssetManagerStatic. It is only
-//used in tests as a double for an actual asset.
+// StaticAsset represents an asset managed by AssetManagerStatic. It is only
+// used in tests as a double for an actual asset.
 type StaticAsset struct {
 	Size  uint64
 	Usage uint64
@@ -46,11 +46,11 @@ type StaticAsset struct {
 	CannotFindAsset bool
 }
 
-//AssetManagerStatic is a core.AssetManager for testing purposes. It just
-//contains a static list of assets for a single asset type. No requests against
-//OpenStack are ever made by it.
+// AssetManagerStatic is a core.AssetManager for testing purposes. It just
+// contains a static list of assets for a single asset type. No requests against
+// OpenStack are ever made by it.
 //
-//Attempts to resize assets will succeed if and only if `newSize > usage`.
+// Attempts to resize assets will succeed if and only if `newSize > usage`.
 type AssetManagerStatic struct {
 	AssetType                 db.AssetType
 	Assets                    map[string]map[string]StaticAsset
@@ -61,7 +61,7 @@ type AssetManagerStatic struct {
 	ConflictsWithAssetType    db.AssetType
 }
 
-//InfoForAssetType implements the core.AssetManager interface.
+// InfoForAssetType implements the core.AssetManager interface.
 func (m AssetManagerStatic) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
 	if assetType == m.AssetType {
 		usageMetrics := m.UsageMetrics
@@ -76,7 +76,7 @@ func (m AssetManagerStatic) InfoForAssetType(assetType db.AssetType) *core.Asset
 	return nil
 }
 
-//CheckResourceAllowed implements the core.AssetManager interface.
+// CheckResourceAllowed implements the core.AssetManager interface.
 func (m AssetManagerStatic) CheckResourceAllowed(assetType db.AssetType, scopeUUID string, configJSON string, existingResources []db.AssetType) error {
 	if m.ExpectsConfiguration {
 		if configJSON == "" {
@@ -118,7 +118,7 @@ var (
 	errSimulatedSetFailure = errors.New("SetAssetSize failing as requested")
 )
 
-//ListAssets implements the core.AssetManager interface.
+// ListAssets implements the core.AssetManager interface.
 func (m AssetManagerStatic) ListAssets(res db.Resource) ([]string, error) {
 	if res.AssetType != m.AssetType {
 		return nil, errWrongAssetType
@@ -135,7 +135,7 @@ func (m AssetManagerStatic) ListAssets(res db.Resource) ([]string, error) {
 	return uuids, nil
 }
 
-//GetAssetStatus implements the core.AssetManager interface.
+// GetAssetStatus implements the core.AssetManager interface.
 func (m AssetManagerStatic) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
 	if res.AssetType != m.AssetType {
 		return core.AssetStatus{}, errWrongAssetType
@@ -170,7 +170,7 @@ func (m AssetManagerStatic) GetAssetStatus(res db.Resource, assetUUID string, pr
 	}, nil
 }
 
-//SetAssetSize implements the core.AssetManager interface.
+// SetAssetSize implements the core.AssetManager interface.
 func (m AssetManagerStatic) SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (db.OperationOutcome, error) {
 	if res.AssetType != m.AssetType {
 		return db.OperationOutcomeErrored, errWrongAssetType

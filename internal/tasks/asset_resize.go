@@ -32,8 +32,8 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
-//WARNING: This must be run in a transaction, or else `FOR UPDATE SKIP LOCKED`
-//will not work as expected.
+// WARNING: This must be run in a transaction, or else `FOR UPDATE SKIP LOCKED`
+// will not work as expected.
 var selectAndDeleteNextResizeQuery = sqlext.SimplifyWhitespace(`
 	DELETE FROM pending_operations WHERE id = (
 		SELECT id FROM pending_operations WHERE greenlit_at < $1 AND (retry_at IS NULL OR retry_at < $1)
@@ -47,9 +47,9 @@ const (
 	retryInterval = 2 * time.Minute
 )
 
-//PollForAssetResizes is a JobPoller that finds the next pending operation. The
-//returned Job executes the pending operation, i.e. moves it from status
-//"greenlit" to either "succeeded", "failed" or "errored".
+// PollForAssetResizes is a JobPoller that finds the next pending operation. The
+// returned Job executes the pending operation, i.e. moves it from status
+// "greenlit" to either "succeeded", "failed" or "errored".
 func (c *Context) PollForAssetResizes() (j Job, returnedError error) {
 	defer func() {
 		if returnedError != nil && returnedError != sql.ErrNoRows {
@@ -91,7 +91,7 @@ type assetResizeJob struct {
 	op db.PendingOperation
 }
 
-//Execute implements the Job interface.
+// Execute implements the Job interface.
 func (j assetResizeJob) Execute() (returnedError error) {
 	c := j.c
 	tx := j.tx

@@ -60,10 +60,10 @@ const (
 	ServerPollInterval = 10 * time.Second
 )
 
-//NOTE 1: The `virtualmachine` labels look like `$NAME ($ID)` or just `$ID`, the
-//latter without parentheses around the ID.
+// NOTE 1: The `virtualmachine` labels look like `$NAME ($ID)` or just `$ID`, the
+// latter without parentheses around the ID.
 //
-//NOTE 2: These queries return fractional values in the range 0..1, NOT percentages in the range 0..100.
+// NOTE 2: These queries return fractional values in the range 0..1, NOT percentages in the range 0..100.
 var serverUsageQueries = map[db.UsageMetric]string{
 	"cpu": `vrops_virtualmachine_cpu_usage_ratio{virtualmachine=~".*${ID}.*"} / 100`,
 	"ram": `vrops_virtualmachine_memory_consumed_kilobytes{virtualmachine=~".*${ID}.*"} / vrops_virtualmachine_memory_kilobytes{virtualmachine=~".*${ID}.*"}`,
@@ -97,7 +97,7 @@ func init() {
 	})
 }
 
-//InfoForAssetType implements the core.AssetManager interface.
+// InfoForAssetType implements the core.AssetManager interface.
 func (m *assetManagerServerGroups) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
 	if strings.HasPrefix(string(assetType), "server-group:") {
 		return &core.AssetTypeInfo{
@@ -108,7 +108,7 @@ func (m *assetManagerServerGroups) InfoForAssetType(assetType db.AssetType) *cor
 	return nil
 }
 
-//CheckResourceAllowed implements the core.AssetManager interface.
+// CheckResourceAllowed implements the core.AssetManager interface.
 func (m *assetManagerServerGroups) CheckResourceAllowed(assetType db.AssetType, scopeUUID string, configJSON string, existingResources []db.AssetType) error {
 	//check that the server group exists and is in the right project
 	groupID := strings.TrimPrefix(string(assetType), "server-group:")
@@ -125,13 +125,13 @@ func (m *assetManagerServerGroups) CheckResourceAllowed(assetType db.AssetType, 
 	return err
 }
 
-//ListAssets implements the core.AssetManager interface.
+// ListAssets implements the core.AssetManager interface.
 func (m *assetManagerServerGroups) ListAssets(res db.Resource) ([]string, error) {
 	groupUUID := strings.TrimPrefix(string(res.AssetType), "server-group:")
 	return []string{groupUUID}, nil
 }
 
-//GetAssetStatus implements the core.AssetManager interface.
+// GetAssetStatus implements the core.AssetManager interface.
 func (m *assetManagerServerGroups) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
 	computeV2, err := m.Provider.CloudAdminClient(openstack.NewComputeV2)
 	if err != nil {
@@ -199,7 +199,7 @@ func (m *assetManagerServerGroups) GetAssetStatus(res db.Resource, assetUUID str
 	return result, nil
 }
 
-//SetAssetSize implements the core.AssetManager interface.
+// SetAssetSize implements the core.AssetManager interface.
 func (m *assetManagerServerGroups) SetAssetSize(res db.Resource, assetUUID string, _, newSize uint64) (db.OperationOutcome, error) {
 	cfg, err := m.parseAndValidateConfig(res.ConfigJSON)
 	if err != nil {
@@ -580,7 +580,7 @@ type configForServerGroup struct {
 	LoadbalancerPoolMemberships []configForLBPoolMembership `json:"loadbalancer_pool_memberships"`
 }
 
-//TODO Go 1.18: change type to slice of actual type, write containsString() with generics instead
+// TODO Go 1.18: change type to slice of actual type, write containsString() with generics instead
 var validBDMSourceTypes = []string{
 	string(bootfromvolume.SourceBlank),
 	string(bootfromvolume.SourceImage),
@@ -682,8 +682,8 @@ func containsString(list []string, val string) bool {
 ////////////////////////////////////////////////////////////////////////////////
 // gophercloud extensions/helpers
 
-//serverGroup is like type servergroups.ServerGroup, but contains fields
-//that the latter does not yet have.
+// serverGroup is like type servergroups.ServerGroup, but contains fields
+// that the latter does not yet have.
 type serverGroup struct {
 	ID        string   `json:"id"`
 	Name      string   `json:"name"`

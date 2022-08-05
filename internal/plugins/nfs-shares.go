@@ -85,7 +85,7 @@ func init() {
 	})
 }
 
-//InfoForAssetType implements the core.AssetManager interface.
+// InfoForAssetType implements the core.AssetManager interface.
 func (m *assetManagerNFS) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
 	if m.parseAssetType(assetType) != nil {
 		return &core.AssetTypeInfo{
@@ -96,7 +96,7 @@ func (m *assetManagerNFS) InfoForAssetType(assetType db.AssetType) *core.AssetTy
 	return nil
 }
 
-//CheckResourceAllowed implements the core.AssetManager interface.
+// CheckResourceAllowed implements the core.AssetManager interface.
 func (m *assetManagerNFS) CheckResourceAllowed(assetType db.AssetType, scopeUUID string, configJSON string, existingResources []db.AssetType) error {
 	if configJSON != "" {
 		return core.ErrNoConfigurationAllowed
@@ -114,7 +114,7 @@ func (m *assetManagerNFS) CheckResourceAllowed(assetType db.AssetType, scopeUUID
 	return nil
 }
 
-//ListAssets implements the core.AssetManager interface.
+// ListAssets implements the core.AssetManager interface.
 func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 	assetType := m.parseAssetType(res.AssetType)
 
@@ -223,7 +223,7 @@ var (
 	shareStatusErrorRx       = regexp.MustCompile(`Invalid share: .* current status is: error.`)
 )
 
-//SetAssetSize implements the core.AssetManager interface.
+// SetAssetSize implements the core.AssetManager interface.
 func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (db.OperationOutcome, error) {
 	err := m.resize(assetUUID, oldSize, newSize /* useReverseOperation = */, false)
 	if err != nil {
@@ -266,7 +266,7 @@ func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useR
 	return shares.Shrink(m.Manila, assetUUID, shares.ShrinkOpts{NewSize: int(newSize)}).ExtractErr()
 }
 
-//GetAssetStatus implements the core.AssetManager interface.
+// GetAssetStatus implements the core.AssetManager interface.
 func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
 	//compute asset status from Prometheus metrics
 	//
@@ -460,8 +460,8 @@ func prometheusGetSingleValue(api prom_v1.API, queryStr string) (float64, error)
 	}
 }
 
-//shareExtendOpts is like shares.ExtendOpts, but supports the new "force" option.
-//TODO: merge into upstream
+// shareExtendOpts is like shares.ExtendOpts, but supports the new "force" option.
+// TODO: merge into upstream
 type shareExtendOpts struct {
 	NewSize int  `json:"new_size"`
 	Force   bool `json:"force"`

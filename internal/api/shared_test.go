@@ -63,8 +63,8 @@ func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action fun
 	})
 }
 
-//MockValidator implements the gopherpolicy.Enforcer and gopherpolicy.Validator
-//interfaces.
+// MockValidator implements the gopherpolicy.Enforcer and gopherpolicy.Validator
+// interfaces.
 type MockValidator struct {
 	ForbiddenRules map[string]bool
 }
@@ -94,7 +94,7 @@ func (mv *MockValidator) Enforce(rule string, ctx policy.Context) bool {
 	return !mv.ForbiddenRules[rule]
 }
 
-//MockProviderClient implements the core.ProviderClientInterface.
+// MockProviderClient implements the core.ProviderClientInterface.
 type MockProviderClient struct{}
 
 func (c MockProviderClient) CloudAdminClient(factory core.ServiceClientFactory) (*gophercloud.ServiceClient, error) {

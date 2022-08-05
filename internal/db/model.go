@@ -28,12 +28,12 @@ import (
 	"gopkg.in/gorp.v2"
 )
 
-//Resource describes the autoscaling behavior for a single resource in a
-//single project or domain. Note that we reuse Limes terminology here: A
-//project resource is the totality of all assets (see type Asset) of a single
-//type within a project. For example, a single NFS share is not a resource,
-//it's an asset. But it *belongs* to the resource "NFS shares", and more
-//specifically, to the project resource "NFS shares for project X".
+// Resource describes the autoscaling behavior for a single resource in a
+// single project or domain. Note that we reuse Limes terminology here: A
+// project resource is the totality of all assets (see type Asset) of a single
+// type within a project. For example, a single NFS share is not a resource,
+// it's an asset. But it *belongs* to the resource "NFS shares", and more
+// specifically, to the project resource "NFS shares for project X".
 type Resource struct {
 	//The pair of (.ScopeUUID, .AssetType) uniquely identifies a Resource on
 	//the API level. Internally, other tables reference Resource by the numeric
@@ -78,12 +78,12 @@ type Resource struct {
 	ScrapeErrorMessage string `db:"scrape_error_message"`
 }
 
-//AssetType is the type of Resource.AssetType. It extends type string with some
-//convenience methods.
+// AssetType is the type of Resource.AssetType. It extends type string with some
+// convenience methods.
 type AssetType string
 
-//PolicyRuleForRead returns the name of the policy rule that allows read access
-//to this resource.
+// PolicyRuleForRead returns the name of the policy rule that allows read access
+// to this resource.
 func (a AssetType) PolicyRuleForRead() string {
 	//only consider the asset type up to the first colon, e.g.
 	//  assetType = "quota:compute:instances"
@@ -92,16 +92,16 @@ func (a AssetType) PolicyRuleForRead() string {
 	return "project:show:" + assetTypeFields[0]
 }
 
-//PolicyRuleForWrite returns the name of the policy rule that allows write
-//access to this resource.
+// PolicyRuleForWrite returns the name of the policy rule that allows write
+// access to this resource.
 func (a AssetType) PolicyRuleForWrite() string {
 	assetTypeFields := strings.SplitN(string(a), ":", 2)
 	return "project:edit:" + assetTypeFields[0]
 }
 
-//Asset describes a single thing that can be resized dynamically based on its
-//utilization. Assets are grouped into resources, see type Resource. Each
-//individual resizing is an operation, see type Operation.
+// Asset describes a single thing that can be resized dynamically based on its
+// utilization. Assets are grouped into resources, see type Resource. Each
+// individual resizing is an operation, see type Operation.
 type Asset struct {
 	//The pair of (.ResourceID, .UUID) uniquely identifies an asset on the
 	//API level. Internally, other tables reference Resource by the
@@ -144,7 +144,7 @@ type Asset struct {
 	CriticalUsages string `db:"critical_usages"`
 }
 
-//PendingOperation describes an ongoing resize operation for an asset.
+// PendingOperation describes an ongoing resize operation for an asset.
 type PendingOperation struct {
 	ID      int64           `db:"id"`
 	AssetID int64           `db:"asset_id"`
@@ -183,7 +183,7 @@ type PendingOperation struct {
 	RetryAt *time.Time `db:"retry_at"`
 }
 
-//IntoFinishedOperation creates the FinishedOperation for this PendingOperation.
+// IntoFinishedOperation creates the FinishedOperation for this PendingOperation.
 func (o PendingOperation) IntoFinishedOperation(outcome OperationOutcome, finishedAt time.Time) FinishedOperation {
 	return FinishedOperation{
 		AssetID:            o.AssetID,
@@ -201,7 +201,7 @@ func (o PendingOperation) IntoFinishedOperation(outcome OperationOutcome, finish
 	}
 }
 
-//FinishedOperation describes a finished resize operation for an asset.
+// FinishedOperation describes a finished resize operation for an asset.
 type FinishedOperation struct {
 	//All fields are identical in semantics to those in type PendingOperation, except
 	//where noted.
@@ -224,7 +224,7 @@ type FinishedOperation struct {
 	ErroredAttempts    uint32  `db:"errored_attempts"`
 }
 
-//OperationReason is an enumeration type for possible reasons for a resize operation.
+// OperationReason is an enumeration type for possible reasons for a resize operation.
 type OperationReason string
 
 const (
@@ -239,7 +239,7 @@ const (
 	OperationReasonLow OperationReason = "low"
 )
 
-//OperationOutcome is an enumeration type for possible outcomes for a resize operation.
+// OperationOutcome is an enumeration type for possible outcomes for a resize operation.
 type OperationOutcome string
 
 const (
@@ -254,7 +254,7 @@ const (
 	OperationOutcomeCancelled OperationOutcome = "cancelled"
 )
 
-//OperationState is an enumeration type for all possible states of an operation.
+// OperationState is an enumeration type for all possible states of an operation.
 type OperationState string
 
 const (
@@ -277,7 +277,7 @@ const (
 	OperationStateErrored = OperationState(OperationOutcomeErrored)
 )
 
-//State returns the operation's state as a word.
+// State returns the operation's state as a word.
 func (o PendingOperation) State() OperationState {
 	switch {
 	case o.ConfirmedAt == nil:
@@ -289,12 +289,12 @@ func (o PendingOperation) State() OperationState {
 	}
 }
 
-//State returns the operation's state as a word.
+// State returns the operation's state as a word.
 func (o FinishedOperation) State() OperationState {
 	return OperationState(o.Outcome)
 }
 
-//Init connects to the database and initializes the schema and model types.
+// Init connects to the database and initializes the schema and model types.
 func Init(dbURL *url.URL) (*gorp.DbMap, error) {
 	cfg := easypg.Configuration{
 		PostgresURL: dbURL,

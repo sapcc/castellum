@@ -37,8 +37,8 @@ func init() {
 	prometheus.MustRegister(opStateTransitionCounter)
 }
 
-//CountStateTransition must be called whenever an operation changes to a
-//different state.
+// CountStateTransition must be called whenever an operation changes to a
+// different state.
 func CountStateTransition(res db.Resource, assetUUID string, from, to db.OperationState) {
 	labels := prometheus.Labels{
 		"project_id": res.ScopeUUID,

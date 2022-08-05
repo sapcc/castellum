@@ -20,20 +20,20 @@ package test
 
 import "time"
 
-//FakeClock is a clock that only changes when we tell it to.
+// FakeClock is a clock that only changes when we tell it to.
 type FakeClock int64
 
-//Now is a double for time.Now().
+// Now is a double for time.Now().
 func (f *FakeClock) Now() time.Time {
 	return time.Unix(int64(*f), 0).UTC()
 }
 
-//Step advances the clock by one second.
+// Step advances the clock by one second.
 func (f *FakeClock) Step() {
 	*f++
 }
 
-//StepBy advances the clock by the given duration
+// StepBy advances the clock by the given duration
 func (f *FakeClock) StepBy(d time.Duration) {
 	*f += FakeClock(d / time.Second)
 }

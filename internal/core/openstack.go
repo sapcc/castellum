@@ -31,9 +31,9 @@ import (
 	"github.com/sapcc/go-api-declarations/bininfo"
 )
 
-//ProviderClient is an interface for an internal type that wraps
-//gophercloud.ProviderClient to provide caching and rescoping. It is only
-//provided as an interface to enable substitution of a mock for tests.
+// ProviderClient is an interface for an internal type that wraps
+// gophercloud.ProviderClient to provide caching and rescoping. It is only
+// provided as an interface to enable substitution of a mock for tests.
 type ProviderClient interface {
 	//CloudAdminClient returns a service client in the provider client's default scope.
 	//The argument is a function like `openstack.NewIdentityV3`.
@@ -51,7 +51,7 @@ type ProviderClient interface {
 	GetDomain(domainID string) (*CachedDomain, error)
 }
 
-//providerClientImpl is the implementation for the ProviderClient interface.
+// providerClientImpl is the implementation for the ProviderClient interface.
 type providerClientImpl struct {
 	pc            *gophercloud.ProviderClient
 	ao            gophercloud.AuthOptions
@@ -62,10 +62,10 @@ type providerClientImpl struct {
 	cacheMutex    *sync.RWMutex
 }
 
-//ServiceClientFactory is a typedef that appears in type ProviderClient.
+// ServiceClientFactory is a typedef that appears in type ProviderClient.
 type ServiceClientFactory func(*gophercloud.ProviderClient, gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error)
 
-//ProjectScope defines the scope into which ProviderClient.ProjectScopedClient() will authenticate.
+// ProjectScope defines the scope into which ProviderClient.ProjectScopedClient() will authenticate.
 type ProjectScope struct {
 	//The ID of the project to scope into.
 	ID string
@@ -73,18 +73,18 @@ type ProjectScope struct {
 	RoleNames []string
 }
 
-//CachedProject contains cached information about a Keystone project.
+// CachedProject contains cached information about a Keystone project.
 type CachedProject struct {
 	Name     string
 	DomainID string
 }
 
-//CachedDomain contains cached information about a Keystone domain.
+// CachedDomain contains cached information about a Keystone domain.
 type CachedDomain struct {
 	Name string
 }
 
-//NewProviderClient constructs a new ProviderClient instance.
+// NewProviderClient constructs a new ProviderClient instance.
 func NewProviderClient(ao gophercloud.AuthOptions, eo gophercloud.EndpointOpts) (ProviderClient, error) {
 	pc, err := openstack.AuthenticatedClient(ao)
 	if err != nil {
@@ -122,12 +122,12 @@ func NewProviderClient(ao gophercloud.AuthOptions, eo gophercloud.EndpointOpts) 
 	}, nil
 }
 
-//CloudAdminClient implements the ProviderClient interface.
+// CloudAdminClient implements the ProviderClient interface.
 func (p *providerClientImpl) CloudAdminClient(factory ServiceClientFactory) (*gophercloud.ServiceClient, error) {
 	return factory(p.pc, p.eo)
 }
 
-//ProjectScopedClient implements the ProviderClient interface.
+// ProjectScopedClient implements the ProviderClient interface.
 func (p *providerClientImpl) ProjectScopedClient(scope ProjectScope) (*gophercloud.ProviderClient, gophercloud.EndpointOpts, error) {
 	return p.projectScopedClientImpl(scope, true)
 }
@@ -228,12 +228,12 @@ func (p *providerClientImpl) projectScopedClientImpl(scope ProjectScope, firstPa
 	return p.projectScopedClientImpl(scope, false)
 }
 
-//GetAuthResult implements the ProviderClient interface.
+// GetAuthResult implements the ProviderClient interface.
 func (p *providerClientImpl) GetAuthResult() gophercloud.AuthResult {
 	return p.pc.GetAuthResult()
 }
 
-//GetProject implements the ProviderClient interface.
+// GetProject implements the ProviderClient interface.
 func (p *providerClientImpl) GetProject(projectID string) (*CachedProject, error) {
 	p.cacheMutex.RLock()
 	result, ok := p.projectCache[projectID]
@@ -264,7 +264,7 @@ func (p *providerClientImpl) GetProject(projectID string) (*CachedProject, error
 	return result, nil
 }
 
-//GetDomain implements the ProviderClient interface.
+// GetDomain implements the ProviderClient interface.
 func (p *providerClientImpl) GetDomain(domainID string) (*CachedDomain, error) {
 	p.cacheMutex.RLock()
 	result, ok := p.domainCache[domainID]

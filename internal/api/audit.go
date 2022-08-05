@@ -31,7 +31,7 @@ import (
 	"github.com/sapcc/go-bits/osext"
 )
 
-//eventSink is a channel that receives audit events.
+// eventSink is a channel that receives audit events.
 var eventSink chan<- cadf.Event
 
 var showAuditOnStdout = !osext.GetenvBool("CASTELLUM_AUDIT_SILENT")
@@ -59,7 +59,7 @@ func StartAuditLogging(rabbitQueueName string, rabbitURI url.URL) {
 
 var observerUUID = audittools.GenerateUUID()
 
-//logAndPublishEvent logs the audit event to stdout and publishes it to a RabbitMQ server.
+// logAndPublishEvent logs the audit event to stdout and publishes it to a RabbitMQ server.
 func logAndPublishEvent(time time.Time, req *http.Request, token *gopherpolicy.Token, reasonCode int, target audittools.TargetRenderer) {
 	action := cadf.UpdateAction
 	if v, ok := target.(scalingEventTarget); ok {
@@ -98,7 +98,7 @@ func logAndPublishEvent(time time.Time, req *http.Request, token *gopherpolicy.T
 	}
 }
 
-//EventParams contains parameters for creating an audit event.
+// EventParams contains parameters for creating an audit event.
 type scalingEventTarget struct {
 	action            cadf.Action
 	projectID         string
@@ -123,7 +123,7 @@ type targetAttachmentContent struct {
 	resource Resource
 }
 
-//MarshalJSON implements the json.Marshaler interface.
+// MarshalJSON implements the json.Marshaler interface.
 func (a targetAttachmentContent) MarshalJSON() ([]byte, error) {
 	//copy resource data into a struct that does not have a custom MarshalJSON
 	data := a.resource

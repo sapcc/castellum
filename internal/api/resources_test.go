@@ -31,7 +31,7 @@ import (
 	"github.com/sapcc/castellum/internal/test"
 )
 
-//JSON serializations of the records in internal/api/fixtures/start-data.sql
+// JSON serializations of the records in internal/api/fixtures/start-data.sql
 var (
 	initialFooResourceJSON = assert.JSONObject{
 		"scraped_at":  1,

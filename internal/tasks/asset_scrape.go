@@ -34,10 +34,10 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
-//query that finds the next resource that needs to be scraped
+// query that finds the next resource that needs to be scraped
 //
-//WARNING: This must be run in a transaction, or else `FOR UPDATE SKIP LOCKED`
-//will not work as expected.
+// WARNING: This must be run in a transaction, or else `FOR UPDATE SKIP LOCKED`
+// will not work as expected.
 var scrapeAssetSearchQuery = sqlext.SimplifyWhitespace(`
 	SELECT * FROM assets
 	WHERE checked_at < $1
@@ -49,9 +49,9 @@ var scrapeAssetSearchQuery = sqlext.SimplifyWhitespace(`
 
 var logScrapes = osext.GetenvBool("CASTELLUM_LOG_SCRAPES")
 
-//PollForAssetScrapes returns a JobPoller that finds the next asset of the given
-//type that needs scraping. The returned Job scrapes the asset, i.e. checks its
-//status and creates/confirms/cancels operations accordingly.
+// PollForAssetScrapes returns a JobPoller that finds the next asset of the given
+// type that needs scraping. The returned Job scrapes the asset, i.e. checks its
+// status and creates/confirms/cancels operations accordingly.
 func (c *Context) PollForAssetScrapes(minAge time.Duration) JobPoller {
 	return func() (j Job, returnedError error) {
 		defer func() {
@@ -96,7 +96,7 @@ type assetScrapeJob struct {
 	asset db.Asset
 }
 
-//Execute implements the Job interface.
+// Execute implements the Job interface.
 func (j assetScrapeJob) Execute() (returnedError error) {
 	c := j.c
 	tx := j.tx

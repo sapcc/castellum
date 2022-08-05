@@ -24,12 +24,12 @@ import (
 	"gopkg.in/gorp.v2"
 )
 
-//T extends testing.T with custom helper methods.
+// T extends testing.T with custom helper methods.
 type T struct {
 	*testing.T
 }
 
-//Must fails the test if the given error is non-nil.
+// Must fails the test if the given error is non-nil.
 func (t T) Must(err error) {
 	t.Helper()
 	if err != nil {
@@ -37,7 +37,7 @@ func (t T) Must(err error) {
 	}
 }
 
-//MustExec fails the test if dbi.Exec(query) returns an error.
+// MustExec fails the test if dbi.Exec(query) returns an error.
 func (t T) MustExec(dbi *gorp.DbMap, query string, args ...interface{}) {
 	t.Helper()
 	_, err := dbi.Exec(query, args...)

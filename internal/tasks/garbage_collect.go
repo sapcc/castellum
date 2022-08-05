@@ -24,7 +24,7 @@ import (
 	"gopkg.in/gorp.v2"
 )
 
-//CollectGarbage removes old entries from the finished_operations table.
+// CollectGarbage removes old entries from the finished_operations table.
 func CollectGarbage(dbi *gorp.DbMap, maxLastUpdatedAt time.Time) error {
 	_, err := dbi.Exec(`DELETE FROM finished_operations WHERE finished_at < $1`, maxLastUpdatedAt)
 	return err

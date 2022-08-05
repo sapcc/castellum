@@ -88,8 +88,8 @@ func init() {
 	prometheus.MustRegister(assetResizeErroredCounter)
 }
 
-//EnsureScrapingCounters adds 0 to all scraping counters, to ensure that
-//all relevant timeseries exist.
+// EnsureScrapingCounters adds 0 to all scraping counters, to ensure that
+// all relevant timeseries exist.
 func (c Context) EnsureScrapingCounters() error {
 	err := c.foreachAssetType(func(assetType db.AssetType) {
 		labels := prometheus.Labels{"asset": string(assetType)}
@@ -104,8 +104,8 @@ func (c Context) EnsureScrapingCounters() error {
 	return nil
 }
 
-//EnsureResizingCounters adds 0 to all resizing counters, to ensure that
-//all relevant timeseries exist.
+// EnsureResizingCounters adds 0 to all resizing counters, to ensure that
+// all relevant timeseries exist.
 func (c Context) EnsureResizingCounters() error {
 	err := c.foreachAssetType(func(assetType db.AssetType) {
 		labels := prometheus.Labels{"asset": string(assetType)}
@@ -153,20 +153,20 @@ func (c Context) foreachAssetType(action func(db.AssetType)) (err error) {
 // that we don't have to track when resources are deleted and need to be
 // removed from the respective GaugeVecs.
 
-//StateMetricsCollector is a prometheus.Collector that submits gauges
-//describing database entries.
+// StateMetricsCollector is a prometheus.Collector that submits gauges
+// describing database entries.
 type StateMetricsCollector struct {
 	Context Context
 }
 
-//Describe implements the prometheus.Collector interface.
+// Describe implements the prometheus.Collector interface.
 func (c StateMetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	projectResourceExistsGauge.Describe(ch)
 }
 
 var resourceStateQuery = `SELECT scope_uuid, asset_type FROM resources`
 
-//Collect implements the prometheus.Collector interface.
+// Collect implements the prometheus.Collector interface.
 func (c StateMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 	err := c.doCollect(ch)
 	if err != nil {
