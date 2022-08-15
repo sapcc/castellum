@@ -45,7 +45,8 @@ else
 endif
 
 install: FORCE build/castellum
-	install -D -m 0755 build/castellum "$(DESTDIR)$(PREFIX)/bin/castellum"
+	install -d -m 0755 "$(DESTDIR)$(PREFIX)/bin"
+	install -m 0755 build/castellum "$(DESTDIR)$(PREFIX)/bin/castellum"
 
 # which packages to test with "go test"
 GO_TESTPKGS := $(shell go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./...)
