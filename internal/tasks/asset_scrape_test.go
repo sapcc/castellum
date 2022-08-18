@@ -1126,14 +1126,14 @@ func TestUpsizeBecauseOfMinFreeSizePassingLowThreshold(baseT *testing.T) {
 	})
 }
 
-func ifthenelseF64(cond bool, thenValue float64, elseValue float64) float64 {
+func ifthenelseF64(cond bool, thenValue, elseValue float64) float64 {
 	if cond {
 		return thenValue
 	}
 	return elseValue
 }
 
-func ifthenelseU64(cond bool, thenValue uint64, elseValue uint64) uint64 {
+func ifthenelseU64(cond bool, thenValue, elseValue uint64) uint64 {
 	if cond {
 		return thenValue
 	}

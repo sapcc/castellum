@@ -56,7 +56,7 @@ func (info limesResourceInfo) AssetType() db.AssetType {
 
 func init() {
 	core.RegisterAssetManagerFactory("project-quota", func(provider core.ProviderClient) (core.AssetManager, error) {
-		limes, err := provider.CloudAdminClient(clients.NewLimesV1)
+		limesClient, err := provider.CloudAdminClient(clients.NewLimesV1)
 		if err != nil {
 			return nil, err
 		}
@@ -79,7 +79,7 @@ func init() {
 		}
 
 		//list all resources that exist, by looking at the current project
-		report, err := projects.Get(limes, currentProjectDomainID, currentProjectID, nil).Extract()
+		report, err := projects.Get(limesClient, currentProjectDomainID, currentProjectID, nil).Extract()
 		if err != nil {
 			return nil, fmt.Errorf("could not get project report for %s", currentProjectID)
 		}
@@ -94,7 +94,7 @@ func init() {
 			}
 		}
 
-		return &assetManagerProjectQuota{provider, limes, knownResources}, nil
+		return &assetManagerProjectQuota{provider, limesClient, knownResources}, nil
 	})
 }
 
@@ -115,7 +115,7 @@ func (m *assetManagerProjectQuota) InfoForAssetType(assetType db.AssetType) *cor
 var errNotAllowedForThisProject = errors.New("autoscaling is not permitted for this resource because of cluster-level policies")
 
 // CheckResourceAllowed implements the core.AssetManager interface.
-func (m *assetManagerProjectQuota) CheckResourceAllowed(assetType db.AssetType, projectID string, configJSON string, existingResources []db.AssetType) error {
+func (m *assetManagerProjectQuota) CheckResourceAllowed(assetType db.AssetType, projectID, configJSON string, existingResources []db.AssetType) error {
 	if configJSON != "" {
 		return core.ErrNoConfigurationAllowed
 	}
