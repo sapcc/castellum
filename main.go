@@ -82,10 +82,9 @@ func main() {
 	//important that this is not the standard "CASTELLUM_DEBUG" variable. That one
 	//is meant to be useful for production systems, where you definitely don't
 	//want to turn off certificate verification.)
-	//nolint:errcheck
 	if osext.GetenvBool("CASTELLUM_INSECURE") {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: true, //nolint:gosec // only used in development environments
 		}
 	}
 

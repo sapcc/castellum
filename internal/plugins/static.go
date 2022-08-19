@@ -77,7 +77,7 @@ func (m AssetManagerStatic) InfoForAssetType(assetType db.AssetType) *core.Asset
 }
 
 // CheckResourceAllowed implements the core.AssetManager interface.
-func (m AssetManagerStatic) CheckResourceAllowed(assetType db.AssetType, scopeUUID string, configJSON string, existingResources []db.AssetType) error {
+func (m AssetManagerStatic) CheckResourceAllowed(assetType db.AssetType, scopeUUID, configJSON string, existingResources []db.AssetType) error {
 	if m.ExpectsConfiguration {
 		if configJSON == "" {
 			return core.ErrNoConfigurationProvided

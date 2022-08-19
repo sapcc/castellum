@@ -60,13 +60,13 @@ func StartAuditLogging(rabbitQueueName string, rabbitURI url.URL) {
 var observerUUID = audittools.GenerateUUID()
 
 // logAndPublishEvent logs the audit event to stdout and publishes it to a RabbitMQ server.
-func logAndPublishEvent(time time.Time, req *http.Request, token *gopherpolicy.Token, reasonCode int, target audittools.TargetRenderer) {
+func logAndPublishEvent(eventTime time.Time, req *http.Request, token *gopherpolicy.Token, reasonCode int, target audittools.TargetRenderer) {
 	action := cadf.UpdateAction
 	if v, ok := target.(scalingEventTarget); ok {
 		action = cadf.Action(string(v.action) + "/" + v.resourceType)
 	}
 	p := audittools.EventParameters{
-		Time:       time,
+		Time:       eventTime,
 		Request:    req,
 		User:       token,
 		ReasonCode: reasonCode,

@@ -158,7 +158,7 @@ func (j resourceScrapeJob) Execute() (returnedError error) {
 			continue
 		}
 		logg.Info("removing deleted %s asset from DB: UUID = %s, scope UUID = %s", res.AssetType, dbAsset.UUID, res.ScopeUUID)
-		_, err = tx.Delete(&dbAsset)
+		_, err = tx.Delete(&dbAsset) //nolint:gosec // Delete is not holding onto the pointer after it returns
 		if err != nil {
 			return err
 		}

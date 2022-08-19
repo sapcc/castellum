@@ -82,7 +82,7 @@ func TestCollectGarbage(baseT *testing.T) {
 			},
 		}
 		for _, op := range ops {
-			t.Must(c.DB.Insert(&op))
+			t.Must(c.DB.Insert(&op)) //nolint:gosec // Insert is not holding onto the pointer after it returns
 		}
 
 		t.ExpectFinishedOperations(c.DB, ops...)
