@@ -65,6 +65,9 @@ linters-settings:
   goimports:
     # Put local imports after 3rd-party packages.
     local-prefixes: github.com/sapcc/castellum
+  gosec:
+    excludes:
+      - G306
   govet:
     # Report about shadowed variables.
     check-shadowing: true
