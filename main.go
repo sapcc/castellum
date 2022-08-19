@@ -22,7 +22,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"crypto/tls"
 	"database/sql"
 	"fmt"
 	"io"
@@ -77,16 +76,9 @@ func main() {
 
 	logg.ShowDebug = osext.GetenvBool("CASTELLUM_DEBUG")
 
-	//The CASTELLUM_INSECURE flag can be used to get Castellum to work through
-	//mitmproxy (which is very useful for development and debugging). (It's very
-	//important that this is not the standard "CASTELLUM_DEBUG" variable. That one
-	//is meant to be useful for production systems, where you definitely don't
-	//want to turn off certificate verification.)
-	if osext.GetenvBool("CASTELLUM_INSECURE") {
-		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{
-			InsecureSkipVerify: true, //nolint:gosec // only used in development environments
-		}
-	}
+	wrap := httpext.WrapTransport(&http.DefaultTransport)
+	wrap.SetInsecureSkipVerify(osext.GetenvBool("CASTELLUM_INSECURE")) //for debugging with mitmproxy etc. (DO NOT SET IN PRODUCTION)
+	wrap.SetOverrideUserAgent(bininfo.Component(), bininfo.VersionOr("rolling"))
 
 	//initialize DB connection
 	dbURL := must.Return(easypg.URLFrom(easypg.URLParts{
@@ -225,7 +217,6 @@ func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provi
 		api.StartAuditLogging(rabbitQueueName, rabbitURI)
 	}
 
-	logg.Info("listening on " + httpListenAddr)
 	err = httpext.ListenAndServeContext(httpext.ContextWithSIGINT(context.Background(), 10*time.Second), httpListenAddr, nil)
 	if err != nil {
 		logg.Error(err.Error())
@@ -256,7 +247,6 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	handler := httpapi.Compose(httpapi.HealthCheckAPI{SkipRequestLog: true})
 	http.Handle("/", handler)
 	http.Handle("/metrics", promhttp.Handler())
-	logg.Info("listening on " + httpListenAddr)
 	err := httpext.ListenAndServeContext(ctx, httpListenAddr, nil)
 	if err != nil {
 		logg.Error(err.Error())
@@ -335,7 +325,6 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 	handler := httpapi.Compose(httpapi.HealthCheckAPI{SkipRequestLog: true})
 	http.Handle("/", handler)
 	http.Handle("/metrics", promhttp.Handler())
-	logg.Info("listening on " + httpListenAddr)
 	err := httpext.ListenAndServeContext(ctx, httpListenAddr, nil)
 	if err != nil {
 		logg.Error(err.Error())

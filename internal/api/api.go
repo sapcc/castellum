@@ -151,8 +151,6 @@ func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *go
 
 	token := h.Validator.CheckToken(r)
 	token.Context.Logger = logg.Debug
-	logg.Debug("token has auth = %v", token.Context.Auth)
-	logg.Debug("token has roles = %v", token.Context.Roles)
 	//all project-scoped endpoints require the user to have access to the
 	//selected project
 	if projectScoped {
