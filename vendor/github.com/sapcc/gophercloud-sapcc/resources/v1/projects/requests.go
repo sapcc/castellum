@@ -47,7 +47,7 @@ type ListOpts struct {
 }
 
 // ToProjectListParams formats a ListOpts into a map of headers and a query string.
-func (opts ListOpts) ToProjectListParams() (map[string]string, string, error) {
+func (opts ListOpts) ToProjectListParams() (headers map[string]string, queryString string, err error) {
 	h, err := gophercloud.BuildHeaders(opts)
 	if err != nil {
 		return nil, "", err
@@ -75,7 +75,7 @@ func List(c *gophercloud.ServiceClient, domainID string, opts ListOptsBuilder) (
 		url += q
 	}
 
-	resp, err := c.Get(url, &r.Body, &gophercloud.RequestOpts{
+	resp, err := c.Get(url, &r.Body, &gophercloud.RequestOpts{ //nolint:bodyclose // already closed by gophercloud
 		MoreHeaders: headers,
 	})
 	_, r.Header, r.Err = gophercloud.ParseResponse(resp, err)
@@ -97,7 +97,7 @@ type GetOpts struct {
 }
 
 // ToProjectGetParams formats a GetOpts into a map of headers and a query string.
-func (opts GetOpts) ToProjectGetParams() (map[string]string, string, error) {
+func (opts GetOpts) ToProjectGetParams() (headers map[string]string, queryString string, err error) {
 	h, err := gophercloud.BuildHeaders(opts)
 	if err != nil {
 		return nil, "", err
@@ -112,7 +112,7 @@ func (opts GetOpts) ToProjectGetParams() (map[string]string, string, error) {
 }
 
 // Get retrieves details on a single project, by ID.
-func Get(c *gophercloud.ServiceClient, domainID string, projectID string, opts GetOptsBuilder) (r CommonResult) {
+func Get(c *gophercloud.ServiceClient, domainID, projectID string, opts GetOptsBuilder) (r CommonResult) {
 	url := getURL(c, domainID, projectID)
 	headers := make(map[string]string)
 	if opts != nil {
@@ -125,7 +125,7 @@ func Get(c *gophercloud.ServiceClient, domainID string, projectID string, opts G
 		url += q
 	}
 
-	resp, err := c.Get(url, &r.Body, &gophercloud.RequestOpts{
+	resp, err := c.Get(url, &r.Body, &gophercloud.RequestOpts{ //nolint:bodyclose // already closed by gophercloud
 		MoreHeaders: headers,
 	})
 	_, r.Header, r.Err = gophercloud.ParseResponse(resp, err)
@@ -143,7 +143,7 @@ type UpdateOpts struct {
 }
 
 // ToProjectUpdateMap formats a UpdateOpts into a map of headers and a request body.
-func (opts UpdateOpts) ToProjectUpdateMap() (map[string]string, map[string]interface{}, error) {
+func (opts UpdateOpts) ToProjectUpdateMap() (headers map[string]string, requestBody map[string]interface{}, err error) {
 	h, err := gophercloud.BuildHeaders(opts)
 	if err != nil {
 		return nil, nil, err
@@ -158,7 +158,7 @@ func (opts UpdateOpts) ToProjectUpdateMap() (map[string]string, map[string]inter
 }
 
 // Update modifies the attributes of a project and returns the response body which contains non-fatal error messages.
-func Update(c *gophercloud.ServiceClient, domainID string, projectID string, opts UpdateOptsBuilder) (r UpdateResult) {
+func Update(c *gophercloud.ServiceClient, domainID, projectID string, opts UpdateOptsBuilder) (r UpdateResult) {
 	url := updateURL(c, domainID, projectID)
 	h, b, err := opts.ToProjectUpdateMap()
 	if err != nil {
@@ -181,9 +181,9 @@ func Update(c *gophercloud.ServiceClient, domainID string, projectID string, opt
 
 // Sync schedules a sync task that pulls a project's data from the backing services
 // into Limes' local database.
-func Sync(c *gophercloud.ServiceClient, domainID string, projectID string) (r SyncResult) {
+func Sync(c *gophercloud.ServiceClient, domainID, projectID string) (r SyncResult) {
 	url := syncURL(c, domainID, projectID)
-	resp, err := c.Post(url, nil, nil, &gophercloud.RequestOpts{
+	resp, err := c.Post(url, nil, nil, &gophercloud.RequestOpts{ //nolint:bodyclose // already closed by gophercloud
 		OkCodes: []int{http.StatusAccepted},
 	})
 	_, r.Header, r.Err = gophercloud.ParseResponse(resp, err)
