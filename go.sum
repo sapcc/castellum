@@ -276,8 +276,8 @@ github.com/sapcc/go-api-declarations v1.3.0 h1:4FMj0UR+Pydil1cpIewa068w/55mqvg3+
 github.com/sapcc/go-api-declarations v1.3.0/go.mod h1:EA4x5xxJGyG/3JTteUOYBg6cJLJgsBHrDj3ryfNU4dQ=
 github.com/sapcc/go-bits v0.0.0-20220824125308-0be4a179e36c h1:gVpEnMaiXUIjeNK6PKPI5ZOJr5wozMD3vn+C064e0W8=
 github.com/sapcc/go-bits v0.0.0-20220824125308-0be4a179e36c/go.mod h1:Nysm5NczZEy/rshqTvu4vJTyKvaCJHIPKw3aaimvJfk=
-github.com/sapcc/gophercloud-sapcc v0.0.0-20220823142120-77644554a4fc h1:a+epE2fMFPZClQkVrYgKxvNVylpXDDc8LgBCPK7ohGQ=
-github.com/sapcc/gophercloud-sapcc v0.0.0-20220823142120-77644554a4fc/go.mod h1:6qxnuoS33BDmwZdSuJPWG0BWmu6TGyGs4yXxR5LszZk=
+github.com/sapcc/gophercloud-sapcc v0.0.0-20220824125306-acab8cdfa856 h1:RIR1FBArh1OggoKkVr1cPKsfyMWx14Z16knCyXFb7F4=
+github.com/sapcc/gophercloud-sapcc v0.0.0-20220824125306-acab8cdfa856/go.mod h1:6qxnuoS33BDmwZdSuJPWG0BWmu6TGyGs4yXxR5LszZk=
 github.com/sergi/go-diff v1.2.0 h1:XU+rvMAioB0UC3q1MFrIQy4Vo5/4VsRDQQXHsEya6xQ=
 github.com/sergi/go-diff v1.2.0/go.mod h1:STckp+ISIX8hZLjrqAeVduY0gWCT9IjLuqbuNXdaHfM=
 github.com/shurcooL/sanitized_anchor_name v1.0.0/go.mod h1:1NzhyTcUVG4SuEtjjoZeVRXNmyL/1OwPU0+IJeTBvfc=
