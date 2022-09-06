@@ -372,7 +372,7 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	}
 
 	manager, info := h.Team.ForAssetType(dbResource.AssetType)
-	maxAssetSize := h.Config.MaxAssetSize[info.AssetType]
+	maxAssetSize := h.Config.MaxAssetSizeFor(info.AssetType)
 
 	action := cadf.UpdateAction
 	if dbResource.ID == 0 {

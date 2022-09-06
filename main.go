@@ -107,37 +107,15 @@ func main() {
 		logg.Fatal("cannot connect to OpenStack: " + err.Error())
 	}
 
+	//get max asset sizes
+	var cfg core.Config
+	must.Succeed(cfg.SetMaxAssetSizeRules(osext.MustGetenv("CASTELLUM_MAX_ASSET_SIZES")))
+
 	//initialize asset managers
 	team := must.Return(core.CreateAssetManagers(
 		strings.Split(osext.MustGetenv("CASTELLUM_ASSET_MANAGERS"), ","),
 		providerClient,
 	))
-
-	//get max asset sizes
-	cfg := core.Config{
-		MaxAssetSize: make(map[db.AssetType]*uint64),
-	}
-	maxAssetSizes := strings.Split(osext.MustGetenv("CASTELLUM_MAX_ASSET_SIZES"), ",")
-	for _, v := range maxAssetSizes {
-		sL := strings.Split(v, "=")
-		if len(sL) != 2 {
-			logg.Fatal("expected a max asset size configuration value in the format: '<asset-type>=<max-asset-size>', got: %s", v)
-		}
-		assetType := sL[0]
-		maxSize := must.Return(strconv.ParseUint(sL[1], 10, 64))
-
-		found := false
-		for _, assetManager := range team {
-			info := assetManager.InfoForAssetType(db.AssetType(assetType))
-			if info != nil {
-				found = true
-				cfg.MaxAssetSize[info.AssetType] = &maxSize
-			}
-		}
-		if !found {
-			logg.Fatal("unknown asset type: %s", assetType)
-		}
-	}
 
 	httpListenAddr := osext.GetenvOrDefault("CASTELLUM_HTTP_LISTEN_ADDRESS", ":8080")
 	switch taskName {
