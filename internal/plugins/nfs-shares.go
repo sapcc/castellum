@@ -172,6 +172,7 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 func (m *assetManagerNFS) ignoreShare(share shares.Share) bool {
 	//ignore shares in status "error" (we won't be able to resize them anyway)
 	if share.Status == "error" {
+		logg.Debug("ignoring share %s because of status = error", share.ID)
 		return true
 	}
 
@@ -184,6 +185,7 @@ func (m *assetManagerNFS) ignoreShare(share shares.Share) bool {
 	//check because some snapmirrors are only detected by it, not by the old one.
 	if snapmirrorStr, ok := share.Metadata["snapmirror"]; ok {
 		if snapmirrorStr == "1" {
+			logg.Debug("ignoring share %s because of snapmirror = 1", share.ID)
 			return true
 		}
 	}
@@ -208,11 +210,21 @@ func (m *assetManagerNFS) ignoreShare(share shares.Share) bool {
 		}
 	}
 	if hasDPMetrics && !hasNonDPMetrics {
+		logg.Debug("ignoring share %s because of volume_type = dp", share.ID)
 		return true
 	}
 	//NOTE: Not having any useful metrics at all is not a valid reason for
 	//ignoring the share. If we lack metrics about a share, we want to be alerted
 	//by the failing scrape.
+
+	//ignore shares that are offline (scraping will fail on these shares because
+	//their size is always reported as 0)
+	for _, sample := range resultVector {
+		if sample.Metric["volume_state"] == "offline" {
+			logg.Debug("ignoring share %s because of volume_state = offline", share.ID)
+			return true
+		}
+	}
 
 	return false
 }
