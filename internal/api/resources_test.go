@@ -19,6 +19,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -404,15 +405,30 @@ func TestPutResource(baseT *testing.T) {
 	})
 }
 
-func TestPutResourceValidationErrors(baseT *testing.T) {
-	t := test.T{T: baseT}
+func TestMaxAssetSizeFor(t *testing.T) {
+	var (
+		cfg        core.Config
+		maxBarSize = uint64(42)
+		maxFooSize = uint64(30)
+	)
 
-	var maxFooSize uint64 = 30
-	cfg := core.Config{
-		MaxAssetSize: map[db.AssetType]*uint64{
-			"foo": &maxFooSize,
-		},
-	}
+	assert.DeepEqual(t, "", cfg.SetMaxAssetSizeRules(fmt.Sprintf("foo.*=%d,.*bar=%d", maxFooSize, maxBarSize)), nil)
+
+	assert.DeepEqual(t, "foo", *cfg.MaxAssetSizeFor(db.AssetType("foo")), maxFooSize)
+	assert.DeepEqual(t, "bar", *cfg.MaxAssetSizeFor(db.AssetType("bar")), maxBarSize)
+	assert.DeepEqual(t, "foobar", *cfg.MaxAssetSizeFor(db.AssetType("foobar")), maxFooSize)
+	assert.DeepEqual(t, "buz", cfg.MaxAssetSizeFor(db.AssetType("buz")), (*uint64)(nil))
+	assert.DeepEqual(t, "somefoo", cfg.MaxAssetSizeFor(db.AssetType("somefoo")), (*uint64)(nil))
+}
+
+func TestPutResourceValidationErrors(baseT *testing.T) {
+	var (
+		maxFooSize uint64 = 30
+		cfg        core.Config
+	)
+
+	t := test.T{T: baseT}
+	assert.DeepEqual(baseT, "", cfg.SetMaxAssetSizeRules(fmt.Sprintf("foo=%d", maxFooSize)), nil)
 
 	withHandler(t, cfg, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, _ []db.Asset) {
 		expectErrors := func(assetType string, body assert.JSONObject, errors ...string) {
