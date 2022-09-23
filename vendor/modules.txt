@@ -14,7 +14,7 @@ github.com/dlmiddlecote/sqlstats
 ## explicit
 # github.com/go-sql-driver/mysql v1.6.0
 ## explicit; go 1.10
-# github.com/gofrs/uuid v4.2.0+incompatible
+# github.com/gofrs/uuid v4.3.0+incompatible
 ## explicit
 github.com/gofrs/uuid
 # github.com/golang/protobuf v1.5.2
@@ -118,7 +118,7 @@ github.com/rs/cors
 github.com/sapcc/go-api-declarations/bininfo
 github.com/sapcc/go-api-declarations/cadf
 github.com/sapcc/go-api-declarations/limes
-# github.com/sapcc/go-bits v0.0.0-20220909131733-7e2aa654bf15
+# github.com/sapcc/go-bits v0.0.0-20220919133313-cbe76a8983ac
 ## explicit; go 1.19
 github.com/sapcc/go-bits/assert
 github.com/sapcc/go-bits/audittools
@@ -138,7 +138,7 @@ github.com/sapcc/go-bits/must
 github.com/sapcc/go-bits/osext
 github.com/sapcc/go-bits/respondwith
 github.com/sapcc/go-bits/sqlext
-# github.com/sapcc/gophercloud-sapcc v0.0.0-20220909131736-bef114cc329e
+# github.com/sapcc/gophercloud-sapcc v0.0.0-20220919133313-4b851336ad87
 ## explicit; go 1.19
 github.com/sapcc/gophercloud-sapcc/clients
 github.com/sapcc/gophercloud-sapcc/resources/v1/projects

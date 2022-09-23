@@ -12,8 +12,8 @@ require (
 	github.com/prometheus/common v0.37.0
 	github.com/rs/cors v1.8.2
 	github.com/sapcc/go-api-declarations v1.3.0
-	github.com/sapcc/go-bits v0.0.0-20220909131733-7e2aa654bf15
-	github.com/sapcc/gophercloud-sapcc v0.0.0-20220909131736-bef114cc329e
+	github.com/sapcc/go-bits v0.0.0-20220919133313-cbe76a8983ac
+	github.com/sapcc/gophercloud-sapcc v0.0.0-20220919133313-4b851336ad87
 	gopkg.in/gorp.v2 v2.2.0
 )
 
@@ -22,7 +22,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/go-gorp/gorp v2.2.0+incompatible // indirect
 	github.com/go-sql-driver/mysql v1.6.0 // indirect
-	github.com/gofrs/uuid v4.2.0+incompatible // indirect
+	github.com/gofrs/uuid v4.3.0+incompatible // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
