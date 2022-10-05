@@ -13,7 +13,7 @@ require (
 	github.com/rs/cors v1.8.2
 	github.com/sapcc/go-api-declarations v1.3.0
 	github.com/sapcc/go-bits v0.0.0-20220919133313-cbe76a8983ac
-	github.com/sapcc/gophercloud-sapcc v0.0.0-20220919133313-4b851336ad87
+	github.com/sapcc/gophercloud-sapcc v0.0.0-20220930124009-dafae87b2f83
 	gopkg.in/gorp.v2 v2.2.0
 )
 
