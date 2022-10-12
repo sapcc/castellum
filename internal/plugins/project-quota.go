@@ -26,6 +26,7 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/sapcc/go-api-declarations/limes"
+	limesresources "github.com/sapcc/go-api-declarations/limes/resources"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/gophercloud-sapcc/clients"
 	"github.com/sapcc/gophercloud-sapcc/resources/v1/projects"
@@ -154,12 +155,14 @@ func (m *assetManagerProjectQuota) SetAssetSize(res db.Resource, projectID strin
 		return db.OperationOutcomeErrored, err
 	}
 
-	srvQuotaReq := limes.ServiceQuotaRequest{
-		Resources: make(limes.ResourceQuotaRequest),
+	quotaReq := limesresources.QuotaRequest{
+		info.ServiceType: limesresources.ServiceQuotaRequest{
+			info.ResourceName: limesresources.ResourceQuotaRequest{
+				Value: newSize,
+				Unit:  info.Unit,
+			},
+		},
 	}
-	srvQuotaReq.Resources[info.ResourceName] = limes.ValueWithUnit{Value: newSize, Unit: info.Unit}
-	quotaReq := limes.QuotaRequest{}
-	quotaReq[info.ServiceType] = srvQuotaReq
 
 	respBytes, err := projects.Update(m.Limes, project.DomainID, projectID, projects.UpdateOpts{Services: quotaReq}).Extract()
 	if len(respBytes) > 0 {
@@ -195,7 +198,7 @@ func (m *assetManagerProjectQuota) GetAssetStatus(res db.Resource, projectID str
 	}, nil
 }
 
-func (m *assetManagerProjectQuota) getQuotaStatus(assetType db.AssetType, projectID string) (*limes.ProjectResourceReport, error) {
+func (m *assetManagerProjectQuota) getQuotaStatus(assetType db.AssetType, projectID string) (*limesresources.ProjectResourceReport, error) {
 	info, err := m.parseAssetType(assetType)
 	if err != nil {
 		return nil, err

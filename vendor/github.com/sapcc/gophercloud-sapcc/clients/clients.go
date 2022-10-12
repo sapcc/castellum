@@ -20,7 +20,8 @@ import (
 	"github.com/gophercloud/gophercloud"
 )
 
-// NewLimesV1 creates a ServiceClient that may be used to interact with Limes.
+// NewLimesV1 creates a ServiceClient that may be used to interact with Limes' API
+// endpoints that deal with resources.
 func NewLimesV1(client *gophercloud.ProviderClient, endpointOpts gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
 	endpointOpts.ApplyDefaults("resources")
 	endpoint, err := client.EndpointLocator(endpointOpts)
@@ -34,6 +35,23 @@ func NewLimesV1(client *gophercloud.ProviderClient, endpointOpts gophercloud.End
 		ProviderClient: client,
 		Endpoint:       endpoint,
 		Type:           "resources",
+	}, nil
+}
+
+// NewLimesRatesV1 creates a ServiceClient that may be used to interact with Limes' API
+// endpoints that deal with rates.
+func NewLimesRatesV1(client *gophercloud.ProviderClient, endpointOpts gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	endpointOpts.ApplyDefaults("sapcc-rates")
+	endpoint, err := client.EndpointLocator(endpointOpts)
+	if err != nil {
+		return nil, err
+	}
+	endpoint += "v1/"
+
+	return &gophercloud.ServiceClient{
+		ProviderClient: client,
+		Endpoint:       endpoint,
+		Type:           "sapcc-rates",
 	}, nil
 }
 

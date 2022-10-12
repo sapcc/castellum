@@ -19,17 +19,7 @@ import (
 	"net/http"
 
 	"github.com/gophercloud/gophercloud"
-	"github.com/sapcc/go-api-declarations/limes"
-)
-
-// RatesDisplay determines the presence of rate limits in a project's Get/List response.
-type RatesDisplay string
-
-const (
-	// WithoutRates is the default value, it is only here for documentation purposes.
-	WithoutRates RatesDisplay = ""
-	WithRates    RatesDisplay = "true"
-	OnlyRates    RatesDisplay = "only"
+	limesresources "github.com/sapcc/go-api-declarations/limes/resources"
 )
 
 // ListOptsBuilder allows extensions to add additional parameters to the List request.
@@ -39,11 +29,10 @@ type ListOptsBuilder interface {
 
 // ListOpts contains parameters for filtering a List request.
 type ListOpts struct {
-	Detail    bool         `q:"detail"`
-	Areas     []string     `q:"area"`
-	Services  []string     `q:"service"`
-	Resources []string     `q:"resource"`
-	Rates     RatesDisplay `q:"rates"`
+	Detail    bool     `q:"detail"`
+	Areas     []string `q:"area"`
+	Services  []string `q:"service"`
+	Resources []string `q:"resource"`
 }
 
 // ToProjectListParams formats a ListOpts into a map of headers and a query string.
@@ -89,11 +78,10 @@ type GetOptsBuilder interface {
 
 // GetOpts contains parameters for filtering a Get request.
 type GetOpts struct {
-	Detail    bool         `q:"detail"`
-	Areas     []string     `q:"area"`
-	Services  []string     `q:"service"`
-	Resources []string     `q:"resource"`
-	Rates     RatesDisplay `q:"rates"`
+	Detail    bool     `q:"detail"`
+	Areas     []string `q:"area"`
+	Services  []string `q:"service"`
+	Resources []string `q:"resource"`
 }
 
 // ToProjectGetParams formats a GetOpts into a map of headers and a query string.
@@ -139,7 +127,7 @@ type UpdateOptsBuilder interface {
 
 // UpdateOpts contains parameters to update a project.
 type UpdateOpts struct {
-	Services limes.QuotaRequest `json:"services"`
+	Services limesresources.QuotaRequest `json:"services"`
 }
 
 // ToProjectUpdateMap formats a UpdateOpts into a map of headers and a request body.
