@@ -907,31 +907,34 @@ func TestCriticalUpsizeTakingMultipleStepsAtOnce(baseT *testing.T) {
 	})
 }
 
-func TestZeroSizedAssetWithoutUsage(baseT *testing.T) {
+func TestZeroAndOneSizedAssetsWithoutUsage(baseT *testing.T) {
 	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
-		//This may occur e.g. in the project-quota asset manager, when the project
-		//in question has no quota at all. We expect Castellum to leave assets
-		//with 0 size and 0 usage alone. And more importantly, we expect Castellum
-		//to not crash on divide-by-zero while doing so. :)
-		setAsset(plugins.StaticAsset{Size: 0, Usage: 0})
+	for _, assetSize := range []uint64{0, 1} {
+		forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
+			//This may occur e.g. in the project-quota asset manager, when the project
+			//in question has no quota at all. We expect Castellum to:
+			//
+			//- leave assets with 0 size and 0 usage alone (and not crash on divide-by-zero while doing so)
+			//- never resize assets with non-zero size and 0 usage to zero size
+			setAsset(plugins.StaticAsset{Size: assetSize, Usage: 0})
 
-		clock.StepBy(10 * time.Minute)
-		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
+			clock.StepBy(10 * time.Minute)
+			t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
 
-		t.ExpectAssets(c.DB, db.Asset{
-			ID:           1,
-			ResourceID:   1,
-			UUID:         "asset1",
-			Size:         0,
-			Usage:        db.UsageValues{db.SingularUsageMetric: 0},
-			CheckedAt:    c.TimeNow(),
-			ScrapedAt:    p2time(c.TimeNow()),
-			ExpectedSize: nil,
+			t.ExpectAssets(c.DB, db.Asset{
+				ID:           1,
+				ResourceID:   1,
+				UUID:         "asset1",
+				Size:         assetSize,
+				Usage:        db.UsageValues{db.SingularUsageMetric: 0},
+				CheckedAt:    c.TimeNow(),
+				ScrapedAt:    p2time(c.TimeNow()),
+				ExpectedSize: nil,
+			})
+			t.ExpectPendingOperations(c.DB /*, nothing */)
+			t.ExpectFinishedOperations(c.DB /*, nothing */)
 		})
-		t.ExpectPendingOperations(c.DB /*, nothing */)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
-	})
+	}
 }
 
 func TestZeroSizedAssetWithUsage(baseT *testing.T) {
@@ -968,6 +971,32 @@ func TestZeroSizedAssetWithUsage(baseT *testing.T) {
 			ConfirmedAt: p2time(c.TimeNow()),
 			GreenlitAt:  p2time(c.TimeNow()),
 		})
+		t.ExpectFinishedOperations(c.DB /*, nothing */)
+	})
+}
+
+func TestDownsizeWithZeroUsageAndMinimumFreeSize(baseT *testing.T) {
+	t := test.T{T: baseT}
+	//This testcase is based on a bug discovered in the wild: Single-step
+	//resizing did not generate a pending operation in this case because of the
+	//special-cased handling around `usage = 0`.
+	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
+		t.MustExec(c.DB, `UPDATE resources SET low_threshold_percent = 89.9, high_delay_seconds = 0, high_threshold_percent = 0, critical_threshold_percent = 90, min_free_size = 2`)
+
+		clock.StepBy(10 * time.Minute)
+		setAsset(plugins.StaticAsset{Size: 5, Usage: 0})
+		t.Must(ExecuteOne(c.PollForAssetScrapes(0)))
+
+		expectedOp := db.PendingOperation{
+			ID:        1,
+			AssetID:   1,
+			Reason:    db.OperationReasonLow,
+			OldSize:   5,
+			NewSize:   ifthenelseU64(res.SingleStep, 2, 4),
+			Usage:     db.UsageValues{db.SingularUsageMetric: 0},
+			CreatedAt: c.TimeNow(),
+		}
+		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 	})
 }

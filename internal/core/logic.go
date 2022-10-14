@@ -264,12 +264,7 @@ func getActionSingleStep(res db.Resource, asset db.Asset, metric db.UsageMetric,
 	newSizeFloat := 100 * asset.Usage[metric] / (thresholdPerc + delta)
 	if reason == db.OperationReasonLow {
 		//for "low", round size down to ensure usage-% comes out above the threshold
-		newSizeRounded := math.Floor(newSizeFloat)
-		//make sure that we don't resize to or below 0
-		if newSizeRounded < 1.5 {
-			return action{Max: 1, Desired: asset.Size}
-		}
-		newSize := uint64(newSizeRounded)
+		newSize := uint64(math.Floor(newSizeFloat))
 		return action{Desired: newSize, Max: asset.Size}
 	}
 	//for "high"/"critical", round size up to ensure usage-% comes out below the threshold
