@@ -61,6 +61,14 @@ type AssetManagerStatic struct {
 	ConflictsWithAssetType    db.AssetType
 }
 
+// PluginTypeID implements the core.AssetManager interface.
+func (m AssetManagerStatic) PluginTypeID() string { return "static" }
+
+// Init implements the core.AssetManager interface.
+func (m AssetManagerStatic) Init(provider core.ProviderClient) (err error) {
+	return nil //unused
+}
+
 // InfoForAssetType implements the core.AssetManager interface.
 func (m AssetManagerStatic) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
 	if assetType == m.AssetType {

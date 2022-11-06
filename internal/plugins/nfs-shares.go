@@ -67,22 +67,28 @@ type assetManagerNFS struct {
 }
 
 func init() {
-	core.RegisterAssetManagerFactory("nfs-shares", func(provider core.ProviderClient) (core.AssetManager, error) {
-		manila, err := provider.CloudAdminClient(openstack.NewSharedFileSystemV2)
-		if err != nil {
-			return nil, err
-		}
-		manila.Microversion = "2.64" //for "force" field on .Extend(), requires Manila at least on Xena
+	core.AssetManagerRegistry.Add(func() core.AssetManager { return &assetManagerNFS{} })
+}
 
-		prometheusURL := osext.MustGetenv("CASTELLUM_NFS_PROMETHEUS_URL")
-		promClient, err := prom_api.NewClient(prom_api.Config{Address: prometheusURL})
-		if err != nil {
-			return nil, fmt.Errorf("cannot connect to Prometheus at %s: %s",
-				prometheusURL, err.Error())
-		}
+// PluginTypeID implements the core.AssetManager interface.
+func (m *assetManagerNFS) PluginTypeID() string { return "nfs-shares" }
 
-		return &assetManagerNFS{manila, prom_v1.NewAPI(promClient)}, nil
-	})
+// Init implements the core.AssetManager interface.
+func (m *assetManagerNFS) Init(provider core.ProviderClient) (err error) {
+	m.Manila, err = provider.CloudAdminClient(openstack.NewSharedFileSystemV2)
+	if err != nil {
+		return err
+	}
+	m.Manila.Microversion = "2.64" //for "force" field on .Extend(), requires Manila at least on Xena
+
+	prometheusURL := osext.MustGetenv("CASTELLUM_NFS_PROMETHEUS_URL")
+	promClient, err := prom_api.NewClient(prom_api.Config{Address: prometheusURL})
+	if err != nil {
+		return fmt.Errorf("cannot connect to Prometheus at %s: %s",
+			prometheusURL, err.Error())
+	}
+	m.Prometheus = prom_v1.NewAPI(promClient)
+	return nil
 }
 
 // InfoForAssetType implements the core.AssetManager interface.
