@@ -22,6 +22,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/sapcc/go-bits/pluggable"
+
 	"github.com/sapcc/castellum/internal/db"
 )
 
@@ -70,8 +72,18 @@ var (
 // AssetManager is the main modularization interface in Castellum. It
 // provides a separation boundary between the plugins that implement the
 // concrete behavior for specific asset types, and the core logic of Castellum.
-// It is created by CreateAssetManagers() using AssetManagerFactory.
+// It is created by CreateAssetManagers() using AssetManagerRegistry.
 type AssetManager interface {
+	pluggable.Plugin
+
+	//Init is called before all other interface methods, and can be used by the
+	//AssetManager to receive a reference to the ProviderClient, as well as
+	//perform any first-time initialization.
+	//
+	//The supplied ProviderClient should be stored inside the AssetManager
+	//instance for later usage and/or used to query OpenStack capabilities.
+	Init(provider ProviderClient) error
+
 	//If this asset type is supported by this asset manager, return information
 	//about it. Otherwise return nil.
 	InfoForAssetType(assetType db.AssetType) *AssetTypeInfo
@@ -99,34 +111,8 @@ type AssetManager interface {
 	GetAssetStatus(res db.Resource, assetUUID string, previousStatus *AssetStatus) (AssetStatus, error)
 }
 
-// AssetManagerFactory is something that creates AssetManager instances. This
-// intermediate step is useful because Castellum should not always support all
-// types of assets. By having plugins register a factory instead of an
-// AssetManager instance, we can ensure that only the selected asset managers
-// get instantiated.
-//
-// The supplied ProviderClient should be stored inside the AssetManager instance
-// for later usage. It can also be used to query OpenStack capabilities.
-type AssetManagerFactory func(ProviderClient) (AssetManager, error)
-
-var assetManagerFactories = make(map[string]AssetManagerFactory)
-
-// RegisterAssetManagerFactory registers an AssetManagerFactory with this package.
-// The given ID must be unique among all factories. It appears in the
-// CASTELLUM_ASSET_MANAGERS environment variable that controls which factories
-// are used.
-func RegisterAssetManagerFactory(id string, factory AssetManagerFactory) {
-	if id == "" {
-		panic("RegisterAssetManagerFactory called with empty ID!")
-	}
-	if _, exists := assetManagerFactories[id]; exists {
-		panic(fmt.Sprintf("RegisterAssetManagerFactory called multiple times for ID = %q", id))
-	}
-	if factory == nil {
-		panic(fmt.Sprintf("RegisterAssetManagerFactory called with factory = nil! (ID = %q)", id))
-	}
-	assetManagerFactories[id] = factory
-}
+// AssetManagerRegistry is a pluggable.Registry for AssetManager implementations.
+var AssetManagerRegistry pluggable.Registry[AssetManager]
 
 // AssetManagerTeam is the set of AssetManager instances that Castellum is using.
 type AssetManagerTeam []AssetManager
@@ -134,18 +120,18 @@ type AssetManagerTeam []AssetManager
 // CreateAssetManagers prepares a set of AssetManager instances for a single run
 // of Castellum. The first argument is the list of IDs of all factories that
 // shall be used to create asset managers.
-func CreateAssetManagers(factoryIDs []string, provider ProviderClient) (AssetManagerTeam, error) {
-	team := make(AssetManagerTeam, len(factoryIDs))
-	for idx, factoryID := range factoryIDs {
-		factory, exists := assetManagerFactories[factoryID]
-		if !exists {
-			return nil, fmt.Errorf("unknown asset manager: %q", factoryID)
+func CreateAssetManagers(pluginTypeIDs []string, provider ProviderClient) (AssetManagerTeam, error) {
+	team := make(AssetManagerTeam, len(pluginTypeIDs))
+	for idx, pluginTypeID := range pluginTypeIDs {
+		manager := AssetManagerRegistry.Instantiate(pluginTypeID)
+		if manager == nil {
+			return nil, fmt.Errorf("unknown asset manager: %q", pluginTypeID)
 		}
-		var err error
-		team[idx], err = factory(provider)
+		err := manager.Init(provider)
 		if err != nil {
-			return nil, fmt.Errorf("cannot initialize asset manager %q: %s", factoryID, err.Error())
+			return nil, fmt.Errorf("cannot initialize asset manager %q: %s", pluginTypeID, err.Error())
 		}
+		team[idx] = manager
 	}
 	return team, nil
 }

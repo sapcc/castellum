@@ -56,47 +56,53 @@ func (info limesResourceInfo) AssetType() db.AssetType {
 }
 
 func init() {
-	core.RegisterAssetManagerFactory("project-quota", func(provider core.ProviderClient) (core.AssetManager, error) {
-		limesClient, err := provider.CloudAdminClient(clients.NewLimesV1)
-		if err != nil {
-			return nil, err
-		}
+	core.AssetManagerRegistry.Add(func() core.AssetManager { return &assetManagerProjectQuota{} })
+}
 
-		//get project ID where we're authenticated (see below for why)
-		var (
-			currentProjectID       string
-			currentProjectDomainID string
-		)
-		if result, ok := provider.GetAuthResult().(tokens.CreateResult); ok {
-			project, err := result.ExtractProject()
-			if err == nil {
-				currentProjectID = project.ID
-				currentProjectDomainID = project.Domain.ID
-			} else {
-				return nil, err
-			}
+// PluginTypeID implements the core.AssetManager interface.
+func (m *assetManagerProjectQuota) PluginTypeID() string { return "project-quota" }
+
+// Init implements the core.AssetManager interface.
+func (m *assetManagerProjectQuota) Init(provider core.ProviderClient) (err error) {
+	m.Provider = provider
+	m.Limes, err = provider.CloudAdminClient(clients.NewLimesV1)
+	if err != nil {
+		return err
+	}
+
+	//get project ID where we're authenticated (see below for why)
+	var (
+		currentProjectID       string
+		currentProjectDomainID string
+	)
+	if result, ok := provider.GetAuthResult().(tokens.CreateResult); ok {
+		project, err := result.ExtractProject()
+		if err == nil {
+			currentProjectID = project.ID
+			currentProjectDomainID = project.Domain.ID
 		} else {
-			return nil, fmt.Errorf("cannot extract project ID from %t", provider.GetAuthResult())
+			return err
 		}
+	} else {
+		return fmt.Errorf("cannot extract project ID from %t", provider.GetAuthResult())
+	}
 
-		//list all resources that exist, by looking at the current project
-		report, err := projects.Get(limesClient, currentProjectDomainID, currentProjectID, nil).Extract()
-		if err != nil {
-			return nil, fmt.Errorf("could not get project report for %s", currentProjectID)
+	//list all resources that exist, by looking at the current project
+	report, err := projects.Get(m.Limes, currentProjectDomainID, currentProjectID, nil).Extract()
+	if err != nil {
+		return fmt.Errorf("could not get project report for %s", currentProjectID)
+	}
+	for _, srv := range report.Services {
+		for _, res := range srv.Resources {
+			m.KnownResources = append(m.KnownResources, limesResourceInfo{
+				ServiceType:  srv.Type,
+				ResourceName: res.Name,
+				Unit:         res.Unit,
+			})
 		}
-		var knownResources []limesResourceInfo
-		for _, srv := range report.Services {
-			for _, res := range srv.Resources {
-				knownResources = append(knownResources, limesResourceInfo{
-					ServiceType:  srv.Type,
-					ResourceName: res.Name,
-					Unit:         res.Unit,
-				})
-			}
-		}
+	}
 
-		return &assetManagerProjectQuota{provider, limesClient, knownResources}, nil
-	})
+	return nil
 }
 
 // InfoForAssetType implements the core.AssetManager interface.

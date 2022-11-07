@@ -76,25 +76,33 @@ type assetManagerServerGroups struct {
 }
 
 func init() {
-	core.RegisterAssetManagerFactory("server-groups", func(provider core.ProviderClient) (core.AssetManager, error) {
-		prometheusURL := osext.MustGetenv("CASTELLUM_SERVERGROUPS_PROMETHEUS_URL")
-		promClient, err := prom_api.NewClient(prom_api.Config{Address: prometheusURL})
-		if err != nil {
-			return nil, fmt.Errorf("cannot connect to Prometheus at %s: %s",
-				prometheusURL, err.Error())
-		}
+	core.AssetManagerRegistry.Add(func() core.AssetManager { return &assetManagerServerGroups{} })
+}
 
-		localRoleNamesStr := osext.MustGetenv("CASTELLUM_SERVERGROUPS_LOCAL_ROLES")
-		var localRoleNames []string
-		for _, roleName := range strings.Split(localRoleNamesStr, ",") {
-			roleName = strings.TrimSpace(roleName)
-			if roleName != "" {
-				localRoleNames = append(localRoleNames, roleName)
-			}
-		}
+// PluginTypeID implements the core.AssetManager interface.
+func (m *assetManagerServerGroups) PluginTypeID() string { return "server-groups" }
 
-		return &assetManagerServerGroups{provider, prom_v1.NewAPI(promClient), localRoleNames}, nil
-	})
+// Init implements the core.AssetManager interface.
+func (m *assetManagerServerGroups) Init(provider core.ProviderClient) (err error) {
+	m.Provider = provider
+
+	prometheusURL := osext.MustGetenv("CASTELLUM_SERVERGROUPS_PROMETHEUS_URL")
+	promClient, err := prom_api.NewClient(prom_api.Config{Address: prometheusURL})
+	if err != nil {
+		return fmt.Errorf("cannot connect to Prometheus at %s: %s",
+			prometheusURL, err.Error())
+	}
+	m.Prometheus = prom_v1.NewAPI(promClient)
+
+	localRoleNamesStr := osext.MustGetenv("CASTELLUM_SERVERGROUPS_LOCAL_ROLES")
+	for _, roleName := range strings.Split(localRoleNamesStr, ",") {
+		roleName = strings.TrimSpace(roleName)
+		if roleName != "" {
+			m.LocalRoleNames = append(m.LocalRoleNames, roleName)
+		}
+	}
+
+	return nil
 }
 
 // InfoForAssetType implements the core.AssetManager interface.
