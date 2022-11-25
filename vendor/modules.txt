@@ -21,7 +21,7 @@ github.com/gofrs/uuid
 ## explicit; go 1.9
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes/timestamp
-# github.com/gophercloud/gophercloud v1.0.0
+# github.com/gophercloud/gophercloud v1.1.0
 ## explicit; go 1.14
 github.com/gophercloud/gophercloud
 github.com/gophercloud/gophercloud/openstack
@@ -46,7 +46,7 @@ github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/pools
 github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares
 github.com/gophercloud/gophercloud/openstack/utils
 github.com/gophercloud/gophercloud/pagination
-# github.com/gophercloud/utils v0.0.0-20220927104426-4113af8d2663
+# github.com/gophercloud/utils v0.0.0-20221124081324-7bac6f5cdf99
 ## explicit; go 1.15
 github.com/gophercloud/utils/env
 github.com/gophercloud/utils/gnocchi
@@ -153,12 +153,12 @@ github.com/sergi/go-diff/diffmatchpatch
 # go.uber.org/atomic v1.10.0
 ## explicit; go 1.18
 go.uber.org/atomic
-# golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
+# golang.org/x/sys v0.2.0
 ## explicit; go 1.17
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/text v0.3.7
+# golang.org/x/text v0.4.0
 ## explicit; go 1.17
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
