@@ -14,7 +14,7 @@ require (
 	github.com/sapcc/go-api-declarations v1.4.2
 	github.com/sapcc/go-bits v0.0.0-20230101201537-12465ca06570
 	github.com/sapcc/gophercloud-sapcc v0.0.0-20230101201535-429a52afd167
-	gopkg.in/gorp.v2 v2.2.0
+	gopkg.in/gorp.v3 v3.1.0
 )
 
 require (
