@@ -23,12 +23,12 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-gorp/gorp/v3"
 	"github.com/gorilla/mux"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/respondwith"
 	"github.com/sapcc/go-bits/sqlext"
-	"gopkg.in/gorp.v2"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"

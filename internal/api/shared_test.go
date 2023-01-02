@@ -24,11 +24,11 @@ import (
 	"time"
 
 	policy "github.com/databus23/goslo.policy"
+	"github.com/go-gorp/gorp/v3"
 	"github.com/gophercloud/gophercloud"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpapi"
-	"gopkg.in/gorp.v2"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"

@@ -22,8 +22,8 @@ import (
 	"encoding/json"
 	"net/url"
 
+	"github.com/go-gorp/gorp/v3"
 	"github.com/sapcc/go-bits/easypg"
-	"gopkg.in/gorp.v2"
 
 	"github.com/sapcc/castellum/internal/db"
 )

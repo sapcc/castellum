@@ -24,8 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-gorp/gorp/v3"
 	"github.com/sapcc/go-bits/easypg"
-	"gopkg.in/gorp.v2"
 )
 
 // Resource describes the autoscaling behavior for a single resource in a

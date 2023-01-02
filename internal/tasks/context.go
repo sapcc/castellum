@@ -21,7 +21,7 @@ package tasks
 import (
 	"time"
 
-	"gopkg.in/gorp.v2"
+	"github.com/go-gorp/gorp/v3"
 
 	"github.com/sapcc/castellum/internal/core"
 )

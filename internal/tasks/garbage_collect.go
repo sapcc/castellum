@@ -21,7 +21,7 @@ package tasks
 import (
 	"time"
 
-	"gopkg.in/gorp.v2"
+	"github.com/go-gorp/gorp/v3"
 )
 
 // CollectGarbage removes old entries from the finished_operations table.

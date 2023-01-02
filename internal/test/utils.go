@@ -21,7 +21,7 @@ package test
 import (
 	"testing"
 
-	"gopkg.in/gorp.v2"
+	"github.com/go-gorp/gorp/v3"
 )
 
 // T extends testing.T with custom helper methods.
