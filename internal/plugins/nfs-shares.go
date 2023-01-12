@@ -19,21 +19,15 @@
 package plugins
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares"
-	prom_api "github.com/prometheus/client_golang/api"
-	prom_v1 "github.com/prometheus/client_golang/api/prometheus/v1"
-	"github.com/prometheus/common/model"
 	"github.com/sapcc/go-bits/logg"
-	"github.com/sapcc/go-bits/osext"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -63,7 +57,7 @@ func (m *assetManagerNFS) parseAssetType(assetType db.AssetType) *assetTypeNFS {
 
 type assetManagerNFS struct {
 	Manila     *gophercloud.ServiceClient
-	Prometheus prom_v1.API
+	Prometheus core.PrometheusClient
 }
 
 func init() {
@@ -81,14 +75,8 @@ func (m *assetManagerNFS) Init(provider core.ProviderClient) (err error) {
 	}
 	m.Manila.Microversion = "2.64" //for "force" field on .Extend(), requires Manila at least on Xena
 
-	prometheusURL := osext.MustGetenv("CASTELLUM_NFS_PROMETHEUS_URL")
-	promClient, err := prom_api.NewClient(prom_api.Config{Address: prometheusURL})
-	if err != nil {
-		return fmt.Errorf("cannot connect to Prometheus at %s: %s",
-			prometheusURL, err.Error())
-	}
-	m.Prometheus = prom_v1.NewAPI(promClient)
-	return nil
+	m.Prometheus, err = core.PrometheusClientFromEnv("CASTELLUM_NFS_PROMETHEUS")
+	return err
 }
 
 // InfoForAssetType implements the core.AssetManager interface.
@@ -202,7 +190,7 @@ func (m *assetManagerNFS) ignoreShare(share shares.Share) bool {
 	//other volume_type values, in which case we will only use the non-dp
 	//metrics)
 	query := fmt.Sprintf(`netapp_volume_total_bytes{project_id=%q,share_id=%q}`, share.ProjectID, share.ID)
-	resultVector, err := prometheusGetVector(m.Prometheus, query)
+	resultVector, err := m.Prometheus.GetVector(query)
 	if err != nil {
 		logg.Error("cannot check volume_type for share %q: %s", share.ID, err.Error())
 	}
@@ -405,23 +393,15 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 	return status, nil
 }
 
-type emptyPrometheusResultErr struct {
-	Query string
-}
-
-func (e emptyPrometheusResultErr) Error() string {
-	return fmt.Sprintf("Prometheus query returned empty result: %s", e.Query)
-}
-
 func (m *assetManagerNFS) getMetricForShare(metric, projectUUID, shareUUID string) (float64, error) {
 	//NOTE: The `max by (share_id)` is necessary for when a share is being
 	//migrated to another shareserver and thus appears in the metrics twice.
 	query := fmt.Sprintf(`max by (share_id) (%s{project_id=%q,share_id=%q,volume_type!="dp"})`,
 		metric, projectUUID, shareUUID)
 
-	val, err := prometheusGetSingleValue(m.Prometheus, query)
+	val, err := m.Prometheus.GetSingleValue(query)
 	if err != nil {
-		if _, ok := err.(emptyPrometheusResultErr); ok {
+		if _, ok := err.(core.PrometheusEmptyResultError); ok {
 			//check if the share still exists in the backend
 			_, getErr := shares.Get(m.Manila, shareUUID).Extract()
 			if _, ok := getErr.(gophercloud.ErrDefault404); ok {
@@ -431,51 +411,6 @@ func (m *assetManagerNFS) getMetricForShare(metric, projectUUID, shareUUID strin
 		return 0, err
 	}
 	return val, nil
-}
-
-func prometheusGetVector(api prom_v1.API, queryStr string) (model.Vector, error) {
-	value, warnings, err := api.Query(context.Background(), queryStr, time.Now())
-	for _, warning := range warnings {
-		logg.Info("Prometheus query produced warning: %s", warning)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("could not execute Prometheus query: %s: %s", queryStr, err.Error())
-	}
-	resultVector, ok := value.(model.Vector)
-	if !ok {
-		return nil, fmt.Errorf("could not execute Prometheus query: %s: unexpected type %T", queryStr, value)
-	}
-	return resultVector, nil
-}
-
-func prometheusGetSingleValue(api prom_v1.API, queryStr string) (float64, error) {
-	resultVector, err := prometheusGetVector(api, queryStr)
-	if err != nil {
-		return 0, err
-	}
-
-	switch resultVector.Len() {
-	case 0:
-		return 0, emptyPrometheusResultErr{Query: queryStr}
-	case 1:
-		return float64(resultVector[0].Value), nil
-	default:
-		//suppress the log message when all values are the same (this can happen
-		//when an adventurous Prometheus configuration causes the NetApp exporter
-		//to be scraped twice)
-		firstValue := resultVector[0].Value
-		allTheSame := true
-		for _, entry := range resultVector {
-			if firstValue != entry.Value {
-				allTheSame = false
-				break
-			}
-		}
-		if !allTheSame {
-			logg.Info("Prometheus query returned more than one result: %s (only the first value will be used)", queryStr)
-		}
-		return float64(resultVector[0].Value), nil
-	}
 }
 
 // shareExtendOpts is like shares.ExtendOpts, but supports the new "force" option.

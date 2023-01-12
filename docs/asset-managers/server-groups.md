@@ -42,6 +42,9 @@ Usage information is collected from Prometheus, by querying the metrics `vrops_v
 | Variable | Default | Explanation |
 | -------- | ------- | ----------- |
 | `CASTELLUM_SERVERGROUPS_PROMETHEUS_URL` | *(required)* | The URL of the Prometheus instance providing usage metrics to this asset manager, e.g. `https://prometheus.example.org:9090`. |
+| `CASTELLUM_SERVERGROUPS_PROMETHEUS_CACERT` | *(optional)* | A CA certificate that the Prometheus instance's server certificate is signed by (only when HTTPS is used). Only required if the CA certificate is not included in the system-wide CA bundle. |
+| `CASTELLUM_SERVERGROUPS_PROMETHEUS_CERT` | *(optional)* | A client certificate to present to the Prometheus instance (only when HTTPS is used). |
+| `CASTELLUM_SERVERGROUPS_PROMETHEUS_KEY` | *(optional)* | The private key for the aforementioned client certificate. |
 | `CASTELLUM_SERVERGROUPS_LOCAL_ROLES` | *(required)* | A comma-separated list of role names. [See below](#required-permissions) for details. |
 
 ### Required permissions

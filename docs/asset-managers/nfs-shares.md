@@ -39,6 +39,9 @@ Usually you want that, if your share is a target in a NetApp SnapMirror setup. S
 | Variable | Default | Explanation |
 | -------- | ------- | ----------- |
 | `CASTELLUM_NFS_PROMETHEUS_URL` | *(required)* | The URL of the Prometheus instance providing usage metrics to this asset manager, e.g. `https://prometheus.example.org:9090`. |
+| `CASTELLUM_NFS_PROMETHEUS_CACERT` | *(optional)* | A CA certificate that the Prometheus instance's server certificate is signed by (only when HTTPS is used). Only required if the CA certificate is not included in the system-wide CA bundle. |
+| `CASTELLUM_NFS_PROMETHEUS_CERT` | *(optional)* | A client certificate to present to the Prometheus instance (only when HTTPS is used). |
+| `CASTELLUM_NFS_PROMETHEUS_KEY` | *(optional)* | The private key for the aforementioned client certificate. |
 
 ### Required permissions
 

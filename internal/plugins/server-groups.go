@@ -38,8 +38,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/gophercloud/gophercloud/openstack/keymanager/v1/secrets"
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/pools"
-	prom_api "github.com/prometheus/client_golang/api"
-	prom_v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
@@ -71,7 +69,7 @@ var serverUsageQueries = map[db.UsageMetric]string{
 
 type assetManagerServerGroups struct {
 	Provider       core.ProviderClient
-	Prometheus     prom_v1.API
+	Prometheus     core.PrometheusClient
 	LocalRoleNames []string
 }
 
@@ -86,13 +84,10 @@ func (m *assetManagerServerGroups) PluginTypeID() string { return "server-groups
 func (m *assetManagerServerGroups) Init(provider core.ProviderClient) (err error) {
 	m.Provider = provider
 
-	prometheusURL := osext.MustGetenv("CASTELLUM_SERVERGROUPS_PROMETHEUS_URL")
-	promClient, err := prom_api.NewClient(prom_api.Config{Address: prometheusURL})
+	m.Prometheus, err = core.PrometheusClientFromEnv("CASTELLUM_SERVERGROUPS_PROMETHEUS")
 	if err != nil {
-		return fmt.Errorf("cannot connect to Prometheus at %s: %s",
-			prometheusURL, err.Error())
+		return err
 	}
-	m.Prometheus = prom_v1.NewAPI(promClient)
 
 	localRoleNamesStr := osext.MustGetenv("CASTELLUM_SERVERGROUPS_LOCAL_ROLES")
 	for _, roleName := range strings.Split(localRoleNamesStr, ",") {
@@ -182,9 +177,9 @@ func (m *assetManagerServerGroups) GetAssetStatus(res db.Resource, assetUUID str
 	for _, serverID := range group.Members {
 		for metric, queryTemplate := range serverUsageQueries {
 			queryStr := strings.Replace(queryTemplate, "${ID}", serverID, -1)
-			value, err := prometheusGetSingleValue(m.Prometheus, queryStr)
+			value, err := m.Prometheus.GetSingleValue(queryStr)
 			if err != nil {
-				if _, ok := err.(emptyPrometheusResultErr); ok && isNewServer[serverID] {
+				if _, ok := err.(core.PrometheusEmptyResultError); ok && isNewServer[serverID] {
 					//within a few minutes of instance creation, it's not a hard error if
 					//the vrops metric has not showed up in Prometheus yet; we'll just
 					//assume zero usage for now, which should be okay since downscaling
