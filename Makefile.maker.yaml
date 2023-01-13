@@ -45,6 +45,10 @@ githubWorkflow:
 
 renovate:
   enabled: true
+  packageRules:
+    # do not try to update to Postgres > 12 (the tests should match what we use in production)
+    - matchPackageNames: [ '^postgres$' ]
+      allowedVersions: '12'
 
 verbatim: |
   # convenience targets for developers: `make run-api/run-collector/run-worker/test-asset-type-*`
