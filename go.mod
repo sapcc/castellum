@@ -10,10 +10,9 @@ require (
 	github.com/gophercloud/utils v0.0.0-20221207145018-e8fba78967ca
 	github.com/gorilla/mux v1.8.0
 	github.com/prometheus/client_golang v1.14.0
-	github.com/prometheus/common v0.39.0
 	github.com/rs/cors v1.8.3
 	github.com/sapcc/go-api-declarations v1.4.2
-	github.com/sapcc/go-bits v0.0.0-20230106150032-a47ac4215fc5
+	github.com/sapcc/go-bits v0.0.0-20230118133144-113f64a2d7cb
 	github.com/sapcc/gophercloud-sapcc v0.0.0-20230101201535-429a52afd167
 )
 
@@ -33,6 +32,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
+	github.com/prometheus/common v0.39.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/rabbitmq/amqp091-go v1.5.0 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect

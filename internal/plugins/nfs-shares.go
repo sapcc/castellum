@@ -28,6 +28,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares"
 	"github.com/sapcc/go-bits/logg"
+	"github.com/sapcc/go-bits/promquery"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -57,7 +58,7 @@ func (m *assetManagerNFS) parseAssetType(assetType db.AssetType) *assetTypeNFS {
 
 type assetManagerNFS struct {
 	Manila     *gophercloud.ServiceClient
-	Prometheus core.PrometheusClient
+	Prometheus promquery.Client
 }
 
 func init() {
@@ -75,7 +76,7 @@ func (m *assetManagerNFS) Init(provider core.ProviderClient) (err error) {
 	}
 	m.Manila.Microversion = "2.64" //for "force" field on .Extend(), requires Manila at least on Xena
 
-	m.Prometheus, err = core.PrometheusClientFromEnv("CASTELLUM_NFS_PROMETHEUS")
+	m.Prometheus, err = promquery.ConfigFromEnv("CASTELLUM_NFS_PROMETHEUS").Connect()
 	return err
 }
 
@@ -399,9 +400,9 @@ func (m *assetManagerNFS) getMetricForShare(metric, projectUUID, shareUUID strin
 	query := fmt.Sprintf(`max by (share_id) (%s{project_id=%q,share_id=%q,volume_type!="dp"})`,
 		metric, projectUUID, shareUUID)
 
-	val, err := m.Prometheus.GetSingleValue(query)
+	val, err := m.Prometheus.GetSingleValue(query, nil)
 	if err != nil {
-		if _, ok := err.(core.PrometheusEmptyResultError); ok {
+		if promquery.IsErrNoRows(err) {
 			//check if the share still exists in the backend
 			_, getErr := shares.Get(m.Manila, shareUUID).Extract()
 			if _, ok := getErr.(gophercloud.ErrDefault404); ok {

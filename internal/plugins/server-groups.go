@@ -41,6 +41,7 @@ import (
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
+	"github.com/sapcc/go-bits/promquery"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -69,7 +70,7 @@ var serverUsageQueries = map[db.UsageMetric]string{
 
 type assetManagerServerGroups struct {
 	Provider       core.ProviderClient
-	Prometheus     core.PrometheusClient
+	Prometheus     promquery.Client
 	LocalRoleNames []string
 }
 
@@ -84,7 +85,7 @@ func (m *assetManagerServerGroups) PluginTypeID() string { return "server-groups
 func (m *assetManagerServerGroups) Init(provider core.ProviderClient) (err error) {
 	m.Provider = provider
 
-	m.Prometheus, err = core.PrometheusClientFromEnv("CASTELLUM_SERVERGROUPS_PROMETHEUS")
+	m.Prometheus, err = promquery.ConfigFromEnv("CASTELLUM_SERVERGROUPS_PROMETHEUS").Connect()
 	if err != nil {
 		return err
 	}
@@ -177,17 +178,15 @@ func (m *assetManagerServerGroups) GetAssetStatus(res db.Resource, assetUUID str
 	for _, serverID := range group.Members {
 		for metric, queryTemplate := range serverUsageQueries {
 			queryStr := strings.Replace(queryTemplate, "${ID}", serverID, -1)
-			value, err := m.Prometheus.GetSingleValue(queryStr)
-			if err != nil {
-				if _, ok := err.(core.PrometheusEmptyResultError); ok && isNewServer[serverID] {
-					//within a few minutes of instance creation, it's not a hard error if
-					//the vrops metric has not showed up in Prometheus yet; we'll just
-					//assume zero usage for now, which should be okay since downscaling
-					//usually has a delay of way more than those few minutes
-					value = 0
-				} else {
-					return core.AssetStatus{}, err
-				}
+			value, err := m.Prometheus.GetSingleValue(queryStr, nil)
+			if promquery.IsErrNoRows(err) && isNewServer[serverID] {
+				//within a few minutes of instance creation, it's not a hard error if
+				//the vrops metric has not showed up in Prometheus yet; we'll just
+				//assume zero usage for now, which should be okay since downscaling
+				//usually has a delay of way more than those few minutes
+				value = 0
+			} else if err != nil {
+				return core.AssetStatus{}, err
 			}
 			if value < 0 {
 				return core.AssetStatus{}, fmt.Errorf("expected value between 0..1, but got negative value from Prometheus query: %s", queryStr)
