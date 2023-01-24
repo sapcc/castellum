@@ -226,7 +226,7 @@ func (m *assetManagerNFS) ignoreShare(share shares.Share) bool {
 
 var (
 	sizeInconsistencyErrorRx = regexp.MustCompile(`New size for (?:extend must be greater|shrink must be less) than current size.*\(current: ([0-9]+), (?:new|extended): ([0-9]+)\)`)
-	quotaErrorRx             = regexp.MustCompile(`Requested share exceeds allowed project/user or share type \S+ quota.`)
+	quotaErrorRx             = regexp.MustCompile(`Requested share exceeds allowed project/user or share type \S+ quota.|\bShareReplicaSizeExceedsAvailableQuota\b`)
 	shareStatusErrorRx       = regexp.MustCompile(`Invalid share: .* current status is: error.`)
 )
 
