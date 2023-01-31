@@ -408,7 +408,7 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if dbResource.ID == 0 {
-		dbResource.NextScrapeAt = time.Unix(0, 0) //give new resources a very early next_scrape_at to prioritize them in the scrape queue
+		dbResource.NextScrapeAt = time.Unix(0, 0).UTC() //give new resources a very early next_scrape_at to prioritize them in the scrape queue
 		err = h.DB.Insert(dbResource)
 	} else {
 		_, err = h.DB.Update(dbResource)
