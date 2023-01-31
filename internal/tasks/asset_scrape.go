@@ -52,6 +52,8 @@ var logScrapes = osext.GetenvBool("CASTELLUM_LOG_SCRAPES")
 // PollForAssetScrapes returns a JobPoller that finds the next asset of the given
 // type that needs scraping. The returned Job scrapes the asset, i.e. checks its
 // status and creates/confirms/cancels operations accordingly.
+//
+//nolint:dupl
 func (c *Context) PollForAssetScrapes() JobPoller {
 	return func() (j Job, returnedError error) {
 		defer func() {

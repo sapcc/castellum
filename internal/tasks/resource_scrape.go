@@ -46,6 +46,8 @@ var scrapeResourceSearchQuery = sqlext.SimplifyWhitespace(`
 // PollForResourceScrapes returns a JobPoller that finds the next resource of the
 // given asset type that needs scraping. The returned Job scrapes it, i.e. it
 // looks for new and deleted assets within that resource.
+//
+//nolint:dupl
 func (c *Context) PollForResourceScrapes() JobPoller {
 	return func() (j Job, returnedError error) {
 		defer func() {

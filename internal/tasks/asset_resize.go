@@ -50,6 +50,8 @@ const (
 // PollForAssetResizes is a JobPoller that finds the next pending operation. The
 // returned Job executes the pending operation, i.e. moves it from status
 // "greenlit" to either "succeeded", "failed" or "errored".
+//
+//nolint:dupl
 func (c *Context) PollForAssetResizes() (j Job, returnedError error) {
 	defer func() {
 		if returnedError != nil && returnedError != sql.ErrNoRows {
