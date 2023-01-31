@@ -40,9 +40,9 @@ import (
 // will not work as expected.
 var scrapeAssetSearchQuery = sqlext.SimplifyWhitespace(`
 	SELECT * FROM assets
-	WHERE checked_at < $1
+	WHERE next_scrape_at <= $1
 	-- order by update priority (first outdated assets, then by ID for deterministic test behavior)
-	ORDER BY checked_at ASC, id ASC
+	ORDER BY next_scrape_at ASC, id ASC
 	-- prevent other job loops from working on the same asset concurrently
 	FOR UPDATE SKIP LOCKED LIMIT 1
 `)
@@ -52,7 +52,7 @@ var logScrapes = osext.GetenvBool("CASTELLUM_LOG_SCRAPES")
 // PollForAssetScrapes returns a JobPoller that finds the next asset of the given
 // type that needs scraping. The returned Job scrapes the asset, i.e. checks its
 // status and creates/confirms/cancels operations accordingly.
-func (c *Context) PollForAssetScrapes(minAge time.Duration) JobPoller {
+func (c *Context) PollForAssetScrapes() JobPoller {
 	return func() (j Job, returnedError error) {
 		defer func() {
 			if returnedError != nil && returnedError != sql.ErrNoRows {
@@ -73,9 +73,8 @@ func (c *Context) PollForAssetScrapes(minAge time.Duration) JobPoller {
 		}()
 
 		//find asset that needs scraping
-		maxCheckedAt := c.TimeNow().Add(-minAge)
 		var asset db.Asset
-		err = tx.SelectOne(&asset, scrapeAssetSearchQuery, maxCheckedAt)
+		err = tx.SelectOne(&asset, scrapeAssetSearchQuery, c.TimeNow())
 		if err != nil {
 			if err == sql.ErrNoRows {
 				logg.Debug("no assets to scrape - slowing down...")
@@ -146,7 +145,7 @@ func (j assetScrapeJob) Execute() (returnedError error) {
 
 	//check asset status
 	var oldStatus *core.AssetStatus
-	if asset.ScrapedAt != nil {
+	if !asset.NeverScraped {
 		oldStatus = &core.AssetStatus{
 			Size:  asset.Size,
 			Usage: asset.Usage,

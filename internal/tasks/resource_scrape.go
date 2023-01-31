@@ -21,7 +21,6 @@ package tasks
 import (
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/go-gorp/gorp/v3"
 	"github.com/prometheus/client_golang/prometheus"
@@ -37,9 +36,9 @@ import (
 // will not work as expected.
 var scrapeResourceSearchQuery = sqlext.SimplifyWhitespace(`
 	SELECT * FROM resources
-	WHERE (scraped_at IS NULL or scraped_at < $1)
-	-- order by update priority (first new resources, then outdated resources, then ID for deterministic test behavior)
-	ORDER BY COALESCE(scraped_at, to_timestamp(-1)) ASC, id ASC
+	WHERE next_scrape_at <= $1
+	-- order by update priority (first outdated resources, then by ID for deterministic test behavior)
+	ORDER BY next_scrape_at ASC, id ASC
 	-- prevent other job loops from working on the same asset concurrently
 	FOR UPDATE SKIP LOCKED LIMIT 1
 `)
@@ -47,7 +46,7 @@ var scrapeResourceSearchQuery = sqlext.SimplifyWhitespace(`
 // PollForResourceScrapes returns a JobPoller that finds the next resource of the
 // given asset type that needs scraping. The returned Job scrapes it, i.e. it
 // looks for new and deleted assets within that resource.
-func (c *Context) PollForResourceScrapes(minAge time.Duration) JobPoller {
+func (c *Context) PollForResourceScrapes() JobPoller {
 	return func() (j Job, returnedError error) {
 		defer func() {
 			if returnedError != nil && returnedError != sql.ErrNoRows {
@@ -69,9 +68,7 @@ func (c *Context) PollForResourceScrapes(minAge time.Duration) JobPoller {
 
 		//find resource to scrape
 		var res db.Resource
-		maxScrapedAt := c.TimeNow().Add(-minAge)
-		logg.Debug("looking for resource to scrape, maxScrapedAt = %s", maxScrapedAt.String())
-		err = tx.SelectOne(&res, scrapeResourceSearchQuery, maxScrapedAt)
+		err = tx.SelectOne(&res, scrapeResourceSearchQuery, c.TimeNow())
 		if err != nil {
 			if err == sql.ErrNoRows {
 				logg.Debug("no resources to scrape - slowing down...")

@@ -214,8 +214,8 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	//The observer process has a budget of 16 DB connections. Since there are
 	//much more assets than resources, we give most of these (12 of 16) to asset
 	//scraping. The rest is split between resource scrape and garbage collection.
-	goQueuedJobLoop(ctx, 12, c.PollForAssetScrapes(5*time.Minute))
-	goQueuedJobLoop(ctx, 3, c.PollForResourceScrapes(30*time.Minute))
+	goQueuedJobLoop(ctx, 12, c.PollForAssetScrapes())
+	goQueuedJobLoop(ctx, 3, c.PollForResourceScrapes())
 	go cronJobLoop(3*time.Minute, c.EnsureScrapingCounters)
 	go cronJobLoop(1*time.Hour, func() error {
 		return tasks.CollectGarbage(dbi, time.Now().Add(-14*24*time.Hour)) //14 days

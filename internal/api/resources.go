@@ -41,7 +41,6 @@ import (
 
 // Resource is how a db.Resource looks like in the API.
 type Resource struct {
-	ScrapedAtUnix     *int64           `json:"scraped_at,omitempty"`
 	Checked           *Checked         `json:"checked,omitempty"`
 	AssetCount        int64            `json:"asset_count"`
 	ConfigJSON        *json.RawMessage `json:"config,omitempty"`
@@ -143,9 +142,6 @@ func (r Resource) UpdateDBResource(res *db.Resource, manager core.AssetManager, 
 		complain(err.Error())
 	}
 
-	if r.ScrapedAtUnix != nil {
-		complain("resource.scraped_at cannot be set via the API")
-	}
 	if r.Checked != nil {
 		complain("resource.checked cannot be set via the API")
 	}
@@ -412,7 +408,7 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if dbResource.ID == 0 {
-		dbResource.NextScrapeAt = h.TimeNow()
+		dbResource.NextScrapeAt = time.Unix(0, 0) //give new resources a very early next_scrape_at to prioritize them in the scrape queue
 		err = h.DB.Insert(dbResource)
 	} else {
 		_, err = h.DB.Update(dbResource)
