@@ -23,8 +23,10 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sapcc/go-bits/assert"
+	"github.com/sapcc/go-bits/easypg"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -183,6 +185,9 @@ func TestGetResource(baseT *testing.T) {
 func TestPutResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, _ []db.Asset) {
+		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
+		tr0.Ignore()
+
 		//mostly like `initialFooResourceJSON`, but with some delays changed and
 		//single-step resizing instead of percentage-based resizing
 		newFooResourceJSON1 := assert.JSONObject{
@@ -258,7 +263,7 @@ func TestPutResource(baseT *testing.T) {
 		m.(*plugins.AssetManagerStatic).CheckResourceAllowedFails = false
 
 		//since all tests above were error cases, expect the DB to be unchanged
-		t.ExpectResources(h.DB, allResources...)
+		tr.DBChanges().AssertEmpty()
 
 		//happy path
 		assert.HTTPRequest{
@@ -269,18 +274,9 @@ func TestPutResource(baseT *testing.T) {
 		}.Check(t.T, hh)
 
 		//expect the resource to have been updated
-		var newResources1 []db.Resource
-		for _, res := range allResources {
-			cloned := res
-			if res.ScopeUUID == "project1" && res.AssetType == "foo" {
-				cloned.LowDelaySeconds = 1800
-				cloned.HighDelaySeconds = 900
-				cloned.SizeStepPercent = 0
-				cloned.SingleStep = true
-			}
-			newResources1 = append(newResources1, cloned)
-		}
-		t.ExpectResources(h.DB, newResources1...)
+		tr.DBChanges().AssertEqualf(`
+			UPDATE resources SET low_delay_seconds = 1800, high_delay_seconds = 900, size_step_percent = 0, single_step = TRUE WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+		`)
 
 		//test disabling low and high thresholds, and enabling critical threshold
 		newFooResourceJSON2 := assert.JSONObject{
@@ -300,29 +296,9 @@ func TestPutResource(baseT *testing.T) {
 			Body:         newFooResourceJSON2,
 			ExpectStatus: http.StatusAccepted,
 		}.Check(t.T, hh)
-
-		//expect the resource to have been updated
-		var newResources2 []db.Resource
-		for _, res := range allResources {
-			if res.ScopeUUID == "project1" && res.AssetType == "foo" {
-				newResources2 = append(newResources2, db.Resource{
-					ID:                       res.ID,
-					ScopeUUID:                "project1",
-					DomainUUID:               "domain1",
-					AssetType:                "foo",
-					ScrapedAt:                res.ScrapedAt,
-					CheckedAt:                *res.ScrapedAt,
-					LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 0},
-					HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 0},
-					CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 98},
-					SizeStepPercent:          15,
-					MinimumFreeSize:          p2uint64(23),
-				})
-			} else {
-				newResources2 = append(newResources2, res)
-			}
-		}
-		t.ExpectResources(h.DB, newResources2...)
+		tr.DBChanges().AssertEqualf(`
+			UPDATE resources SET low_threshold_percent = '{"singular":0}', low_delay_seconds = 0, high_threshold_percent = '{"singular":0}', high_delay_seconds = 0, critical_threshold_percent = '{"singular":98}', size_step_percent = 15, min_free_size = 23, single_step = FALSE WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+		`)
 
 		//test enabling low and high thresholds, and disabling critical threshold
 		assert.HTTPRequest{
@@ -331,7 +307,9 @@ func TestPutResource(baseT *testing.T) {
 			Body:         newFooResourceJSON1,
 			ExpectStatus: http.StatusAccepted,
 		}.Check(t.T, hh)
-		t.ExpectResources(h.DB, newResources1...)
+		tr.DBChanges().AssertEqualf(`
+			UPDATE resources SET low_threshold_percent = '{"singular":20}', low_delay_seconds = 1800, high_threshold_percent = '{"singular":80}', high_delay_seconds = 900, critical_threshold_percent = '{"singular":0}', size_step_percent = 0, min_free_size = NULL, single_step = TRUE WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+		`)
 
 		//test creating a new resource from scratch (rather than updating an existing one)
 		assert.HTTPRequest{
@@ -340,18 +318,12 @@ func TestPutResource(baseT *testing.T) {
 			Body:         newFooResourceJSON2,
 			ExpectStatus: http.StatusAccepted,
 		}.Check(t.T, hh)
-		allResources = append(newResources1, db.Resource{
-			ID:                       5,
-			ScopeUUID:                "project3",
-			DomainUUID:               "domain1",
-			AssetType:                "foo",
-			LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 0},
-			HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 0},
-			CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 98},
-			SizeStepPercent:          15,
-			MinimumFreeSize:          p2uint64(23),
-		})
-		t.ExpectResources(h.DB, allResources...)
+		tr.DBChanges().AssertEqualf(
+			`
+				INSERT INTO resources (id, scope_uuid, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_free_size, domain_uuid, checked_at) VALUES (5, 'project3', 'foo', '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":98}', 15, 23, 'domain1', %d);
+			`,
+			time.Time{}.Unix(),
+		)
 
 		//test setting constraints
 		newFooResourceJSON3 := assert.JSONObject{
@@ -362,9 +334,9 @@ func TestPutResource(baseT *testing.T) {
 				"percent": 15,
 			},
 			"size_constraints": assert.JSONObject{
-				"minimum":      0,
+				"minimum":      0, //gets normalized into NULL
 				"maximum":      42000,
-				"minimum_free": 0,
+				"minimum_free": 0, //gets normalized into NULL
 			},
 		}
 		assert.HTTPRequest{
@@ -375,30 +347,9 @@ func TestPutResource(baseT *testing.T) {
 		}.Check(t.T, hh)
 
 		//expect the resource to have been updated
-		var newResources3 []db.Resource
-		for _, res := range allResources {
-			if res.ScopeUUID == "project1" && res.AssetType == "foo" {
-				newResources3 = append(newResources3, db.Resource{
-					ID:                       res.ID,
-					ScopeUUID:                "project1",
-					DomainUUID:               "domain1",
-					AssetType:                "foo",
-					ScrapedAt:                res.ScrapedAt,
-					CheckedAt:                *res.ScrapedAt,
-					LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 0},
-					HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 0},
-					CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 98},
-					SizeStepPercent:          15,
-					SingleStep:               false,
-					MinimumSize:              nil, //0 gets normalized to NULL
-					MaximumSize:              p2uint64(42000),
-					MinimumFreeSize:          nil, //0 gets normalized to NULL
-				})
-			} else {
-				newResources3 = append(newResources3, res)
-			}
-		}
-		t.ExpectResources(h.DB, newResources3...)
+		tr.DBChanges().AssertEqualf(`
+			UPDATE resources SET low_threshold_percent = '{"singular":0}', low_delay_seconds = 0, high_threshold_percent = '{"singular":0}', high_delay_seconds = 0, critical_threshold_percent = '{"singular":98}', size_step_percent = 15, max_size = 42000, single_step = FALSE WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+		`)
 	})
 }
 
@@ -428,6 +379,9 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 	assert.DeepEqual(baseT, "", cfg.SetMaxAssetSizeRules(fmt.Sprintf("foo=%d", maxFooSize)), nil)
 
 	withHandler(t, cfg, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, _ []db.Asset) {
+		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
+		tr0.Ignore()
+
 		expectErrors := func(assetType string, body assert.JSONObject, errors ...string) {
 			t.T.Helper()
 			assert.HTTPRequest{
@@ -600,13 +554,16 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 		)
 
 		//none of this should have touched the DB
-		t.ExpectResources(h.DB, allResources...)
+		tr.DBChanges().AssertEmpty()
 	})
 }
 
 func TestDeleteResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, allAssets []db.Asset) {
+		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
+		tr0.Ignore()
+
 		//endpoint requires a token with project access
 		mv.Forbid("project:access")
 		assert.HTTPRequest{
@@ -654,7 +611,7 @@ func TestDeleteResource(baseT *testing.T) {
 		mv.Allow("project:edit:foo")
 
 		//since all tests above were error cases, expect all resources to still be there
-		t.ExpectResources(h.DB, allResources...)
+		tr.DBChanges().AssertEmpty()
 
 		//happy path
 		assert.HTTPRequest{
@@ -664,22 +621,13 @@ func TestDeleteResource(baseT *testing.T) {
 		}.Check(t.T, hh)
 
 		//expect this resource and its assets to be gone
-		var remainingResources []db.Resource
-		isRemainingResource := make(map[int64]bool)
-		for _, res := range allResources {
-			if res.ScopeUUID != "project1" || res.AssetType != "foo" {
-				remainingResources = append(remainingResources, res)
-				isRemainingResource[res.ID] = true
-			}
-		}
-		t.ExpectResources(h.DB, remainingResources...)
-
-		var remainingAssets []db.Asset
-		for _, asset := range allAssets {
-			if isRemainingResource[asset.ResourceID] {
-				remainingAssets = append(remainingAssets, asset)
-			}
-		}
-		t.ExpectAssets(h.DB, remainingAssets...)
+		tr.DBChanges().AssertEqualf(`
+			DELETE FROM assets WHERE id = 1 AND resource_id = 1 AND uuid = 'fooasset1';
+			DELETE FROM assets WHERE id = 2 AND resource_id = 1 AND uuid = 'fooasset2';
+			DELETE FROM finished_operations WHERE asset_id = 1 AND reason = 'critical' AND outcome = 'errored' AND old_size = 1024 AND new_size = 1025 AND created_at = 51 AND confirmed_at = 52 AND greenlit_at = 52 AND finished_at = 53 AND greenlit_by_user_uuid = NULL AND error_message = 'datacenter is on fire' AND errored_attempts = 0 AND usage = '{"singular":983.04}';
+			DELETE FROM finished_operations WHERE asset_id = 1 AND reason = 'high' AND outcome = 'succeeded' AND old_size = 1023 AND new_size = 1024 AND created_at = 41 AND confirmed_at = 42 AND greenlit_at = 43 AND finished_at = 44 AND greenlit_by_user_uuid = 'user2' AND error_message = '' AND errored_attempts = 0 AND usage = '{"singular":818.4}';
+			DELETE FROM finished_operations WHERE asset_id = 1 AND reason = 'low' AND outcome = 'cancelled' AND old_size = 1000 AND new_size = 900 AND created_at = 31 AND confirmed_at = NULL AND greenlit_at = NULL AND finished_at = 32 AND greenlit_by_user_uuid = NULL AND error_message = '' AND errored_attempts = 0 AND usage = '{"singular":200}';
+			DELETE FROM resources WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+		`)
 	})
 }

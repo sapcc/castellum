@@ -131,10 +131,6 @@ func (c MockProviderClient) GetDomain(domainID string) (*core.CachedDomain, erro
 	}
 }
 
-func p2uint64(x uint64) *uint64 {
-	return &x
-}
-
 func testCommonEndpointBehavior(t test.T, hh http.Handler, validator *MockValidator, pathPattern string) {
 	path := func(projectID, resourceID string) string {
 		return fmt.Sprintf(pathPattern, projectID, resourceID)

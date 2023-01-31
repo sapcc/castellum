@@ -62,18 +62,6 @@ func (t T) MustUpdate(dbi *gorp.DbMap, row interface{}) {
 	t.Must(err)
 }
 
-// ExpectResources checks that the DB contains exactly the given resources.
-func (t T) ExpectResources(dbi *gorp.DbMap, resources ...db.Resource) {
-	t.Helper()
-	var dbResources []db.Resource
-	_, err := dbi.Select(&dbResources, `SELECT * FROM resources ORDER BY id`)
-	t.Must(err)
-	if len(dbResources) == 0 {
-		dbResources = nil
-	}
-	t.AssertJSONEqual("resources", dbResources, resources)
-}
-
 // ExpectAssets checks that the DB contains exactly the given assets.
 func (t T) ExpectAssets(dbi *gorp.DbMap, assets ...db.Asset) {
 	t.Helper()
