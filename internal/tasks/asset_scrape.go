@@ -172,6 +172,7 @@ func (j assetScrapeJob) Execute() (returnedError error) {
 		//scraped_at unchanged to indicate old data
 		asset.CheckedAt = c.TimeNow()
 		asset.ScrapeErrorMessage = err.Error()
+		asset.NextScrapeAt = asset.CheckedAt.Add(AssetScrapeInterval)
 		_, dbErr := tx.Update(&asset)
 		if dbErr != nil {
 			return dbErr
@@ -202,7 +203,9 @@ func (j assetScrapeJob) Execute() (returnedError error) {
 	now := c.TimeNow()
 	asset.CheckedAt = now
 	asset.ScrapedAt = &now
+	asset.NextScrapeAt = now.Add(AssetScrapeInterval)
 	asset.ScrapeErrorMessage = ""
+	asset.NeverScraped = false
 	canTouchPendingOperations := true
 	switch {
 	case asset.ExpectedSize == nil:

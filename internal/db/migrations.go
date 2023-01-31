@@ -103,4 +103,31 @@ var SQLMigrations = map[string]string{
 			usage                  TEXT        NOT NULL
 		);
 	`,
+	"017_next_scrape_at.up.sql": `
+		ALTER TABLE resources
+			ADD COLUMN next_scrape_at TIMESTAMP NOT NULL DEFAULT NOW();
+		ALTER TABLE assets
+			ADD COLUMN next_scrape_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			ADD COLUMN never_scraped  BOOLEAN   NOT NULL DEFAULT FALSE;
+
+		UPDATE resources
+			SET next_scrape_at = scraped_at + interval '30 minutes'
+			WHERE scraped_at IS NOT NULL;
+		UPDATE assets
+			SET next_scrape_at = checked_at + interval '5 minutes', never_scraped = (scraped_at IS NULL);
+	`,
+	"017_next_check_at.down.sql": `
+		UPDATE resources
+			SET scraped_at = next_scrape_at - interval '30 minutes';
+		UPDATE assets
+			SET checked_at = next_scrape_at - interval '5 minutes';
+		UPDATE assets
+			SET scraped_at = CASE WHEN never_scraped THEN NULL ELSE checked_at END;
+
+		ALTER TABLE resources
+			DROP COLUMN next_scrape_at;
+		ALTER TABLE assets
+			DROP COLUMN next_scrape_at,
+			DROP COLUMN never_scraped;
+	`,
 }

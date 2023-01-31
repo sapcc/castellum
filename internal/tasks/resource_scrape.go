@@ -122,6 +122,7 @@ func (j resourceScrapeJob) Execute() (returnedError error) {
 		//but leave scraped_at unchanged to indicate old data
 		res.CheckedAt = c.TimeNow()
 		res.ScrapeErrorMessage = err.Error()
+		res.NextScrapeAt = c.TimeNow().Add(ResourceScrapeInterval)
 		_, dbErr := tx.Update(&res)
 		if dbErr != nil {
 			return dbErr
@@ -144,11 +145,6 @@ func (j resourceScrapeJob) Execute() (returnedError error) {
 	if err != nil {
 		return err
 	}
-
-	now := c.TimeNow()
-	res.CheckedAt = now
-	res.ScrapedAt = &now
-	res.ScrapeErrorMessage = ""
 
 	//cleanup asset entries for deleted assets
 	isAssetInDB := make(map[string]bool)
@@ -176,6 +172,7 @@ func (j resourceScrapeJob) Execute() (returnedError error) {
 			UUID:         assetUUID,
 			CheckedAt:    now,
 			ExpectedSize: nil,
+			NextScrapeAt: now.Add(AssetScrapeInterval),
 		}
 
 		status, err := manager.GetAssetStatus(res, assetUUID, nil)
@@ -185,11 +182,13 @@ func (j resourceScrapeJob) Execute() (returnedError error) {
 			dbAsset.Size = status.Size
 			dbAsset.Usage = status.Usage
 			dbAsset.ScrapedAt = &now
+			dbAsset.NeverScraped = false
 		} else {
 			assetScrapeFailedCounter.With(labels).Inc()
 			dbAsset.Size = 0
 			dbAsset.Usage = info.MakeZeroUsageValues()
 			dbAsset.ScrapeErrorMessage = err.Error()
+			dbAsset.NeverScraped = true
 		}
 
 		err = tx.Insert(&dbAsset)
@@ -199,6 +198,11 @@ func (j resourceScrapeJob) Execute() (returnedError error) {
 	}
 
 	//record successful scrape
+	now := c.TimeNow()
+	res.CheckedAt = now
+	res.ScrapedAt = &now
+	res.ScrapeErrorMessage = ""
+	res.NextScrapeAt = now.Add(ResourceScrapeInterval)
 	_, err = tx.Update(&res)
 	if err != nil {
 		return err

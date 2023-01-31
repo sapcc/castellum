@@ -45,8 +45,10 @@ type Resource struct {
 	ConfigJSON string    `db:"config_json"` //(optional) config specifically for this asset type
 
 	//When we last tried to check this Resource for new or deleted assets.
+	//TODO: deprecated, remove
 	CheckedAt time.Time `db:"checked_at"`
 	//When this Resource was checked for new or deleted assets.
+	//TODO: deprecated, remove
 	ScrapedAt *time.Time `db:"scraped_at"`
 
 	//Assets will resize when they have crossed a certain threshold for a certain
@@ -76,6 +78,8 @@ type Resource struct {
 
 	//Contains the error message if the last scrape failed, otherwise an empty string.
 	ScrapeErrorMessage string `db:"scrape_error_message"`
+	//The next time when this Resource should be checked for new or deleted assets.
+	NextScrapeAt time.Time `db:"next_scrape_at"`
 }
 
 // AssetType is the type of Resource.AssetType. It extends type string with some
@@ -121,8 +125,10 @@ type Asset struct {
 	Usage UsageValues `db:"usage"`
 
 	//When we last tried to obtain the current .Size and .Usage values.
+	//TODO: deprecated, remove
 	CheckedAt time.Time `db:"checked_at"`
 	//When the current .Size and .Usage values were obtained.
+	//TODO: deprecated, remove
 	ScrapedAt *time.Time `db:"scraped_at"`
 	//This flag is set by a Castellum worker after a resize operation to indicate
 	//that the .Size attribute is outdated. The value is the new_size of the
@@ -136,6 +142,11 @@ type Asset struct {
 	//If the last scrape failed, contains the error message returned by
 	//GetAssetStatus(). Contains the empty string otherwise.
 	ScrapeErrorMessage string `db:"scrape_error_message"`
+	//The next time when new .Size and .Usage values shall be obtained.
+	NextScrapeAt time.Time `db:"next_scrape_at"`
+	//Whether we ever scraped this asset successfully. If false, .Size and .Usage
+	//will be 0 and those values should not be trusted.
+	NeverScraped bool `db:"never_scraped"`
 
 	//A comma-separated list of all UsageMetrics for which this asset has
 	//critical usage levels. This field is only generated and never consumed by

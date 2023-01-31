@@ -412,6 +412,7 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if dbResource.ID == 0 {
+		dbResource.NextScrapeAt = h.TimeNow()
 		err = h.DB.Insert(dbResource)
 	} else {
 		_, err = h.DB.Update(dbResource)

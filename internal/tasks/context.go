@@ -69,3 +69,10 @@ func ExecuteOne(p JobPoller) error {
 	}
 	return j.Execute()
 }
+
+const (
+	// AssetScrapeInterval is the interval for scrapes of an individual asset.
+	AssetScrapeInterval time.Duration = 5 * time.Minute
+	// ResourceScrapeInterval is the interval for scrapes of an individual resource.
+	ResourceScrapeInterval time.Duration = 30 * time.Minute
+)
