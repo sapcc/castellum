@@ -37,9 +37,7 @@ Returns `200` and a JSON response body like this:
 {
   "resources": {
     "nfs-shares": {
-      "scraped_at": 1557134678,
       "checked": {
-        "at": 1557144528,
         "error": "cannot connect to OpenStack"
       },
       "asset_count": 42,
@@ -125,9 +123,7 @@ Otherwise returns `200` and a JSON response body like this:
 
 ```json
 {
-  "scraped_at": 1557134678,
   "checked": {
-    "at": 1557144528,
     "error": "cannot connect to OpenStack"
   },
   "low_threshold": {
@@ -186,16 +182,13 @@ Otherwise returns `200` and a JSON response body like this:
       "id": "2535fd62-c30a-4241-8c67-a12c4fba98ad",
       "size": 100,
       "usage_percent": 42,
-      "scraped_at": 1557140894,
       "stale": true
     },
     {
       "id": "acc137e0-ac0f-43c4-a3de-ba728c0091fd",
       "size": 1000,
       "usage_percent": 91,
-      "scraped_at": 1557140895,
       "checked": {
-        "at": 1557141495,
         "error": "cannot connect to OpenStack"
       },
       "stale": false
@@ -204,7 +197,6 @@ Otherwise returns `200` and a JSON response body like this:
       "id": "b73894be-bcbc-44f0-b7e2-29b758c06ce9",
       "size": 20,
       "usage_percent": 60,
-      "scraped_at": 1557140896,
       "stale": false
     }
   ]
@@ -238,9 +230,7 @@ Otherwise returns `200` and a JSON response body like this:
   "id": "acc137e0-ac0f-43c4-a3de-ba728c0091fd",
   "size": 1000,
   "usage_percent": 91,
-  "scraped_at": 1557140895,
   "checked": {
-    "at": 1557141495,
     "error": "cannot connect to OpenStack"
   },
   "stale": false,

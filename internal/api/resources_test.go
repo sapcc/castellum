@@ -35,7 +35,6 @@ import (
 // JSON serializations of the records in internal/api/fixtures/start-data.sql
 var (
 	initialFooResourceJSON = assert.JSONObject{
-		"scraped_at":  1,
 		"asset_count": 2,
 		"low_threshold": assert.JSONObject{
 			"usage_percent": 20,
@@ -50,9 +49,7 @@ var (
 		},
 	}
 	initialBarResourceJSON = assert.JSONObject{
-		"scraped_at": 2,
 		"checked": assert.JSONObject{
-			"at":    3,
 			"error": "datacenter is on fire",
 		},
 		"asset_count": 1,
@@ -458,8 +455,6 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 
 		expectErrors("foo",
 			assert.JSONObject{
-				"scraped_at":       12345,
-				"checked":          assert.JSONObject{"at": 56789},
 				"asset_count":      500,
 				"config":           assert.JSONObject{"foo": "bar"},
 				"low_threshold":    assert.JSONObject{"usage_percent": 20},
@@ -468,8 +463,6 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 				"size_constraints": assert.JSONObject{"minimum": 30, "maximum": 20},
 			},
 			"no configuration allowed for this asset type",
-			"resource.scraped_at cannot be set via the API",
-			"resource.checked cannot be set via the API",
 			"resource.asset_count cannot be set via the API",
 			"delay for low threshold is missing",
 			"delay for high threshold is missing",

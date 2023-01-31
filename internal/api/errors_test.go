@@ -52,7 +52,6 @@ func TestGetResourceScrapeErrors(baseT *testing.T) {
 					{
 						"asset_type": "bar",
 						"checked": assert.JSONObject{
-							"at":    3,
 							"error": "datacenter is on fire",
 						},
 						"domain_id":  "domain1",
@@ -61,7 +60,6 @@ func TestGetResourceScrapeErrors(baseT *testing.T) {
 					{
 						"asset_type": "foo",
 						"checked": assert.JSONObject{
-							"at":    6,
 							"error": "datacenter is on fire",
 						},
 						"domain_id":  "domain1",
@@ -95,7 +93,6 @@ func TestGetAssetScrapeErrors(baseT *testing.T) {
 						"asset_id":   "fooasset2",
 						"asset_type": "foo",
 						"checked": assert.JSONObject{
-							"at":    15,
 							"error": "unexpected uptime",
 						},
 						"domain_id":  "domain1",

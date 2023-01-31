@@ -39,7 +39,6 @@ type Asset struct {
 	UUID               string         `json:"id"`
 	Size               uint64         `json:"size,omitempty"`
 	UsagePercent       db.UsageValues `json:"usage_percent"`
-	ScrapedAtUnix      *int64         `json:"scraped_at,omitempty"`
 	Checked            *Checked       `json:"checked,omitempty"`
 	Stale              bool           `json:"stale"`
 	PendingOperation   *Operation     `json:"pending_operation,omitempty"`
@@ -48,7 +47,6 @@ type Asset struct {
 
 // Checked appears in type Asset and Resource.
 type Checked struct {
-	AtUnix       int64  `json:"at"`
 	ErrorMessage string `json:"error,omitempty"`
 }
 
@@ -98,15 +96,13 @@ type OperationFinish struct {
 // AssetFromDB converts a db.Asset into an api.Asset.
 func AssetFromDB(asset db.Asset) Asset {
 	a := Asset{
-		UUID:          asset.UUID,
-		Size:          asset.Size,
-		UsagePercent:  core.GetMultiUsagePercent(asset.Size, asset.Usage),
-		ScrapedAtUnix: timeOrNullToUnix(asset.ScrapedAt),
-		Stale:         asset.ExpectedSize != nil,
+		UUID:         asset.UUID,
+		Size:         asset.Size,
+		UsagePercent: core.GetMultiUsagePercent(asset.Size, asset.Usage),
+		Stale:        asset.ExpectedSize != nil,
 	}
 	if asset.ScrapeErrorMessage != "" {
 		a.Checked = &Checked{
-			AtUnix:       asset.CheckedAt.Unix(),
 			ErrorMessage: asset.ScrapeErrorMessage,
 		}
 	}

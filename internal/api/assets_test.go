@@ -41,16 +41,13 @@ func TestGetAssets(baseT *testing.T) {
 				"id":            "fooasset1",
 				"size":          1024,
 				"usage_percent": 50,
-				"scraped_at":    11,
 				"stale":         true,
 			},
 			{
 				"id":            "fooasset2",
 				"size":          512,
 				"usage_percent": 80,
-				"scraped_at":    12,
 				"checked": assert.JSONObject{
-					"at":    15,
 					"error": "unexpected uptime",
 				},
 				"stale": false,
@@ -87,7 +84,6 @@ func TestGetAsset(baseT *testing.T) {
 			"id":            "fooasset1",
 			"size":          1024,
 			"usage_percent": 50,
-			"scraped_at":    11,
 			"stale":         true,
 		}
 		req := assert.HTTPRequest{
@@ -143,7 +139,6 @@ func TestGetAsset(baseT *testing.T) {
 		//check rendering of a scraping error
 		t.MustExec(h.DB, `UPDATE assets SET checked_at = UNIX(12), scrape_error_message = $1 WHERE id = 1`, "filer is on fire")
 		response["checked"] = assert.JSONObject{
-			"at":    12,
 			"error": "filer is on fire",
 		}
 		req.Check(t.T, hh)
@@ -221,7 +216,6 @@ func TestGetAsset(baseT *testing.T) {
 			ExpectBody: assert.JSONObject{
 				"id": "fooasset3",
 				"checked": assert.JSONObject{
-					"at":    42,
 					"error": "filer has stranger anxiety",
 				},
 				"stale":         false,

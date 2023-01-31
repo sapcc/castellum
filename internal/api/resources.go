@@ -84,9 +84,8 @@ func (h handler) ResourceFromDB(res db.Resource) (Resource, error) {
 	}
 
 	result := Resource{
-		ScrapedAtUnix: timeOrNullToUnix(res.ScrapedAt),
-		AssetCount:    assetCount,
-		SizeSteps:     SizeSteps{Percent: res.SizeStepPercent, Single: res.SingleStep},
+		AssetCount: assetCount,
+		SizeSteps:  SizeSteps{Percent: res.SizeStepPercent, Single: res.SingleStep},
 	}
 	if res.ConfigJSON != "" {
 		val := json.RawMessage(res.ConfigJSON)
@@ -94,7 +93,6 @@ func (h handler) ResourceFromDB(res db.Resource) (Resource, error) {
 	}
 	if res.ScrapeErrorMessage != "" {
 		result.Checked = &Checked{
-			AtUnix:       res.CheckedAt.Unix(),
 			ErrorMessage: res.ScrapeErrorMessage,
 		}
 	}

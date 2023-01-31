@@ -49,9 +49,9 @@ type AssetError struct {
 	Checked *Checked `json:"checked,omitempty"`
 
 	// these fields are only used in resize errors
-	OldSize  uint64   `json:"old_size,omitempty"`
-	NewSize  uint64   `json:"new_size,omitempty"`
-	Finished *Checked `json:"finished,omitempty"`
+	OldSize  uint64           `json:"old_size,omitempty"`
+	NewSize  uint64           `json:"new_size,omitempty"`
+	Finished *OperationFinish `json:"finished,omitempty"`
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -88,7 +88,6 @@ func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request)
 				DomainUUID:  res.DomainUUID,
 				AssetType:   string(res.AssetType),
 				Checked: Checked{
-					AtUnix:       res.CheckedAt.Unix(),
 					ErrorMessage: res.ScrapeErrorMessage,
 				},
 			})
@@ -142,7 +141,6 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 					DomainUUID:  res.DomainUUID,
 					AssetType:   string(res.AssetType),
 					Checked: &Checked{
-						AtUnix:       a.CheckedAt.Unix(),
 						ErrorMessage: a.ScrapeErrorMessage,
 					},
 				})
@@ -211,7 +209,7 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 					AssetType:   string(res.AssetType),
 					OldSize:     o.OldSize,
 					NewSize:     o.NewSize,
-					Finished: &Checked{
+					Finished: &OperationFinish{
 						AtUnix:       o.FinishedAt.Unix(),
 						ErrorMessage: o.ErrorMessage,
 					},

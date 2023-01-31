@@ -243,14 +243,6 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 	return &res
 }
 
-func timeOrNullToUnix(t *time.Time) *int64 {
-	if t == nil {
-		return nil
-	}
-	tst := t.Unix()
-	return &tst
-}
-
 var (
 	ageRx    = regexp.MustCompile(`^(0|[1-9][0-9]*)([mhd])$`)
 	ageUnits = map[string]time.Duration{
