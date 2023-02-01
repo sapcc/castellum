@@ -44,13 +44,6 @@ type Resource struct {
 	AssetType  AssetType `db:"asset_type"`
 	ConfigJSON string    `db:"config_json"` //(optional) config specifically for this asset type
 
-	//When we last tried to check this Resource for new or deleted assets.
-	//TODO: deprecated, remove
-	CheckedAt time.Time `db:"checked_at"`
-	//When this Resource was checked for new or deleted assets.
-	//TODO: deprecated, remove
-	ScrapedAt *time.Time `db:"scraped_at"`
-
 	//Assets will resize when they have crossed a certain threshold for a certain
 	//time. Those thresholds (in percent of usage) and delays (in seconds) are
 	//defined here. The "critical" threshold will cause immediate upscaling, so
@@ -124,12 +117,6 @@ type Asset struct {
 	//The asset's current utilization, in the same unit as .Size.
 	Usage UsageValues `db:"usage"`
 
-	//When we last tried to obtain the current .Size and .Usage values.
-	//TODO: deprecated, remove
-	CheckedAt time.Time `db:"checked_at"`
-	//When the current .Size and .Usage values were obtained.
-	//TODO: deprecated, remove
-	ScrapedAt *time.Time `db:"scraped_at"`
 	//This flag is set by a Castellum worker after a resize operation to indicate
 	//that the .Size attribute is outdated. The value is the new_size of the
 	//resize operation. We should expect this size to show in the next

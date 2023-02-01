@@ -46,7 +46,6 @@ func TestResourceScraping(baseT *testing.T) {
 			ScopeUUID:                "project1",
 			DomainUUID:               "domain1",
 			AssetType:                "foo",
-			CheckedAt:                c.TimeNow(),
 			LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 0},
 			HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 0},
 			CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 0},
@@ -56,7 +55,6 @@ func TestResourceScraping(baseT *testing.T) {
 			ScopeUUID:                "project3",
 			DomainUUID:               "domain1",
 			AssetType:                "foo",
-			CheckedAt:                c.TimeNow(),
 			LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 0},
 			HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 0},
 			CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 0},
@@ -80,11 +78,10 @@ func TestResourceScraping(baseT *testing.T) {
 		clock.StepBy(time.Hour)
 		t.Must(ExecuteOne(c.PollForResourceScrapes()))
 		tr.DBChanges().AssertEqualf(`
-				INSERT INTO assets (id, resource_id, uuid, size, scraped_at, checked_at, usage, next_scrape_at) VALUES (1, 1, 'asset1', 1000, %[1]d, %[1]d, '{"singular":400}', %[2]d);
-				INSERT INTO assets (id, resource_id, uuid, size, scraped_at, checked_at, usage, next_scrape_at) VALUES (2, 1, 'asset2', 2000, %[1]d, %[1]d, '{"singular":1000}', %[2]d);
-				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d, next_scrape_at = %[3]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at) VALUES (1, 1, 'asset1', 1000, '{"singular":400}', %[1]d);
+				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at) VALUES (2, 1, 'asset2', 2000, '{"singular":1000}', %[1]d);
+				UPDATE resources SET next_scrape_at = %[2]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 			`,
-			c.TimeNow().Unix(),
 			c.TimeNow().Add(5*time.Minute).Unix(),
 			c.TimeNow().Add(30*time.Minute).Unix(),
 		)
@@ -93,24 +90,22 @@ func TestResourceScraping(baseT *testing.T) {
 		clock.StepBy(time.Hour)
 		t.Must(ExecuteOne(c.PollForResourceScrapes()))
 		tr.DBChanges().AssertEqualf(`
-				INSERT INTO assets (id, resource_id, uuid, size, scraped_at, checked_at, usage, next_scrape_at) VALUES (3, 2, 'asset5', 5000, %[1]d, %[1]d, '{"singular":2500}', %[2]d);
-				INSERT INTO assets (id, resource_id, uuid, size, scraped_at, checked_at, usage, next_scrape_at) VALUES (4, 2, 'asset6', 6000, %[1]d, %[1]d, '{"singular":2520}', %[2]d);
-				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d, next_scrape_at = %[3]d WHERE id = 2 AND scope_uuid = 'project3' AND asset_type = 'foo';
+				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at) VALUES (3, 2, 'asset5', 5000, '{"singular":2500}', %[1]d);
+				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at) VALUES (4, 2, 'asset6', 6000, '{"singular":2520}', %[1]d);
+				UPDATE resources SET next_scrape_at = %[2]d WHERE id = 2 AND scope_uuid = 'project3' AND asset_type = 'foo';
 			`,
-			c.TimeNow().Unix(),
 			c.TimeNow().Add(5*time.Minute).Unix(),
 			c.TimeNow().Add(30*time.Minute).Unix(),
 		)
 
 		//next ScrapeNextResource() should scrape project1/foo again because its
-		//scraped_at timestamp is the smallest; there should be no changes except for
-		//resources.scraped_at and resource.checked_at
+		//next_scrape_at timestamp is the smallest; there should be no changes except for
+		//resources.next_scrape_at
 		clock.StepBy(time.Hour)
 		t.Must(ExecuteOne(c.PollForResourceScrapes()))
 		tr.DBChanges().AssertEqualf(`
-				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d, next_scrape_at = %[2]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+				UPDATE resources SET next_scrape_at = %d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 			`,
-			c.TimeNow().Unix(),
 			c.TimeNow().Add(30*time.Minute).Unix(),
 		)
 
@@ -120,9 +115,8 @@ func TestResourceScraping(baseT *testing.T) {
 		t.Must(ExecuteOne(c.PollForResourceScrapes()))
 		tr.DBChanges().AssertEqualf(`
 				DELETE FROM assets WHERE id = 4 AND resource_id = 2 AND uuid = 'asset6';
-				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d, next_scrape_at = %[2]d WHERE id = 2 AND scope_uuid = 'project3' AND asset_type = 'foo';
+				UPDATE resources SET next_scrape_at = %d WHERE id = 2 AND scope_uuid = 'project3' AND asset_type = 'foo';
 			`,
-			c.TimeNow().Unix(),
 			c.TimeNow().Add(30*time.Minute).Unix(),
 		)
 
@@ -130,10 +124,9 @@ func TestResourceScraping(baseT *testing.T) {
 		amStatic.Assets["project1"]["asset7"] = plugins.StaticAsset{Size: 10, Usage: 3}
 		t.Must(ExecuteOne(c.PollForResourceScrapes()))
 		tr.DBChanges().AssertEqualf(`
-				INSERT INTO assets (id, resource_id, uuid, size, scraped_at, checked_at, usage, next_scrape_at) VALUES (5, 1, 'asset7', 10, %[1]d, %[1]d, '{"singular":3}', %[2]d);
-				UPDATE resources SET scraped_at = %[1]d, checked_at = %[1]d, next_scrape_at = %[3]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at) VALUES (5, 1, 'asset7', 10, '{"singular":3}', %[1]d);
+				UPDATE resources SET next_scrape_at = %[2]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 			`,
-			c.TimeNow().Unix(),
 			c.TimeNow().Add(5*time.Minute).Unix(),
 			c.TimeNow().Add(30*time.Minute).Unix(),
 		)
@@ -143,15 +136,13 @@ func TestResourceScraping(baseT *testing.T) {
 			ScopeUUID:    "project2",
 			DomainUUID:   "domain1",
 			AssetType:    "foo",
-			CheckedAt:    c.TimeNow(),
 			NextScrapeAt: c.TimeNow(),
 		}))
 		amStatic.Assets["project2"] = nil
 		t.Must(ExecuteOne(c.PollForResourceScrapes()))
 		tr.DBChanges().AssertEqualf(`
-				INSERT INTO resources (id, scope_uuid, asset_type, scraped_at, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, domain_uuid, checked_at, next_scrape_at) VALUES (3, 'project2', 'foo', %[1]d, '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":0}', 0, 'domain1', %[1]d, %[2]d);
+				INSERT INTO resources (id, scope_uuid, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, domain_uuid, next_scrape_at) VALUES (3, 'project2', 'foo', '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":0}', 0, 'domain1', %d);
 			`,
-			c.TimeNow().Unix(),
 			c.TimeNow().Add(30*time.Minute).Unix(),
 		)
 	})

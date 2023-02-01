@@ -130,4 +130,20 @@ var SQLMigrations = map[string]string{
 			DROP COLUMN next_scrape_at,
 			DROP COLUMN never_scraped;
 	`,
+	"018_remove_checked_at_and_scraped_at.up.sql": `
+		ALTER TABLE resources
+			DROP COLUMN scraped_at,
+			DROP COLUMN checked_at;
+		ALTER TABLE assets
+			DROP COLUMN scraped_at,
+			DROP COLUMN checked_at;
+	`,
+	"018_remove_checked_at_and_scraped_at.down.sql": `
+		ALTER TABLE resources
+			ADD COLUMN scraped_at TIMESTAMP DEFAULT NULL,
+			ADD COLUMN checked_at TIMESTAMP NOT NULL DEFAULT NOW();
+		ALTER TABLE assets
+			ADD COLUMN scraped_at TIMESTAMP DEFAULT NULL,
+			ADD COLUMN checked_at TIMESTAMP NOT NULL DEFAULT NOW();
+	`,
 }

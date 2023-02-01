@@ -71,9 +71,7 @@ The following fields may be returned:
 | Field | Type | Explanation |
 | ----- | ---- | ----------- |
 | `resources.$type` | object | Configuration for a project resource. Resources will only be shown when a) autoscaling is enabled for them and b) the requester has sufficient permissions to read them. |
-| `resources.$type.scraped_at` | timestamp | *Readonly.* When Castellum last scanned this resource for new assets or deleted assets. |
-| `resources.$type.checked.at` | timestamp | *Readonly.* When Castellum last _tried_ to scan this resource for new assets or deleted assets. Only shown when different from `scraped_at`, i.e. when the last check failed. |
-| `resources.$type.checked.error` | string | *Readonly.* When the last check failed (see above), this field contains the error message that was returned from the backend. |
+| `resources.$type.checked.error` | string | *Readonly.* If the last attempt to scan this resource for new or deleted assets failed, this field contains the error message that was returned from the backend. |
 | `resources.$type.asset_count` | integer | *Readonly.* The number of assets in this resource. |
 | `resources.$type.config` | object or null | Type-specific configuration for this resource. Most resources don't take configuration here, in which case this field will be missing. Refer to the [asset manager's documentation](asset-managers/) for whether a resource accepts or requires configuration. |
 | `resources.$type.low_threshold`<br>`resources.$type.high_threshold`<br>`resources.$type.critical_threshold` | object | Configuration for thresholds that trigger an automated resize operation. Any of these may be missing if the threshold in question has not been enabled. |
@@ -157,7 +155,6 @@ Enables autoscaling on the specified project resource. The request body must be 
 document following the same schema as the response from the corresponding GET endpoint,
 except that the following fields may not be present:
 
-- `scraped_at`
 - `checked`
 - `asset_count`
 
@@ -210,13 +207,11 @@ For each asset, the following fields may be returned:
 | `id` | string | UUID of asset. |
 | `size` | integer | Size of asset. The unit depends on the asset type. Refer to the [asset managers' documentation](asset-managers/) for more information. |
 | `usage_percent` | [float or object](#multi-usage-resources) | Usage of asset as percentage of size. When the asset has multiple usage types (e.g. instances have both CPU usage and RAM usage), usually the higher value is reported here. |
-| `scraped_at` | timestamp | When the size and usage of the asset was last retrieved by Castellum. |
-| `checked.at` | timestamp | When Castellum last tried to retrieve the size and usage of the asset. Only shown when different from `scraped_at`, i.e. when the last check failed. |
-| `checked.error` | string | When the last check failed (see above), this field contains the error message that was returned from the backend. |
+| `checked.error` | string | If the last attempt by Castellum to retrieve the size and usage of the asset failed, this field contains the error message that was returned from the backend. |
 | `stale` | bool | This flag is set by Castellum after a resize operation to indicate that the reported size and usage are probably not accurate anymore. Will be cleared by the next scrape. |
 
-When no scrape ever succeeded (e.g. because the asset is in an error state since creation), the fields `size`,
-`usage_percent` and `scraped_at` will all be missing. The `checked.error` field will always be present in this case.
+When no scrape ever succeeded (e.g. because the asset is in an error state since creation), the fields `size` and
+`usage_percent` will be missing. The `checked.error` field will always be present in this case.
 
 ## GET /v1/projects/:id/assets/:type/:id
 
@@ -447,7 +442,6 @@ Returns `200` on success and a JSON response body like this:
     {
       "asset_type": "nfs-shares",
       "checked": {
-        "at": 1557144528,
         "error": "cannot connect to OpenStack"
       },
       "domain_id": "481b2af2-d816-4453-8743-a05382e7d1ce",
@@ -456,7 +450,6 @@ Returns `200` on success and a JSON response body like this:
     {
       "asset_type": "foo",
       "checked": {
-        "at": 1557144777,
         "error": "datacenter is on fire"
       },
       "domain_id": "481b2af2-d816-4453-8743-a05382e7d1ce",
@@ -490,7 +483,6 @@ Returns `200` on success and a JSON response body like this:
       "asset_id": "c991eb08-e14e-4559-94d6-c9c390c18776",
       "asset_type": "nfs-shares",
       "checked": {
-        "at": 1557144799,
         "error": "cannot connect to OpenStack"
       },
       "domain_id": "481b2af2-d816-4453-8743-a05382e7d1ce",

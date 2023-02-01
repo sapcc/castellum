@@ -137,7 +137,7 @@ func TestGetAsset(baseT *testing.T) {
 		req.Check(t.T, hh)
 
 		//check rendering of a scraping error
-		t.MustExec(h.DB, `UPDATE assets SET checked_at = UNIX(12), scrape_error_message = $1 WHERE id = 1`, "filer is on fire")
+		t.MustExec(h.DB, `UPDATE assets SET scrape_error_message = $1 WHERE id = 1`, "filer is on fire")
 		response["checked"] = assert.JSONObject{
 			"error": "filer is on fire",
 		}
@@ -206,7 +206,6 @@ func TestGetAsset(baseT *testing.T) {
 		t.Must(h.DB.Insert(&db.Asset{
 			ResourceID:         1,
 			UUID:               "fooasset3",
-			CheckedAt:          time.Unix(42, 0).UTC(),
 			ScrapeErrorMessage: "filer has stranger anxiety",
 		}))
 		assert.HTTPRequest{

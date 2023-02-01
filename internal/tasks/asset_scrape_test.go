@@ -57,8 +57,6 @@ func runAssetScrapeTest(t test.T, resourceIsSingleStep bool, action func(*Contex
 			UUID:         "asset1",
 			Size:         1000,
 			Usage:        db.UsageValues{db.SingularUsageMetric: 500},
-			CheckedAt:    c.TimeNow(),
-			ScrapedAt:    p2time(c.TimeNow()),
 			NextScrapeAt: c.TimeNow(),
 			NeverScraped: true,
 			ExpectedSize: nil,
@@ -403,8 +401,6 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 				UUID:         "asset1",
 				Size:         1000,
 				Usage:        db.UsageValues{db.SingularUsageMetric: 500},
-				CheckedAt:    c.TimeNow(),
-				ScrapedAt:    p2time(c.TimeNow()),
 				NextScrapeAt: c.TimeNow(),
 				ExpectedSize: nil,
 			},
@@ -413,8 +409,6 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 				UUID:         "asset2",
 				Size:         1000,
 				Usage:        db.UsageValues{db.SingularUsageMetric: 500},
-				CheckedAt:    c.TimeNow(),
-				ScrapedAt:    p2time(c.TimeNow()),
 				NextScrapeAt: c.TimeNow(),
 				ExpectedSize: nil,
 			},
@@ -423,8 +417,6 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 				UUID:         "asset3",
 				Size:         1000,
 				Usage:        db.UsageValues{db.SingularUsageMetric: 500},
-				CheckedAt:    c.TimeNow(),
-				ScrapedAt:    p2time(c.TimeNow()),
 				NextScrapeAt: c.TimeNow(),
 				ExpectedSize: nil,
 			},
@@ -450,18 +442,12 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 		t.Must(ExecuteOne(c.PollForAssetScrapes()))
 
 		//so the asset table should look like this now
-		assets[0].CheckedAt = c.TimeNow().Add(-2 * time.Minute)
-		assets[1].CheckedAt = c.TimeNow().Add(-time.Minute)
-		assets[2].CheckedAt = c.TimeNow()
 		assets[0].NextScrapeAt = c.TimeNow().Add(3 * time.Minute)
 		assets[1].NextScrapeAt = c.TimeNow().Add(4 * time.Minute)
 		assets[2].NextScrapeAt = c.TimeNow().Add(5 * time.Minute)
 		assets[0].Usage = db.UsageValues{db.SingularUsageMetric: 510}
 		assets[1].Usage = db.UsageValues{db.SingularUsageMetric: 520}
 		assets[2].Usage = db.UsageValues{db.SingularUsageMetric: 530}
-		for idx := 0; idx < len(assets); idx++ {
-			assets[idx].ScrapedAt = p2time(assets[idx].CheckedAt)
-		}
 		t.ExpectAssets(c.DB, assets...)
 
 		//next scrape should work identically
@@ -471,15 +457,9 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 		t.Must(ExecuteOne(c.PollForAssetScrapes()))
 		clock.StepBy(time.Minute)
 		t.Must(ExecuteOne(c.PollForAssetScrapes()))
-		assets[0].CheckedAt = c.TimeNow().Add(-2 * time.Minute)
-		assets[1].CheckedAt = c.TimeNow().Add(-time.Minute)
-		assets[2].CheckedAt = c.TimeNow()
 		assets[0].NextScrapeAt = c.TimeNow().Add(3 * time.Minute)
 		assets[1].NextScrapeAt = c.TimeNow().Add(4 * time.Minute)
 		assets[2].NextScrapeAt = c.TimeNow().Add(5 * time.Minute)
-		for idx := 0; idx < len(assets); idx++ {
-			assets[idx].ScrapedAt = p2time(assets[idx].CheckedAt)
-		}
 		t.ExpectAssets(c.DB, assets...)
 
 		//and all of this should not have created any operations
@@ -518,8 +498,6 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 			UUID:         "asset1",
 			Size:         1000,
 			Usage:        db.UsageValues{db.SingularUsageMetric: 500},
-			CheckedAt:    c.TimeNow(),
-			ScrapedAt:    p2time(c.TimeNow()),
 			ExpectedSize: p2uint64(1100),
 		}
 
@@ -529,8 +507,6 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 		clock.StepBy(5 * time.Minute)
 		t.Must(ExecuteOne(c.PollForAssetScrapes()))
 
-		asset.CheckedAt = c.TimeNow()
-		asset.ScrapedAt = p2time(c.TimeNow())
 		asset.NextScrapeAt = c.TimeNow().Add(5 * time.Minute)
 		t.ExpectAssets(c.DB, asset)
 
@@ -544,8 +520,6 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 
 		asset.Size = 1100
 		asset.Usage = db.UsageValues{db.SingularUsageMetric: 1000}
-		asset.CheckedAt = c.TimeNow()
-		asset.ScrapedAt = p2time(c.TimeNow())
 		asset.NextScrapeAt = c.TimeNow().Add(5 * time.Minute)
 		asset.ExpectedSize = nil
 		t.ExpectAssets(c.DB, asset)
@@ -584,8 +558,6 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
 			UUID:         "asset1",
 			Size:         1200,
 			Usage:        db.UsageValues{db.SingularUsageMetric: 600},
-			CheckedAt:    c.TimeNow(),
-			ScrapedAt:    p2time(c.TimeNow()),
 			NextScrapeAt: c.TimeNow().Add(5 * time.Minute),
 			ExpectedSize: nil,
 		})
@@ -597,8 +569,8 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 	//1. If core.AssetNotFoundErr is returned then the asset is deleted from
 	//the db.
 	//2. All other errors are passed through to the caller of ScrapeNextAsset,
-	//but the asset's checked_at timestamp is still updated to ensure that the
-	//main loop progresses to the next asset.
+	//but the asset's next_scrape_at timestamp is still updated to ensure that
+	//the main loop progresses to the next asset.
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock) {
 		setAsset(plugins.StaticAsset{
@@ -622,8 +594,6 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 			UUID:               "asset1",
 			Size:               1000,
 			Usage:              db.UsageValues{db.SingularUsageMetric: 500}, //changed usage not observed because of error
-			ScrapedAt:          p2time(c.TimeNow().Add(-5 * time.Minute)),   //not updated by ScrapeNextAsset!
-			CheckedAt:          c.TimeNow(),                                 //but this WAS updated!
 			NextScrapeAt:       c.TimeNow().Add(5 * time.Minute),
 			ExpectedSize:       nil,
 			ScrapeErrorMessage: "GetAssetStatus failing as requested",
@@ -642,8 +612,6 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 			UUID:               "asset1",
 			Size:               1000,
 			Usage:              db.UsageValues{db.SingularUsageMetric: 600},
-			ScrapedAt:          p2time(c.TimeNow()),
-			CheckedAt:          c.TimeNow(),
 			NextScrapeAt:       c.TimeNow().Add(5 * time.Minute),
 			ExpectedSize:       nil,
 			ScrapeErrorMessage: "",
@@ -945,8 +913,6 @@ func TestZeroAndOneSizedAssetsWithoutUsage(baseT *testing.T) {
 				UUID:         "asset1",
 				Size:         assetSize,
 				Usage:        db.UsageValues{db.SingularUsageMetric: 0},
-				CheckedAt:    c.TimeNow(),
-				ScrapedAt:    p2time(c.TimeNow()),
 				NextScrapeAt: c.TimeNow().Add(5 * time.Minute),
 				ExpectedSize: nil,
 			})
@@ -972,8 +938,6 @@ func TestZeroSizedAssetWithUsage(baseT *testing.T) {
 			UUID:           "asset1",
 			Size:           0,
 			Usage:          db.UsageValues{db.SingularUsageMetric: 5},
-			CheckedAt:      c.TimeNow(),
-			ScrapedAt:      p2time(c.TimeNow()),
 			NextScrapeAt:   c.TimeNow().Add(5 * time.Minute),
 			ExpectedSize:   nil,
 			CriticalUsages: string(db.SingularUsageMetric),

@@ -169,11 +169,10 @@ func (j assetScrapeJob) Execute() (returnedError error) {
 
 		//GetAssetStatus may fail for single assets, e.g. for Manila shares in
 		//transitional states like Creating/Deleting; in that case, update
-		//checked_at so that the next call continues with the next asset, but leave
-		//scraped_at unchanged to indicate old data
-		asset.CheckedAt = c.TimeNow()
+		//next_scrape_at so that the next call continues with the next asset, but
+		//fill the scrape error message to indicate old data
 		asset.ScrapeErrorMessage = err.Error()
-		asset.NextScrapeAt = asset.CheckedAt.Add(AssetScrapeInterval)
+		asset.NextScrapeAt = c.TimeNow().Add(AssetScrapeInterval)
 		_, dbErr := tx.Update(&asset)
 		if dbErr != nil {
 			return dbErr
@@ -201,10 +200,7 @@ func (j assetScrapeJob) Execute() (returnedError error) {
 	//update asset attributes - We have four separate cases here, which
 	//correspond to the branches of the `switch` statement. When changing any of
 	//this, tread very carefully.
-	now := c.TimeNow()
-	asset.CheckedAt = now
-	asset.ScrapedAt = &now
-	asset.NextScrapeAt = now.Add(AssetScrapeInterval)
+	asset.NextScrapeAt = c.TimeNow().Add(AssetScrapeInterval)
 	asset.ScrapeErrorMessage = ""
 	asset.NeverScraped = false
 	canTouchPendingOperations := true

@@ -117,9 +117,8 @@ func (j resourceScrapeJob) Execute() (returnedError error) {
 	//check which assets exist in this resource in OpenStack
 	assetUUIDs, err := manager.ListAssets(res)
 	if err != nil {
-		//In case of error we update checked_at so that the next call continues
-		//but leave scraped_at unchanged to indicate old data
-		res.CheckedAt = c.TimeNow()
+		//In case of error we update next_scrape_at so that the next call continues
+		//but fill the error message to indicate old data
 		res.ScrapeErrorMessage = err.Error()
 		res.NextScrapeAt = c.TimeNow().Add(ResourceScrapeInterval)
 		_, dbErr := tx.Update(&res)
@@ -165,13 +164,11 @@ func (j resourceScrapeJob) Execute() (returnedError error) {
 			continue
 		}
 		logg.Info("adding new %s asset to DB: UUID = %s, scope UUID = %s", res.AssetType, assetUUID, res.ScopeUUID)
-		now := c.TimeNow()
 		dbAsset := db.Asset{
 			ResourceID:   res.ID,
 			UUID:         assetUUID,
-			CheckedAt:    now,
 			ExpectedSize: nil,
-			NextScrapeAt: now.Add(AssetScrapeInterval),
+			NextScrapeAt: c.TimeNow().Add(AssetScrapeInterval),
 		}
 
 		status, err := manager.GetAssetStatus(res, assetUUID, nil)
@@ -180,7 +177,6 @@ func (j resourceScrapeJob) Execute() (returnedError error) {
 			assetScrapeSuccessCounter.With(labels).Inc()
 			dbAsset.Size = status.Size
 			dbAsset.Usage = status.Usage
-			dbAsset.ScrapedAt = &now
 			dbAsset.NeverScraped = false
 		} else {
 			assetScrapeFailedCounter.With(labels).Inc()
@@ -197,11 +193,8 @@ func (j resourceScrapeJob) Execute() (returnedError error) {
 	}
 
 	//record successful scrape
-	now := c.TimeNow()
-	res.CheckedAt = now
-	res.ScrapedAt = &now
 	res.ScrapeErrorMessage = ""
-	res.NextScrapeAt = now.Add(ResourceScrapeInterval)
+	res.NextScrapeAt = c.TimeNow().Add(ResourceScrapeInterval)
 	_, err = tx.Update(&res)
 	if err != nil {
 		return err

@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
@@ -319,12 +318,9 @@ func TestPutResource(baseT *testing.T) {
 			Body:         newFooResourceJSON2,
 			ExpectStatus: http.StatusAccepted,
 		}.Check(t.T, hh)
-		tr.DBChanges().AssertEqualf(
-			`
-				INSERT INTO resources (id, scope_uuid, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_free_size, domain_uuid, checked_at, next_scrape_at) VALUES (5, 'project3', 'foo', '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":98}', 15, 23, 'domain1', %d, 0);
-			`,
-			time.Time{}.Unix(),
-		)
+		tr.DBChanges().AssertEqualf(`
+			INSERT INTO resources (id, scope_uuid, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_free_size, domain_uuid, next_scrape_at) VALUES (5, 'project3', 'foo', '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":98}', 15, 23, 'domain1', 0);
+		`)
 
 		//test setting constraints
 		newFooResourceJSON3 := assert.JSONObject{
