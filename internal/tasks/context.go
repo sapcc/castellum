@@ -19,6 +19,7 @@
 package tasks
 
 import (
+	"math/rand"
 	"time"
 
 	"github.com/go-gorp/gorp/v3"
@@ -34,7 +35,8 @@ type Context struct {
 
 	//dependency injection slots (usually filled by ApplyDefaults(), but filled
 	//with doubles in tests)
-	TimeNow func() time.Time
+	TimeNow   func() time.Time
+	AddJitter func(time.Duration) time.Duration
 
 	//When Blocker is not nil, tasks that support concurrent operation will
 	//withhold operations until this channel is closed.
@@ -44,6 +46,17 @@ type Context struct {
 // ApplyDefaults injects the regular runtime dependencies into this Context.
 func (c *Context) ApplyDefaults() {
 	c.TimeNow = time.Now
+	c.AddJitter = addJitter
+}
+
+// addJitter returns a random duration within +/- 10% of the requested value.
+// This can be used to even out the load on a scheduled job over time, by
+// spreading jobs that would normally be scheduled right next to each other out
+// over time without corrupting the individual schedules too much.
+func addJitter(duration time.Duration) time.Duration {
+	//nolint:gosec // This is not crypto-relevant, so math/rand is okay.
+	r := rand.Float64() //NOTE: 0 <= r < 1
+	return time.Duration(float64(duration) * (0.9 + 0.2*r))
 }
 
 // JobPoller is a function, usually a member function of type Context, that can

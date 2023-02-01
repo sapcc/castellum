@@ -172,7 +172,7 @@ func (j assetScrapeJob) Execute() (returnedError error) {
 		//next_scrape_at so that the next call continues with the next asset, but
 		//fill the scrape error message to indicate old data
 		asset.ScrapeErrorMessage = err.Error()
-		asset.NextScrapeAt = c.TimeNow().Add(AssetScrapeInterval)
+		asset.NextScrapeAt = c.TimeNow().Add(c.AddJitter(AssetScrapeInterval))
 		_, dbErr := tx.Update(&asset)
 		if dbErr != nil {
 			return dbErr
@@ -200,7 +200,7 @@ func (j assetScrapeJob) Execute() (returnedError error) {
 	//update asset attributes - We have four separate cases here, which
 	//correspond to the branches of the `switch` statement. When changing any of
 	//this, tread very carefully.
-	asset.NextScrapeAt = c.TimeNow().Add(AssetScrapeInterval)
+	asset.NextScrapeAt = c.TimeNow().Add(c.AddJitter(AssetScrapeInterval))
 	asset.ScrapeErrorMessage = ""
 	asset.NeverScraped = false
 	canTouchPendingOperations := true

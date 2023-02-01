@@ -36,11 +36,17 @@ func withContext(t test.T, action func(*Context, *plugins.AssetManagerStatic, *t
 		clock := &clockVar
 
 		action(&Context{
-			DB:      dbi,
-			Team:    core.AssetManagerTeam{amStatic},
-			TimeNow: clock.Now,
+			DB:        dbi,
+			Team:      core.AssetManagerTeam{amStatic},
+			TimeNow:   clock.Now,
+			AddJitter: noJitter,
 		}, amStatic, clock)
 	})
+}
+
+func noJitter(d time.Duration) time.Duration {
+	// Tests should be deterministic, so we do not add random jitter here.
+	return d
 }
 
 // Take pointer to time.Time expression.

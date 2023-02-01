@@ -120,7 +120,7 @@ func (j resourceScrapeJob) Execute() (returnedError error) {
 		//In case of error we update next_scrape_at so that the next call continues
 		//but fill the error message to indicate old data
 		res.ScrapeErrorMessage = err.Error()
-		res.NextScrapeAt = c.TimeNow().Add(ResourceScrapeInterval)
+		res.NextScrapeAt = c.TimeNow().Add(c.AddJitter(ResourceScrapeInterval))
 		_, dbErr := tx.Update(&res)
 		if dbErr != nil {
 			return dbErr
@@ -168,7 +168,7 @@ func (j resourceScrapeJob) Execute() (returnedError error) {
 			ResourceID:   res.ID,
 			UUID:         assetUUID,
 			ExpectedSize: nil,
-			NextScrapeAt: c.TimeNow().Add(AssetScrapeInterval),
+			NextScrapeAt: c.TimeNow().Add(c.AddJitter(AssetScrapeInterval)),
 		}
 
 		status, err := manager.GetAssetStatus(res, assetUUID, nil)
@@ -194,7 +194,7 @@ func (j resourceScrapeJob) Execute() (returnedError error) {
 
 	//record successful scrape
 	res.ScrapeErrorMessage = ""
-	res.NextScrapeAt = c.TimeNow().Add(ResourceScrapeInterval)
+	res.NextScrapeAt = c.TimeNow().Add(c.AddJitter(ResourceScrapeInterval))
 	_, err = tx.Update(&res)
 	if err != nil {
 		return err
