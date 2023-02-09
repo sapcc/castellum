@@ -350,7 +350,7 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
-		//when the "Critical" threshold gets crossed while the the "High" operation
+		//when the "Critical" threshold gets crossed while the "High" operation
 		//is not yet confirmed, the "High" operation is cancelled and a "Critical"
 		//operation replaces it
 		clock.StepBy(10 * time.Minute)

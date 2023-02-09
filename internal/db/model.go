@@ -54,7 +54,7 @@ type Resource struct {
 	HighDelaySeconds         uint32      `db:"high_delay_seconds"`
 	CriticalThresholdPercent UsageValues `db:"critical_threshold_percent"`
 
-	//This defines how much the the asset's size changes per
+	//This defines how much the asset's size changes per
 	//downscaling/upscaling operation (in % of previous size).
 	SizeStepPercent float64 `db:"size_step_percent"`
 	//When true, ignore SizeStepPercent and always resize by the smallest step
