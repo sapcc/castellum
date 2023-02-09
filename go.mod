@@ -12,14 +12,13 @@ require (
 	github.com/prometheus/client_golang v1.14.0
 	github.com/rs/cors v1.8.3
 	github.com/sapcc/go-api-declarations v1.4.3
-	github.com/sapcc/go-bits v0.0.0-20230127160334-4cfcb11b2ecb
-	github.com/sapcc/gophercloud-sapcc v0.0.0-20230127143243-98c6f09836d0
+	github.com/sapcc/go-bits v0.0.0-20230203091932-bc999fbc3108
+	github.com/sapcc/gophercloud-sapcc v0.0.0-20230203092039-38083be1ac56
 )
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
-	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
@@ -34,7 +33,7 @@ require (
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.39.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
-	github.com/rabbitmq/amqp091-go v1.6.0 // indirect
+	github.com/rabbitmq/amqp091-go v1.6.1 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
 	go.uber.org/atomic v1.10.0 // indirect

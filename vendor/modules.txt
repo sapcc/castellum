@@ -13,8 +13,6 @@ github.com/dlmiddlecote/sqlstats
 # github.com/go-gorp/gorp/v3 v3.1.0
 ## explicit; go 1.18
 github.com/go-gorp/gorp/v3
-# github.com/go-sql-driver/mysql v1.7.0
-## explicit; go 1.13
 # github.com/gofrs/uuid v4.4.0+incompatible
 ## explicit
 github.com/gofrs/uuid
@@ -106,7 +104,7 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/rabbitmq/amqp091-go v1.6.0
+# github.com/rabbitmq/amqp091-go v1.6.1
 ## explicit; go 1.16
 github.com/rabbitmq/amqp091-go
 # github.com/rogpeppe/go-internal v1.9.0
@@ -121,7 +119,7 @@ github.com/sapcc/go-api-declarations/cadf
 github.com/sapcc/go-api-declarations/internal/marshal
 github.com/sapcc/go-api-declarations/limes
 github.com/sapcc/go-api-declarations/limes/resources
-# github.com/sapcc/go-bits v0.0.0-20230127160334-4cfcb11b2ecb
+# github.com/sapcc/go-bits v0.0.0-20230203091932-bc999fbc3108
 ## explicit; go 1.19
 github.com/sapcc/go-bits/assert
 github.com/sapcc/go-bits/audittools
@@ -143,7 +141,7 @@ github.com/sapcc/go-bits/pluggable
 github.com/sapcc/go-bits/promquery
 github.com/sapcc/go-bits/respondwith
 github.com/sapcc/go-bits/sqlext
-# github.com/sapcc/gophercloud-sapcc v0.0.0-20230127143243-98c6f09836d0
+# github.com/sapcc/gophercloud-sapcc v0.0.0-20230203092039-38083be1ac56
 ## explicit; go 1.19
 github.com/sapcc/gophercloud-sapcc/clients
 github.com/sapcc/gophercloud-sapcc/resources/v1/projects
