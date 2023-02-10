@@ -12,8 +12,8 @@ require (
 	github.com/prometheus/client_golang v1.14.0
 	github.com/rs/cors v1.8.3
 	github.com/sapcc/go-api-declarations v1.4.3
-	github.com/sapcc/go-bits v0.0.0-20230203091932-bc999fbc3108
-	github.com/sapcc/gophercloud-sapcc v0.0.0-20230203092039-38083be1ac56
+	github.com/sapcc/go-bits v0.0.0-20230209153735-1a4f98d32f2f
+	github.com/sapcc/gophercloud-sapcc v0.0.0-20230209153730-4482e179c507
 )
 
 require (
