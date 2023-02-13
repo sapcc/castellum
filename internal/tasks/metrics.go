@@ -19,10 +19,12 @@
 package tasks
 
 import (
+	"database/sql"
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-bits/logg"
+	"github.com/sapcc/go-bits/sqlext"
 
 	"github.com/sapcc/castellum/internal/db"
 )
@@ -188,11 +190,7 @@ func (c StateMetricsCollector) doCollect(ch chan<- prometheus.Metric) error {
 	projectResourceExistsDesc := <-descCh
 
 	//fetch values
-	rows, err := c.Context.DB.Query(resourceStateQuery)
-	if err != nil {
-		return err
-	}
-	for rows.Next() {
+	err := sqlext.ForeachRow(c.Context.DB, resourceStateQuery, nil, func(rows *sql.Rows) error {
 		var (
 			scopeUUID string
 			assetType db.AssetType
@@ -206,14 +204,7 @@ func (c StateMetricsCollector) doCollect(ch chan<- prometheus.Metric) error {
 			prometheus.GaugeValue, 1,
 			scopeUUID, string(assetType),
 		)
-	}
-	err = rows.Err()
-	if err == nil {
-		err = rows.Close()
-	}
-	if err != nil {
-		return err
-	}
-
-	return nil
+		return nil
+	})
+	return err
 }

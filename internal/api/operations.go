@@ -19,6 +19,7 @@
 package api
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"strings"
@@ -160,24 +161,20 @@ func (h handler) GetPendingOperations(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) getAssetUUIDMap(res db.Resource) (map[int64]string, error) {
-	rows, err := h.DB.Query(`SELECT id, uuid FROM assets WHERE resource_id = $1`, res.ID)
-	if err != nil {
-		return nil, err
-	}
-
 	assetUUIDs := make(map[int64]string)
-	for rows.Next() {
+	err := sqlext.ForeachRow(h.DB, `SELECT id, uuid FROM assets WHERE resource_id = $1`, []any{res.ID}, func(rows *sql.Rows) error {
 		var (
 			id   int64
 			uuid string
 		)
 		err := rows.Scan(&id, &uuid)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		assetUUIDs[id] = uuid
-	}
-	return assetUUIDs, rows.Err()
+		return nil
+	})
+	return assetUUIDs, err
 }
 
 func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Request) {
