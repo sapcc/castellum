@@ -12,7 +12,7 @@ require (
 	github.com/prometheus/client_golang v1.14.0
 	github.com/rs/cors v1.8.3
 	github.com/sapcc/go-api-declarations v1.4.3
-	github.com/sapcc/go-bits v0.0.0-20230209153735-1a4f98d32f2f
+	github.com/sapcc/go-bits v0.0.0-20230217073628-aeeff1f2933c
 	github.com/sapcc/gophercloud-sapcc v0.0.0-20230209153730-4482e179c507
 )
 
@@ -33,7 +33,7 @@ require (
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.39.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
-	github.com/rabbitmq/amqp091-go v1.6.1 // indirect
+	github.com/rabbitmq/amqp091-go v1.7.0 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
