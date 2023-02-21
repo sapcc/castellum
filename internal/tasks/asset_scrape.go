@@ -153,7 +153,9 @@ func (j assetScrapeJob) Execute() (returnedError error) {
 			Usage: asset.Usage,
 		}
 	}
+	startedAt := c.TimeNow()
 	status, err := manager.GetAssetStatus(res, asset.UUID, oldStatus)
+	finishedAt := c.TimeNow()
 	if err != nil {
 		errMsg := fmt.Errorf("cannot query status of %s %s: %s", string(res.AssetType), asset.UUID, err.Error())
 		if _, ok := err.(core.AssetNotFoundErr); ok {
@@ -200,7 +202,8 @@ func (j assetScrapeJob) Execute() (returnedError error) {
 	//update asset attributes - We have four separate cases here, which
 	//correspond to the branches of the `switch` statement. When changing any of
 	//this, tread very carefully.
-	asset.NextScrapeAt = c.TimeNow().Add(c.AddJitter(AssetScrapeInterval))
+	asset.NextScrapeAt = finishedAt.Add(c.AddJitter(AssetScrapeInterval))
+	asset.ScrapeDurationSecs = finishedAt.Sub(startedAt).Seconds()
 	asset.ScrapeErrorMessage = ""
 	asset.NeverScraped = false
 	canTouchPendingOperations := true

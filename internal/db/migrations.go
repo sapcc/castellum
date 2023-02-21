@@ -146,4 +146,16 @@ var SQLMigrations = map[string]string{
 			ADD COLUMN scraped_at TIMESTAMP DEFAULT NULL,
 			ADD COLUMN checked_at TIMESTAMP NOT NULL DEFAULT NOW();
 	`,
+	"019_scrape_duration_secs.up.sql": `
+		ALTER TABLE resources
+			ADD COLUMN scrape_duration_secs REAL NOT NULL DEFAULT 0;
+		ALTER TABLE assets
+			ADD COLUMN scrape_duration_secs REAL NOT NULL DEFAULT 0;
+	`,
+	"019_scrape_duration_secs.down.sql": `
+		ALTER TABLE resources
+			DROP COLUMN scrape_duration_secs;
+		ALTER TABLE assets
+			DROP COLUMN scrape_duration_secs;
+	`,
 }

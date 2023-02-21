@@ -73,6 +73,8 @@ type Resource struct {
 	ScrapeErrorMessage string `db:"scrape_error_message"`
 	//The next time when this Resource should be checked for new or deleted assets.
 	NextScrapeAt time.Time `db:"next_scrape_at"`
+	// Contains the duration of the last scrape, or 0 if the resource was never scraped successfully.
+	ScrapeDurationSecs float64 `db:"scrape_duration_secs"`
 }
 
 // AssetType is the type of Resource.AssetType. It extends type string with some
@@ -131,6 +133,8 @@ type Asset struct {
 	ScrapeErrorMessage string `db:"scrape_error_message"`
 	//The next time when new .Size and .Usage values shall be obtained.
 	NextScrapeAt time.Time `db:"next_scrape_at"`
+	// Contains the duration of the last scrape, or 0 if the asset was never scraped successfully.
+	ScrapeDurationSecs float64 `db:"scrape_duration_secs"`
 	//Whether we ever scraped this asset successfully. If false, .Size and .Usage
 	//will be 0 and those values should not be trusted.
 	NeverScraped bool `db:"never_scraped"`

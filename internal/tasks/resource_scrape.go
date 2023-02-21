@@ -115,7 +115,9 @@ func (j resourceScrapeJob) Execute() (returnedError error) {
 	logg.Debug("scraping %s resource in scope %s using manager %v", res.AssetType, res.ScopeUUID, manager)
 
 	//check which assets exist in this resource in OpenStack
+	startedAt := c.TimeNow()
 	assetUUIDs, err := manager.ListAssets(res)
+	finishedAt := c.TimeNow()
 	if err != nil {
 		//In case of error we update next_scrape_at so that the next call continues
 		//but fill the error message to indicate old data
@@ -194,7 +196,8 @@ func (j resourceScrapeJob) Execute() (returnedError error) {
 
 	//record successful scrape
 	res.ScrapeErrorMessage = ""
-	res.NextScrapeAt = c.TimeNow().Add(c.AddJitter(ResourceScrapeInterval))
+	res.NextScrapeAt = finishedAt.Add(c.AddJitter(ResourceScrapeInterval))
+	res.ScrapeDurationSecs = finishedAt.Sub(startedAt).Seconds()
 	_, err = tx.Update(&res)
 	if err != nil {
 		return err
