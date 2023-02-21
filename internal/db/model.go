@@ -297,7 +297,7 @@ func (o FinishedOperation) State() OperationState {
 }
 
 // Init connects to the database and initializes the schema and model types.
-func Init(dbURL *url.URL) (*gorp.DbMap, error) {
+func Init(dbURL *url.URL, taskName string) (*gorp.DbMap, error) {
 	cfg := easypg.Configuration{
 		PostgresURL: dbURL,
 		Migrations:  SQLMigrations,
@@ -309,7 +309,11 @@ func Init(dbURL *url.URL) (*gorp.DbMap, error) {
 	}
 
 	//ensure that this process does not starve other Castellum processes for DB connections
-	dbConn.SetMaxOpenConns(16)
+	if taskName == "observer" {
+		dbConn.SetMaxOpenConns(32)
+	} else {
+		dbConn.SetMaxOpenConns(16)
+	}
 
 	gorpDB := &gorp.DbMap{Db: dbConn, Dialect: gorp.PostgresDialect{}}
 	gorpDB.AddTableWithName(Resource{}, "resources").SetKeys(true, "id")
