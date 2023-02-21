@@ -89,7 +89,7 @@ func main() {
 		ConnectionOptions: os.Getenv("CASTELLUM_DB_CONNECTION_OPTIONS"),
 		DatabaseName:      osext.GetenvOrDefault("CASTELLUM_DB_NAME", "castellum"),
 	}))
-	dbi := must.Return(db.Init(dbURL))
+	dbi := must.Return(db.Init(dbURL, taskName))
 	prometheus.MustRegister(sqlstats.NewStatsCollector("castellum", dbi.Db))
 
 	//initialize OpenStack connection
