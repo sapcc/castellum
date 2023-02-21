@@ -89,7 +89,7 @@ func main() {
 		ConnectionOptions: os.Getenv("CASTELLUM_DB_CONNECTION_OPTIONS"),
 		DatabaseName:      osext.GetenvOrDefault("CASTELLUM_DB_NAME", "castellum"),
 	}))
-	dbi := must.Return(db.Init(dbURL, taskName))
+	dbi := must.Return(db.Init(dbURL))
 	prometheus.MustRegister(sqlstats.NewStatsCollector("castellum", dbi.Db))
 
 	//initialize OpenStack connection
@@ -211,11 +211,10 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	c.ApplyDefaults()
 	prometheus.MustRegister(tasks.StateMetricsCollector{Context: c})
 
-	//The observer process has a budget of 32 DB connections (more than the
-	//normal value of 16 because of its high workload). Since there are
-	//much more assets than resources, we give most of these (28 of 32) to asset
+	//The observer process has a budget of 16 DB connections. Since there are
+	//much more assets than resources, we give most of these (12 of 16) to asset
 	//scraping. The rest is split between resource scrape and garbage collection.
-	goQueuedJobLoop(ctx, 28, c.PollForAssetScrapes())
+	goQueuedJobLoop(ctx, 12, c.PollForAssetScrapes())
 	goQueuedJobLoop(ctx, 3, c.PollForResourceScrapes())
 	go cronJobLoop(3*time.Minute, c.EnsureScrapingCounters)
 	go cronJobLoop(1*time.Hour, func() error {

@@ -37,7 +37,7 @@ func (t T) WithDB(fixtureFile *string, action func(dbi *gorp.DbMap)) {
 		t.Fatalf("malformed database URL %q: %s", postgresURLStr, err.Error())
 	}
 
-	dbi, err := db.Init(dbURL, "test")
+	dbi, err := db.Init(dbURL)
 	if err != nil {
 		t.Error(err)
 		t.Log("Try prepending ./testing/with-postgres-db.sh to your command.")
