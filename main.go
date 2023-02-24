@@ -195,10 +195,8 @@ func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provi
 		api.StartAuditLogging(rabbitQueueName, rabbitURI)
 	}
 
-	err = httpext.ListenAndServeContext(httpext.ContextWithSIGINT(context.Background(), 10*time.Second), httpListenAddr, nil)
-	if err != nil {
-		logg.Error(err.Error())
-	}
+	ctx := httpext.ContextWithSIGINT(context.Background(), 10*time.Second)
+	must.Succeed(httpext.ListenAndServeContext(ctx, httpListenAddr, nil))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -225,10 +223,7 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	handler := httpapi.Compose(httpapi.HealthCheckAPI{SkipRequestLog: true})
 	http.Handle("/", handler)
 	http.Handle("/metrics", promhttp.Handler())
-	err := httpext.ListenAndServeContext(ctx, httpListenAddr, nil)
-	if err != nil {
-		logg.Error(err.Error())
-	}
+	must.Succeed(httpext.ListenAndServeContext(ctx, httpListenAddr, nil))
 }
 
 // Execute a task repeatedly, but slow down when sql.ErrNoRows is returned by it.
@@ -303,10 +298,7 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 	handler := httpapi.Compose(httpapi.HealthCheckAPI{SkipRequestLog: true})
 	http.Handle("/", handler)
 	http.Handle("/metrics", promhttp.Handler())
-	err := httpext.ListenAndServeContext(ctx, httpListenAddr, nil)
-	if err != nil {
-		logg.Error(err.Error())
-	}
+	must.Succeed(httpext.ListenAndServeContext(ctx, httpListenAddr, nil))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
