@@ -21,6 +21,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 
@@ -34,6 +35,9 @@ func (e *Engine) AddTo(r *mux.Router) {
 	r.Methods("GET").
 		Path(`/v1/projects/{project_id}/shares/{share_id}`).
 		HandlerFunc(e.handleGetShare)
+	r.Methods("GET").
+		Path(`/v1/projects/{project_id}/shares/{share_id}/exclusion-reasons`).
+		HandlerFunc(e.handleGetExclusionReasons)
 }
 
 // CheckDataAvailability is used by the GET /healthcheck endpoint.
@@ -80,4 +84,54 @@ func convertBytesToGiB(x float64) float64 {
 		return 0
 	}
 	return x / 1024 / 1024 / 1024
+}
+
+func (e *Engine) handleGetExclusionReasons(w http.ResponseWriter, r *http.Request) {
+	httpapi.IdentifyEndpoint(r, "/v1/projects/:project_id/shares/:share_id/exclusion-reasons")
+	vars := mux.Vars(r)
+	projectID, shareID := vars["project_id"], vars["share_id"]
+
+	//grab a sample of this share's metrics to check the labels on it
+	query := fmt.Sprintf(`netapp_volume_total_bytes{project_id=%q,share_id=%q}`, projectID, shareID)
+	resultVector, err := e.PromClient.GetVector(query)
+	if err != nil {
+		msg := fmt.Sprintf("cannot check volume_type for share %q: %s", shareID, err.Error())
+		http.Error(w, msg, http.StatusInternalServerError)
+		return
+	}
+
+	//check the labels on the obtained samples
+	hasDPMetrics := false
+	hasNonDPMetrics := false
+	isOffline := false
+	for _, sample := range resultVector {
+		if sample.Metric["volume_type"] == "dp" {
+			hasDPMetrics = true
+		} else {
+			hasNonDPMetrics = true
+		}
+		if sample.Metric["volume_state"] == "offline" {
+			isOffline = true
+		}
+	}
+
+	//Any field in the response being "true" will cause castellum-observer to ignore this share entirely.
+	respondwith.JSON(w, http.StatusOK, map[string]bool{
+		//We want to ignore "shares" that are actually snapmirror targets (sapcc-specific
+		//extension). The castellum-observer takes care of the checks on the level of
+		//the Manila API. What we check here is that we actually have metrics of the
+		//share itself (volume_type!="dp"), rather than of a snapmirror (volume_type="dp").
+		//
+		//It's possible that we have both metrics with volume_type="dp" and other
+		//volume_type values, in which case we will only use the non-dp metrics.
+		//This check is specifically about excluding shares that are *only* snapmirrors.
+		//
+		//NOTE: Not having any useful metrics at all is not a valid reason for
+		//ignoring the share. If we lack metrics about a share, we want to be alerted
+		//by the failing scrape.
+		"volume_type = dp": hasDPMetrics && !hasNonDPMetrics,
+		//Scraping will fail on shares in state "offline" because their size is
+		//always reported as 0.
+		"volume_state = offline": isOffline,
+	})
 }

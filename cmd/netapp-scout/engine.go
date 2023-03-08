@@ -91,6 +91,7 @@ func (e *Engine) collect() error {
 	finishedAt := time.Now()
 	collectedAtGauge.Set(float64(startedAt.Unix()))
 	collectionDurationSecsGauge.Set(finishedAt.Sub(startedAt).Seconds())
+	logg.Debug("collected data on %d shares", len(result))
 
 	//make new data visible to the API
 	e.DataMutex.Lock()

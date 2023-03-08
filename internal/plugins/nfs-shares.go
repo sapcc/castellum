@@ -19,8 +19,11 @@
 package plugins
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"math"
+	"net/http"
 	"regexp"
 	"strings"
 
@@ -28,7 +31,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares"
 	"github.com/sapcc/go-bits/logg"
-	"github.com/sapcc/go-bits/promquery"
+	"github.com/sapcc/go-bits/osext"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -57,8 +60,8 @@ func (m *assetManagerNFS) parseAssetType(assetType db.AssetType) *assetTypeNFS {
 }
 
 type assetManagerNFS struct {
-	Manila     *gophercloud.ServiceClient
-	Prometheus promquery.Client
+	Manila       *gophercloud.ServiceClient
+	ScoutBaseURL string
 }
 
 func init() {
@@ -76,7 +79,7 @@ func (m *assetManagerNFS) Init(provider core.ProviderClient) (err error) {
 	}
 	m.Manila.Microversion = "2.64" //for "force" field on .Extend(), requires Manila at least on Xena
 
-	m.Prometheus, err = promquery.ConfigFromEnv("CASTELLUM_NFS_PROMETHEUS").Connect()
+	m.ScoutBaseURL, err = osext.NeedGetenv("CASTELLUM_NFS_NETAPP_SCOUT_URL")
 	return err
 }
 
@@ -148,7 +151,11 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 
 		if len(s) > 0 {
 			for _, share := range s {
-				if m.ignoreShare(share) {
+				isIgnored, err := m.ignoreShare(share)
+				if err != nil {
+					return nil, err
+				}
+				if isIgnored {
 					continue
 				}
 				if !wasSeen[share.ID] {
@@ -164,11 +171,11 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 	}
 }
 
-func (m *assetManagerNFS) ignoreShare(share shares.Share) bool {
+func (m *assetManagerNFS) ignoreShare(share shares.Share) (bool, error) {
 	//ignore shares in status "error" (we won't be able to resize them anyway)
 	if share.Status == "error" {
 		logg.Debug("ignoring share %s because of status = error", share.ID)
-		return true
+		return true, nil
 	}
 
 	//ignore "shares" that are actually snapmirror targets (sapcc-specific
@@ -181,47 +188,47 @@ func (m *assetManagerNFS) ignoreShare(share shares.Share) bool {
 	if snapmirrorStr, ok := share.Metadata["snapmirror"]; ok {
 		if snapmirrorStr == "1" {
 			logg.Debug("ignoring share %s because of snapmirror = 1", share.ID)
-			return true
+			return true, nil
 		}
 	}
 
-	//ignore "shares" that are actually snapmirror targets (sapcc-specific
-	//extension); new-style check: check for volume_type!="dp" label on share
-	//metrics (it's possible that we have both metrics with volume_type="dp" and
-	//other volume_type values, in which case we will only use the non-dp
-	//metrics)
-	query := fmt.Sprintf(`netapp_volume_total_bytes{project_id=%q,share_id=%q}`, share.ProjectID, share.ID)
-	resultVector, err := m.Prometheus.GetVector(query)
+	//There are further exclusion rules that are based on Prometheus metrics and
+	//thus evaluated in the netapp-scout.
+	path := fmt.Sprintf("v1/projects/%s/shares/%s/exclusion-reasons", share.ProjectID, share.ID)
+	var exclusionReasons map[string]bool
+	err := m.queryScout(path, &exclusionReasons)
 	if err != nil {
-		logg.Error("cannot check volume_type for share %q: %s", share.ID, err.Error())
+		return false, err
 	}
-	hasDPMetrics := false
-	hasNonDPMetrics := false
-	for _, sample := range resultVector {
-		if sample.Metric["volume_type"] == "dp" {
-			hasDPMetrics = true
-		} else {
-			hasNonDPMetrics = true
-		}
-	}
-	if hasDPMetrics && !hasNonDPMetrics {
-		logg.Debug("ignoring share %s because of volume_type = dp", share.ID)
-		return true
-	}
-	//NOTE: Not having any useful metrics at all is not a valid reason for
-	//ignoring the share. If we lack metrics about a share, we want to be alerted
-	//by the failing scrape.
-
-	//ignore shares that are offline (scraping will fail on these shares because
-	//their size is always reported as 0)
-	for _, sample := range resultVector {
-		if sample.Metric["volume_state"] == "offline" {
-			logg.Debug("ignoring share %s because of volume_state = offline", share.ID)
-			return true
+	for reason, isExcluded := range exclusionReasons {
+		if isExcluded {
+			logg.Debug("ignoring share %s because of %s", share.ID, reason)
+			return true, nil
 		}
 	}
 
-	return false
+	return false, nil
+}
+
+func (m *assetManagerNFS) queryScout(path string, data any) error {
+	url := strings.TrimSuffix(m.ScoutBaseURL, "/") + "/" + strings.TrimPrefix(path, "/")
+	resp, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("could not GET %s: %w", url, err)
+	}
+	defer resp.Body.Close()
+	buf, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("could not GET %s: %w", url, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("could not GET %s: expected 200 OK, but got %d and response: %q", url, resp.StatusCode, string(buf))
+	}
+	err = json.Unmarshal(buf, data)
+	if err != nil {
+		return fmt.Errorf("could not GET %s: %w", url, err)
+	}
+	return nil
 }
 
 var (
@@ -275,104 +282,19 @@ func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useR
 
 // GetAssetStatus implements the core.AssetManager interface.
 func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
-	//compute asset status from Prometheus metrics
-	//
-	//Option 1: For old shares, we have 5% snapshot reserve that gets allocated
-	//*AS PART OF* the target share size, so we need to count the snapshot
-	//reserve into the size and the snapshot usage into the usage, i.e.
-	//
-	//    cond  = netapp_volume_is_space_reporting_logical == 0 && netapp_volume_percentage_snapshot_reserve == 5
-	//    size  = netapp_volume_total_bytes + netapp_volume_snapshot_reserved_bytes
-	//    usage = netapp_volume_used_bytes  + max(netapp_volume_snapshot_reserved_bytes, netapp_volume_snapshot_used_bytes)
-	//
-	//Option 2: For newer shares, we have a much larger snapshot reserve (usually
-	//50%) that gets allocated *IN ADDITION TO* the target share size, and
-	//therefore snapshot usage usually does not eat into the main share size, i.e.
-	//
-	//    cond  = netapp_volume_is_space_reporting_logical == 0 && netapp_volume_percentage_snapshot_reserve > 5
-	//    size  = netapp_volume_total_bytes
-	//    usage = netapp_volume_used_bytes
-	//
-	//Option 3: Same as option 2, but if logical space reporting is used, we need
-	//to look at a different metric.
-	//
-	//    cond  = netapp_volume_is_space_reporting_logical == 1
-	//    size  = netapp_volume_total_bytes
-	//    usage = netapp_volume_logical_used_bytes
-	//
-	//TODO Remove option 1 once all shares have migrated to the new layout.
-
-	//pull metrics that are always required
-	bytesTotal, err := m.getMetricForShare("netapp_volume_total_bytes", res.ScopeUUID, assetUUID)
+	//query Prometheus metrics (via netapp-scout) for size and usage
+	var data struct {
+		SizeGiB  uint64  `json:"size_gib"`
+		UsageGiB float64 `json:"usage_gib"`
+	}
+	path := fmt.Sprintf("v1/projects/%s/shares/%s", res.ScopeUUID, assetUUID)
+	err := m.queryScout(path, &data)
 	if err != nil {
 		return core.AssetStatus{}, err
 	}
-	isSpaceReportingLogical, err := m.getMetricForShare("netapp_volume_is_space_reporting_logical", res.ScopeUUID, assetUUID)
-	if err != nil {
-		return core.AssetStatus{}, err
-	}
-
-	var status core.AssetStatus
-	if isSpaceReportingLogical == 1.0 {
-		//option 3
-		bytesUsed, err := m.getMetricForShare("netapp_volume_logical_used_bytes", res.ScopeUUID, assetUUID)
-		if err != nil {
-			return core.AssetStatus{}, err
-		}
-
-		usageGiB := bytesUsed / 1024 / 1024 / 1024
-		if bytesUsed <= 0 {
-			usageGiB = 0
-		}
-		status = core.AssetStatus{
-			Size:  uint64(math.Round(bytesTotal / 1024 / 1024 / 1024)),
-			Usage: db.UsageValues{db.SingularUsageMetric: usageGiB},
-		}
-	} else {
-		bytesUsed, err := m.getMetricForShare("netapp_volume_used_bytes", res.ScopeUUID, assetUUID)
-		if err != nil {
-			return core.AssetStatus{}, err
-		}
-		snapshotReservePercent, err := m.getMetricForShare("netapp_volume_percentage_snapshot_reserve", res.ScopeUUID, assetUUID)
-		if err != nil {
-			return core.AssetStatus{}, err
-		}
-
-		if snapshotReservePercent == 5.0 {
-			//option 1
-			bytesReservedBySnapshots, err := m.getMetricForShare("netapp_volume_snapshot_reserved_bytes", res.ScopeUUID, assetUUID)
-			if err != nil {
-				return core.AssetStatus{}, err
-			}
-			bytesUsedBySnapshots, err := m.getMetricForShare("netapp_volume_snapshot_used_bytes", res.ScopeUUID, assetUUID)
-			if err != nil {
-				return core.AssetStatus{}, err
-			}
-
-			if bytesUsedBySnapshots < bytesReservedBySnapshots {
-				bytesUsedBySnapshots = bytesReservedBySnapshots
-			}
-			sizeBytes := bytesTotal + bytesReservedBySnapshots
-			usageBytes := bytesUsed + bytesUsedBySnapshots
-			usageGiB := usageBytes / 1024 / 1024 / 1024
-			if usageBytes <= 0 {
-				usageGiB = 0
-			}
-			status = core.AssetStatus{
-				Size:  uint64(math.Round(sizeBytes / 1024 / 1024 / 1024)),
-				Usage: db.UsageValues{db.SingularUsageMetric: usageGiB},
-			}
-		} else {
-			//option 2
-			usageGiB := bytesUsed / 1024 / 1024 / 1024
-			if bytesUsed <= 0 {
-				usageGiB = 0
-			}
-			status = core.AssetStatus{
-				Size:  uint64(math.Round(bytesTotal / 1024 / 1024 / 1024)),
-				Usage: db.UsageValues{db.SingularUsageMetric: usageGiB},
-			}
-		}
+	status := core.AssetStatus{
+		Size:  data.SizeGiB,
+		Usage: db.UsageValues{db.SingularUsageMetric: data.UsageGiB},
 	}
 
 	//when size has changed compared to last time, double-check with the Manila
@@ -392,26 +314,6 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 	}
 
 	return status, nil
-}
-
-func (m *assetManagerNFS) getMetricForShare(metric, projectUUID, shareUUID string) (float64, error) {
-	//NOTE: The `max by (share_id)` is necessary for when a share is being
-	//migrated to another shareserver and thus appears in the metrics twice.
-	query := fmt.Sprintf(`max by (share_id) (%s{project_id=%q,share_id=%q,volume_type!="dp"})`,
-		metric, projectUUID, shareUUID)
-
-	val, err := m.Prometheus.GetSingleValue(query, nil)
-	if err != nil {
-		if promquery.IsErrNoRows(err) {
-			//check if the share still exists in the backend
-			_, getErr := shares.Get(m.Manila, shareUUID).Extract()
-			if _, ok := getErr.(gophercloud.ErrDefault404); ok {
-				return 0, core.AssetNotFoundErr{InnerError: fmt.Errorf("share not found in Manila: %s", getErr.Error())}
-			}
-		}
-		return 0, err
-	}
-	return val, nil
 }
 
 // shareExtendOpts is like shares.ExtendOpts, but supports the new "force" option.
