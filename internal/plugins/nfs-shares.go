@@ -212,7 +212,7 @@ func (m *assetManagerNFS) ignoreShare(share shares.Share) (bool, error) {
 
 func (m *assetManagerNFS) queryScout(path string, data any) error {
 	url := strings.TrimSuffix(m.ScoutBaseURL, "/") + "/" + strings.TrimPrefix(path, "/")
-	resp, err := http.Get(url)
+	resp, err := http.Get(url) //nolint:gosec
 	if err != nil {
 		return fmt.Errorf("could not GET %s: %w", url, err)
 	}
