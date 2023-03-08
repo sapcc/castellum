@@ -3,6 +3,7 @@ build/
 
 # runtime artifacts (see Makefile)
 .env
+test-*.yaml
 test-config-*.json
 
 # testing artifacts
