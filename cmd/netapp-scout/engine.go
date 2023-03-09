@@ -50,6 +50,7 @@ func (e *Engine) CollectLoop() {
 	for {
 		err := e.collect()
 		if err != nil {
+			failedCollectionsCounter.Inc()
 			logg.Error(err.Error())
 		}
 		time.Sleep(5 * time.Second)
@@ -103,6 +104,7 @@ func (e *Engine) collect() error {
 
 	//track collection success and performance
 	finishedAt := time.Now()
+	successfulCollectionsCounter.Inc()
 	collectedAtGauge.Set(float64(startedAt.Unix()))
 	collectionDurationSecsGauge.Set(finishedAt.Sub(startedAt).Seconds())
 	logg.Debug("collected data on %d shares", len(result))

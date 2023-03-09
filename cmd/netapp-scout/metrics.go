@@ -30,9 +30,21 @@ var (
 		Name: "castellum_netapp_scout_data_collection_duration_secs",
 		Help: "Duration in seconds of the last successful data collection in castellum-netapp-scout.",
 	})
+	successfulCollectionsCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "castellum_netapp_scout_successful_collections",
+		Help: "Counter for successful data collections in castellum-netapp-scout.",
+	})
+	failedCollectionsCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "castellum_netapp_scout_failed_collections",
+		Help: "Counter for failed data collections in castellum-netapp-scout.",
+	})
 )
 
 func init() {
 	prometheus.MustRegister(collectedAtGauge)
 	prometheus.MustRegister(collectionDurationSecsGauge)
+	prometheus.MustRegister(successfulCollectionsCounter)
+	successfulCollectionsCounter.Add(0)
+	prometheus.MustRegister(failedCollectionsCounter)
+	failedCollectionsCounter.Add(0)
 }
