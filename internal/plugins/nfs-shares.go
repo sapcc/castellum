@@ -196,7 +196,7 @@ func (m *assetManagerNFS) ignoreShare(share shares.Share) (bool, error) {
 	//thus evaluated in the netapp-scout.
 	path := fmt.Sprintf("v1/projects/%s/shares/%s/exclusion-reasons", share.ProjectID, share.ID)
 	var exclusionReasons map[string]bool
-	err := m.queryScout(path, &exclusionReasons)
+	err := m.queryScout(path, &exclusionReasons, nil)
 	if err != nil {
 		return false, err
 	}
@@ -210,20 +210,31 @@ func (m *assetManagerNFS) ignoreShare(share shares.Share) (bool, error) {
 	return false, nil
 }
 
-func (m *assetManagerNFS) queryScout(path string, data any) error {
+func (m *assetManagerNFS) queryScout(path string, data any, actionOn404 func() error) error {
 	url := strings.TrimSuffix(m.ScoutBaseURL, "/") + "/" + strings.TrimPrefix(path, "/")
 	resp, err := http.Get(url) //nolint:gosec
 	if err != nil {
 		return fmt.Errorf("could not GET %s: %w", url, err)
 	}
 	defer resp.Body.Close()
+
 	buf, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("could not GET %s: %w", url, err)
 	}
+
+	if resp.StatusCode == http.StatusNotFound && actionOn404 != nil {
+		//when netapp-scout reports a 404, we can sometimes return a more specific
+		//error than a generic HTTP request error
+		err := actionOn404()
+		if err != nil {
+			return err
+		}
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("could not GET %s: expected 200 OK, but got %d and response: %q", url, resp.StatusCode, string(buf))
 	}
+
 	err = json.Unmarshal(buf, data)
 	if err != nil {
 		return fmt.Errorf("could not GET %s: %w", url, err)
@@ -282,13 +293,22 @@ func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useR
 
 // GetAssetStatus implements the core.AssetManager interface.
 func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
+	//when netapp-scout reports a 404 for this share, we can check Manila to see if the share was deleted in the meantime
+	actionOn404 := func() error {
+		_, getErr := shares.Get(m.Manila, assetUUID).Extract()
+		if _, ok := getErr.(gophercloud.ErrDefault404); ok {
+			return core.AssetNotFoundErr{InnerError: fmt.Errorf("share not found in Manila: %s", getErr.Error())}
+		}
+		return nil //use the default error returned by m.queryScout()
+	}
+
 	//query Prometheus metrics (via netapp-scout) for size and usage
 	var data struct {
 		SizeGiB  uint64  `json:"size_gib"`
 		UsageGiB float64 `json:"usage_gib"`
 	}
 	path := fmt.Sprintf("v1/projects/%s/shares/%s", res.ScopeUUID, assetUUID)
-	err := m.queryScout(path, &data)
+	err := m.queryScout(path, &data, actionOn404)
 	if err != nil {
 		return core.AssetStatus{}, err
 	}
