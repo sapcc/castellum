@@ -87,6 +87,20 @@ func (e *Engine) collect() error {
 		}
 	}
 
+	//there should never be no data at all (if there are no shares, what do we need an autoscaler for?)
+	if len(result) == 0 {
+		return fmt.Errorf("collected no NetApp metrics at all (is the netapp-api-exporter scrape working correctly?)")
+	}
+	//check that we have complete data for all shares
+	for shareIdentity, shareData := range result {
+		for _, metricName := range allMetricNames {
+			if _, exists := shareData[metricName]; !exists {
+				return fmt.Errorf("collected incomplete data: share %s in project %s does not have %s (this can happen momentarily if shares just appeared or disappeared while we collected; if this error persists, it's a problem)",
+					shareIdentity.ShareID, shareIdentity.ProjectID, metricName)
+			}
+		}
+	}
+
 	//track collection success and performance
 	finishedAt := time.Now()
 	collectedAtGauge.Set(float64(startedAt.Unix()))
