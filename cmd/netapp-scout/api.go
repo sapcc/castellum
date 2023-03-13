@@ -60,7 +60,7 @@ func (e *Engine) handleGetShare(w http.ResponseWriter, r *http.Request) {
 		ShareID:   vars["share_id"],
 	})
 	if shareData == nil {
-		http.Error(w, "no such share", http.StatusNotFound)
+		http.Error(w, "no such share found in Prometheus", http.StatusNotFound)
 		return
 	}
 

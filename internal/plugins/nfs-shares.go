@@ -232,7 +232,7 @@ func (m *assetManagerNFS) queryScout(path string, data any, actionOn404 func() e
 		}
 	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("could not GET %s: expected 200 OK, but got %d and response: %q", url, resp.StatusCode, string(buf))
+		return fmt.Errorf("could not GET %s: expected 200 OK, but got %d and response: %q", url, resp.StatusCode, strings.TrimSpace(string(buf)))
 	}
 
 	err = json.Unmarshal(buf, data)
