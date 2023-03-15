@@ -73,6 +73,12 @@ func (e *Engine) handleGetShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// This endpoint makes a lot of noise that can easily obscure error logs.
+	// Therefore, do not log the request if it comes out ok. We don't need the
+	// request log here to see that the scout is working. We can rely on the
+	// "observed nfs-shares" logs in the observer for that.
+	httpapi.SkipRequestLog(r)
+
 	respondwith.JSON(w, http.StatusOK, map[string]any{
 		"size_gib":  uint64(math.Round(convertBytesToGiB(sizeBytes))),
 		"usage_gib": convertBytesToGiB(usageBytes),
