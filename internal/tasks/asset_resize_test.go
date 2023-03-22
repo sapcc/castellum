@@ -21,18 +21,19 @@ package tasks
 import (
 	"database/sql"
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-api-declarations/castellum"
 
 	"github.com/sapcc/castellum/internal/db"
+	"github.com/sapcc/castellum/internal/jobloop"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
 )
 
-func setupAssetResizeTest(t test.T, c *Context, amStatic *plugins.AssetManagerStatic, assetCount int) {
+func setupAssetResizeTest(t test.T, c *Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry, assetCount int) jobloop.Job {
 	//create a resource and assets to test with
 	t.Must(c.DB.Insert(&db.Resource{
 		ScopeUUID: "project1",
@@ -57,12 +58,14 @@ func setupAssetResizeTest(t test.T, c *Context, amStatic *plugins.AssetManagerSt
 			Usage: 500,
 		}
 	}
+
+	return c.AssetResizingJob(registry)
 }
 
 func TestSuccessfulResize(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock) {
-		setupAssetResizeTest(t, c, amStatic, 1)
+	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
+		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
 		//add a greenlit PendingOperation
 		clock.StepBy(5 * time.Minute)
@@ -80,7 +83,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 
 		//ExecuteOne(AssetResizeJob{}) should do nothing right now because that operation is
 		//only greenlit in the future, but not right now
-		err := ExecuteOne(c.PollForAssetResizes)
+		err := resizeJob.ProcessOne()
 		if err != sql.ErrNoRows {
 			t.Fatalf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
@@ -89,7 +92,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 
 		//go into the future and check that the operation gets executed
 		clock.StepBy(10 * time.Minute)
-		err = ExecuteOne(c.PollForAssetResizes)
+		err = resizeJob.ProcessOne()
 		t.Must(err)
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
@@ -120,8 +123,8 @@ func TestSuccessfulResize(baseT *testing.T) {
 
 func TestFailingResize(tBase *testing.T) {
 	t := test.T{T: tBase}
-	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock) {
-		setupAssetResizeTest(t, c, amStatic, 1)
+	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
+		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
 		//add a greenlit PendingOperation
 		clock.StepBy(10 * time.Minute)
@@ -138,7 +141,7 @@ func TestFailingResize(tBase *testing.T) {
 		t.Must(c.DB.Insert(&pendingOp))
 
 		amStatic.SetAssetSizeFails = true
-		t.Must(ExecuteOne(c.PollForAssetResizes))
+		t.Must(resizeJob.ProcessOne())
 
 		//check that resizing fails as expected
 		t.ExpectPendingOperations(c.DB /*, nothing */)
@@ -170,8 +173,8 @@ func TestFailingResize(tBase *testing.T) {
 
 func TestErroringResize(tBase *testing.T) {
 	t := test.T{T: tBase}
-	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock) {
-		setupAssetResizeTest(t, c, amStatic, 1)
+	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
+		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
 		//add a greenlit PendingOperation that will error in SetAssetSize()
 		clock.StepBy(10 * time.Minute)
@@ -190,7 +193,7 @@ func TestErroringResize(tBase *testing.T) {
 		//when the outcome of the resize is "errored", we can retry several times
 		for try := 0; try < maxRetries; try++ {
 			clock.StepBy(10 * time.Minute)
-			t.Must(ExecuteOne(c.PollForAssetResizes))
+			t.Must(resizeJob.ProcessOne())
 
 			pendingOp.ID++
 			pendingOp.ErroredAttempts++
@@ -201,7 +204,7 @@ func TestErroringResize(tBase *testing.T) {
 
 		//ExecuteOne(AssetResizeJob{}) should do nothing right now because, although the
 		//operation is greenlit, its retry_at timestamp is in the future
-		err := ExecuteOne(c.PollForAssetResizes)
+		err := resizeJob.ProcessOne()
 		if err != sql.ErrNoRows {
 			t.Fatalf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
@@ -210,7 +213,7 @@ func TestErroringResize(tBase *testing.T) {
 
 		//check that resizing errors as expected once the retry budget is exceeded
 		clock.StepBy(10 * time.Minute)
-		t.Must(ExecuteOne(c.PollForAssetResizes))
+		t.Must(resizeJob.ProcessOne())
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
 			AssetID:         1,
@@ -236,50 +239,5 @@ func TestErroringResize(tBase *testing.T) {
 			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			ExpectedSize: nil,
 		})
-	})
-}
-
-func TestOperationQueueBehavior(baseT *testing.T) {
-	t := test.T{T: baseT}
-	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock) {
-		//This test checks that, when there are multiple operations to execute, each
-		//operation gets executed /exactly once/.
-		setupAssetResizeTest(t, c, amStatic, 10)
-
-		//add 10 pending operations that are all ready to execute immediately
-		clock.StepBy(10 * time.Minute)
-		var finishedOps []db.FinishedOperation
-		for idx := uint64(1); idx <= 10; idx++ {
-			pendingOp := db.PendingOperation{
-				AssetID:     int64(idx),
-				Reason:      castellum.OperationReasonHigh,
-				OldSize:     1000,
-				NewSize:     1200 + idx, //need operations to be distinguishable
-				Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 500},
-				CreatedAt:   c.TimeNow().Add(-10 * time.Minute),
-				ConfirmedAt: p2time(c.TimeNow().Add(-5 * time.Minute)),
-				GreenlitAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
-			}
-			t.Must(c.DB.Insert(&pendingOp))
-			finishedOps = append(finishedOps,
-				pendingOp.IntoFinishedOperation(castellum.OperationOutcomeSucceeded, c.TimeNow()),
-			)
-		}
-
-		//execute them all in parallel
-		blocker := make(chan struct{})
-		c.Blocker = blocker
-		wg := &sync.WaitGroup{}
-		wg.Add(10)
-		for idx := 0; idx < 10; idx++ {
-			go func() {
-				defer wg.Done()
-				t.Must(ExecuteOne(c.PollForAssetResizes))
-			}()
-		}
-
-		close(blocker)
-		wg.Wait()
-		t.ExpectFinishedOperations(c.DB, finishedOps...)
 	})
 }

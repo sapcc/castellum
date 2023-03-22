@@ -20,7 +20,6 @@ package tasks
 
 import (
 	"database/sql"
-	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-bits/logg"
@@ -29,126 +28,13 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
-var (
-	projectResourceExistsGauge = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "castellum_has_project_resource",
-			Help: "Constant value of 1 for each existing project resource.",
-		},
-		[]string{"project_id", "asset"},
-	)
-	resourceScrapeSuccessCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "castellum_successful_resource_scrapes",
-			Help: "Counter for successful resource scrape operations.",
-		},
-		[]string{"asset"},
-	)
-	resourceScrapeFailedCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "castellum_failed_resource_scrapes",
-			Help: "Counter for failed resource scrape operations.",
-		},
-		[]string{"asset"},
-	)
-	assetScrapeSuccessCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "castellum_successful_asset_scrapes",
-			Help: "Counter for successful asset scrape operations.",
-		},
-		[]string{"asset"},
-	)
-	assetScrapeFailedCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "castellum_failed_asset_scrapes",
-			Help: "Counter for failed asset scrape operations.",
-		},
-		[]string{"asset"},
-	)
-	assetResizeCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "castellum_asset_resizes",
-			Help: `Counter for asset resize operations that ran to completion, yielding a FinishedOperation in either "succeeded" or "failed" state.`,
-		},
-		[]string{"asset"},
-	)
-	assetResizeErroredCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "castellum_errored_asset_resizes",
-			Help: "Counter for asset resize operations that encountered an unexpected error and could not produce a FinishedOperation.",
-		},
-		[]string{"asset"},
-	)
+var projectResourceExistsGauge = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "castellum_has_project_resource",
+		Help: "Constant value of 1 for each existing project resource.",
+	},
+	[]string{"project_id", "asset"},
 )
-
-func init() {
-	prometheus.MustRegister(resourceScrapeSuccessCounter)
-	prometheus.MustRegister(resourceScrapeFailedCounter)
-	prometheus.MustRegister(assetScrapeSuccessCounter)
-	prometheus.MustRegister(assetScrapeFailedCounter)
-	prometheus.MustRegister(assetResizeCounter)
-	prometheus.MustRegister(assetResizeErroredCounter)
-}
-
-// EnsureScrapingCounters adds 0 to all scraping counters, to ensure that
-// all relevant timeseries exist.
-func (c Context) EnsureScrapingCounters() error {
-	err := c.foreachAssetType(func(assetType db.AssetType) {
-		labels := prometheus.Labels{"asset": string(assetType)}
-		resourceScrapeSuccessCounter.With(labels).Add(0)
-		resourceScrapeFailedCounter.With(labels).Add(0)
-		assetScrapeSuccessCounter.With(labels).Add(0)
-		assetScrapeFailedCounter.With(labels).Add(0)
-	})
-	if err != nil {
-		return fmt.Errorf("during EnsureScrapingCounters: %w", err)
-	}
-	return nil
-}
-
-// EnsureResizingCounters adds 0 to all resizing counters, to ensure that
-// all relevant timeseries exist.
-func (c Context) EnsureResizingCounters() error {
-	err := c.foreachAssetType(func(assetType db.AssetType) {
-		labels := prometheus.Labels{"asset": string(assetType)}
-		assetResizeCounter.With(labels).Add(0)
-		assetResizeErroredCounter.With(labels).Add(0)
-	})
-	if err != nil {
-		return fmt.Errorf("during EnsureResizingCounters: %w", err)
-	}
-	return nil
-}
-
-func (c Context) foreachAssetType(action func(db.AssetType)) (err error) {
-	rows, err := c.DB.Query(`SELECT DISTINCT asset_type FROM resources`)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if err != nil {
-			err = rows.Close()
-		} else {
-			rows.Close()
-		}
-	}()
-
-	for rows.Next() {
-		var assetType db.AssetType
-		err := rows.Scan(&assetType)
-		if err != nil {
-			return err
-		}
-		action(assetType)
-	}
-	err = rows.Err()
-	if err != nil {
-		rows.Close()
-		return err
-	}
-	return rows.Close()
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Some metrics are generated with a prometheus.Collector implementation, so

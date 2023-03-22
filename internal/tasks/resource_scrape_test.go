@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/easypg"
 
@@ -33,9 +34,11 @@ import (
 
 func TestResourceScraping(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock) {
+	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
+		job := c.ResourceScrapingJob(registry)
+
 		//ScrapeNextResource() without any resources just does nothing
-		err := ExecuteOne(c.PollForResourceScrapes())
+		err := job.ProcessOne()
 		if err != sql.ErrNoRows {
 			t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
@@ -77,25 +80,25 @@ func TestResourceScraping(baseT *testing.T) {
 
 		//first ScrapeNextResource() should scrape project1/foo
 		clock.StepBy(time.Hour)
-		t.Must(ExecuteOne(c.PollForResourceScrapes()))
+		t.Must(job.ProcessOne())
 		tr.DBChanges().AssertEqualf(`
-				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at) VALUES (1, 1, 'asset1', 1000, '{"singular":400}', %[1]d);
-				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at) VALUES (2, 1, 'asset2', 2000, '{"singular":1000}', %[1]d);
+				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (1, 1, 'asset1', 0, '{"singular":0}', %[1]d, TRUE);
+				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (2, 1, 'asset2', 0, '{"singular":0}', %[1]d, TRUE);
 				UPDATE resources SET next_scrape_at = %[2]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 			`,
-			c.TimeNow().Add(5*time.Minute).Unix(),
+			c.TimeNow().Unix(),
 			c.TimeNow().Add(30*time.Minute).Unix(),
 		)
 
 		//first ScrapeNextResource() should scrape project3/foo
 		clock.StepBy(time.Hour)
-		t.Must(ExecuteOne(c.PollForResourceScrapes()))
+		t.Must(job.ProcessOne())
 		tr.DBChanges().AssertEqualf(`
-				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at) VALUES (3, 2, 'asset5', 5000, '{"singular":2500}', %[1]d);
-				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at) VALUES (4, 2, 'asset6', 6000, '{"singular":2520}', %[1]d);
+				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (3, 2, 'asset5', 0, '{"singular":0}', %[1]d, TRUE);
+				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (4, 2, 'asset6', 0, '{"singular":0}', %[1]d, TRUE);
 				UPDATE resources SET next_scrape_at = %[2]d WHERE id = 2 AND scope_uuid = 'project3' AND asset_type = 'foo';
 			`,
-			c.TimeNow().Add(5*time.Minute).Unix(),
+			c.TimeNow().Unix(),
 			c.TimeNow().Add(30*time.Minute).Unix(),
 		)
 
@@ -103,7 +106,7 @@ func TestResourceScraping(baseT *testing.T) {
 		//next_scrape_at timestamp is the smallest; there should be no changes except for
 		//resources.next_scrape_at
 		clock.StepBy(time.Hour)
-		t.Must(ExecuteOne(c.PollForResourceScrapes()))
+		t.Must(job.ProcessOne())
 		tr.DBChanges().AssertEqualf(`
 				UPDATE resources SET next_scrape_at = %d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 			`,
@@ -113,7 +116,7 @@ func TestResourceScraping(baseT *testing.T) {
 		//simulate deletion of an asset
 		delete(amStatic.Assets["project3"], "asset6")
 		clock.StepBy(time.Hour)
-		t.Must(ExecuteOne(c.PollForResourceScrapes()))
+		t.Must(job.ProcessOne())
 		tr.DBChanges().AssertEqualf(`
 				DELETE FROM assets WHERE id = 4 AND resource_id = 2 AND uuid = 'asset6';
 				UPDATE resources SET next_scrape_at = %d WHERE id = 2 AND scope_uuid = 'project3' AND asset_type = 'foo';
@@ -123,12 +126,12 @@ func TestResourceScraping(baseT *testing.T) {
 
 		//simulate addition of a new asset
 		amStatic.Assets["project1"]["asset7"] = plugins.StaticAsset{Size: 10, Usage: 3}
-		t.Must(ExecuteOne(c.PollForResourceScrapes()))
+		t.Must(job.ProcessOne())
 		tr.DBChanges().AssertEqualf(`
-				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at) VALUES (5, 1, 'asset7', 10, '{"singular":3}', %[1]d);
+				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (5, 1, 'asset7', 0, '{"singular":0}', %[1]d, TRUE);
 				UPDATE resources SET next_scrape_at = %[2]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 			`,
-			c.TimeNow().Add(5*time.Minute).Unix(),
+			c.TimeNow().Unix(),
 			c.TimeNow().Add(30*time.Minute).Unix(),
 		)
 
@@ -140,7 +143,7 @@ func TestResourceScraping(baseT *testing.T) {
 			NextScrapeAt: c.TimeNow(),
 		}))
 		amStatic.Assets["project2"] = nil
-		t.Must(ExecuteOne(c.PollForResourceScrapes()))
+		t.Must(job.ProcessOne())
 		tr.DBChanges().AssertEqualf(`
 				INSERT INTO resources (id, scope_uuid, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, domain_uuid, next_scrape_at) VALUES (3, 'project2', 'foo', '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":0}', 0, 'domain1', %d);
 			`,
