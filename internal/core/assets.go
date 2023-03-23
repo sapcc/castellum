@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/pluggable"
 
 	"github.com/sapcc/castellum/internal/db"
@@ -30,18 +31,27 @@ import (
 // AssetStatus shows the current state of an asset. It is returned by AssetManager.GetAssetStatus().
 type AssetStatus struct {
 	Size  uint64
-	Usage db.UsageValues
+	Usage castellum.UsageValues
 }
 
 // AssetTypeInfo describes an AssetType supported by an AssetManager.
 type AssetTypeInfo struct {
 	AssetType    db.AssetType
-	UsageMetrics []db.UsageMetric
+	UsageMetrics []castellum.UsageMetric
+}
+
+// Identifier inserts the metric name into the given format string, but returns
+// the empty string for SingularUsageMetric.
+func Identifier(metric castellum.UsageMetric, format string) string {
+	if metric == castellum.SingularUsageMetric {
+		return ""
+	}
+	return fmt.Sprintf(format, metric)
 }
 
 // MakeZeroUsageValues is a convenience function to instantiate an all-zero UsageValues for this AssetType.
-func (info AssetTypeInfo) MakeZeroUsageValues() db.UsageValues {
-	vals := make(db.UsageValues, len(info.UsageMetrics))
+func (info AssetTypeInfo) MakeZeroUsageValues() castellum.UsageValues {
+	vals := make(castellum.UsageValues, len(info.UsageMetrics))
 	for _, metric := range info.UsageMetrics {
 		vals[metric] = 0
 	}
@@ -105,7 +115,7 @@ type AssetManager interface {
 	ListAssets(res db.Resource) ([]string, error)
 	//The returned Outcome should be either Succeeded, Failed or Errored, but not Cancelled.
 	//The returned error should be nil if and only if the outcome is Succeeded.
-	SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (db.OperationOutcome, error)
+	SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error)
 	//previousStatus will be nil when this function is called for the first time
 	//for the given asset.
 	GetAssetStatus(res db.Resource, assetUUID string, previousStatus *AssetStatus) (AssetStatus, error)
@@ -148,6 +158,6 @@ func (team AssetManagerTeam) ForAssetType(assetType db.AssetType) (AssetManager,
 	return nil, AssetTypeInfo{
 		//provide a reasonable fallback for AssetTypeInfo
 		AssetType:    assetType,
-		UsageMetrics: []db.UsageMetric{db.SingularUsageMetric},
+		UsageMetrics: []castellum.UsageMetric{castellum.SingularUsageMetric},
 	}
 }

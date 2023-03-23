@@ -19,7 +19,7 @@
 
 package plugins
 
-import "github.com/sapcc/castellum/internal/db"
+import "github.com/sapcc/go-api-declarations/castellum"
 
 // UserError is an error wrapper that simplifies
 //
@@ -39,14 +39,14 @@ func (e UserError) Cause() error {
 }
 
 // Classify inspects the given error, unwraps UserError if possible, and adds an
-// appropriate db.OperationOutcome to the result.
-func Classify(err error) (db.OperationOutcome, error) {
+// appropriate castellum.OperationOutcome to the result.
+func Classify(err error) (castellum.OperationOutcome, error) {
 	switch err := err.(type) {
 	case nil:
-		return db.OperationOutcomeSucceeded, nil
+		return castellum.OperationOutcomeSucceeded, nil
 	case UserError:
-		return db.OperationOutcomeFailed, err.Inner
+		return castellum.OperationOutcomeFailed, err.Inner
 	default:
-		return db.OperationOutcomeErrored, err
+		return castellum.OperationOutcomeErrored, err
 	}
 }

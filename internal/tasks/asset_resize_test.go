@@ -25,6 +25,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sapcc/go-api-declarations/castellum"
+
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
@@ -46,7 +48,7 @@ func setupAssetResizeTest(t test.T, c *Context, amStatic *plugins.AssetManagerSt
 			ResourceID:   1,
 			UUID:         uuid,
 			Size:         1000,
-			Usage:        db.UsageValues{db.SingularUsageMetric: 500},
+			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			ExpectedSize: nil,
 		}))
 
@@ -66,10 +68,10 @@ func TestSuccessfulResize(baseT *testing.T) {
 		clock.StepBy(5 * time.Minute)
 		pendingOp := db.PendingOperation{
 			AssetID:     1,
-			Reason:      db.OperationReasonHigh,
+			Reason:      castellum.OperationReasonHigh,
 			OldSize:     1000,
 			NewSize:     1200,
-			Usage:       db.UsageValues{db.SingularUsageMetric: 500},
+			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			CreatedAt:   c.TimeNow().Add(-5 * time.Minute),
 			ConfirmedAt: p2time(c.TimeNow()),
 			GreenlitAt:  p2time(c.TimeNow().Add(5 * time.Minute)),
@@ -92,15 +94,15 @@ func TestSuccessfulResize(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
 			AssetID:     1,
-			Reason:      db.OperationReasonHigh,
+			Reason:      castellum.OperationReasonHigh,
 			OldSize:     1000,
 			NewSize:     1200,
-			Usage:       db.UsageValues{db.SingularUsageMetric: 500},
+			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			CreatedAt:   c.TimeNow().Add(-15 * time.Minute),
 			ConfirmedAt: p2time(c.TimeNow().Add(-10 * time.Minute)),
 			GreenlitAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
 			FinishedAt:  c.TimeNow(),
-			Outcome:     db.OperationOutcomeSucceeded,
+			Outcome:     castellum.OperationOutcomeSucceeded,
 		})
 
 		//expect asset to report an expected size, but still show the old size
@@ -110,7 +112,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 			ResourceID:   1,
 			UUID:         "asset1",
 			Size:         1000,
-			Usage:        db.UsageValues{db.SingularUsageMetric: 500},
+			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			ExpectedSize: p2uint64(1200),
 		})
 	})
@@ -125,10 +127,10 @@ func TestFailingResize(tBase *testing.T) {
 		clock.StepBy(10 * time.Minute)
 		pendingOp := db.PendingOperation{
 			AssetID:     1,
-			Reason:      db.OperationReasonLow,
+			Reason:      castellum.OperationReasonLow,
 			OldSize:     1000,
 			NewSize:     600,
-			Usage:       db.UsageValues{db.SingularUsageMetric: 500},
+			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			CreatedAt:   c.TimeNow().Add(-10 * time.Minute),
 			ConfirmedAt: p2time(c.TimeNow().Add(-5 * time.Minute)),
 			GreenlitAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
@@ -142,15 +144,15 @@ func TestFailingResize(tBase *testing.T) {
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
 			AssetID:      1,
-			Reason:       db.OperationReasonLow,
+			Reason:       castellum.OperationReasonLow,
 			OldSize:      1000,
 			NewSize:      600,
-			Usage:        db.UsageValues{db.SingularUsageMetric: 500},
+			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			CreatedAt:    c.TimeNow().Add(-10 * time.Minute),
 			ConfirmedAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
 			GreenlitAt:   p2time(c.TimeNow().Add(-5 * time.Minute)),
 			FinishedAt:   c.TimeNow(),
-			Outcome:      db.OperationOutcomeFailed,
+			Outcome:      castellum.OperationOutcomeFailed,
 			ErrorMessage: "SetAssetSize failing as requested",
 		})
 
@@ -160,7 +162,7 @@ func TestFailingResize(tBase *testing.T) {
 			ResourceID:   1,
 			UUID:         "asset1",
 			Size:         1000,
-			Usage:        db.UsageValues{db.SingularUsageMetric: 500},
+			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			ExpectedSize: nil,
 		})
 	})
@@ -175,10 +177,10 @@ func TestErroringResize(tBase *testing.T) {
 		clock.StepBy(10 * time.Minute)
 		pendingOp := db.PendingOperation{
 			AssetID:     1,
-			Reason:      db.OperationReasonLow,
+			Reason:      castellum.OperationReasonLow,
 			OldSize:     1000,
 			NewSize:     400, //will error because `new_size < usage` (usage = 500, see above)
-			Usage:       db.UsageValues{db.SingularUsageMetric: 500},
+			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			CreatedAt:   c.TimeNow().Add(-10 * time.Minute),
 			ConfirmedAt: p2time(c.TimeNow().Add(-5 * time.Minute)),
 			GreenlitAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
@@ -212,15 +214,15 @@ func TestErroringResize(tBase *testing.T) {
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
 			AssetID:         1,
-			Reason:          db.OperationReasonLow,
+			Reason:          castellum.OperationReasonLow,
 			OldSize:         1000,
 			NewSize:         400,
-			Usage:           db.UsageValues{db.SingularUsageMetric: 500},
+			Usage:           castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			CreatedAt:       pendingOp.CreatedAt,
 			ConfirmedAt:     pendingOp.ConfirmedAt,
 			GreenlitAt:      pendingOp.GreenlitAt,
 			FinishedAt:      c.TimeNow(),
-			Outcome:         db.OperationOutcomeErrored,
+			Outcome:         castellum.OperationOutcomeErrored,
 			ErrorMessage:    "cannot set size smaller than current usage",
 			ErroredAttempts: maxRetries,
 		})
@@ -231,7 +233,7 @@ func TestErroringResize(tBase *testing.T) {
 			ResourceID:   1,
 			UUID:         "asset1",
 			Size:         1000,
-			Usage:        db.UsageValues{db.SingularUsageMetric: 500},
+			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			ExpectedSize: nil,
 		})
 	})
@@ -250,17 +252,17 @@ func TestOperationQueueBehavior(baseT *testing.T) {
 		for idx := uint64(1); idx <= 10; idx++ {
 			pendingOp := db.PendingOperation{
 				AssetID:     int64(idx),
-				Reason:      db.OperationReasonHigh,
+				Reason:      castellum.OperationReasonHigh,
 				OldSize:     1000,
 				NewSize:     1200 + idx, //need operations to be distinguishable
-				Usage:       db.UsageValues{db.SingularUsageMetric: 500},
+				Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 500},
 				CreatedAt:   c.TimeNow().Add(-10 * time.Minute),
 				ConfirmedAt: p2time(c.TimeNow().Add(-5 * time.Minute)),
 				GreenlitAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
 			}
 			t.Must(c.DB.Insert(&pendingOp))
 			finishedOps = append(finishedOps,
-				pendingOp.IntoFinishedOperation(db.OperationOutcomeSucceeded, c.TimeNow()),
+				pendingOp.IntoFinishedOperation(castellum.OperationOutcomeSucceeded, c.TimeNow()),
 			)
 		}
 

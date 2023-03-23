@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/sapcc/go-api-declarations/cadf"
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/logg"
@@ -120,7 +121,7 @@ func (t scalingEventTarget) Render() cadf.Resource {
 }
 
 type targetAttachmentContent struct {
-	resource Resource
+	resource castellum.Resource
 }
 
 // MarshalJSON implements the json.Marshaler interface.

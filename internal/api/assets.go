@@ -24,6 +24,7 @@ import (
 	"sort"
 
 	"github.com/gorilla/mux"
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/respondwith"
 
@@ -31,78 +32,16 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
-////////////////////////////////////////////////////////////////////////////////
-// data types
-
-// Asset is how a db.Asset looks like in the API.
-type Asset struct {
-	UUID               string         `json:"id"`
-	Size               uint64         `json:"size,omitempty"`
-	UsagePercent       db.UsageValues `json:"usage_percent"`
-	Checked            *Checked       `json:"checked,omitempty"`
-	Stale              bool           `json:"stale"`
-	PendingOperation   *Operation     `json:"pending_operation,omitempty"`
-	FinishedOperations *[]Operation   `json:"finished_operations,omitempty"`
-}
-
-// Checked appears in type Asset and Resource.
-type Checked struct {
-	ErrorMessage string `json:"error,omitempty"`
-}
-
-// Operation is how a db.PendingOperation or db.FinishedOperation looks like in
-// the API.
-type Operation struct {
-	ProjectUUID string       `json:"project_id,omitempty"`
-	AssetType   db.AssetType `json:"asset_type,omitempty"`
-	AssetID     string       `json:"asset_id,omitempty"`
-	//^ These fields are left empty when Operation appears inside type Asset.
-	State     db.OperationState      `json:"state"`
-	Reason    db.OperationReason     `json:"reason"`
-	OldSize   uint64                 `json:"old_size"`
-	NewSize   uint64                 `json:"new_size"`
-	Created   OperationCreation      `json:"created"`
-	Confirmed *OperationConfirmation `json:"confirmed,omitempty"`
-	Greenlit  *OperationGreenlight   `json:"greenlit,omitempty"`
-	Finished  *OperationFinish       `json:"finished,omitempty"`
-}
-
-// OperationCreation appears in type Operation.
-type OperationCreation struct {
-	AtUnix       int64          `json:"at"`
-	UsagePercent db.UsageValues `json:"usage_percent"`
-}
-
-// OperationConfirmation appears in type Operation.
-type OperationConfirmation struct {
-	AtUnix int64 `json:"at"`
-}
-
-// OperationGreenlight appears in type Operation.
-type OperationGreenlight struct {
-	AtUnix     int64   `json:"at"`
-	ByUserUUID *string `json:"by_user,omitempty"`
-}
-
-// OperationFinish appears in type Operation.
-type OperationFinish struct {
-	AtUnix       int64  `json:"at"`
-	ErrorMessage string `json:"error,omitempty"`
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// conversion and validation methods
-
 // AssetFromDB converts a db.Asset into an api.Asset.
-func AssetFromDB(asset db.Asset) Asset {
-	a := Asset{
+func AssetFromDB(asset db.Asset) castellum.Asset {
+	a := castellum.Asset{
 		UUID:         asset.UUID,
 		Size:         asset.Size,
 		UsagePercent: core.GetMultiUsagePercent(asset.Size, asset.Usage),
 		Stale:        asset.ExpectedSize != nil,
 	}
 	if asset.ScrapeErrorMessage != "" {
-		a.Checked = &Checked{
+		a.Checked = &castellum.Checked{
 			ErrorMessage: asset.ScrapeErrorMessage,
 		}
 	}
@@ -110,30 +49,32 @@ func AssetFromDB(asset db.Asset) Asset {
 }
 
 // PendingOperationFromDB converts a db.PendingOperation into an api.Operation.
-func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, res *db.Resource) Operation {
-	op := Operation{
+func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, res *db.Resource) castellum.StandaloneOperation {
+	op := castellum.StandaloneOperation{
 		AssetID: assetID,
-		State:   dbOp.State(),
-		Reason:  dbOp.Reason,
-		OldSize: dbOp.OldSize,
-		NewSize: dbOp.NewSize,
-		Created: OperationCreation{
-			AtUnix:       dbOp.CreatedAt.Unix(),
-			UsagePercent: core.GetMultiUsagePercent(dbOp.OldSize, dbOp.Usage),
+		Operation: castellum.Operation{
+			State:   dbOp.State(),
+			Reason:  dbOp.Reason,
+			OldSize: dbOp.OldSize,
+			NewSize: dbOp.NewSize,
+			Created: castellum.OperationCreation{
+				AtUnix:       dbOp.CreatedAt.Unix(),
+				UsagePercent: core.GetMultiUsagePercent(dbOp.OldSize, dbOp.Usage),
+			},
+			Finished: nil,
 		},
-		Finished: nil,
 	}
 	if res != nil {
 		op.ProjectUUID = res.ScopeUUID
-		op.AssetType = res.AssetType
+		op.AssetType = string(res.AssetType)
 	}
 	if dbOp.ConfirmedAt != nil {
-		op.Confirmed = &OperationConfirmation{
+		op.Confirmed = &castellum.OperationConfirmation{
 			AtUnix: dbOp.ConfirmedAt.Unix(),
 		}
 	}
 	if dbOp.GreenlitAt != nil {
-		op.Greenlit = &OperationGreenlight{
+		op.Greenlit = &castellum.OperationGreenlight{
 			AtUnix:     dbOp.GreenlitAt.Unix(),
 			ByUserUUID: dbOp.GreenlitByUserUUID,
 		}
@@ -142,33 +83,35 @@ func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, res *db.Re
 }
 
 // FinishedOperationFromDB converts a db.FinishedOperation into an api.Operation.
-func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string, res *db.Resource) Operation {
-	op := Operation{
+func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string, res *db.Resource) castellum.StandaloneOperation {
+	op := castellum.StandaloneOperation{
 		AssetID: assetID,
-		State:   dbOp.State(),
-		Reason:  dbOp.Reason,
-		OldSize: dbOp.OldSize,
-		NewSize: dbOp.NewSize,
-		Created: OperationCreation{
-			AtUnix:       dbOp.CreatedAt.Unix(),
-			UsagePercent: core.GetMultiUsagePercent(dbOp.OldSize, dbOp.Usage),
-		},
-		Finished: &OperationFinish{
-			AtUnix:       dbOp.FinishedAt.Unix(),
-			ErrorMessage: dbOp.ErrorMessage,
+		Operation: castellum.Operation{
+			State:   dbOp.State(),
+			Reason:  dbOp.Reason,
+			OldSize: dbOp.OldSize,
+			NewSize: dbOp.NewSize,
+			Created: castellum.OperationCreation{
+				AtUnix:       dbOp.CreatedAt.Unix(),
+				UsagePercent: core.GetMultiUsagePercent(dbOp.OldSize, dbOp.Usage),
+			},
+			Finished: &castellum.OperationFinish{
+				AtUnix:       dbOp.FinishedAt.Unix(),
+				ErrorMessage: dbOp.ErrorMessage,
+			},
 		},
 	}
 	if res != nil {
 		op.ProjectUUID = res.ScopeUUID
-		op.AssetType = res.AssetType
+		op.AssetType = string(res.AssetType)
 	}
 	if dbOp.ConfirmedAt != nil {
-		op.Confirmed = &OperationConfirmation{
+		op.Confirmed = &castellum.OperationConfirmation{
 			AtUnix: dbOp.ConfirmedAt.Unix(),
 		}
 	}
 	if dbOp.GreenlitAt != nil {
-		op.Greenlit = &OperationGreenlight{
+		op.Greenlit = &castellum.OperationGreenlight{
 			AtUnix:     dbOp.GreenlitAt.Unix(),
 			ByUserUUID: dbOp.GreenlitByUserUUID,
 		}
@@ -197,14 +140,14 @@ func (h handler) GetAssets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	assets := make([]Asset, len(dbAssets))
+	assets := make([]castellum.Asset, len(dbAssets))
 	for idx, dbAsset := range dbAssets {
 		assets[idx] = AssetFromDB(dbAsset)
 	}
 	sort.Slice(assets, func(i, j int) bool { return assets[i].UUID < assets[j].UUID })
 
 	result := struct {
-		Assets []Asset `json:"assets"`
+		Assets []castellum.Asset `json:"assets"`
 	}{assets}
 	respondwith.JSON(w, http.StatusOK, result)
 }
@@ -255,7 +198,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		if respondwith.ErrorText(w, err) {
 			return
 		}
-		finishedOps := make([]Operation, len(dbFinishedOps))
+		finishedOps := make([]castellum.StandaloneOperation, len(dbFinishedOps))
 		for idx, op := range dbFinishedOps {
 			finishedOps[idx] = FinishedOperationFromDB(op, "", nil)
 		}

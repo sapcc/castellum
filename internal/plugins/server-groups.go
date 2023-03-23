@@ -38,6 +38,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/gophercloud/gophercloud/openstack/keymanager/v1/secrets"
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/pools"
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
@@ -63,7 +64,7 @@ const (
 // latter without parentheses around the ID.
 //
 // NOTE 2: These queries return fractional values in the range 0..1, NOT percentages in the range 0..100.
-var serverUsageQueries = map[db.UsageMetric]string{
+var serverUsageQueries = map[castellum.UsageMetric]string{
 	"cpu": `vrops_virtualmachine_cpu_usage_ratio{virtualmachine=~".*${ID}.*"} / 100`,
 	"ram": `vrops_virtualmachine_memory_consumed_kilobytes{virtualmachine=~".*${ID}.*"} / vrops_virtualmachine_memory_kilobytes{virtualmachine=~".*${ID}.*"}`,
 }
@@ -106,7 +107,7 @@ func (m *assetManagerServerGroups) InfoForAssetType(assetType db.AssetType) *cor
 	if strings.HasPrefix(string(assetType), "server-group:") {
 		return &core.AssetTypeInfo{
 			AssetType:    assetType,
-			UsageMetrics: []db.UsageMetric{"cpu", "ram"},
+			UsageMetrics: []castellum.UsageMetric{"cpu", "ram"},
 		}
 	}
 	return nil
@@ -170,7 +171,7 @@ func (m *assetManagerServerGroups) GetAssetStatus(res db.Resource, assetUUID str
 	//get usage values for all servers
 	result := core.AssetStatus{
 		Size:  uint64(len(group.Members)),
-		Usage: make(db.UsageValues),
+		Usage: make(castellum.UsageValues),
 	}
 	for metric := range serverUsageQueries {
 		result.Usage[metric] = 0
@@ -202,20 +203,20 @@ func (m *assetManagerServerGroups) GetAssetStatus(res db.Resource, assetUUID str
 }
 
 // SetAssetSize implements the core.AssetManager interface.
-func (m *assetManagerServerGroups) SetAssetSize(res db.Resource, assetUUID string, _, newSize uint64) (db.OperationOutcome, error) {
+func (m *assetManagerServerGroups) SetAssetSize(res db.Resource, assetUUID string, _, newSize uint64) (castellum.OperationOutcome, error) {
 	cfg, err := m.parseAndValidateConfig(res.ConfigJSON)
 	if err != nil {
 		//if validation fails here, we should not have accepted the configuration
 		//in the first place; so this is really a problem with the application
 		//("errored") instead of the user's fault ("failed")
-		return db.OperationOutcomeErrored, err
+		return castellum.OperationOutcomeErrored, err
 	}
 
 	//double-check actual `oldSize` by counting current group members
 	groupID := strings.TrimPrefix(string(res.AssetType), "server-group:")
 	group, err := m.getServerGroup(groupID)
 	if err != nil {
-		return db.OperationOutcomeErrored, err
+		return castellum.OperationOutcomeErrored, err
 	}
 	oldSize := uint64(len(group.Members))
 
@@ -228,24 +229,24 @@ func (m *assetManagerServerGroups) SetAssetSize(res db.Resource, assetUUID strin
 	}
 
 	//nothing to do (should be unreachable in practice since we would not get called at all when `oldSize == newSize`)
-	return db.OperationOutcomeSucceeded, nil
+	return castellum.OperationOutcomeSucceeded, nil
 }
 
-func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configForServerGroup, group serverGroup, countToDelete uint64) (db.OperationOutcome, error) {
+func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configForServerGroup, group serverGroup, countToDelete uint64) (castellum.OperationOutcome, error) {
 	computeV2, err := m.Provider.CloudAdminClient(openstack.NewComputeV2)
 	if err != nil {
-		return db.OperationOutcomeErrored, err
+		return castellum.OperationOutcomeErrored, err
 	}
 	provider, eo, err := m.Provider.ProjectScopedClient(core.ProjectScope{
 		ID:        res.ScopeUUID,
 		RoleNames: m.LocalRoleNames,
 	})
 	if err != nil {
-		return db.OperationOutcomeErrored, err
+		return castellum.OperationOutcomeErrored, err
 	}
 	loadbalancerV2, err := openstack.NewLoadBalancerV2(provider, eo)
 	if err != nil {
-		return db.OperationOutcomeErrored, err
+		return castellum.OperationOutcomeErrored, err
 	}
 
 	//get creation timestamps for all servers in this group
@@ -253,7 +254,7 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 	for _, serverID := range group.Members {
 		server, err := servers.Get(computeV2, serverID).Extract()
 		if err != nil {
-			return db.OperationOutcomeErrored, fmt.Errorf("cannot inspect server %s in %s: %w", serverID, res.AssetType, err)
+			return castellum.OperationOutcomeErrored, fmt.Errorf("cannot inspect server %s in %s: %w", serverID, res.AssetType, err)
 		}
 		allServers = append(allServers, server)
 	}
@@ -284,7 +285,7 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 			err := m.removeServerFromLoadbalancer(server, lb, loadbalancerV2)
 			if err != nil {
 				err = fmt.Errorf("cannot remove server %s in %s from LB pool %s: %w", server.ID, res.AssetType, lb.PoolUUID, err)
-				return db.OperationOutcomeErrored, err
+				return castellum.OperationOutcomeErrored, err
 			}
 		}
 		if len(cfg.LoadbalancerPoolMemberships) > 0 {
@@ -293,7 +294,7 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 		}
 		err := servers.Delete(computeV2, server.ID).ExtractErr()
 		if err != nil {
-			return db.OperationOutcomeErrored, fmt.Errorf("cannot delete server %s in %s: %w", server.ID, res.AssetType, err)
+			return castellum.OperationOutcomeErrored, fmt.Errorf("cannot delete server %s in %s: %w", server.ID, res.AssetType, err)
 		}
 		serversInDeletion[server.ID] = server.Status
 	}
@@ -310,7 +311,7 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 				msgs = append(msgs, fmt.Sprintf("%s is in status %q", serverID, status))
 			}
 			sort.Strings(msgs)
-			return db.OperationOutcomeErrored, fmt.Errorf("timeout waiting for server deletion in %s: %s", res.AssetType, strings.Join(msgs, ", "))
+			return castellum.OperationOutcomeErrored, fmt.Errorf("timeout waiting for server deletion in %s: %s", res.AssetType, strings.Join(msgs, ", "))
 		}
 
 		//check if servers are still there
@@ -323,39 +324,39 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 				continue
 			}
 			if err != nil {
-				return db.OperationOutcomeErrored, fmt.Errorf("cannot inspect deleted server %s in %s: %w", serverID, res.AssetType, err)
+				return castellum.OperationOutcomeErrored, fmt.Errorf("cannot inspect deleted server %s in %s: %w", serverID, res.AssetType, err)
 			}
 			//note down changes in server status (we may want to use these for the timeout error message)
 			serversInDeletion[server.ID] = server.Status
 		}
 	}
 
-	return db.OperationOutcomeSucceeded, nil
+	return castellum.OperationOutcomeSucceeded, nil
 }
 
-func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForServerGroup, group serverGroup, countToCreate uint64) (db.OperationOutcome, error) {
+func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForServerGroup, group serverGroup, countToCreate uint64) (castellum.OperationOutcome, error) {
 	provider, eo, err := m.Provider.ProjectScopedClient(core.ProjectScope{
 		ID:        res.ScopeUUID,
 		RoleNames: m.LocalRoleNames,
 	})
 	if err != nil {
-		return db.OperationOutcomeErrored, err
+		return castellum.OperationOutcomeErrored, err
 	}
 	computeV2, err := openstack.NewComputeV2(provider, eo)
 	if err != nil {
-		return db.OperationOutcomeErrored, err
+		return castellum.OperationOutcomeErrored, err
 	}
 	imageV2, err := openstack.NewImageServiceV2(provider, eo)
 	if err != nil {
-		return db.OperationOutcomeErrored, err
+		return castellum.OperationOutcomeErrored, err
 	}
 	keymgrV1, err := openstack.NewKeyManagerV1(provider, eo)
 	if err != nil {
-		return db.OperationOutcomeErrored, err
+		return castellum.OperationOutcomeErrored, err
 	}
 	loadbalancerV2, err := openstack.NewLoadBalancerV2(provider, eo)
 	if err != nil {
-		return db.OperationOutcomeErrored, err
+		return castellum.OperationOutcomeErrored, err
 	}
 
 	resolvedImageID, err := m.resolveImageIntoID(imageV2, cfg.Template.Image.Name)
@@ -414,7 +415,7 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 
 		server, err := servers.Create(computeV2, opts(name)).Extract()
 		if err != nil {
-			return db.OperationOutcomeErrored, fmt.Errorf("cannot create server %s in %s: %w", name, res.AssetType, err)
+			return castellum.OperationOutcomeErrored, fmt.Errorf("cannot create server %s in %s: %w", name, res.AssetType, err)
 		}
 		serversInCreation[server.ID] = server.Status
 	}
@@ -473,10 +474,10 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 	}
 
 	if len(msgs) == 0 {
-		return db.OperationOutcomeSucceeded, nil
+		return castellum.OperationOutcomeSucceeded, nil
 	}
 	sort.Strings(msgs)
-	return db.OperationOutcomeErrored, fmt.Errorf("timeout waiting for server creation in %s: %s", res.AssetType, strings.Join(msgs, ", "))
+	return castellum.OperationOutcomeErrored, fmt.Errorf("timeout waiting for server creation in %s: %s", res.AssetType, strings.Join(msgs, ", "))
 }
 
 func makeNameDisambiguator() string {

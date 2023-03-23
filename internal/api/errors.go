@@ -21,41 +21,12 @@ package api
 import (
 	"net/http"
 
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/respondwith"
 
 	"github.com/sapcc/castellum/internal/db"
 )
-
-///////////////////////////////////////////////////////////////////////////////
-// data types
-
-// ResourceScrapeError is how a resource's scrape error appears in API.
-type ResourceScrapeError struct {
-	ProjectUUID string  `json:"project_id,omitempty"`
-	DomainUUID  string  `json:"domain_id"`
-	AssetType   string  `json:"asset_type"`
-	Checked     Checked `json:"checked"`
-}
-
-// AssetError is how an asset's error appears in API.
-type AssetError struct {
-	AssetUUID   string `json:"asset_id"`
-	ProjectUUID string `json:"project_id,omitempty"`
-	DomainUUID  string `json:"domain_id"`
-	AssetType   string `json:"asset_type"`
-
-	// this field is only used in scrape errors
-	Checked *Checked `json:"checked,omitempty"`
-
-	// these fields are only used in resize errors
-	OldSize  uint64           `json:"old_size,omitempty"`
-	NewSize  uint64           `json:"new_size,omitempty"`
-	Finished *OperationFinish `json:"finished,omitempty"`
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// HTTP handlers
 
 func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/admin/resource-scrape-errors")
@@ -74,7 +45,7 @@ func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	resScrapeErrs := []ResourceScrapeError{}
+	resScrapeErrs := []castellum.ResourceScrapeError{}
 	for _, res := range dbResources {
 		projectID := ""
 		// .ScopeUUID is either a domain- or project UUID.
@@ -83,18 +54,18 @@ func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request)
 		}
 
 		resScrapeErrs = append(resScrapeErrs,
-			ResourceScrapeError{
+			castellum.ResourceScrapeError{
 				ProjectUUID: projectID,
 				DomainUUID:  res.DomainUUID,
 				AssetType:   string(res.AssetType),
-				Checked: Checked{
+				Checked: castellum.Checked{
 					ErrorMessage: res.ScrapeErrorMessage,
 				},
 			})
 	}
 
 	respondwith.JSON(w, http.StatusOK, struct {
-		ResourceScrapeErrors []ResourceScrapeError `json:"resource_scrape_errors"`
+		ResourceScrapeErrors []castellum.ResourceScrapeError `json:"resource_scrape_errors"`
 	}{resScrapeErrs})
 }
 
@@ -115,7 +86,7 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	assetScrapeErrs := []AssetError{}
+	assetScrapeErrs := []castellum.AssetScrapeError{}
 	for _, res := range dbResources {
 		var dbAssets []db.Asset
 		_, err := h.DB.Select(&dbAssets, `
@@ -135,12 +106,12 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 
 		for _, a := range dbAssets {
 			assetScrapeErrs = append(assetScrapeErrs,
-				AssetError{
+				castellum.AssetScrapeError{
 					AssetUUID:   a.UUID,
 					ProjectUUID: projectID,
 					DomainUUID:  res.DomainUUID,
 					AssetType:   string(res.AssetType),
-					Checked: &Checked{
+					Checked: &castellum.Checked{
 						ErrorMessage: a.ScrapeErrorMessage,
 					},
 				})
@@ -148,7 +119,7 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondwith.JSON(w, http.StatusOK, struct {
-		AssetScrapeErrors []AssetError `json:"asset_scrape_errors"`
+		AssetScrapeErrors []castellum.AssetScrapeError `json:"asset_scrape_errors"`
 	}{assetScrapeErrs})
 }
 
@@ -169,7 +140,7 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	assetResizeErrs := []AssetError{}
+	assetResizeErrs := []castellum.AssetResizeError{}
 	for _, res := range dbResources {
 		var ops []db.FinishedOperation
 		//We only care about assets that are still problematic.
@@ -202,14 +173,14 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 
 		for _, o := range ops {
 			assetResizeErrs = append(assetResizeErrs,
-				AssetError{
+				castellum.AssetResizeError{
 					AssetUUID:   assetUUIDs[o.AssetID],
 					ProjectUUID: projectID,
 					DomainUUID:  res.DomainUUID,
 					AssetType:   string(res.AssetType),
 					OldSize:     o.OldSize,
 					NewSize:     o.NewSize,
-					Finished: &OperationFinish{
+					Finished: &castellum.OperationFinish{
 						AtUnix:       o.FinishedAt.Unix(),
 						ErrorMessage: o.ErrorMessage,
 					},
@@ -218,6 +189,6 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondwith.JSON(w, http.StatusOK, struct {
-		AssetScrapeErrors []AssetError `json:"asset_resize_errors"`
+		AssetScrapeErrors []castellum.AssetResizeError `json:"asset_resize_errors"`
 	}{assetResizeErrs})
 }

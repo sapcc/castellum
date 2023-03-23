@@ -26,6 +26,7 @@ import (
 
 	"github.com/go-gorp/gorp/v3"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/osext"
 	"github.com/sapcc/go-bits/sqlext"
@@ -191,7 +192,7 @@ func (j assetScrapeJob) Execute() (returnedError error) {
 		for metric, usage := range status.Usage {
 			usageLogStrings = append(usageLogStrings, fmt.Sprintf(
 				"usage%s = %.3f (%.3f%%)",
-				metric.Identifier("[%s]"), usage, core.GetUsagePercent(status.Size, usage),
+				core.Identifier(metric, "[%s]"), usage, core.GetUsagePercent(status.Size, usage),
 			))
 		}
 		logg.Info("observed %s %s at size = %d, %s",
@@ -301,14 +302,14 @@ func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, ass
 	}
 
 	eligibleFor := core.GetEligibleOperations(res, asset, info)
-	if val, exists := eligibleFor[db.OperationReasonCritical]; exists {
-		op.Reason = db.OperationReasonCritical
+	if val, exists := eligibleFor[castellum.OperationReasonCritical]; exists {
+		op.Reason = castellum.OperationReasonCritical
 		op.NewSize = val
-	} else if val, exists := eligibleFor[db.OperationReasonHigh]; exists {
-		op.Reason = db.OperationReasonHigh
+	} else if val, exists := eligibleFor[castellum.OperationReasonHigh]; exists {
+		op.Reason = castellum.OperationReasonHigh
 		op.NewSize = val
-	} else if val, exists := eligibleFor[db.OperationReasonLow]; exists {
-		op.Reason = db.OperationReasonLow
+	} else if val, exists := eligibleFor[castellum.OperationReasonLow]; exists {
+		op.Reason = castellum.OperationReasonLow
 		op.NewSize = val
 	} else {
 		//no threshold exceeded -> do not create an operation
@@ -322,13 +323,13 @@ func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, ass
 	}
 
 	//critical operations can be confirmed immediately
-	if op.Reason == db.OperationReasonCritical {
+	if op.Reason == castellum.OperationReasonCritical {
 		op.ConfirmedAt = &op.CreatedAt
 		//right now, nothing requires operator approval
 		op.GreenlitAt = op.ConfirmedAt
 	}
 
-	core.CountStateTransition(res, asset.UUID, db.OperationStateDidNotExist, op.State())
+	core.CountStateTransition(res, asset.UUID, castellum.OperationStateDidNotExist, op.State())
 	return tx.Insert(&op)
 }
 
@@ -336,8 +337,8 @@ func (c Context) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, ass
 	//cancel when the threshold that triggered this operation is no longer being crossed
 	eligibleFor := core.GetEligibleOperations(res, asset, info)
 	_, isEligible := eligibleFor[op.Reason]
-	if op.Reason == db.OperationReasonHigh {
-		if _, canBeUpgraded := eligibleFor[db.OperationReasonCritical]; canBeUpgraded {
+	if op.Reason == castellum.OperationReasonHigh {
+		if _, canBeUpgraded := eligibleFor[castellum.OperationReasonCritical]; canBeUpgraded {
 			//as an exception, cancel a "High" operation when we've crossed the
 			//"Critical" threshold in the meantime - when we get to
 			//maybeCreateOperation() next, a new operation with reason "Critical" will
@@ -349,8 +350,8 @@ func (c Context) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, ass
 		return &op, nil
 	}
 
-	core.CountStateTransition(res, asset.UUID, op.State(), db.OperationStateCancelled)
-	finishedOp := op.IntoFinishedOperation(db.OperationOutcomeCancelled, c.TimeNow())
+	core.CountStateTransition(res, asset.UUID, op.State(), castellum.OperationStateCancelled)
+	finishedOp := op.IntoFinishedOperation(castellum.OperationOutcomeCancelled, c.TimeNow())
 	_, err := tx.Delete(&op)
 	if err != nil {
 		return nil, err
@@ -386,11 +387,11 @@ func (c Context) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, as
 	//can only confirm when it has been like this for at least the configured delay
 	var earliestConfirm time.Time
 	switch op.Reason {
-	case db.OperationReasonLow:
+	case castellum.OperationReasonLow:
 		earliestConfirm = op.CreatedAt.Add(time.Duration(res.LowDelaySeconds) * time.Second)
-	case db.OperationReasonHigh:
+	case castellum.OperationReasonHigh:
 		earliestConfirm = op.CreatedAt.Add(time.Duration(res.HighDelaySeconds) * time.Second)
-	case db.OperationReasonCritical:
+	case castellum.OperationReasonCritical:
 		//defense in depth - maybeCreateOperation() should already have confirmed this
 		earliestConfirm = op.CreatedAt
 	}

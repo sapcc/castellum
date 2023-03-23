@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -144,11 +145,11 @@ func TestGetAssetResizeErrors(baseT *testing.T) {
 		//"succeeded" and check that we get an empty list
 		t.Must(h.DB.Insert(&db.FinishedOperation{
 			AssetID:     1,
-			Reason:      db.OperationReasonCritical,
-			Outcome:     db.OperationOutcomeSucceeded,
+			Reason:      castellum.OperationReasonCritical,
+			Outcome:     castellum.OperationOutcomeSucceeded,
 			OldSize:     1024,
 			NewSize:     1025,
-			Usage:       db.UsageValues{db.SingularUsageMetric: 983.04},
+			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 983.04},
 			CreatedAt:   time.Unix(70, 0).UTC(),
 			ConfirmedAt: p2time(time.Unix(71, 0).UTC()),
 			GreenlitAt:  p2time(time.Unix(71, 0).UTC()),

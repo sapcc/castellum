@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/easypg"
 
 	"github.com/sapcc/castellum/internal/db"
@@ -46,18 +47,18 @@ func TestResourceScraping(baseT *testing.T) {
 			ScopeUUID:                "project1",
 			DomainUUID:               "domain1",
 			AssetType:                "foo",
-			LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 0},
-			HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 0},
-			CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 0},
+			LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 0},
+			HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 0},
+			CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 0},
 			NextScrapeAt:             c.TimeNow(),
 		}))
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:                "project3",
 			DomainUUID:               "domain1",
 			AssetType:                "foo",
-			LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 0},
-			HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 0},
-			CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 0},
+			LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 0},
+			HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 0},
+			CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 0},
 			NextScrapeAt:             c.TimeNow(),
 		}))
 

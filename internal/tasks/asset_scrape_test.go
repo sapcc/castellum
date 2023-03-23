@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/easypg"
 
 	"github.com/sapcc/castellum/internal/db"
@@ -44,11 +45,11 @@ func runAssetScrapeTest(t test.T, resourceIsSingleStep bool, action func(*Contex
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",
 			AssetType:                "foo",
-			LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 20},
+			LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
 			LowDelaySeconds:          3600,
-			HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 80},
+			HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 80},
 			HighDelaySeconds:         3600,
-			CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 95},
+			CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 95},
 			SizeStepPercent:          ifthenelseF64(resourceIsSingleStep, 0, 20),
 			SingleStep:               resourceIsSingleStep,
 		}))
@@ -56,7 +57,7 @@ func runAssetScrapeTest(t test.T, resourceIsSingleStep bool, action func(*Contex
 			ResourceID:   1,
 			UUID:         "asset1",
 			Size:         1000,
-			Usage:        db.UsageValues{db.SingularUsageMetric: 500},
+			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			NextScrapeAt: c.TimeNow(),
 			NeverScraped: true,
 			ExpectedSize: nil,
@@ -120,10 +121,10 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 		expectedOp := db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
-			Reason:    db.OperationReasonHigh,
+			Reason:    castellum.OperationReasonHigh,
 			OldSize:   1000,
 			NewSize:   ifthenelseU64(res.SingleStep, 1001, 1200),
-			Usage:     db.UsageValues{db.SingularUsageMetric: 800},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 800},
 			CreatedAt: c.TimeNow(),
 		}
 		t.ExpectPendingOperations(c.DB, expectedOp)
@@ -177,10 +178,10 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
-			Reason:    db.OperationReasonHigh,
+			Reason:    castellum.OperationReasonHigh,
 			OldSize:   1000,
 			NewSize:   ifthenelseU64(res.SingleStep, 1001, 1200),
-			Usage:     db.UsageValues{db.SingularUsageMetric: 800},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 800},
 			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
@@ -193,11 +194,11 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
 			AssetID:    1,
-			Reason:     db.OperationReasonHigh,
-			Outcome:    db.OperationOutcomeCancelled,
+			Reason:     castellum.OperationReasonHigh,
+			Outcome:    castellum.OperationOutcomeCancelled,
 			OldSize:    1000,
 			NewSize:    ifthenelseU64(res.SingleStep, 1001, 1200),
-			Usage:      db.UsageValues{db.SingularUsageMetric: 800},
+			Usage:      castellum.UsageValues{castellum.SingularUsageMetric: 800},
 			CreatedAt:  c.TimeNow().Add(-40 * time.Minute),
 			FinishedAt: c.TimeNow(),
 		})
@@ -221,10 +222,10 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 		expectedOp := db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
-			Reason:    db.OperationReasonLow,
+			Reason:    castellum.OperationReasonLow,
 			OldSize:   1000,
 			NewSize:   ifthenelseU64(res.SingleStep, 999, 800),
-			Usage:     db.UsageValues{db.SingularUsageMetric: 200},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 200},
 			CreatedAt: c.TimeNow(),
 		}
 		t.ExpectPendingOperations(c.DB, expectedOp)
@@ -278,10 +279,10 @@ func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
-			Reason:    db.OperationReasonLow,
+			Reason:    castellum.OperationReasonLow,
 			OldSize:   1000,
 			NewSize:   ifthenelseU64(res.SingleStep, 999, 800),
-			Usage:     db.UsageValues{db.SingularUsageMetric: 200},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 200},
 			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
@@ -294,11 +295,11 @@ func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
 			AssetID:    1,
-			Reason:     db.OperationReasonLow,
-			Outcome:    db.OperationOutcomeCancelled,
+			Reason:     castellum.OperationReasonLow,
+			Outcome:    castellum.OperationOutcomeCancelled,
 			OldSize:    1000,
 			NewSize:    ifthenelseU64(res.SingleStep, 999, 800),
-			Usage:      db.UsageValues{db.SingularUsageMetric: 200},
+			Usage:      castellum.UsageValues{castellum.SingularUsageMetric: 200},
 			CreatedAt:  c.TimeNow().Add(-40 * time.Minute),
 			FinishedAt: c.TimeNow(),
 		})
@@ -317,10 +318,10 @@ func TestCriticalUpsizeTowardsGreenlight(baseT *testing.T) {
 		expectedOp := db.PendingOperation{
 			ID:          1,
 			AssetID:     1,
-			Reason:      db.OperationReasonCritical,
+			Reason:      castellum.OperationReasonCritical,
 			OldSize:     1000,
 			NewSize:     ifthenelseU64(res.SingleStep, 1188, 1200),
-			Usage:       db.UsageValues{db.SingularUsageMetric: 950},
+			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 950},
 			CreatedAt:   c.TimeNow(),
 			ConfirmedAt: p2time(c.TimeNow()),
 			GreenlitAt:  p2time(c.TimeNow()),
@@ -342,10 +343,10 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
-			Reason:    db.OperationReasonHigh,
+			Reason:    castellum.OperationReasonHigh,
 			OldSize:   1000,
 			NewSize:   ifthenelseU64(res.SingleStep, 1126, 1200),
-			Usage:     db.UsageValues{db.SingularUsageMetric: 900},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 900},
 			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
@@ -360,21 +361,21 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:          2,
 			AssetID:     1,
-			Reason:      db.OperationReasonCritical,
+			Reason:      castellum.OperationReasonCritical,
 			OldSize:     1000,
 			NewSize:     ifthenelseU64(res.SingleStep, 1201, 1200),
-			Usage:       db.UsageValues{db.SingularUsageMetric: 960},
+			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 960},
 			CreatedAt:   c.TimeNow(),
 			ConfirmedAt: p2time(c.TimeNow()),
 			GreenlitAt:  p2time(c.TimeNow()),
 		})
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
 			AssetID:    1,
-			Reason:     db.OperationReasonHigh,
-			Outcome:    db.OperationOutcomeCancelled,
+			Reason:     castellum.OperationReasonHigh,
+			Outcome:    castellum.OperationOutcomeCancelled,
 			OldSize:    1000,
 			NewSize:    ifthenelseU64(res.SingleStep, 1126, 1200),
-			Usage:      db.UsageValues{db.SingularUsageMetric: 900},
+			Usage:      castellum.UsageValues{castellum.SingularUsageMetric: 900},
 			CreatedAt:  c.TimeNow().Add(-10 * time.Minute),
 			FinishedAt: c.TimeNow(),
 		})
@@ -388,11 +389,11 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",
 			AssetType:                "foo",
-			LowThresholdPercent:      db.UsageValues{db.SingularUsageMetric: 20},
+			LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
 			LowDelaySeconds:          3600,
-			HighThresholdPercent:     db.UsageValues{db.SingularUsageMetric: 80},
+			HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 80},
 			HighDelaySeconds:         3600,
-			CriticalThresholdPercent: db.UsageValues{db.SingularUsageMetric: 95},
+			CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 95},
 			SizeStepPercent:          20,
 		}))
 		assets := []db.Asset{
@@ -400,7 +401,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 				ResourceID:   1,
 				UUID:         "asset1",
 				Size:         1000,
-				Usage:        db.UsageValues{db.SingularUsageMetric: 500},
+				Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 				NextScrapeAt: c.TimeNow(),
 				ExpectedSize: nil,
 			},
@@ -408,7 +409,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 				ResourceID:   1,
 				UUID:         "asset2",
 				Size:         1000,
-				Usage:        db.UsageValues{db.SingularUsageMetric: 500},
+				Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 				NextScrapeAt: c.TimeNow(),
 				ExpectedSize: nil,
 			},
@@ -416,7 +417,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 				ResourceID:   1,
 				UUID:         "asset3",
 				Size:         1000,
-				Usage:        db.UsageValues{db.SingularUsageMetric: 500},
+				Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 				NextScrapeAt: c.TimeNow(),
 				ExpectedSize: nil,
 			},
@@ -445,9 +446,9 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 		assets[0].NextScrapeAt = c.TimeNow().Add(3 * time.Minute)
 		assets[1].NextScrapeAt = c.TimeNow().Add(4 * time.Minute)
 		assets[2].NextScrapeAt = c.TimeNow().Add(5 * time.Minute)
-		assets[0].Usage = db.UsageValues{db.SingularUsageMetric: 510}
-		assets[1].Usage = db.UsageValues{db.SingularUsageMetric: 520}
-		assets[2].Usage = db.UsageValues{db.SingularUsageMetric: 530}
+		assets[0].Usage = castellum.UsageValues{castellum.SingularUsageMetric: 510}
+		assets[1].Usage = castellum.UsageValues{castellum.SingularUsageMetric: 520}
+		assets[2].Usage = castellum.UsageValues{castellum.SingularUsageMetric: 530}
 		t.ExpectAssets(c.DB, assets...)
 
 		//next scrape should work identically
@@ -497,7 +498,7 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 			ResourceID:   1,
 			UUID:         "asset1",
 			Size:         1000,
-			Usage:        db.UsageValues{db.SingularUsageMetric: 500},
+			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			ExpectedSize: p2uint64(1100),
 		}
 
@@ -519,7 +520,7 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 		t.Must(ExecuteOne(c.PollForAssetScrapes()))
 
 		asset.Size = 1100
-		asset.Usage = db.UsageValues{db.SingularUsageMetric: 1000}
+		asset.Usage = castellum.UsageValues{castellum.SingularUsageMetric: 1000}
 		asset.NextScrapeAt = c.TimeNow().Add(5 * time.Minute)
 		asset.ExpectedSize = nil
 		t.ExpectAssets(c.DB, asset)
@@ -527,10 +528,10 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
-			Reason:    db.OperationReasonHigh,
+			Reason:    castellum.OperationReasonHigh,
 			OldSize:   1100,
 			NewSize:   ifthenelseU64(res.SingleStep, 1251, 1320),
-			Usage:     db.UsageValues{db.SingularUsageMetric: 1000},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 1000},
 			CreatedAt: c.TimeNow(),
 		})
 	})
@@ -557,7 +558,7 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
 			ResourceID:   1,
 			UUID:         "asset1",
 			Size:         1200,
-			Usage:        db.UsageValues{db.SingularUsageMetric: 600},
+			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 600},
 			NextScrapeAt: c.TimeNow().Add(5 * time.Minute),
 			ExpectedSize: nil,
 		})
@@ -593,7 +594,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 			ResourceID:         1,
 			UUID:               "asset1",
 			Size:               1000,
-			Usage:              db.UsageValues{db.SingularUsageMetric: 500}, //changed usage not observed because of error
+			Usage:              castellum.UsageValues{castellum.SingularUsageMetric: 500}, //changed usage not observed because of error
 			NextScrapeAt:       c.TimeNow().Add(5 * time.Minute),
 			ExpectedSize:       nil,
 			ScrapeErrorMessage: "GetAssetStatus failing as requested",
@@ -611,7 +612,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 			ResourceID:         1,
 			UUID:               "asset1",
 			Size:               1000,
-			Usage:              db.UsageValues{db.SingularUsageMetric: 600},
+			Usage:              castellum.UsageValues{castellum.SingularUsageMetric: 600},
 			NextScrapeAt:       c.TimeNow().Add(5 * time.Minute),
 			ExpectedSize:       nil,
 			ScrapeErrorMessage: "",
@@ -663,10 +664,10 @@ func TestRestrictDownsizeBecauseOfMinimumSize(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
-			Reason:    db.OperationReasonLow,
+			Reason:    castellum.OperationReasonLow,
 			OldSize:   1000,
 			NewSize:   900,
-			Usage:     db.UsageValues{db.SingularUsageMetric: 100},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 100},
 			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
@@ -710,10 +711,10 @@ func TestRestrictUpsizeBecauseOfMaximumSize(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:          1,
 			AssetID:     1,
-			Reason:      db.OperationReasonCritical,
+			Reason:      castellum.OperationReasonCritical,
 			OldSize:     1000,
 			NewSize:     1100,
-			Usage:       db.UsageValues{db.SingularUsageMetric: 999},
+			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 999},
 			CreatedAt:   c.TimeNow(),
 			ConfirmedAt: p2time(c.TimeNow()),
 			GreenlitAt:  p2time(c.TimeNow()),
@@ -733,10 +734,10 @@ func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 		expectedOp := db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
-			Reason:    db.OperationReasonHigh,
+			Reason:    castellum.OperationReasonHigh,
 			OldSize:   1000,
 			NewSize:   ifthenelseU64(res.SingleStep, 1126, 1200),
-			Usage:     db.UsageValues{db.SingularUsageMetric: 900},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 900},
 			CreatedAt: c.TimeNow(),
 		}
 		t.ExpectPendingOperations(c.DB, expectedOp)
@@ -771,10 +772,10 @@ func TestDownsizeAllowedByMinimumFreeSize(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
-			Reason:    db.OperationReasonLow,
+			Reason:    castellum.OperationReasonLow,
 			OldSize:   1000,
 			NewSize:   ifthenelseU64(res.SingleStep, 700, 800),
-			Usage:     db.UsageValues{db.SingularUsageMetric: 100},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 100},
 			CreatedAt: c.TimeNow(),
 		})
 	})
@@ -797,10 +798,10 @@ func TestDownsizeRestrictedByMinimumFreeSize(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
-			Reason:    db.OperationReasonLow,
+			Reason:    castellum.OperationReasonLow,
 			OldSize:   1000,
 			NewSize:   900,
-			Usage:     db.UsageValues{db.SingularUsageMetric: 100},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 100},
 			CreatedAt: c.TimeNow(),
 		})
 	})
@@ -836,10 +837,10 @@ func TestUpsizeForcedByMinimumFreeSize(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
-			Reason:    db.OperationReasonHigh,
+			Reason:    castellum.OperationReasonHigh,
 			OldSize:   1000,
 			NewSize:   ifthenelseU64(res.SingleStep, 1100, 1200),
-			Usage:     db.UsageValues{db.SingularUsageMetric: 500},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			CreatedAt: c.TimeNow(),
 		})
 
@@ -881,10 +882,10 @@ func TestCriticalUpsizeTakingMultipleStepsAtOnce(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:          1,
 			AssetID:     1,
-			Reason:      db.OperationReasonCritical,
+			Reason:      castellum.OperationReasonCritical,
 			OldSize:     1380,
 			NewSize:     1434,
-			Usage:       db.UsageValues{db.SingularUsageMetric: 1350},
+			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 1350},
 			CreatedAt:   c.TimeNow(),
 			ConfirmedAt: p2time(c.TimeNow()),
 			GreenlitAt:  p2time(c.TimeNow()),
@@ -912,7 +913,7 @@ func TestZeroAndOneSizedAssetsWithoutUsage(baseT *testing.T) {
 				ResourceID:   1,
 				UUID:         "asset1",
 				Size:         assetSize,
-				Usage:        db.UsageValues{db.SingularUsageMetric: 0},
+				Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 0},
 				NextScrapeAt: c.TimeNow().Add(5 * time.Minute),
 				ExpectedSize: nil,
 			})
@@ -937,20 +938,20 @@ func TestZeroSizedAssetWithUsage(baseT *testing.T) {
 			ResourceID:     1,
 			UUID:           "asset1",
 			Size:           0,
-			Usage:          db.UsageValues{db.SingularUsageMetric: 5},
+			Usage:          castellum.UsageValues{castellum.SingularUsageMetric: 5},
 			NextScrapeAt:   c.TimeNow().Add(5 * time.Minute),
 			ExpectedSize:   nil,
-			CriticalUsages: string(db.SingularUsageMetric),
+			CriticalUsages: string(castellum.SingularUsageMetric),
 		})
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:      1,
 			AssetID: 1,
-			Reason:  db.OperationReasonCritical,
+			Reason:  castellum.OperationReasonCritical,
 			OldSize: 0,
 			//single-step resizing will end up one higher than percentage-step
 			//resizing because it also wants to leave the high threshold
 			NewSize:     ifthenelseU64(res.SingleStep, 7, 6),
-			Usage:       db.UsageValues{db.SingularUsageMetric: 5},
+			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 5},
 			CreatedAt:   c.TimeNow(),
 			ConfirmedAt: p2time(c.TimeNow()),
 			GreenlitAt:  p2time(c.TimeNow()),
@@ -974,10 +975,10 @@ func TestDownsizeWithZeroUsageAndMinimumFreeSize(baseT *testing.T) {
 		expectedOp := db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
-			Reason:    db.OperationReasonLow,
+			Reason:    castellum.OperationReasonLow,
 			OldSize:   5,
 			NewSize:   ifthenelseU64(res.SingleStep, 2, 4),
-			Usage:     db.UsageValues{db.SingularUsageMetric: 0},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 0},
 			CreatedAt: c.TimeNow(),
 		}
 		t.ExpectPendingOperations(c.DB, expectedOp)
@@ -998,13 +999,13 @@ func TestDownsizeShouldNotGoIntoHighThreshold(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:      1,
 			AssetID: 1,
-			Reason:  db.OperationReasonLow,
+			Reason:  castellum.OperationReasonLow,
 			OldSize: 1000,
 			//single-step resizing targets just above the low threshold and thus does
 			//not come near the high threshold, but percentage-step resizing would
 			//(if it ignored the high threshold) go down to size 800 which is too far
 			NewSize:   ifthenelseU64(res.SingleStep, 933, 876),
-			Usage:     db.UsageValues{db.SingularUsageMetric: 700},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 700},
 			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
@@ -1025,14 +1026,14 @@ func TestDownsizeShouldNotGoIntoCriticalThreshold(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:      1,
 			AssetID: 1,
-			Reason:  db.OperationReasonLow,
+			Reason:  castellum.OperationReasonLow,
 			OldSize: 1000,
 			//single-step resizing targets just above the low threshold and thus does
 			//not come near the critical threshold, but percentage-step resizing
 			//would (if it ignored the critical threshold) go down to size 800 which
 			//is too far
 			NewSize:   ifthenelseU64(res.SingleStep, 888, 843),
-			Usage:     db.UsageValues{db.SingularUsageMetric: 800},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 800},
 			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
@@ -1053,14 +1054,14 @@ func TestUpsizeShouldNotGoIntoHighThreshold(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:      1,
 			AssetID: 1,
-			Reason:  db.OperationReasonHigh,
+			Reason:  castellum.OperationReasonHigh,
 			OldSize: 1000,
 			//single-step resizing targets just below the high threshold and thus
 			//does not come near the low threshold, but percentage-step resizing
 			//would (if it ignored the low threshold) go up to size 1200 which is too
 			//far
 			NewSize:   ifthenelseU64(res.SingleStep, 1046, 1149),
-			Usage:     db.UsageValues{db.SingularUsageMetric: 230},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 230},
 			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
@@ -1097,10 +1098,10 @@ func TestResizesEndingUpInLowThreshold(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:          1,
 			AssetID:     1,
-			Reason:      db.OperationReasonCritical,
+			Reason:      castellum.OperationReasonCritical,
 			OldSize:     14,
 			NewSize:     15,
-			Usage:       db.UsageValues{db.SingularUsageMetric: 14},
+			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 14},
 			CreatedAt:   c.TimeNow(),
 			ConfirmedAt: p2time(c.TimeNow()),
 			GreenlitAt:  p2time(c.TimeNow()),
@@ -1129,10 +1130,10 @@ func TestUpsizeBecauseOfMinFreeSizePassingLowThreshold(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
-			Reason:    db.OperationReasonHigh,
+			Reason:    castellum.OperationReasonHigh,
 			OldSize:   1000,
 			NewSize:   3000,
-			Usage:     db.UsageValues{db.SingularUsageMetric: 500},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			CreatedAt: c.TimeNow(),
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
