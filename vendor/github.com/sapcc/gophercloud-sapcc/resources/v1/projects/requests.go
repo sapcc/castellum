@@ -127,7 +127,8 @@ type UpdateOptsBuilder interface {
 
 // UpdateOpts contains parameters to update a project.
 type UpdateOpts struct {
-	Services limesresources.QuotaRequest `json:"services"`
+	Services limesresources.QuotaRequest         `json:"services"`
+	Bursting *limesresources.ProjectBurstingInfo `json:"bursting,omitempty"`
 }
 
 // ToProjectUpdateMap formats a UpdateOpts into a map of headers and a request body.

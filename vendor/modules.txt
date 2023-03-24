@@ -104,7 +104,7 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/rabbitmq/amqp091-go v1.7.0
+# github.com/rabbitmq/amqp091-go v1.8.0
 ## explicit; go 1.16
 github.com/rabbitmq/amqp091-go
 # github.com/rogpeppe/go-internal v1.9.0
@@ -119,7 +119,7 @@ github.com/sapcc/go-api-declarations/cadf
 github.com/sapcc/go-api-declarations/internal/marshal
 github.com/sapcc/go-api-declarations/limes
 github.com/sapcc/go-api-declarations/limes/resources
-# github.com/sapcc/go-bits v0.0.0-20230316103846-e4db5274bdc9
+# github.com/sapcc/go-bits v0.0.0-20230323091343-206e6dcb3e83
 ## explicit; go 1.19
 github.com/sapcc/go-bits/assert
 github.com/sapcc/go-bits/audittools
@@ -141,7 +141,7 @@ github.com/sapcc/go-bits/pluggable
 github.com/sapcc/go-bits/promquery
 github.com/sapcc/go-bits/respondwith
 github.com/sapcc/go-bits/sqlext
-# github.com/sapcc/gophercloud-sapcc v0.0.0-20230316102519-081e14084e81
+# github.com/sapcc/gophercloud-sapcc v0.0.0-20230323091419-72d4e6b5b1ef
 ## explicit; go 1.19
 github.com/sapcc/gophercloud-sapcc/clients
 github.com/sapcc/gophercloud-sapcc/resources/v1/projects
