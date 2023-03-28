@@ -37,10 +37,6 @@ type Context struct {
 	//with doubles in tests)
 	TimeNow   func() time.Time
 	AddJitter func(time.Duration) time.Duration
-
-	//When Blocker is not nil, tasks that support concurrent operation will
-	//withhold operations until this channel is closed.
-	Blocker <-chan struct{}
 }
 
 // ApplyDefaults injects the regular runtime dependencies into this Context.

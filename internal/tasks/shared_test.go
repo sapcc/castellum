@@ -22,25 +22,27 @@ import (
 	"time"
 
 	"github.com/go-gorp/gorp/v3"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
 )
 
-func withContext(t test.T, action func(*Context, *plugins.AssetManagerStatic, *test.FakeClock)) {
+func withContext(t test.T, action func(*Context, *plugins.AssetManagerStatic, *test.FakeClock, *prometheus.Registry)) {
 	t.WithDB(nil, func(dbi *gorp.DbMap) {
 		amStatic := &plugins.AssetManagerStatic{AssetType: "foo"}
 		//clock starts at an easily recognizable value
 		clockVar := test.FakeClock(99990)
 		clock := &clockVar
+		registry := prometheus.NewPedanticRegistry()
 
 		action(&Context{
 			DB:        dbi,
 			Team:      core.AssetManagerTeam{amStatic},
 			TimeNow:   clock.Now,
 			AddJitter: noJitter,
-		}, amStatic, clock)
+		}, amStatic, clock, registry)
 	})
 }
 

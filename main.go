@@ -22,7 +22,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"database/sql"
 	"fmt"
 	"io"
 	"net"
@@ -54,6 +53,7 @@ import (
 	"github.com/sapcc/castellum/internal/api"
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
+	"github.com/sapcc/castellum/internal/jobloop"
 	"github.com/sapcc/castellum/internal/tasks"
 
 	//load asset managers
@@ -213,71 +213,15 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	//The observer process has a budget of 16 DB connections. Since there are
 	//much more assets than resources, we give most of these (12 of 16) to asset
 	//scraping. The rest is split between resource scrape and garbage collection.
-	goQueuedJobLoop(ctx, 12, c.PollForAssetScrapes())
-	goQueuedJobLoop(ctx, 3, c.PollForResourceScrapes())
-	go cronJobLoop(3*time.Minute, c.EnsureScrapingCounters)
-	go cronJobLoop(1*time.Hour, func() error {
-		return tasks.CollectGarbage(dbi, time.Now().Add(-14*24*time.Hour)) //14 days
-	})
+	go c.AssetScrapingJob(nil).Run(ctx, jobloop.NumGoroutines(12))
+	go c.ResourceScrapingJob(nil).Run(ctx, jobloop.NumGoroutines(3))
+	go c.GarbageCollectionJob(nil).Run(ctx)
 
 	//use main goroutine to emit Prometheus metrics
 	handler := httpapi.Compose(httpapi.HealthCheckAPI{SkipRequestLog: true})
 	http.Handle("/", handler)
 	http.Handle("/metrics", promhttp.Handler())
 	must.Succeed(httpext.ListenAndServeContext(ctx, httpListenAddr, nil))
-}
-
-// Execute a task repeatedly, but slow down when sql.ErrNoRows is returned by it.
-// (Tasks use this error value to indicate that nothing needs scraping, so we
-// can back off a bit to avoid useless database load.)
-func goQueuedJobLoop(ctx context.Context, numGoroutines int, poll tasks.JobPoller) {
-	ch := make(chan tasks.Job) //unbuffered!
-
-	//one goroutine to select tasks from the DB
-	go func(ch chan<- tasks.Job) {
-		for ctx.Err() == nil {
-			job, err := poll()
-			switch err {
-			case nil:
-				ch <- job
-			case sql.ErrNoRows:
-				//no jobs waiting right now - slow down a bit to avoid useless DB load
-				time.Sleep(3 * time.Second)
-			default:
-				logg.Error(err.Error())
-			}
-		}
-
-		//`ctx` has expired -> tell workers to shutdown
-		close(ch)
-	}(ch)
-
-	//multiple goroutines to execute tasks
-	//
-	//We use `numGoroutines-1` here since we already have spawned one goroutine
-	//for the polling above.
-	for i := 0; i < numGoroutines-1; i++ {
-		go func(ch <-chan tasks.Job) {
-			for job := range ch {
-				err := job.Execute()
-				if err != nil {
-					logg.Error(err.Error())
-				}
-			}
-		}(ch)
-	}
-}
-
-// Execute a task repeatedly, in set intervals. Unlike queuedJobLoop(), this
-// does not change pace when errors are returned.
-func cronJobLoop(interval time.Duration, task func() error) {
-	for {
-		err := task()
-		if err != nil {
-			logg.Error(err.Error())
-		}
-		time.Sleep(interval)
-	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -292,8 +236,7 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 	//The worker process has a budget of 16 DB connections. We need one of that
 	//for polling, the rest can go towards resizing workers. Therefore, 12 resize
 	//workers is a safe number that even leaves some headroom for future tasks.
-	goQueuedJobLoop(ctx, 12, c.PollForAssetResizes)
-	go cronJobLoop(3*time.Minute, c.EnsureResizingCounters)
+	go c.AssetResizingJob(nil).Run(ctx, jobloop.NumGoroutines(12))
 
 	//use main goroutine to emit Prometheus metrics
 	handler := httpapi.Compose(httpapi.HealthCheckAPI{SkipRequestLog: true})
