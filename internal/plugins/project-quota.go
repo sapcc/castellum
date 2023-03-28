@@ -25,6 +25,7 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-api-declarations/limes"
 	limesresources "github.com/sapcc/go-api-declarations/limes/resources"
 	"github.com/sapcc/go-bits/logg"
@@ -112,7 +113,7 @@ func (m *assetManagerProjectQuota) InfoForAssetType(assetType db.AssetType) *cor
 		if thisAssetType == assetType {
 			return &core.AssetTypeInfo{
 				AssetType:    thisAssetType,
-				UsageMetrics: []db.UsageMetric{db.SingularUsageMetric},
+				UsageMetrics: []castellum.UsageMetric{castellum.SingularUsageMetric},
 			}
 		}
 	}
@@ -151,14 +152,14 @@ func (m *assetManagerProjectQuota) ListAssets(res db.Resource) ([]string, error)
 }
 
 // SetAssetSize implements the core.AssetManager interface.
-func (m *assetManagerProjectQuota) SetAssetSize(res db.Resource, projectID string, oldSize, newSize uint64) (db.OperationOutcome, error) {
+func (m *assetManagerProjectQuota) SetAssetSize(res db.Resource, projectID string, oldSize, newSize uint64) (castellum.OperationOutcome, error) {
 	info, err := m.parseAssetType(res.AssetType)
 	if err != nil {
-		return db.OperationOutcomeErrored, err
+		return castellum.OperationOutcomeErrored, err
 	}
 	project, err := m.Provider.GetProject(projectID)
 	if err != nil {
-		return db.OperationOutcomeErrored, err
+		return castellum.OperationOutcomeErrored, err
 	}
 
 	quotaReq := limesresources.QuotaRequest{
@@ -177,11 +178,11 @@ func (m *assetManagerProjectQuota) SetAssetSize(res db.Resource, projectID strin
 	}
 	if err != nil {
 		if isUserError(err) {
-			return db.OperationOutcomeFailed, err
+			return castellum.OperationOutcomeFailed, err
 		}
-		return db.OperationOutcomeErrored, err
+		return castellum.OperationOutcomeErrored, err
 	}
-	return db.OperationOutcomeSucceeded, nil
+	return castellum.OperationOutcomeSucceeded, nil
 }
 
 func isUserError(err error) bool {
@@ -200,7 +201,7 @@ func (m *assetManagerProjectQuota) GetAssetStatus(res db.Resource, projectID str
 	}
 	return core.AssetStatus{
 		Size:  *resource.Quota,
-		Usage: db.UsageValues{db.SingularUsageMetric: float64(resource.Usage)},
+		Usage: castellum.UsageValues{castellum.SingularUsageMetric: float64(resource.Usage)},
 	}, nil
 }
 

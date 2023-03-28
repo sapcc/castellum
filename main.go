@@ -42,6 +42,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
 	"github.com/sapcc/go-api-declarations/bininfo"
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpapi"
@@ -372,7 +373,7 @@ PROMPT:
 					logg.Error(err.Error())
 					continue
 				}
-				usageValues := make(db.UsageValues)
+				usageValues := make(castellum.UsageValues)
 				for _, field := range fields[4:] {
 					subfields := strings.SplitN(field, "=", 2)
 					if len(subfields) != 2 {
@@ -384,7 +385,7 @@ PROMPT:
 						logg.Error(err.Error())
 						continue PROMPT
 					}
-					usageValues[db.UsageMetric(subfields[0])] = usage
+					usageValues[castellum.UsageMetric(subfields[0])] = usage
 				}
 				previousStatus = &core.AssetStatus{Size: size, Usage: usageValues}
 			default:

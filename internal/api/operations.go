@@ -26,6 +26,7 @@ import (
 
 	"github.com/go-gorp/gorp/v3"
 	"github.com/gorilla/mux"
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/respondwith"
@@ -130,7 +131,7 @@ func (h handler) GetPendingOperations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allOps := []Operation{}
+	allOps := []castellum.StandaloneOperation{}
 	for _, dbResource := range dbResources {
 		//find operations
 		var ops []db.PendingOperation
@@ -156,7 +157,7 @@ func (h handler) GetPendingOperations(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondwith.JSON(w, http.StatusOK, struct {
-		PendingOperations []Operation `json:"pending_operations"`
+		PendingOperations []castellum.StandaloneOperation `json:"pending_operations"`
 	}{allOps})
 }
 
@@ -184,14 +185,14 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	relevantOps := []Operation{}
+	relevantOps := []castellum.StandaloneOperation{}
 	for _, dbResource := range dbResources {
 		_, info := h.Team.ForAssetType(dbResource.AssetType)
 
 		failedOpsByAssetID, err := recentOperationQuery{
 			DB:           h.DB,
 			ResourceID:   dbResource.ID,
-			Outcomes:     []db.OperationOutcome{db.OperationOutcomeFailed, db.OperationOutcomeErrored},
+			Outcomes:     []castellum.OperationOutcome{castellum.OperationOutcomeFailed, castellum.OperationOutcomeErrored},
 			OverriddenBy: `TRUE`,
 		}.Execute()
 		if respondwith.ErrorText(w, err) {
@@ -217,7 +218,7 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 	}
 
 	respondwith.JSON(w, http.StatusOK, struct {
-		Operations []Operation `json:"recently_failed_operations"`
+		Operations []castellum.StandaloneOperation `json:"recently_failed_operations"`
 	}{relevantOps})
 }
 
@@ -234,14 +235,14 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 	}
 	maxFinishedAt := h.TimeNow().Add(-maxAge)
 
-	relevantOps := []Operation{}
+	relevantOps := []castellum.StandaloneOperation{}
 	for _, dbResource := range dbResources {
 		//find succeeded operations
 		succeededOpsByAssetID, err := recentOperationQuery{
 			DB:           h.DB,
 			ResourceID:   dbResource.ID,
-			Outcomes:     []db.OperationOutcome{db.OperationOutcomeSucceeded},
-			OverriddenBy: fmt.Sprintf(`outcome != '%s'`, db.OperationOutcomeCancelled),
+			Outcomes:     []castellum.OperationOutcome{castellum.OperationOutcomeSucceeded},
+			OverriddenBy: fmt.Sprintf(`outcome != '%s'`, castellum.OperationOutcomeCancelled),
 		}.Execute()
 		if respondwith.ErrorText(w, err) {
 			return
@@ -264,14 +265,14 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 	}
 
 	respondwith.JSON(w, http.StatusOK, struct {
-		Operations []Operation `json:"recently_succeeded_operations"`
+		Operations []castellum.StandaloneOperation `json:"recently_succeeded_operations"`
 	}{relevantOps})
 }
 
 type recentOperationQuery struct {
 	DB           *gorp.DbMap
 	ResourceID   int64
-	Outcomes     []db.OperationOutcome
+	Outcomes     []castellum.OperationOutcome
 	OverriddenBy string //contains a condition for an SQL WHERE clause
 }
 

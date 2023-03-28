@@ -26,6 +26,7 @@ import (
 	policy "github.com/databus23/goslo.policy"
 	"github.com/go-gorp/gorp/v3"
 	"github.com/gophercloud/gophercloud"
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpapi"
@@ -41,7 +42,7 @@ func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action fun
 	t.WithDB(&baseline, func(dbi *gorp.DbMap) {
 		team := core.AssetManagerTeam{
 			&plugins.AssetManagerStatic{AssetType: "foo"},
-			&plugins.AssetManagerStatic{AssetType: "bar", UsageMetrics: []db.UsageMetric{"first", "second"}, ExpectsConfiguration: true},
+			&plugins.AssetManagerStatic{AssetType: "bar", UsageMetrics: []castellum.UsageMetric{"first", "second"}, ExpectsConfiguration: true},
 			&plugins.AssetManagerStatic{AssetType: "qux", ConflictsWithAssetType: "foo"},
 		}
 		mv := &MockValidator{}

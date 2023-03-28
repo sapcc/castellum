@@ -25,6 +25,7 @@ import (
 
 	"github.com/go-gorp/gorp/v3"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/sqlext"
 
@@ -38,6 +39,7 @@ var selectAndDeleteNextResizeQuery = sqlext.SimplifyWhitespace(`
 	DELETE FROM pending_operations WHERE id = (
 		SELECT id FROM pending_operations WHERE greenlit_at < $1 AND (retry_at IS NULL OR retry_at < $1)
 		ORDER BY reason ASC LIMIT 1
+		-- prevent other job loops from working on the same asset concurrently
 		FOR UPDATE SKIP LOCKED
 	) RETURNING *
 `)
@@ -153,7 +155,7 @@ func (j assetResizeJob) Execute() (returnedError error) {
 	//without us failing the entire operation. For outcome "failed", we have a
 	//user error and the user will likely only notice once they see the failed
 	//operation in Castellum, so there is little use retrying here.
-	if outcome == db.OperationOutcomeErrored && op.ErroredAttempts < maxRetries {
+	if outcome == castellum.OperationOutcomeErrored && op.ErroredAttempts < maxRetries {
 		op.ID = 0
 		op.ErroredAttempts++
 		retryAt := c.TimeNow().Add(retryInterval)
@@ -175,7 +177,7 @@ func (j assetResizeJob) Execute() (returnedError error) {
 
 	//mark asset as having just completed as resize operation (see
 	//logic in ScrapeNextAsset() for details)
-	if outcome == db.OperationOutcomeSucceeded {
+	if outcome == castellum.OperationOutcomeSucceeded {
 		_, err := tx.Exec(`UPDATE assets SET expected_size = $1 WHERE id = $2`,
 			finishedOp.NewSize, asset.ID)
 		if err != nil {
@@ -183,6 +185,6 @@ func (j assetResizeJob) Execute() (returnedError error) {
 		}
 	}
 
-	core.CountStateTransition(res, asset.UUID, db.OperationStateGreenlit, finishedOp.State())
+	core.CountStateTransition(res, asset.UUID, castellum.OperationStateGreenlit, finishedOp.State())
 	return tx.Commit()
 }

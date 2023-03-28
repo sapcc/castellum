@@ -30,6 +30,7 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares"
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/osext"
 
@@ -88,7 +89,7 @@ func (m *assetManagerNFS) InfoForAssetType(assetType db.AssetType) *core.AssetTy
 	if m.parseAssetType(assetType) != nil {
 		return &core.AssetTypeInfo{
 			AssetType:    assetType,
-			UsageMetrics: []db.UsageMetric{db.SingularUsageMetric},
+			UsageMetrics: []castellum.UsageMetric{castellum.SingularUsageMetric},
 		}
 	}
 	return nil
@@ -249,7 +250,7 @@ var (
 )
 
 // SetAssetSize implements the core.AssetManager interface.
-func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (db.OperationOutcome, error) {
+func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error) {
 	err := m.resize(assetUUID, oldSize, newSize /* useReverseOperation = */, false)
 	if err != nil {
 		match := sizeInconsistencyErrorRx.FindStringSubmatch(err.Error())
@@ -257,7 +258,7 @@ func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSiz
 			//ignore idiotic complaints about the share already having the size we
 			//want to resize to
 			if match[1] == match[2] {
-				return db.OperationOutcomeSucceeded, nil
+				return castellum.OperationOutcomeSucceeded, nil
 			}
 
 			//We only rely on sizes reported by NetApp. But bugs in the Manila API may
@@ -266,7 +267,7 @@ func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSiz
 			//direction. In this case, we try the opposite direction to see if it helps.
 			err2 := m.resize(assetUUID, oldSize, newSize /* useReverseOperation = */, true)
 			if err2 == nil {
-				return db.OperationOutcomeSucceeded, nil
+				return castellum.OperationOutcomeSucceeded, nil
 			}
 			//If not successful, still return the original error (to avoid confusion).
 		}
@@ -274,11 +275,11 @@ func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSiz
 		//If the resize fails because of missing quota or because the share is in
 		//status "error", it's the user's fault, not ours.
 		if quotaErrorRx.MatchString(err.Error()) || shareStatusErrorRx.MatchString(err.Error()) {
-			return db.OperationOutcomeFailed, err
+			return castellum.OperationOutcomeFailed, err
 		}
-		return db.OperationOutcomeErrored, err
+		return castellum.OperationOutcomeErrored, err
 	}
-	return db.OperationOutcomeSucceeded, nil
+	return castellum.OperationOutcomeSucceeded, nil
 }
 
 func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useReverseOperation bool) error {
@@ -314,7 +315,7 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 	}
 	status := core.AssetStatus{
 		Size:  data.SizeGiB,
-		Usage: db.UsageValues{db.SingularUsageMetric: data.UsageGiB},
+		Usage: castellum.UsageValues{castellum.SingularUsageMetric: data.UsageGiB},
 	}
 
 	//when size has changed compared to last time, double-check with the Manila

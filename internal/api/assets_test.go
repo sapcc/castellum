@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -97,10 +98,10 @@ func TestGetAsset(baseT *testing.T) {
 		//check rendering of a pending operation in state "created"
 		pendingOp := db.PendingOperation{
 			AssetID:   1,
-			Reason:    db.OperationReasonHigh,
+			Reason:    castellum.OperationReasonHigh,
 			OldSize:   1024,
 			NewSize:   2048,
-			Usage:     db.UsageValues{db.SingularUsageMetric: 768},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 768},
 			CreatedAt: time.Unix(21, 0).UTC(),
 		}
 		t.Must(h.DB.Insert(&pendingOp))

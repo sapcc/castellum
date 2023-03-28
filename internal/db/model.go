@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/go-gorp/gorp/v3"
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/easypg"
 )
 
@@ -48,11 +49,11 @@ type Resource struct {
 	//time. Those thresholds (in percent of usage) and delays (in seconds) are
 	//defined here. The "critical" threshold will cause immediate upscaling, so
 	//it does not have a configurable delay.
-	LowThresholdPercent      UsageValues `db:"low_threshold_percent"`
-	LowDelaySeconds          uint32      `db:"low_delay_seconds"`
-	HighThresholdPercent     UsageValues `db:"high_threshold_percent"`
-	HighDelaySeconds         uint32      `db:"high_delay_seconds"`
-	CriticalThresholdPercent UsageValues `db:"critical_threshold_percent"`
+	LowThresholdPercent      castellum.UsageValues `db:"low_threshold_percent"`
+	LowDelaySeconds          uint32                `db:"low_delay_seconds"`
+	HighThresholdPercent     castellum.UsageValues `db:"high_threshold_percent"`
+	HighDelaySeconds         uint32                `db:"high_delay_seconds"`
+	CriticalThresholdPercent castellum.UsageValues `db:"critical_threshold_percent"`
 
 	//This defines how much the asset's size changes per
 	//downscaling/upscaling operation (in % of previous size).
@@ -117,7 +118,7 @@ type Asset struct {
 	//value is defined by the plugin that implements this asset type.
 	Size uint64 `db:"size"`
 	//The asset's current utilization, in the same unit as .Size.
-	Usage UsageValues `db:"usage"`
+	Usage castellum.UsageValues `db:"usage"`
 
 	//This flag is set by a Castellum worker after a resize operation to indicate
 	//that the .Size attribute is outdated. The value is the new_size of the
@@ -148,15 +149,15 @@ type Asset struct {
 
 // PendingOperation describes an ongoing resize operation for an asset.
 type PendingOperation struct {
-	ID      int64           `db:"id"`
-	AssetID int64           `db:"asset_id"`
-	Reason  OperationReason `db:"reason"`
+	ID      int64                     `db:"id"`
+	AssetID int64                     `db:"asset_id"`
+	Reason  castellum.OperationReason `db:"reason"`
 
 	//.OldSize and .Usage mirror the state of the asset when the operation
 	//was created, and .NewSize defines the target size.
-	OldSize uint64      `db:"old_size"`
-	NewSize uint64      `db:"new_size"`
-	Usage   UsageValues `db:"usage"`
+	OldSize uint64                `db:"old_size"`
+	NewSize uint64                `db:"new_size"`
+	Usage   castellum.UsageValues `db:"usage"`
 
 	//This sequence of timestamps represent the various states that an operation enters in its lifecycle.
 
@@ -186,7 +187,7 @@ type PendingOperation struct {
 }
 
 // IntoFinishedOperation creates the FinishedOperation for this PendingOperation.
-func (o PendingOperation) IntoFinishedOperation(outcome OperationOutcome, finishedAt time.Time) FinishedOperation {
+func (o PendingOperation) IntoFinishedOperation(outcome castellum.OperationOutcome, finishedAt time.Time) FinishedOperation {
 	return FinishedOperation{
 		AssetID:            o.AssetID,
 		Reason:             o.Reason,
@@ -207,13 +208,13 @@ func (o PendingOperation) IntoFinishedOperation(outcome OperationOutcome, finish
 type FinishedOperation struct {
 	//All fields are identical in semantics to those in type PendingOperation, except
 	//where noted.
-	AssetID int64            `db:"asset_id"`
-	Reason  OperationReason  `db:"reason"`
-	Outcome OperationOutcome `db:"outcome"`
+	AssetID int64                      `db:"asset_id"`
+	Reason  castellum.OperationReason  `db:"reason"`
+	Outcome castellum.OperationOutcome `db:"outcome"`
 
-	OldSize uint64      `db:"old_size"`
-	NewSize uint64      `db:"new_size"`
-	Usage   UsageValues `db:"usage"`
+	OldSize uint64                `db:"old_size"`
+	NewSize uint64                `db:"new_size"`
+	Usage   castellum.UsageValues `db:"usage"`
 
 	CreatedAt   time.Time  `db:"created_at"`
 	ConfirmedAt *time.Time `db:"confirmed_at"`
@@ -226,74 +227,21 @@ type FinishedOperation struct {
 	ErroredAttempts    uint32  `db:"errored_attempts"`
 }
 
-// OperationReason is an enumeration type for possible reasons for a resize operation.
-type OperationReason string
-
-const (
-	//OperationReasonCritical indicates that the resize operation was triggered
-	//because the asset's usage exceeded the critical threshold.
-	OperationReasonCritical OperationReason = "critical"
-	//OperationReasonHigh indicates that the resize operation was triggered
-	//because the asset's usage exceeded the high threshold.
-	OperationReasonHigh OperationReason = "high"
-	//OperationReasonLow indicates that the resize operation was triggered
-	//because the asset's usage deceeded the low threshold.
-	OperationReasonLow OperationReason = "low"
-)
-
-// OperationOutcome is an enumeration type for possible outcomes for a resize operation.
-type OperationOutcome string
-
-const (
-	//OperationOutcomeSucceeded indicates that a resize operation was completed
-	//successfully.
-	OperationOutcomeSucceeded OperationOutcome = "succeeded"
-	//OperationOutcomeFailed indicates that a resize operation failed because of a problem on the side of the user (e.g. insufficient quota).
-	OperationOutcomeFailed OperationOutcome = "failed"
-	//OperationOutcomeErrored indicates that a resize operation errored because of a problem in OpenStack.
-	OperationOutcomeErrored OperationOutcome = "errored"
-	//OperationOutcomeCancelled indicates that a resize operation was cancelled. This happens when usage falls back into normal
-	OperationOutcomeCancelled OperationOutcome = "cancelled"
-)
-
-// OperationState is an enumeration type for all possible states of an operation.
-type OperationState string
-
-const (
-	//OperationStateDidNotExist is a bogus state for transitions where there is no
-	//previous state.
-	OperationStateDidNotExist OperationState = "none"
-	//OperationStateCreated is a PendingOperation with ConfirmedAt == nil.
-	OperationStateCreated OperationState = "created"
-	//OperationStateConfirmed is a PendingOperation with ConfirmedAt != nil && GreenlitAt == nil.
-	OperationStateConfirmed OperationState = "confirmed"
-	//OperationStateGreenlit is a PendingOperation with ConfirmedAt != nil && GreenlitAt != nil.
-	OperationStateGreenlit OperationState = "greenlit"
-	//OperationStateCancelled is a FinishedOperation with OperationOutcomeCancelled.
-	OperationStateCancelled = OperationState(OperationOutcomeCancelled)
-	//OperationStateSucceeded is a FinishedOperation with OperationOutcomeSucceeded.
-	OperationStateSucceeded = OperationState(OperationOutcomeSucceeded)
-	//OperationStateFailed is a FinishedOperation with OperationOutcomeFailed.
-	OperationStateFailed = OperationState(OperationOutcomeFailed)
-	//OperationStateErrored is a FinishedOperation with OperationOutcomeErrored.
-	OperationStateErrored = OperationState(OperationOutcomeErrored)
-)
-
 // State returns the operation's state as a word.
-func (o PendingOperation) State() OperationState {
+func (o PendingOperation) State() castellum.OperationState {
 	switch {
 	case o.ConfirmedAt == nil:
-		return OperationStateCreated
+		return castellum.OperationStateCreated
 	case o.GreenlitAt == nil:
-		return OperationStateConfirmed
+		return castellum.OperationStateConfirmed
 	default:
-		return OperationStateGreenlit
+		return castellum.OperationStateGreenlit
 	}
 }
 
 // State returns the operation's state as a word.
-func (o FinishedOperation) State() OperationState {
-	return OperationState(o.Outcome)
+func (o FinishedOperation) State() castellum.OperationState {
+	return castellum.OperationState(o.Outcome)
 }
 
 // Init connects to the database and initializes the schema and model types.

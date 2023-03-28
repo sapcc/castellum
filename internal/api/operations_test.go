@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -50,10 +51,10 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 		//check rendering of a pending operation in state "created"
 		pendingOp := db.PendingOperation{
 			AssetID:   1,
-			Reason:    db.OperationReasonHigh,
+			Reason:    castellum.OperationReasonHigh,
 			OldSize:   1024,
 			NewSize:   2048,
-			Usage:     db.UsageValues{db.SingularUsageMetric: 768},
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 768},
 			CreatedAt: time.Unix(21, 0).UTC(),
 		}
 		t.Must(h.DB.Insert(&pendingOp))
@@ -112,24 +113,24 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 	})
 }
 
-func withEitherFailedOrErroredOperation(action func(db.OperationOutcome)) {
+func withEitherFailedOrErroredOperation(action func(castellum.OperationOutcome)) {
 	//start-data.sql has a FinishedOperation with outcome "errored". This helper
 	//function enables us to re-run tests concerning this "errored" operation with
 	//its outcome changed to "failed", to check that "failed" behaves like
 	//"errored" for the operations report endpoints.
-	action(db.OperationOutcomeErrored)
-	action(db.OperationOutcomeFailed)
+	action(castellum.OperationOutcomeErrored)
+	action(castellum.OperationOutcomeFailed)
 }
 
 func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withEitherFailedOrErroredOperation(func(failedOperationOutcome db.OperationOutcome) {
+	withEitherFailedOrErroredOperation(func(failedOperationOutcome castellum.OperationOutcome) {
 		withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
 			testCommonEndpointBehavior(t, hh, mv,
 				"/v1/projects/%s/resources/%s/operations/recently-failed")
 
 			t.MustExec(h.DB, `UPDATE finished_operations SET outcome = $1 WHERE outcome = $2`,
-				failedOperationOutcome, db.OperationOutcomeErrored,
+				failedOperationOutcome, castellum.OperationOutcomeErrored,
 			)
 
 			//start-data.sql has a recently failed critical operation for fooasset1, but
@@ -148,7 +149,7 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 			//critical usage levels
 			t.MustExec(h.DB, `UPDATE resources SET critical_threshold_percent = 95 WHERE id = 1`)
 			t.MustExec(h.DB, `UPDATE assets SET usage = $1 WHERE id = $2`,
-				db.UsageValues{db.SingularUsageMetric: 0.97 * 1024},
+				castellum.UsageValues{castellum.SingularUsageMetric: 0.97 * 1024},
 				1,
 			)
 			expectedOps = []assert.JSONObject{{
@@ -185,10 +186,10 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 			//not yet finished
 			t.Must(h.DB.Insert(&db.PendingOperation{
 				AssetID:   1,
-				Reason:    db.OperationReasonHigh,
+				Reason:    castellum.OperationReasonHigh,
 				OldSize:   1024,
 				NewSize:   2048,
-				Usage:     db.UsageValues{db.SingularUsageMetric: 768},
+				Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 768},
 				CreatedAt: time.Unix(61, 0).UTC(),
 			}))
 			assert.HTTPRequest{
@@ -202,11 +203,11 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 			//finished after the failed one
 			t.Must(h.DB.Insert(&db.FinishedOperation{
 				AssetID:     1,
-				Reason:      db.OperationReasonHigh,
-				Outcome:     db.OperationOutcomeSucceeded,
+				Reason:      castellum.OperationReasonHigh,
+				Outcome:     castellum.OperationOutcomeSucceeded,
 				OldSize:     1024,
 				NewSize:     2048,
-				Usage:       db.UsageValues{db.SingularUsageMetric: 768},
+				Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 768},
 				CreatedAt:   time.Unix(61, 0).UTC(),
 				ConfirmedAt: p2time(time.Unix(61, 0).UTC()),
 				GreenlitAt:  p2time(time.Unix(61, 0).UTC()),
@@ -243,13 +244,13 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	clock := test.FakeClock(3600)
-	withEitherFailedOrErroredOperation(func(failedOperationOutcome db.OperationOutcome) {
+	withEitherFailedOrErroredOperation(func(failedOperationOutcome castellum.OperationOutcome) {
 		withHandler(t, core.Config{}, clock.Now, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
 			testCommonEndpointBehavior(t, hh, mv,
 				"/v1/projects/%s/resources/%s/operations/recently-succeeded")
 
 			t.MustExec(h.DB, `UPDATE finished_operations SET outcome = $1 WHERE outcome = $2`,
-				failedOperationOutcome, db.OperationOutcomeErrored,
+				failedOperationOutcome, castellum.OperationOutcomeErrored,
 			)
 
 			//start-data.sql has a succeeded operation, but also a failed/errored one on the same
@@ -265,7 +266,7 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 
 			//make the failed operation a cancelled one to surface the succeeded operation
 			t.MustExec(h.DB, `UPDATE finished_operations SET outcome = $1 WHERE outcome = $2`,
-				db.OperationOutcomeCancelled, failedOperationOutcome,
+				castellum.OperationOutcomeCancelled, failedOperationOutcome,
 			)
 			expectedOps = []assert.JSONObject{{
 				"project_id": "project1",
@@ -301,10 +302,10 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 			//not yet finished
 			t.Must(h.DB.Insert(&db.PendingOperation{
 				AssetID:   1,
-				Reason:    db.OperationReasonHigh,
+				Reason:    castellum.OperationReasonHigh,
 				OldSize:   1024,
 				NewSize:   2048,
-				Usage:     db.UsageValues{db.SingularUsageMetric: 768},
+				Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 768},
 				CreatedAt: time.Unix(61, 0).UTC(),
 			}))
 			req := assert.HTTPRequest{

@@ -20,6 +20,7 @@ package core
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/logg"
 
 	"github.com/sapcc/castellum/internal/db"
@@ -39,7 +40,7 @@ func init() {
 
 // CountStateTransition must be called whenever an operation changes to a
 // different state.
-func CountStateTransition(res db.Resource, assetUUID string, from, to db.OperationState) {
+func CountStateTransition(res db.Resource, assetUUID string, from, to castellum.OperationState) {
 	labels := prometheus.Labels{
 		"project_id": res.ScopeUUID,
 		"asset":      string(res.AssetType),

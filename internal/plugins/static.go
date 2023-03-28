@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/sapcc/go-api-declarations/castellum"
+
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 )
@@ -54,7 +56,7 @@ type StaticAsset struct {
 type AssetManagerStatic struct {
 	AssetType                 db.AssetType
 	Assets                    map[string]map[string]StaticAsset
-	UsageMetrics              []db.UsageMetric
+	UsageMetrics              []castellum.UsageMetric
 	CheckResourceAllowedFails bool
 	SetAssetSizeFails         bool
 	ExpectsConfiguration      bool
@@ -74,7 +76,7 @@ func (m AssetManagerStatic) InfoForAssetType(assetType db.AssetType) *core.Asset
 	if assetType == m.AssetType {
 		usageMetrics := m.UsageMetrics
 		if len(usageMetrics) == 0 {
-			usageMetrics = []db.UsageMetric{db.SingularUsageMetric}
+			usageMetrics = []castellum.UsageMetric{castellum.SingularUsageMetric}
 		}
 		return &core.AssetTypeInfo{
 			AssetType:    m.AssetType,
@@ -174,32 +176,32 @@ func (m AssetManagerStatic) GetAssetStatus(res db.Resource, assetUUID string, pr
 
 	return core.AssetStatus{
 		Size:  asset.Size,
-		Usage: db.UsageValues{db.SingularUsageMetric: float64(asset.Usage)},
+		Usage: castellum.UsageValues{castellum.SingularUsageMetric: float64(asset.Usage)},
 	}, nil
 }
 
 // SetAssetSize implements the core.AssetManager interface.
-func (m AssetManagerStatic) SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (db.OperationOutcome, error) {
+func (m AssetManagerStatic) SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error) {
 	if res.AssetType != m.AssetType {
-		return db.OperationOutcomeErrored, errWrongAssetType
+		return castellum.OperationOutcomeErrored, errWrongAssetType
 	}
 	assets, exists := m.Assets[res.ScopeUUID]
 	if !exists {
-		return db.OperationOutcomeErrored, errUnknownProject
+		return castellum.OperationOutcomeErrored, errUnknownProject
 	}
 	asset, exists := assets[assetUUID]
 	if !exists {
-		return db.OperationOutcomeErrored, errUnknownAsset
+		return castellum.OperationOutcomeErrored, errUnknownAsset
 	}
 	if asset.Size != oldSize {
-		return db.OperationOutcomeErrored, errOldSizeMismatch
+		return castellum.OperationOutcomeErrored, errOldSizeMismatch
 	}
 	if asset.Usage > newSize {
-		return db.OperationOutcomeErrored, errTooSmall
+		return castellum.OperationOutcomeErrored, errTooSmall
 	}
 	if m.SetAssetSizeFails {
-		return db.OperationOutcomeFailed, errSimulatedSetFailure
+		return castellum.OperationOutcomeFailed, errSimulatedSetFailure
 	}
 	assets[assetUUID] = StaticAsset{Size: newSize, Usage: asset.Usage}
-	return db.OperationOutcomeSucceeded, nil
+	return castellum.OperationOutcomeSucceeded, nil
 }

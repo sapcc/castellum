@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sapcc/go-api-declarations/castellum"
+
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
@@ -50,31 +52,31 @@ func TestCollectGarbage(baseT *testing.T) {
 		ops := []db.FinishedOperation{
 			{
 				AssetID:    1,
-				Reason:     db.OperationReasonHigh,
-				Outcome:    db.OperationOutcomeCancelled,
+				Reason:     castellum.OperationReasonHigh,
+				Outcome:    castellum.OperationOutcomeCancelled,
 				OldSize:    1000,
 				NewSize:    1200,
-				Usage:      db.UsageValues{db.SingularUsageMetric: 800},
+				Usage:      castellum.UsageValues{castellum.SingularUsageMetric: 800},
 				CreatedAt:  fakeNow.Add(-40 * time.Minute),
 				FinishedAt: fakeNow.Add(-30 * time.Minute),
 			},
 			{
 				AssetID:    2,
-				Reason:     db.OperationReasonHigh,
-				Outcome:    db.OperationOutcomeCancelled,
+				Reason:     castellum.OperationReasonHigh,
+				Outcome:    castellum.OperationOutcomeCancelled,
 				OldSize:    1000,
 				NewSize:    1200,
-				Usage:      db.UsageValues{db.SingularUsageMetric: 800},
+				Usage:      castellum.UsageValues{castellum.SingularUsageMetric: 800},
 				CreatedAt:  fakeNow.Add(-25 * time.Minute),
 				FinishedAt: fakeNow.Add(-20 * time.Minute),
 			},
 			{
 				AssetID:     2,
-				Reason:      db.OperationReasonCritical,
-				Outcome:     db.OperationOutcomeSucceeded,
+				Reason:      castellum.OperationReasonCritical,
+				Outcome:     castellum.OperationOutcomeSucceeded,
 				OldSize:     1000,
 				NewSize:     1200,
-				Usage:       db.UsageValues{db.SingularUsageMetric: 800},
+				Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 800},
 				CreatedAt:   fakeNow.Add(-20 * time.Minute),
 				ConfirmedAt: p2time(fakeNow.Add(-20 * time.Minute)),
 				GreenlitAt:  p2time(fakeNow.Add(-20 * time.Minute)),
