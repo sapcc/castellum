@@ -116,16 +116,15 @@ Each component (API, observer and worker) exposes Prometheus metrics via HTTP, o
 | ---------------- | ----------- |
 | `castellum_operation_state_transitions`<br/>(API, observer, worker) | Counter for state transitions of operations.<br/>Labels: `project_id`, `asset` (asset type), `from_state` and `to_state`. |
 | `castellum_has_project_resource`<br/>(observer) | Constant value of 1 for each existing project resource. This can be used in alert expressions to distinguish resources with autoscaling from resources without autoscaling.<br/>Labels: `project_id`, `asset` (asset type). |
-| `castellum_successful_resource_scrapes`<br/>(observer) | Counter for successful resource scrape operations.<br/>Labels: `asset` (asset type). |
-| `castellum_failed_resource_scrapes`<br/>(observer) | Counter for failed resource scrape operations.<br/>Labels: `asset` (asset type). |
-| `castellum_successful_asset_scrapes`<br/>(observer) | Counter for successful asset scrape operations.<br/>Labels: `asset` (asset type). |
-| `castellum_failed_asset_scrapes`<br/>(observer) | Counter for failed asset scrape operations.<br/>Labels: `asset` (asset type). |
-| `castellum_asset_resizes`<br/>(worker) | Counter for asset resize operations that ran to completion, i.e. which consumed a PendingOperation and produced a FinishedOperation in either "succeeded" or "failed" state.<br/>Labels: `asset` (asset type). |
-| `castellum_errored_asset_resizes`<br/>(worker) | Counter for asset resize operations that encountered an unexpected error, i.e. which could not consume a PendingOperation and produce a FinishedOperation.<br/>Labels: `asset` (asset type). |
+| `castellum_resource_scrapes`<br/>(observer) | Counter for executed resource scrape operations.<br/>Labels: `asset` (asset type), `task_outcome` (either `failure` or `success`). |
+| `castellum_asset_scrapes`<br/>(observer) | Counter for executed asset scrape operations.<br/>Labels: `asset` (asset type), `task_outcome` (either `failure` or `success`). |
+| `castellum_asset_resizes`<br/>(worker) | Counter for asset resize operations (see below for semantics notes).<br/>Labels: `asset` (asset type), `task_outcome` (either `failure` or `success`). |
 
-Note that `castellum_asset_resizes` is also incremented for resize operations that move into state "failed". The counter
-`castellum_errored_asset_resizes` is only incremented when a greenlit operation cannot be moved out of the "greenlit"
-state at all. Resize operations that move into state "failed" are counted by `castellum_operation_state_transitions{to_state="failed"}`.
+Note that `castellum_asset_resizes{task_outcome="success"}` is incremented whenever a PendingOperation is consumed and
+converted into a FinishedOperation, even if that operation moved into state "failed" or "errored". The counter
+`castellum_asset_resizes{task_outcome="failure"}` is only incremented when a greenlit operation cannot be moved out of
+the "greenlit" state at all. Resize operations that move into state "failed" or "errored" are counted by
+`castellum_operation_state_transitions{to_state=~"failed|errored"}`.
 
 [pq-uri]: https://www.postgresql.org/docs/9.6/static/libpq-connect.html#LIBPQ-CONNSTRING
 [os-env]: https://docs.openstack.org/python-openstackclient/latest/cli/man/openstack.html
