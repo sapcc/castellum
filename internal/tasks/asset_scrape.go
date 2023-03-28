@@ -56,7 +56,7 @@ var logScrapes = osext.GetenvBool("CASTELLUM_LOG_SCRAPES")
 func (c *Context) AssetScrapingJob(registerer prometheus.Registerer) jobloop.Job {
 	return (&jobloop.TxGuardedJob[*gorp.Transaction, db.Asset]{
 		Metadata: jobloop.JobMetadata{
-			Description:     "asset scraping",
+			ReadableName:    "asset scraping",
 			ConcurrencySafe: true, //because "FOR UPDATE SKIP LOCKED" is used
 			CounterOpts: prometheus.CounterOpts{
 				Name: "castellum_asset_scrapes",

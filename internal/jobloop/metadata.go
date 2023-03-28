@@ -24,8 +24,9 @@ import "github.com/prometheus/client_golang/prometheus"
 // JobMetadata contains metadata and common configuration for a job. Types that
 // implement the Job interface will usually be holding one of these.
 type JobMetadata struct {
-	// A description of this job. This will be used in error log messages.
-	Description string
+	// A readable name or short description for this job. This will be used in
+	// log messages.
+	ReadableName string
 	// Whether it is safe to have multiple tasks running in parallel. If set to
 	// false, the job will never select a new task before the previous task has
 	// been fully processed, thus avoiding any concurrent processing of tasks.
@@ -42,6 +43,12 @@ type JobMetadata struct {
 	counter *prometheus.CounterVec
 }
 
+const (
+	outcomeLabelName    = "task_outcome"
+	outcomeValueSuccess = "success"
+	outcomeValueFailure = "failure"
+)
+
 // Internal API for job implementations: Registers and initializes the
 // CounterVec that is described by this JobMetadata.
 func (m *JobMetadata) setup(registerer prometheus.Registerer) {
@@ -49,7 +56,7 @@ func (m *JobMetadata) setup(registerer prometheus.Registerer) {
 		registerer = prometheus.DefaultRegisterer
 	}
 
-	allLabelNames := append([]string{"task_outcome"}, m.CounterLabels...)
+	allLabelNames := append([]string{outcomeLabelName}, m.CounterLabels...)
 	m.counter = prometheus.NewCounterVec(m.CounterOpts, allLabelNames)
 	registerer.MustRegister(m.counter)
 
@@ -59,9 +66,9 @@ func (m *JobMetadata) setup(registerer prometheus.Registerer) {
 	for _, label := range m.CounterLabels {
 		labels[label] = "unknown"
 	}
-	labels["task_outcome"] = "success"
+	labels[outcomeLabelName] = outcomeValueSuccess
 	m.counter.With(labels).Add(0)
-	labels["task_outcome"] = "failure"
+	labels[outcomeLabelName] = "failure"
 	m.counter.With(labels).Add(0)
 }
 
@@ -72,7 +79,6 @@ func (m *JobMetadata) makeLabels() prometheus.Labels {
 	for _, label := range m.CounterLabels {
 		labels[label] = "early-db-access"
 	}
-	labels["task_outcome"] = "unknown"
 	return labels
 }
 
@@ -80,9 +86,9 @@ func (m *JobMetadata) makeLabels() prometheus.Labels {
 // "task_outcome" label will be set based on whether `err` is nil or not.
 func (m *JobMetadata) countTask(labels prometheus.Labels, err error) {
 	if err == nil {
-		labels["task_outcome"] = "success"
+		labels[outcomeLabelName] = outcomeValueSuccess
 	} else {
-		labels["task_outcome"] = "failure"
+		labels[outcomeLabelName] = "failure"
 	}
 	m.counter.With(labels).Inc()
 }

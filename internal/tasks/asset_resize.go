@@ -54,7 +54,7 @@ const (
 func (c *Context) AssetResizingJob(registerer prometheus.Registerer) jobloop.Job {
 	return (&jobloop.TxGuardedJob[*gorp.Transaction, db.PendingOperation]{
 		Metadata: jobloop.JobMetadata{
-			Description:     "asset resizing",
+			ReadableName:    "asset resizing",
 			ConcurrencySafe: true, //because "FOR UPDATE SKIP LOCKED" is used
 			CounterOpts: prometheus.CounterOpts{
 				Name: "castellum_asset_resizes",

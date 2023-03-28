@@ -49,13 +49,13 @@ import (
 //	func (e *MyExecutor) EventTranslationJob(registerer prometheus.Registerer) jobloop.Job {
 //	    return (&jobloop.ProducerConsumerJob[*eventTranslateTask]{ //task type is private
 //	        Metadata: jobloop.JobMetadata {
-//	            Description:     "event translation",
+//	            ReadableName:    "event translation",
 //	            ConcurrencySafe: true,
 //	            MetricOpts:      prometheus.CounterOpts{Name: "myservice_event_translations"},
 //	            LabelNames:      []string{"event_type"},
 //	        },
-//	        DiscoverTask:      e.findNextEventToTranslate,    //function is private
-//	        ProcessTask:       e.translateEvent,              //function is private
+//	        DiscoverTask: e.findNextEventToTranslate, //function is private
+//	        ProcessTask:  e.translateEvent,           //function is private
 //	    }).Setup(registerer)
 //	}
 type ProducerConsumerJob[T any] struct {
@@ -101,7 +101,7 @@ func (j *ProducerConsumerJob[T]) produceOne() (T, prometheus.Labels, error) {
 	labels := j.Metadata.makeLabels()
 	task, err := j.DiscoverTask(labels)
 	if err != nil && err != sql.ErrNoRows {
-		err = fmt.Errorf("could not select task for job %q: %w", j.Metadata.Description, err)
+		err = fmt.Errorf("could not select task for job %q: %w", j.Metadata.ReadableName, err)
 		j.Metadata.countTask(labels, err)
 	}
 	return task, labels, err
@@ -112,7 +112,7 @@ func (j *ProducerConsumerJob[T]) produceOne() (T, prometheus.Labels, error) {
 func (j *ProducerConsumerJob[T]) consumeOne(task T, labels prometheus.Labels) error {
 	err := j.ProcessTask(task, labels)
 	if err != nil {
-		err = fmt.Errorf("could not process task for job %q: %w", j.Metadata.Description, err)
+		err = fmt.Errorf("could not process task for job %q: %w", j.Metadata.ReadableName, err)
 	}
 	j.Metadata.countTask(labels, err)
 	return err

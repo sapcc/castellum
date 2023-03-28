@@ -34,9 +34,9 @@ type CronJob struct {
 	// A function that will be executed by this job once per Interval.
 	//
 	// The provided label set will have been prefilled with the labels from
-	// Metadata.CounterLabels and all label values set to "early-db-access". The
-	// implementation is expected to substitute the actual label values as soon
-	// as they become known.
+	// Metadata.CounterLabels and all label values set to "early-db-access".
+	// The implementation is expected to substitute the actual label values as
+	// soon as they become known.
 	Task func(prometheus.Labels) error
 }
 
@@ -76,7 +76,7 @@ func (i cronJobImpl) Run(ctx context.Context, numGoroutines uint) {
 		case <-ticker.C:
 			err := i.ProcessOne()
 			if err != nil {
-				logg.Error("could not run task for job %q: %s", i.j.Metadata.Description, err.Error())
+				logg.Error("could not run task for job %q: %s", i.j.Metadata.ReadableName, err.Error())
 			}
 		}
 	}

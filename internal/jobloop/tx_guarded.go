@@ -30,12 +30,29 @@ import (
 // ensures that the entirety of each task runs within a single SQL transaction,
 // and manages the lifecycle of that transaction.
 //
-// This type can be used in the same way as ProducerConsumerJob, except that it
+// This type works in the same way as ProducerConsumerJob, except that it
 // offers a different set of callbacks. The type arguments are:
 //   - P (Payload), the payload for one individual task (e.g. the ORM object
 //     corresponding to the selected row)
 //   - Tx (Transaction), the type for a DB transaction (the job implementation
 //     will call Rollback on this in case of errors)
+//
+// Just like ProducerConsumerJob, the type arguments are often private types,
+// and the job type as well as the callbacks are hidden within the defining
+// package, like this:
+//
+//	func (e *MyExecutor) EventTranslationJob(registerer prometheus.Registerer) jobloop.Job {
+//	    return (&jobloop.TxGuardedJob[*sql.Tx, dbmodel.Event]{
+//	        Metadata: jobloop.JobMetadata {
+//	            ReadableName:    "event translation",
+//	            ConcurrencySafe: true,
+//	            MetricOpts:      prometheus.CounterOpts{Name: "myservice_event_translations"},
+//	            LabelNames:      []string{"event_type"},
+//	        },
+//	        BeginTx:     e.DB.Begin,
+//	        DiscoverRow: e.findNextEventToTranslate, //function is private
+//	        ProcessRow:  e.translateEvent,           //function is private
+//	    }).Setup(registerer)
 type TxGuardedJob[Tx sqlext.Rollbacker, P any] struct {
 	Metadata JobMetadata
 

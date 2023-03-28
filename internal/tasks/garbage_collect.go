@@ -31,7 +31,7 @@ import (
 func (c *Context) GarbageCollectionJob(registerer prometheus.Registerer) jobloop.Job {
 	return (&jobloop.CronJob{
 		Metadata: jobloop.JobMetadata{
-			Description: "garbage collection of finished operations",
+			ReadableName: "garbage collection of finished operations",
 			CounterOpts: prometheus.CounterOpts{
 				Name: "castellum_finished_operation_garbage_collection_runs",
 				Help: "Counter for garbage collection runs of the finished_operations table.",

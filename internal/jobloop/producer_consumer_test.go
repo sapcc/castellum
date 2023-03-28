@@ -48,7 +48,7 @@ type producerConsumerEngine struct {
 func (e *producerConsumerEngine) Job(registerer prometheus.Registerer) Job {
 	return (&ProducerConsumerJob[int]{
 		Metadata: JobMetadata{
-			Description:     "test job",
+			ReadableName:    "test job",
 			ConcurrencySafe: true,
 			CounterOpts:     prometheus.CounterOpts{Name: "test_job_runs", Help: "Hello World."},
 			CounterLabels:   []string{},

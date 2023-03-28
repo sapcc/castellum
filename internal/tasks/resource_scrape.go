@@ -48,7 +48,7 @@ var scrapeResourceSearchQuery = sqlext.SimplifyWhitespace(`
 func (c *Context) ResourceScrapingJob(registerer prometheus.Registerer) jobloop.Job {
 	return (&jobloop.TxGuardedJob[*gorp.Transaction, db.Resource]{
 		Metadata: jobloop.JobMetadata{
-			Description:     "resource scraping",
+			ReadableName:    "resource scraping",
 			ConcurrencySafe: true, //because "FOR UPDATE SKIP LOCKED" is used
 			CounterOpts: prometheus.CounterOpts{
 				Name: "castellum_resource_scrapes",
