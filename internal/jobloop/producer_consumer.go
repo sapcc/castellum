@@ -130,8 +130,10 @@ func (i producerConsumerJobImpl[T]) ProcessOne() error {
 }
 
 // Run implements the jobloop.Job interface.
-func (i producerConsumerJobImpl[T]) Run(ctx context.Context, numGoroutines uint) {
-	switch numGoroutines {
+func (i producerConsumerJobImpl[T]) Run(ctx context.Context, opts ...Option) {
+	cfg := newJobConfig(opts)
+
+	switch cfg.NumGoroutines {
 	case 0:
 		panic("ProducerConsumerJob.Run() called with numGoroutines == 0")
 	case 1:
@@ -140,11 +142,11 @@ func (i producerConsumerJobImpl[T]) Run(ctx context.Context, numGoroutines uint)
 		if !i.j.Metadata.ConcurrencySafe {
 			panic("ProducerConsumerJob.Run() called with numGoroutines > 1, but job is not ConcurrencySafe")
 		}
-		i.runMultiThreaded(ctx, numGoroutines)
+		i.runMultiThreaded(ctx, cfg.NumGoroutines)
 	}
 }
 
-// Implementation of Run() for `numGoroutines == 1`.
+// Implementation of Run() for `cfg.NumGoroutines == 1`.
 func (i producerConsumerJobImpl[T]) runSingleThreaded(ctx context.Context) {
 	for ctx.Err() == nil { //while ctx has not expired
 		err := i.ProcessOne()
@@ -157,7 +159,7 @@ type taskWithLabels[T any] struct {
 	Labels prometheus.Labels
 }
 
-// Implementation of Run() for `numGoroutines > 1`.
+// Implementation of Run() for `cfg.NumGoroutines > 1`.
 func (i producerConsumerJobImpl[T]) runMultiThreaded(ctx context.Context, numGoroutines uint) {
 	j := i.j
 	ch := make(chan taskWithLabels[T]) //unbuffered!

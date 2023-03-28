@@ -32,8 +32,6 @@ type Job interface {
 	// be executed, `sql.ErrNoRows` is returned.
 	ProcessOne() error
 	// Run blocks the current goroutine and executes tasks until `ctx` expires.
-	// The job is allowed to spawn up to `numGoroutines-1` additional goroutines
-	// to process tasks concurrently. It is guaranteed that no more than
-	// `numGoroutines` tasks will be processed concurrently at any point in time.
-	Run(ctx context.Context, numGoroutines uint)
+	// The runtime behavior of the job can be configured through Option arguments.
+	Run(ctx context.Context, opts ...Option)
 }

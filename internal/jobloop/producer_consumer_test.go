@@ -130,7 +130,7 @@ func TestSingleThreaded(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		defer wgJobLoop.Done()
-		job.Run(ctx, 1)
+		job.Run(ctx)
 	}()
 
 	//wait until all tasks have been dispatched
@@ -160,7 +160,7 @@ func TestMultiThreaded(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		defer wgJobLoop.Done()
-		job.Run(ctx, 11)
+		job.Run(ctx, NumGoroutines(11))
 	}()
 
 	//wait until all tasks have been dispatched

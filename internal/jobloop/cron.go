@@ -65,7 +65,7 @@ func (i cronJobImpl) ProcessOne() error {
 }
 
 // Run implements the Job interface.
-func (i cronJobImpl) Run(ctx context.Context, numGoroutines uint) {
+func (i cronJobImpl) Run(ctx context.Context, opts ...Option) {
 	ticker := time.NewTicker(i.j.Interval)
 	defer ticker.Stop()
 

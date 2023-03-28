@@ -53,6 +53,7 @@ import (
 	"github.com/sapcc/castellum/internal/api"
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
+	"github.com/sapcc/castellum/internal/jobloop"
 	"github.com/sapcc/castellum/internal/tasks"
 
 	//load asset managers
@@ -212,9 +213,9 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	//The observer process has a budget of 16 DB connections. Since there are
 	//much more assets than resources, we give most of these (12 of 16) to asset
 	//scraping. The rest is split between resource scrape and garbage collection.
-	go c.AssetScrapingJob(nil).Run(ctx, 12)
-	go c.ResourceScrapingJob(nil).Run(ctx, 3)
-	go c.GarbageCollectionJob(nil).Run(ctx, 1)
+	go c.AssetScrapingJob(nil).Run(ctx, jobloop.NumGoroutines(12))
+	go c.ResourceScrapingJob(nil).Run(ctx, jobloop.NumGoroutines(3))
+	go c.GarbageCollectionJob(nil).Run(ctx)
 
 	//use main goroutine to emit Prometheus metrics
 	handler := httpapi.Compose(httpapi.HealthCheckAPI{SkipRequestLog: true})
@@ -235,7 +236,7 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 	//The worker process has a budget of 16 DB connections. We need one of that
 	//for polling, the rest can go towards resizing workers. Therefore, 12 resize
 	//workers is a safe number that even leaves some headroom for future tasks.
-	go c.AssetResizingJob(nil).Run(ctx, 12)
+	go c.AssetResizingJob(nil).Run(ctx, jobloop.NumGoroutines(12))
 
 	//use main goroutine to emit Prometheus metrics
 	handler := httpapi.Compose(httpapi.HealthCheckAPI{SkipRequestLog: true})
