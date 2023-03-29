@@ -17,7 +17,8 @@
 ******************************************************************************/
 
 // Package jobloop contains the Job trait that abstracts over several types of
-// worker loops.
+// worker loops. The package provides the basic implementation of these worker
+// loops, including basic instrumentation.
 package jobloop
 
 import (

@@ -25,12 +25,12 @@ import (
 	"github.com/go-gorp/gorp/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-api-declarations/castellum"
+	"github.com/sapcc/go-bits/jobloop"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/sqlext"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
-	"github.com/sapcc/castellum/internal/jobloop"
 )
 
 // WARNING: This must be run in a transaction, or else `FOR UPDATE SKIP LOCKED`

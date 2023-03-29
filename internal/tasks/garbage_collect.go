@@ -23,8 +23,7 @@ import (
 
 	"github.com/go-gorp/gorp/v3"
 	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/sapcc/castellum/internal/jobloop"
+	"github.com/sapcc/go-bits/jobloop"
 )
 
 // GarbageCollectionJob removes old entries from the finished_operations table.

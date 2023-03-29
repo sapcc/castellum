@@ -22,6 +22,7 @@ import (
 	"database/sql"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/sapcc/go-bits/sqlext"
 )
 
