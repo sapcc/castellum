@@ -6,14 +6,14 @@ require (
 	github.com/databus23/goslo.policy v0.0.0-20210929125152-81bf2876dbdb
 	github.com/dlmiddlecote/sqlstats v1.0.2
 	github.com/go-gorp/gorp/v3 v3.1.0
-	github.com/gophercloud/gophercloud v1.2.0
+	github.com/gophercloud/gophercloud v1.3.0
 	github.com/gophercloud/utils v0.0.0-20230324070755-05e9e7f5ea4d
 	github.com/gorilla/mux v1.8.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/rs/cors v1.8.3
 	github.com/sapcc/go-api-declarations v1.5.0
-	github.com/sapcc/go-bits v0.0.0-20230329135247-82ec642f9479
-	github.com/sapcc/gophercloud-sapcc v0.0.0-20230323091419-72d4e6b5b1ef
+	github.com/sapcc/go-bits v0.0.0-20230330081034-6c004b82649f
+	github.com/sapcc/gophercloud-sapcc v0.0.0-20230330081015-28312b987989
 	gopkg.in/yaml.v2 v2.4.0
 )
 
