@@ -132,6 +132,10 @@ func (c MockProviderClient) GetDomain(domainID string) (*core.CachedDomain, erro
 	}
 }
 
+func (c MockProviderClient) FindProjectID(projectName, projectDomainName string) (string, error) {
+	panic("FindProjectID is not implemented in MockProviderClient")
+}
+
 func testCommonEndpointBehavior(t test.T, hh http.Handler, validator *MockValidator, pathPattern string) {
 	path := func(projectID, resourceID string) string {
 		return fmt.Sprintf(pathPattern, projectID, resourceID)

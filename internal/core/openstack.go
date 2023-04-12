@@ -48,6 +48,10 @@ type ProviderClient interface {
 	//GetDomain queries the given domain ID in Keystone, unless it is already cached.
 	//When the project does not exist, nil is returned instead of an error.
 	GetDomain(domainID string) (*CachedDomain, error)
+
+	//FindProjectID searches for a project with the given name and domain name.
+	//When the project does not exist, "" is returned instead of an error.
+	FindProjectID(projectName, projectDomainName string) (string, error)
 }
 
 // providerClientImpl is the implementation for the ProviderClient interface.
@@ -286,4 +290,55 @@ func (p *providerClientImpl) GetDomain(domainID string) (*CachedDomain, error) {
 	p.domainCache[domainID] = result
 	p.cacheMutex.Unlock()
 	return result, nil
+}
+
+// FindProjectID implements the ProviderClient interface.
+func (p *providerClientImpl) FindProjectID(projectName, projectDomainName string) (string, error) {
+	identityV3, err := p.CloudAdminClient(openstack.NewIdentityV3)
+	if err != nil {
+		return "", err
+	}
+	domainID, err := p.findDomainID(identityV3, projectDomainName)
+	if err != nil {
+		return "", err
+	}
+	if domainID == "" {
+		return "", nil //no matching domain, hence no matching project
+	}
+
+	allPages, err := projects.List(identityV3, projects.ListOpts{Name: projectName, DomainID: domainID}).AllPages()
+	if err != nil {
+		return "", err
+	}
+	allProjects, err := projects.ExtractProjects(allPages)
+	if err != nil {
+		return "", err
+	}
+	switch len(allProjects) {
+	case 0:
+		return "", nil //no matching project
+	case 1:
+		return allProjects[0].ID, nil
+	default:
+		return "", fmt.Errorf("multiple projects found with name %q in domain %q", projectName, projectDomainName)
+	}
+}
+
+func (p *providerClientImpl) findDomainID(identityV3 *gophercloud.ServiceClient, domainName string) (string, error) {
+	allPages, err := domains.List(identityV3, domains.ListOpts{Name: domainName}).AllPages()
+	if err != nil {
+		return "", fmt.Errorf("while listing domains with name %q: %w", domainName, err)
+	}
+	allDomains, err := domains.ExtractDomains(allPages)
+	if err != nil {
+		return "", fmt.Errorf("while listing domains with name %q: %w", domainName, err)
+	}
+	switch len(allDomains) {
+	case 0:
+		return "", nil //no matching domain
+	case 1:
+		return allDomains[0].ID, nil
+	default:
+		return "", fmt.Errorf("multiple domains found with name %q", domainName)
+	}
 }
