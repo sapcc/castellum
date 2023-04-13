@@ -22,7 +22,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/sapcc/go-api-declarations/cadf"
@@ -199,11 +198,7 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	errs := core.ApplyResourceSpecInto(dbResource, input, existingResources, h.Config, h.Team)
 	if len(errs) > 0 {
 		doAudit(http.StatusUnprocessableEntity)
-		errsStr := make([]string, len(errs))
-		for idx, err := range errs {
-			errsStr[idx] = err.Error()
-		}
-		http.Error(w, strings.Join(errsStr, "\n"), http.StatusUnprocessableEntity)
+		http.Error(w, errs.Join("\n"), http.StatusUnprocessableEntity)
 		return
 	}
 
