@@ -21,9 +21,7 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"sort"
 	"strings"
 	"time"
 
@@ -36,11 +34,6 @@ import (
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 )
-
-////////////////////////////////////////////////////////////////////////////////
-// data types
-
-// Resource is how a db.Resource looks like in the API.
 
 ////////////////////////////////////////////////////////////////////////////////
 // conversion and validation methods
@@ -92,172 +85,6 @@ func (h handler) ResourceFromDB(res db.Resource) (castellum.Resource, error) {
 		}
 	}
 	return result, nil
-}
-
-// UpdateDBResource updates the given db.Resource with the values provided in
-// this api.Resource.
-func UpdateDBResource(resource castellum.Resource, res *db.Resource, manager core.AssetManager, info core.AssetTypeInfo, maxAssetSize *uint64, existingResources []db.AssetType) (errors []string) {
-	complain := func(msg string, args ...interface{}) {
-		if len(args) > 0 {
-			msg = fmt.Sprintf(msg, args...)
-		}
-		errors = append(errors, msg)
-	}
-
-	if resource.ConfigJSON == nil {
-		res.ConfigJSON = ""
-	} else {
-		res.ConfigJSON = string(*resource.ConfigJSON)
-	}
-	err := manager.CheckResourceAllowed(res.AssetType, res.ScopeUUID, res.ConfigJSON, existingResources)
-	if err != nil {
-		complain(err.Error())
-	}
-
-	if resource.Checked != nil {
-		complain("resource.checked cannot be set via the API")
-	}
-	if resource.AssetCount != 0 {
-		complain("resource.asset_count cannot be set via the API")
-	}
-
-	//helper function to check the internal consistency of {Low,High,Critical}ThresholdPercent
-	checkThresholdCommon := func(tType string, vals castellum.UsageValues) {
-		isMetric := make(map[castellum.UsageMetric]bool)
-		for _, metric := range info.UsageMetrics {
-			isMetric[metric] = true
-			val, exists := vals[metric]
-			if !exists {
-				complain("missing %s threshold%s", tType, core.Identifier(metric, " for %s"))
-				continue
-			}
-			if val <= 0 || val > 100 {
-				complain("%s threshold%s must be above 0%% and below or at 100%% of usage", tType, core.Identifier(metric, " for %s"))
-			}
-		}
-
-		providedMetrics := make([]string, 0, len(vals))
-		for metric := range vals {
-			providedMetrics = append(providedMetrics, string(metric))
-		}
-		sort.Strings(providedMetrics) //for deterministic order of error messages in unit test
-		for _, metric := range providedMetrics {
-			if !isMetric[castellum.UsageMetric(metric)] {
-				complain("%s threshold specified for metric %q which is not valid for this asset type", tType, metric)
-			}
-		}
-	}
-
-	if resource.LowThreshold == nil {
-		res.LowThresholdPercent = info.MakeZeroUsageValues()
-		res.LowDelaySeconds = 0
-	} else {
-		res.LowThresholdPercent = resource.LowThreshold.UsagePercent
-		checkThresholdCommon("low", res.LowThresholdPercent)
-		res.LowDelaySeconds = resource.LowThreshold.DelaySeconds
-		if res.LowDelaySeconds == 0 {
-			complain("delay for low threshold is missing")
-		}
-	}
-
-	if resource.HighThreshold == nil {
-		res.HighThresholdPercent = info.MakeZeroUsageValues()
-		res.HighDelaySeconds = 0
-	} else {
-		res.HighThresholdPercent = resource.HighThreshold.UsagePercent
-		checkThresholdCommon("high", res.HighThresholdPercent)
-		res.HighDelaySeconds = resource.HighThreshold.DelaySeconds
-		if res.HighDelaySeconds == 0 {
-			complain("delay for high threshold is missing")
-		}
-	}
-
-	if resource.CriticalThreshold == nil {
-		res.CriticalThresholdPercent = info.MakeZeroUsageValues()
-	} else {
-		res.CriticalThresholdPercent = resource.CriticalThreshold.UsagePercent
-		checkThresholdCommon("critical", res.CriticalThresholdPercent)
-		if resource.CriticalThreshold.DelaySeconds != 0 {
-			complain("critical threshold may not have a delay")
-		}
-	}
-
-	if resource.LowThreshold != nil && resource.HighThreshold != nil {
-		for _, metric := range info.UsageMetrics {
-			if res.LowThresholdPercent[metric] > res.HighThresholdPercent[metric] {
-				complain("low threshold%s must be below high threshold", core.Identifier(metric, " for %s"))
-			}
-		}
-	}
-	if resource.LowThreshold != nil && resource.CriticalThreshold != nil {
-		for _, metric := range info.UsageMetrics {
-			if res.LowThresholdPercent[metric] > res.CriticalThresholdPercent[metric] {
-				complain("low threshold%s must be below critical threshold", core.Identifier(metric, " for %s"))
-			}
-		}
-	}
-	if resource.HighThreshold != nil && resource.CriticalThreshold != nil {
-		for _, metric := range info.UsageMetrics {
-			if res.HighThresholdPercent[metric] > res.CriticalThresholdPercent[metric] {
-				complain("high threshold%s must be below critical threshold", core.Identifier(metric, " for %s"))
-			}
-		}
-	}
-
-	if resource.LowThreshold == nil && resource.HighThreshold == nil && resource.CriticalThreshold == nil {
-		complain("at least one threshold must be configured")
-	}
-
-	res.SizeStepPercent = resource.SizeSteps.Percent
-	res.SingleStep = resource.SizeSteps.Single
-	if res.SingleStep {
-		if res.SizeStepPercent != 0 {
-			complain("percentage-based step may not be configured when single-step resizing is used")
-		}
-	} else {
-		if res.SizeStepPercent == 0 {
-			complain("size step must be greater than 0%")
-		}
-	}
-
-	if resource.SizeConstraints == nil {
-		if maxAssetSize != nil {
-			complain(fmt.Sprintf("maximum size must be configured for %s", info.AssetType))
-		}
-		res.MinimumSize = nil
-		res.MaximumSize = nil
-		res.MinimumFreeSize = nil
-	} else {
-		res.MinimumSize = resource.SizeConstraints.Minimum
-		if res.MinimumSize != nil && *res.MinimumSize == 0 {
-			res.MinimumSize = nil
-		}
-
-		res.MaximumSize = resource.SizeConstraints.Maximum
-		if res.MaximumSize == nil {
-			if maxAssetSize != nil {
-				complain(fmt.Sprintf("maximum size must be configured for %s", info.AssetType))
-			}
-		} else {
-			min := uint64(0)
-			if res.MinimumSize != nil {
-				min = *res.MinimumSize
-			}
-			if *res.MaximumSize <= min {
-				complain("maximum size must be greater than minimum size")
-			}
-			if maxAssetSize != nil && *res.MaximumSize > *maxAssetSize {
-				complain(fmt.Sprintf("maximum size must be %d or less", *maxAssetSize))
-			}
-		}
-
-		res.MinimumFreeSize = resource.SizeConstraints.MinimumFree
-		if res.MinimumFreeSize != nil && *res.MinimumFreeSize == 0 {
-			res.MinimumFreeSize = nil
-		}
-	}
-
-	return
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -337,9 +164,6 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	manager, info := h.Team.ForAssetType(dbResource.AssetType)
-	maxAssetSize := h.Config.MaxAssetSizeFor(info.AssetType)
-
 	action := cadf.UpdateAction
 	if dbResource.ID == 0 {
 		action = cadf.EnableAction
@@ -372,10 +196,14 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	errs := UpdateDBResource(input, dbResource, manager, info, maxAssetSize, existingResources)
+	errs := core.ApplyResourceSpecInto(dbResource, input, existingResources, h.Config, h.Team)
 	if len(errs) > 0 {
 		doAudit(http.StatusUnprocessableEntity)
-		http.Error(w, strings.Join(errs, "\n"), http.StatusUnprocessableEntity)
+		errsStr := make([]string, len(errs))
+		for idx, err := range errs {
+			errsStr[idx] = err.Error()
+		}
+		http.Error(w, strings.Join(errsStr, "\n"), http.StatusUnprocessableEntity)
 		return
 	}
 
