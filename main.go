@@ -123,7 +123,7 @@ func main() {
 		if len(os.Args) != 3 {
 			usage()
 		}
-		runAPI(&cfg, dbi, team, providerClient, httpListenAddr)
+		runAPI(cfg, dbi, team, providerClient, httpListenAddr)
 	case "observer":
 		if len(os.Args) != 3 {
 			usage()
@@ -151,7 +151,7 @@ func main() {
 ////////////////////////////////////////////////////////////////////////////////
 // task: API
 
-func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
+func runAPI(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
 	identityV3, err := providerClient.CloudAdminClient(openstack.NewIdentityV3)
 	if err != nil {
 		logg.Fatal("cannot find Keystone V3 API: " + err.Error())

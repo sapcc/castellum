@@ -58,7 +58,7 @@ func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action fun
 		if timeNow == nil {
 			timeNow = time.Now
 		}
-		h := &handler{Config: &cfg, DB: dbi, Team: team, Validator: mv, Provider: MockProviderClient{}, TimeNow: timeNow}
+		h := &handler{Config: cfg, DB: dbi, Team: team, Validator: mv, Provider: MockProviderClient{}, TimeNow: timeNow}
 		hh := httpapi.Compose(h, httpapi.WithoutLogging())
 		action(h, hh, mv, resources, assets)
 	})

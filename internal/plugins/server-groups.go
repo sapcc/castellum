@@ -114,7 +114,7 @@ func (m *assetManagerServerGroups) InfoForAssetType(assetType db.AssetType) *cor
 }
 
 // CheckResourceAllowed implements the core.AssetManager interface.
-func (m *assetManagerServerGroups) CheckResourceAllowed(assetType db.AssetType, scopeUUID, configJSON string, existingResources []db.AssetType) error {
+func (m *assetManagerServerGroups) CheckResourceAllowed(assetType db.AssetType, scopeUUID, configJSON string, existingResources map[db.AssetType]struct{}) error {
 	//check that the server group exists and is in the right project
 	groupID := strings.TrimPrefix(string(assetType), "server-group:")
 	group, err := m.getServerGroup(groupID)

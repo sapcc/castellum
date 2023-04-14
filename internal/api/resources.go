@@ -181,14 +181,14 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 			})
 	}
 
-	var existingResources []db.AssetType
+	existingResources := make(map[db.AssetType]struct{})
 	err := sqlext.ForeachRow(h.DB,
 		`SELECT asset_type FROM resources WHERE scope_uuid = $1`, []any{projectUUID},
 		func(rows *sql.Rows) error {
 			var assetType db.AssetType
 			err := rows.Scan(&assetType)
 			if err == nil {
-				existingResources = append(existingResources, assetType)
+				existingResources[assetType] = struct{}{}
 			}
 			return err
 		},
