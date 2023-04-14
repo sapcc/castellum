@@ -150,7 +150,7 @@ github.com/sapcc/go-bits/pluggable
 github.com/sapcc/go-bits/promquery
 github.com/sapcc/go-bits/respondwith
 github.com/sapcc/go-bits/sqlext
-# github.com/sapcc/gophercloud-sapcc v0.0.0-20230404144305-447dc9e2299b
+# github.com/sapcc/gophercloud-sapcc v0.0.0-20230412141637-d12efbe59583
 ## explicit; go 1.20
 github.com/sapcc/gophercloud-sapcc/clients
 github.com/sapcc/gophercloud-sapcc/resources/v1/projects
