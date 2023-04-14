@@ -157,6 +157,9 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	if !token.Require(w, dbResource.AssetType.PolicyRuleForWrite()) {
 		return
 	}
+	if h.rejectIfResourceSeeded(w, r, *dbResource) {
+		return
+	}
 
 	var input castellum.Resource
 	if !RequireJSON(w, r, &input) {
@@ -231,6 +234,10 @@ func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
 	if !token.Require(w, dbResource.AssetType.PolicyRuleForWrite()) {
 		return
 	}
+	if h.rejectIfResourceSeeded(w, r, *dbResource) {
+		return
+	}
+
 	// this allows to reuse the logAndPublishEvent() with same parameters except reasonCode
 	doAudit := func(statusCode int) {
 		logAndPublishEvent(requestTime, r, token, statusCode,

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/regexpext"
 	"gopkg.in/yaml.v2"
 
@@ -31,6 +32,7 @@ import (
 // Config contains everything that we found in the configuration file.
 type Config struct {
 	MaxAssetSizeRules []MaxAssetSizeRule `yaml:"max_asset_sizes"`
+	ProjectSeeds      []ProjectSeed      `yaml:"project_seeds"`
 }
 
 // LoadConfig loads the configuration file from the given path.
@@ -68,4 +70,39 @@ func (c Config) MaxAssetSizeFor(assetType db.AssetType) (result *uint64) {
 	}
 
 	return
+}
+
+// ProjectSeed appears in type Seed.
+type ProjectSeed struct {
+	ProjectName             string                              `json:"project_name"`
+	DomainName              string                              `json:"domain_name"`
+	Resources               map[db.AssetType]castellum.Resource `json:"resources"`
+	DisabledResourceRegexps []regexpext.BoundedRegexp           `json:"disabled_resources"`
+}
+
+// IsSeededResource returns true if the config contains a seed for this
+// resource. This is used by the API to reject PUT/DELETE requests to seeded
+// resources.
+func (c Config) IsSeededResource(project CachedProject, domain CachedDomain, assetType db.AssetType) bool {
+	for _, s := range c.ProjectSeeds {
+		if project.Name == s.ProjectName && domain.Name == s.DomainName {
+			return s.isSeededResource(assetType)
+		}
+	}
+	return false
+}
+
+func (s ProjectSeed) isSeededResource(assetType db.AssetType) bool {
+	_, exists := s.Resources[assetType]
+	if exists {
+		return true
+	}
+
+	for _, rx := range s.DisabledResourceRegexps {
+		if rx.MatchString(string(assetType)) {
+			return true
+		}
+	}
+
+	return false
 }
