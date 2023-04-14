@@ -20,56 +20,52 @@ package core
 
 import (
 	"fmt"
-	"regexp"
-	"strconv"
-	"strings"
+	"os"
+
+	"github.com/sapcc/go-bits/regexpext"
+	"gopkg.in/yaml.v2"
 
 	"github.com/sapcc/castellum/internal/db"
 )
 
-// Config contains the app-level configuration options.
+// Config contains everything that we found in the configuration file.
 type Config struct {
-	MaxAssetSizeRules []MaxAssetSizeRule
+	MaxAssetSizeRules []MaxAssetSizeRule `yaml:"max_asset_sizes"`
 }
 
+// LoadConfig loads the configuration file from the given path.
+func LoadConfig(configPath string) (Config, error) {
+	buf, err := os.ReadFile(configPath)
+	if err != nil {
+		return Config{}, err
+	}
+
+	var cfg Config
+	err = yaml.UnmarshalStrict(buf, &cfg)
+	if err != nil {
+		return Config{}, fmt.Errorf("could not parse %s: %w", configPath, err)
+	}
+
+	return cfg, nil
+}
+
+// MaxAssetSizeRule appears in type Config.
 type MaxAssetSizeRule struct {
-	Regex *regexp.Regexp
-	Value *uint64
+	AssetTypeRx regexpext.BoundedRegexp `yaml:"asset_type"`
+	Value       uint64                  `yaml:"value"`
 }
 
-func (c Config) MaxAssetSizeFor(AssetType db.AssetType) (maxAssetSize *uint64) {
+// MaxAssetSizeFor computes the highest permissible max_size value for this
+// asset type. If no constraints apply, nil is returned.
+func (c Config) MaxAssetSizeFor(assetType db.AssetType) (result *uint64) {
 	for _, rule := range c.MaxAssetSizeRules {
-		if rule.Regex.MatchString(string(AssetType)) {
-			if maxAssetSize == nil || *rule.Value < *maxAssetSize {
-				maxAssetSize = rule.Value
+		if rule.AssetTypeRx.MatchString(string(assetType)) {
+			if result == nil || rule.Value < *result {
+				val := rule.Value
+				result = &val
 			}
 		}
 	}
 
-	return maxAssetSize
-}
-
-func (c *Config) SetMaxAssetSizeRules(maxAssetSizeString string) error {
-	maxAssetSizes := strings.Split(maxAssetSizeString, ",")
-	for _, v := range maxAssetSizes {
-		sL := strings.Split(v, "=")
-		if len(sL) != 2 {
-			return fmt.Errorf("expected a max asset size configuration value in the format: '<asset-type>=<max-asset-size>', got: %s", v)
-		}
-		assetType := sL[0]
-		maxSize, err := strconv.ParseUint(sL[1], 10, 64)
-		if err != nil {
-			return err
-		}
-
-		rgx, err := regexp.Compile("^" + assetType + "$")
-		if err != nil {
-			return err
-		}
-		c.MaxAssetSizeRules = append(c.MaxAssetSizeRules, MaxAssetSizeRule{
-			Regex: rgx,
-			Value: &maxSize,
-		})
-	}
-	return nil
+	return
 }

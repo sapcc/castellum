@@ -148,6 +148,7 @@ github.com/sapcc/go-bits/must
 github.com/sapcc/go-bits/osext
 github.com/sapcc/go-bits/pluggable
 github.com/sapcc/go-bits/promquery
+github.com/sapcc/go-bits/regexpext
 github.com/sapcc/go-bits/respondwith
 github.com/sapcc/go-bits/sqlext
 # github.com/sapcc/gophercloud-sapcc v0.0.0-20230412141637-d12efbe59583

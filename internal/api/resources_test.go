@@ -19,7 +19,6 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -352,12 +351,15 @@ func TestPutResource(baseT *testing.T) {
 
 func TestMaxAssetSizeFor(t *testing.T) {
 	var (
-		cfg        core.Config
 		maxBarSize = uint64(42)
 		maxFooSize = uint64(30)
+		cfg        = core.Config{
+			MaxAssetSizeRules: []core.MaxAssetSizeRule{
+				{AssetTypeRx: "foo.*", Value: maxFooSize},
+				{AssetTypeRx: ".*bar", Value: maxBarSize},
+			},
+		}
 	)
-
-	assert.DeepEqual(t, "", cfg.SetMaxAssetSizeRules(fmt.Sprintf("foo.*=%d,.*bar=%d", maxFooSize, maxBarSize)), nil)
 
 	assert.DeepEqual(t, "foo", *cfg.MaxAssetSizeFor(db.AssetType("foo")), maxFooSize)
 	assert.DeepEqual(t, "bar", *cfg.MaxAssetSizeFor(db.AssetType("bar")), maxBarSize)
@@ -367,14 +369,13 @@ func TestMaxAssetSizeFor(t *testing.T) {
 }
 
 func TestPutResourceValidationErrors(baseT *testing.T) {
-	var (
-		maxFooSize uint64 = 30
-		cfg        core.Config
-	)
+	var cfg = core.Config{
+		MaxAssetSizeRules: []core.MaxAssetSizeRule{
+			{AssetTypeRx: "foo", Value: 30},
+		},
+	}
 
 	t := test.T{T: baseT}
-	assert.DeepEqual(baseT, "", cfg.SetMaxAssetSizeRules(fmt.Sprintf("foo=%d", maxFooSize)), nil)
-
 	withHandler(t, cfg, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
 		tr0.Ignore()
