@@ -71,16 +71,16 @@ All components receive configuration via environment variables. The following va
 | `CASTELLUM_DB_PORT` | `5432` | Port on which the PostgreSQL service is running on. |
 | `CASTELLUM_DB_NAME` | `castellum` | The name of the database. |
 | `CASTELLUM_DB_CONNECTION_OPTIONS` | *(optional)* | Database connection options. |
-| `CASTELLUM_HTTP_LISTEN_ADDRESS` | `:8080` | Listen address for the internal HTTP server. For `castellum observer/worker`, this just exposes Prometheus metrics on `/metrics`. For `castelum api`, this also exposes [the REST API](./docs/api-spec.md). |
-| `CASTELLUM_MAX_ASSET_SIZES` | *(optional)* | A comma-separated list of `<asset-type>=<max-size>` pairs. If present, only resource configurations honoring these constraints will be allowed. |
-| `CASTELLUM_OSLO_POLICY_PATH` | *(required)* | Path to the `policy.json` file for this service. See [*Oslo policy*](#oslo-policy) for details. |
-| `CASTELLUM_RABBITMQ_QUEUE_NAME` | *(required for enabling audit trail)* | Name for the queue that will hold the audit events. The events are published to the default exchange. |
-| `CASTELLUM_RABBITMQ_USERNAME` | `guest` | RabbitMQ Username. |
-| `CASTELLUM_RABBITMQ_PASSWORD` | `guest` | Password for the specified user. |
-| `CASTELLUM_RABBITMQ_HOSTNAME` | `localhost` | Hostname of the RabbitMQ server. |
-| `CASTELLUM_RABBITMQ_PORT` | `5672` |  Port number to which the underlying connection is made. |
-| `CASTELLUM_AUDIT_SILENT` | `false` | Disable audit event logging to standard output. |
+| `CASTELLUM_HTTP_LISTEN_ADDRESS` | `:8080` | Listen address for the internal HTTP server. For `castellum observer/worker`, this just exposes Prometheus metrics on `/metrics`. For `castellum api`, this also exposes [the REST API](./docs/api-spec.md). |
 | `CASTELLUM_LOG_SCRAPES` | `false` | Whether to write a log line for each asset scrape operation. This can be useful to debug situations where Castellum does not create operations when it should, but it generates a lot of log traffic (one line per asset per 5 minutes, which e.g. for 2000 assets is about 1 GiB per week). |
+| `CASTELLUM_MAX_ASSET_SIZES` | *(optional)* | A comma-separated list of `<asset-type>=<max-size>` pairs. If present, only resource configurations honoring these constraints will be allowed. |
+| `CASTELLUM_OSLO_POLICY_PATH`<br>(API only) | *(required)* | Path to the `policy.json` file for this service. See [*Oslo policy*](#oslo-policy) for details. |
+| `CASTELLUM_RABBITMQ_QUEUE_NAME`<br>(API only) | *(required for enabling audit trail)* | Name for the queue that will hold the audit events. The events are published to the default exchange. |
+| `CASTELLUM_RABBITMQ_USERNAME`<br>(API only) | `guest` | RabbitMQ Username. |
+| `CASTELLUM_RABBITMQ_PASSWORD`<br>(API only) | `guest` | Password for the specified user. |
+| `CASTELLUM_RABBITMQ_HOSTNAME`<br>(API only) | `localhost` | Hostname of the RabbitMQ server. |
+| `CASTELLUM_RABBITMQ_PORT`<br>(API only) | `5672` |  Port number to which the underlying connection is made. |
+| `CASTELLUM_AUDIT_SILENT`<br>(API only) | `false` | Disable audit event logging to standard output. |
 | `OS_...` | *(required)* | A full set of OpenStack auth environment variables for Castellum's service user. See [documentation for openstackclient][os-env] for details. |
 
 ### Oslo policy
