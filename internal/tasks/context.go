@@ -30,8 +30,10 @@ import (
 // Context holds things used by the various task implementations in this
 // package.
 type Context struct {
-	DB   *gorp.DbMap
-	Team core.AssetManagerTeam
+	Config         core.Config
+	DB             *gorp.DbMap
+	Team           core.AssetManagerTeam
+	ProviderClient core.ProviderClient
 
 	//dependency injection slots (usually filled by ApplyDefaults(), but filled
 	//with doubles in tests)

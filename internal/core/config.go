@@ -94,10 +94,10 @@ func (c Config) IsSeededResource(project CachedProject, domain CachedDomain, ass
 
 func (s ProjectSeed) isSeededResource(assetType db.AssetType) bool {
 	_, exists := s.Resources[assetType]
-	if exists {
-		return true
-	}
+	return exists || s.ForbidsResource(assetType)
+}
 
+func (s ProjectSeed) ForbidsResource(assetType db.AssetType) bool {
 	for _, rx := range s.DisabledResourceRegexps {
 		if rx.MatchString(string(assetType)) {
 			return true

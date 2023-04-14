@@ -128,7 +128,7 @@ func main() {
 		if len(os.Args) != 3 {
 			usage()
 		}
-		runObserver(dbi, team, httpListenAddr)
+		runObserver(cfg, dbi, team, providerClient, httpListenAddr)
 	case "worker":
 		if len(os.Args) != 3 {
 			usage()
@@ -202,10 +202,10 @@ func runAPI(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provid
 ////////////////////////////////////////////////////////////////////////////////
 // task: observer
 
-func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
+func runObserver(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
 	ctx := httpext.ContextWithSIGINT(context.Background(), 1*time.Second)
 
-	c := tasks.Context{DB: dbi, Team: team}
+	c := tasks.Context{Config: cfg, DB: dbi, Team: team, ProviderClient: providerClient}
 	c.ApplyDefaults()
 	prometheus.MustRegister(tasks.StateMetricsCollector{Context: c})
 
@@ -214,6 +214,7 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	//scraping. The rest is split between resource scrape and garbage collection.
 	go c.AssetScrapingJob(nil).Run(ctx, jobloop.NumGoroutines(12))
 	go c.ResourceScrapingJob(nil).Run(ctx, jobloop.NumGoroutines(3))
+	go c.ResourceSeedingJob(nil).Run(ctx)
 	go c.GarbageCollectionJob(nil).Run(ctx)
 
 	//use main goroutine to emit Prometheus metrics
