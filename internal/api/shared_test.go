@@ -25,7 +25,6 @@ import (
 
 	policy "github.com/databus23/goslo.policy"
 	"github.com/go-gorp/gorp/v3"
-	"github.com/gophercloud/gophercloud"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/gopherpolicy"
@@ -46,6 +45,16 @@ func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action fun
 			&plugins.AssetManagerStatic{AssetType: "qux", ConflictsWithAssetType: "foo"},
 		}
 		mv := &MockValidator{}
+		mpc := test.MockProviderClient{
+			Domains: map[string]core.CachedDomain{
+				"domain1": {Name: "First Domain"},
+			},
+			Projects: map[string]core.CachedProject{
+				"project1": {Name: "First Project", DomainID: "domain1"},
+				"project2": {Name: "Second Project", DomainID: "domain1"},
+				"project3": {Name: "Third Project", DomainID: "domain1"},
+			},
+		}
 
 		var resources []db.Resource
 		_, err := dbi.Select(&resources, `SELECT * FROM resources ORDER BY ID`)
@@ -58,7 +67,7 @@ func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action fun
 		if timeNow == nil {
 			timeNow = time.Now
 		}
-		h := &handler{Config: cfg, DB: dbi, Team: team, Validator: mv, Provider: MockProviderClient{}, TimeNow: timeNow}
+		h := &handler{Config: cfg, DB: dbi, Team: team, Validator: mv, Provider: mpc, TimeNow: timeNow}
 		hh := httpapi.Compose(h, httpapi.WithoutLogging())
 		action(h, hh, mv, resources, assets)
 	})
@@ -93,47 +102,6 @@ func (mv *MockValidator) CheckToken(r *http.Request) *gopherpolicy.Token {
 
 func (mv *MockValidator) Enforce(rule string, ctx policy.Context) bool {
 	return !mv.ForbiddenRules[rule]
-}
-
-// MockProviderClient implements the core.ProviderClientInterface.
-type MockProviderClient struct{}
-
-func (c MockProviderClient) CloudAdminClient(factory core.ServiceClientFactory) (*gophercloud.ServiceClient, error) {
-	panic("CloudAdminClient is not implemented in MockProviderClient")
-}
-
-func (c MockProviderClient) ProjectScopedClient(scope core.ProjectScope) (*gophercloud.ProviderClient, gophercloud.EndpointOpts, error) {
-	panic("ProjectScopedClient is not implemented in MockProviderClient")
-}
-
-func (c MockProviderClient) GetAuthResult() gophercloud.AuthResult {
-	panic("GetAuthResult is not implemented in MockProviderClient")
-}
-
-func (c MockProviderClient) GetProject(projectID string) (*core.CachedProject, error) {
-	switch projectID {
-	case "project1":
-		return &core.CachedProject{Name: "First Project", DomainID: "domain1"}, nil
-	case "project2":
-		return &core.CachedProject{Name: "Second Project", DomainID: "domain1"}, nil
-	case "project3":
-		return &core.CachedProject{Name: "Third Project", DomainID: "domain1"}, nil
-	default:
-		return nil, nil
-	}
-}
-
-func (c MockProviderClient) GetDomain(domainID string) (*core.CachedDomain, error) {
-	switch domainID {
-	case "domain1":
-		return &core.CachedDomain{Name: "First Domain"}, nil
-	default:
-		return nil, nil
-	}
-}
-
-func (c MockProviderClient) FindProjectID(projectName, projectDomainName string) (string, error) {
-	panic("FindProjectID is not implemented in MockProviderClient")
 }
 
 func testCommonEndpointBehavior(t test.T, hh http.Handler, validator *MockValidator, pathPattern string) {
