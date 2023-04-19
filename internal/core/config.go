@@ -74,10 +74,10 @@ func (c Config) MaxAssetSizeFor(assetType db.AssetType) (result *uint64) {
 
 // ProjectSeed appears in type Seed.
 type ProjectSeed struct {
-	ProjectName             string                              `json:"project_name"`
-	DomainName              string                              `json:"domain_name"`
-	Resources               map[db.AssetType]castellum.Resource `json:"resources"`
-	DisabledResourceRegexps []regexpext.BoundedRegexp           `json:"disabled_resources"`
+	ProjectName             string                              `yaml:"project_name"`
+	DomainName              string                              `yaml:"domain_name"`
+	Resources               map[db.AssetType]castellum.Resource `yaml:"resources"`
+	DisabledResourceRegexps []regexpext.BoundedRegexp           `yaml:"disabled_resources"`
 }
 
 // IsSeededResource returns true if the config contains a seed for this

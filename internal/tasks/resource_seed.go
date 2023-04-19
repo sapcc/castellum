@@ -62,17 +62,17 @@ func (c *Context) applyResourceSeeds() error {
 	for _, seed := range c.Config.ProjectSeeds {
 		projectUUID, err := c.ProviderClient.FindProjectID(seed.ProjectName, seed.DomainName)
 		if err != nil {
-			return fmt.Errorf("cannot find project %s/%s: %w", seed.DomainName, seed.ProjectName, err)
+			return fmt.Errorf(`cannot find project "%s/%s": %w`, seed.DomainName, seed.ProjectName, err)
 		}
 		if projectUUID == "" {
 			//project does not exist in Keystone -> skip this project seed this time
-			missingProjects = append(missingProjects, fmt.Sprintf("%s/%s", seed.DomainName, seed.ProjectName))
+			missingProjects = append(missingProjects, fmt.Sprintf(`"%s/%s"`, seed.DomainName, seed.ProjectName))
 			continue
 		}
 
 		err = c.applyProjectSeed(projectUUID, seed)
 		if err != nil {
-			return fmt.Errorf("while applying seed for project %s/%s (%s): %w", seed.DomainName, seed.ProjectName, projectUUID, err)
+			return fmt.Errorf(`while applying seed for project "%s/%s" (%s): %w`, seed.DomainName, seed.ProjectName, projectUUID, err)
 		}
 	}
 
@@ -138,9 +138,10 @@ func (c *Context) applyProjectSeed(projectUUID string, seed core.ProjectSeed) er
 			return err
 		}
 		dbResource := db.Resource{
-			ScopeUUID:  projectUUID,
-			DomainUUID: proj.DomainID,
-			AssetType:  assetType,
+			ScopeUUID:    projectUUID,
+			DomainUUID:   proj.DomainID,
+			AssetType:    assetType,
+			NextScrapeAt: time.Unix(0, 0).UTC(), //give new resources a very early next_scrape_at to prioritize them in the scrape queue
 		}
 		errs := core.ApplyResourceSpecInto(&dbResource, resource, isExistingResource, c.Config, c.Team)
 		if !errs.IsEmpty() {
