@@ -22,6 +22,8 @@ package tasks
 import (
 	"fmt"
 	"reflect"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -56,6 +58,7 @@ func (c *Context) ResourceSeedingJob(registerer prometheus.Registerer) jobloop.J
 }
 
 func (c *Context) applyResourceSeeds() error {
+	var missingProjects []string
 	for _, seed := range c.Config.ProjectSeeds {
 		projectUUID, err := c.ProviderClient.FindProjectID(seed.ProjectName, seed.DomainName)
 		if err != nil {
@@ -63,6 +66,7 @@ func (c *Context) applyResourceSeeds() error {
 		}
 		if projectUUID == "" {
 			//project does not exist in Keystone -> skip this project seed this time
+			missingProjects = append(missingProjects, fmt.Sprintf("%s/%s", seed.DomainName, seed.ProjectName))
 			continue
 		}
 
@@ -70,6 +74,12 @@ func (c *Context) applyResourceSeeds() error {
 		if err != nil {
 			return fmt.Errorf("while applying seed for project %s/%s (%s): %w", seed.DomainName, seed.ProjectName, projectUUID, err)
 		}
+	}
+
+	if len(missingProjects) > 0 {
+		sort.Strings(missingProjects)
+		logg.Info("while applying the resource seed: %d projects were skipped because they do not exist in Keystone: %s",
+			len(missingProjects), strings.Join(missingProjects, ", "))
 	}
 
 	return nil
