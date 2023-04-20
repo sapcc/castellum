@@ -28,13 +28,14 @@ import (
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/jobloop"
 
+	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
 )
 
 func runAssetScrapeTest(t test.T, resourceIsSingleStep bool, action func(*Context, func(plugins.StaticAsset), *test.FakeClock, jobloop.Job)) {
-	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
+	withContext(t, core.Config{}, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
 		scrapeJob := c.AssetScrapingJob(registry)
 
 		//asset scrape without any resources just does nothing
@@ -388,7 +389,7 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 
 func TestAssetScrapeOrdering(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withContext(t, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
+	withContext(t, core.Config{}, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
 		scrapeJob := c.AssetScrapingJob(registry)
 
 		//create a resource and multiple assets to test with

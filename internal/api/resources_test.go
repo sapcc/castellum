@@ -19,13 +19,14 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
+	"github.com/sapcc/go-bits/regexpext"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -352,12 +353,15 @@ func TestPutResource(baseT *testing.T) {
 
 func TestMaxAssetSizeFor(t *testing.T) {
 	var (
-		cfg        core.Config
 		maxBarSize = uint64(42)
 		maxFooSize = uint64(30)
+		cfg        = core.Config{
+			MaxAssetSizeRules: []core.MaxAssetSizeRule{
+				{AssetTypeRx: "foo.*", Value: maxFooSize},
+				{AssetTypeRx: ".*bar", Value: maxBarSize},
+			},
+		}
 	)
-
-	assert.DeepEqual(t, "", cfg.SetMaxAssetSizeRules(fmt.Sprintf("foo.*=%d,.*bar=%d", maxFooSize, maxBarSize)), nil)
 
 	assert.DeepEqual(t, "foo", *cfg.MaxAssetSizeFor(db.AssetType("foo")), maxFooSize)
 	assert.DeepEqual(t, "bar", *cfg.MaxAssetSizeFor(db.AssetType("bar")), maxBarSize)
@@ -367,14 +371,13 @@ func TestMaxAssetSizeFor(t *testing.T) {
 }
 
 func TestPutResourceValidationErrors(baseT *testing.T) {
-	var (
-		maxFooSize uint64 = 30
-		cfg        core.Config
-	)
+	var cfg = core.Config{
+		MaxAssetSizeRules: []core.MaxAssetSizeRule{
+			{AssetTypeRx: "foo", Value: 30},
+		},
+	}
 
 	t := test.T{T: baseT}
-	assert.DeepEqual(baseT, "", cfg.SetMaxAssetSizeRules(fmt.Sprintf("foo=%d", maxFooSize)), nil)
-
 	withHandler(t, cfg, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
 		tr0.Ignore()
@@ -626,5 +629,67 @@ func TestDeleteResource(baseT *testing.T) {
 			DELETE FROM finished_operations WHERE asset_id = 1 AND reason = 'low' AND outcome = 'cancelled' AND old_size = 1000 AND new_size = 900 AND created_at = 31 AND confirmed_at = NULL AND greenlit_at = NULL AND finished_at = 32 AND greenlit_by_user_uuid = NULL AND error_message = '' AND errored_attempts = 0 AND usage = '{"singular":200}';
 			DELETE FROM resources WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 		`)
+	})
+}
+
+func TestSeedBlocksResourceUpdates(baseT *testing.T) {
+	//this seed matches what we have in fixtures/start-data.sql
+	cfg := core.Config{
+		ProjectSeeds: []core.ProjectSeed{{
+			ProjectName: "First Project",
+			DomainName:  "First Domain",
+			Resources: map[db.AssetType]castellum.Resource{
+				"foo": {
+					LowThreshold: &castellum.Threshold{
+						UsagePercent: castellum.UsageValues{castellum.SingularUsageMetric: 20},
+						DelaySeconds: 3600,
+					},
+					HighThreshold: &castellum.Threshold{
+						UsagePercent: castellum.UsageValues{castellum.SingularUsageMetric: 80},
+						DelaySeconds: 1800,
+					},
+					SizeSteps: castellum.SizeSteps{
+						Percent: 20,
+					},
+				},
+			},
+			DisabledResourceRegexps: []regexpext.BoundedRegexp{"qux"},
+		}},
+	}
+
+	t := test.T{T: baseT}
+	clock := test.FakeClock(3600)
+	withHandler(t, cfg, clock.Now, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, _ []db.Asset) {
+		//cannot PUT an existing resource defined by the seed
+		assert.HTTPRequest{
+			Method:       "PUT",
+			Path:         "/v1/projects/project1/resources/foo",
+			Body:         initialFooResourceJSON,
+			ExpectStatus: http.StatusConflict,
+		}.Check(t.T, hh)
+
+		//cannot DELETE an existing resource defined by the seed
+		assert.HTTPRequest{
+			Method:       "DELETE",
+			Path:         "/v1/projects/project1/resources/foo",
+			Body:         initialFooResourceJSON,
+			ExpectStatus: http.StatusConflict,
+		}.Check(t.T, hh)
+
+		//cannot PUT a missing resource disabled by the seed
+		assert.HTTPRequest{
+			Method:       "PUT",
+			Path:         "/v1/projects/project1/resources/qux",
+			Body:         initialFooResourceJSON,
+			ExpectStatus: http.StatusConflict,
+		}.Check(t.T, hh)
+
+		//cannot DELETE a missing resource disabled by the seed
+		assert.HTTPRequest{
+			Method:       "PUT",
+			Path:         "/v1/projects/project1/resources/qux",
+			Body:         initialFooResourceJSON,
+			ExpectStatus: http.StatusConflict,
+		}.Check(t.T, hh)
 	})
 }

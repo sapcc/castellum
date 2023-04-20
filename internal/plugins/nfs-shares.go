@@ -96,13 +96,13 @@ func (m *assetManagerNFS) InfoForAssetType(assetType db.AssetType) *core.AssetTy
 }
 
 // CheckResourceAllowed implements the core.AssetManager interface.
-func (m *assetManagerNFS) CheckResourceAllowed(assetType db.AssetType, scopeUUID, configJSON string, existingResources []db.AssetType) error {
+func (m *assetManagerNFS) CheckResourceAllowed(assetType db.AssetType, scopeUUID, configJSON string, existingResources map[db.AssetType]struct{}) error {
 	if configJSON != "" {
 		return core.ErrNoConfigurationAllowed
 	}
 
 	parsed := m.parseAssetType(assetType)
-	for _, otherAssetType := range existingResources {
+	for otherAssetType := range existingResources {
 		parsedOther := m.parseAssetType(otherAssetType)
 		if parsedOther != nil && (parsed.AllShares != parsedOther.AllShares) {
 			return fmt.Errorf("cannot create a %q resource because of possible contradiction with existing %q resource",

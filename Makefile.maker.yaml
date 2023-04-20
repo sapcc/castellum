@@ -55,9 +55,10 @@ renovate:
 
 verbatim: |
   # convenience targets for developers: `make run-api/run-collector/run-worker/test-asset-type-*`
-  # runs one of the components, with environment options sourced from $PWD/.env; and resource
-  # configuration optionally sourced from $PWD/test-config-$ASSET_TYPE.json
+  # runs one of the components, with environment options sourced from $PWD/.env; and configuration
+  # from $PWD/test-config.yaml; and resource configuration optionally sourced
+  # from $PWD/test-config-$ASSET_TYPE.json
   run-%: build/castellum
-    set -euo pipefail && source ./.env && ./build/castellum $*
+    set -euo pipefail && source ./.env && ./build/castellum $* ./test-config.yaml
   test-asset-type-%: build/castellum
-    set -euo pipefail && source ./.env && ./build/castellum test-asset-type $* "$$(test -f "test-config-$*.json" && cat "test-config-$*.json")"
+    set -euo pipefail && source ./.env && ./build/castellum test-asset-type ./test-config.yaml $* "$$(test -f "test-config-$*.json" && cat "test-config-$*.json")"

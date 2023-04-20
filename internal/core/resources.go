@@ -38,7 +38,7 @@ import (
 //
 // For new resources, a fresh `res` shall be given that shall only be filled
 // with an AssetType and ScopeUUID.
-func ApplyResourceSpecInto(res *db.Resource, spec castellum.Resource, existingResources []db.AssetType, cfg *Config, team AssetManagerTeam) (errs errext.ErrorSet) {
+func ApplyResourceSpecInto(res *db.Resource, spec castellum.Resource, existingResources map[db.AssetType]struct{}, cfg Config, team AssetManagerTeam) (errs errext.ErrorSet) {
 	manager, info := team.ForAssetType(res.AssetType)
 	if manager == nil {
 		errs.Addf("unsupported asset type")

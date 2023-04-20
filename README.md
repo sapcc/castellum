@@ -51,9 +51,9 @@ administrator needs to take care of (e.g. outage of an API used by Castellum).
 Build with `make && make install`, or with `docker build` if that's to your taste. Castellum has three different
 components that you all need to run for a complete installation:
 
-- `castellum api` provides an OpenStack-style HTTP-based REST API. To add TLS, put this behind a reverse proxy.
-- `castellum observer` discovers assets and (based on their status) creates, confirms and cancels resize operations.
-- `castellum worker` performs the actual resizing.
+- `castellum api <config-file>` provides an OpenStack-style HTTP-based REST API. To add TLS, put this behind a reverse proxy.
+- `castellum observer <config-file>` discovers assets and (based on their status) creates, confirms and cancels resize operations.
+- `castellum worker <config-file>` performs the actual resizing.
 
 The API and worker components can be scaled horizontally at will. **The observer cannot be scaled**. Do not run more
 than one instance of it at a time.
@@ -73,7 +73,6 @@ All components receive configuration via environment variables. The following va
 | `CASTELLUM_DB_CONNECTION_OPTIONS` | *(optional)* | Database connection options. |
 | `CASTELLUM_HTTP_LISTEN_ADDRESS` | `:8080` | Listen address for the internal HTTP server. For `castellum observer/worker`, this just exposes Prometheus metrics on `/metrics`. For `castellum api`, this also exposes [the REST API](./docs/api-spec.md). |
 | `CASTELLUM_LOG_SCRAPES` | `false` | Whether to write a log line for each asset scrape operation. This can be useful to debug situations where Castellum does not create operations when it should, but it generates a lot of log traffic (one line per asset per 5 minutes, which e.g. for 2000 assets is about 1 GiB per week). |
-| `CASTELLUM_MAX_ASSET_SIZES` | *(optional)* | A comma-separated list of `<asset-type>=<max-size>` pairs. If present, only resource configurations honoring these constraints will be allowed. |
 | `CASTELLUM_OSLO_POLICY_PATH`<br>(API only) | *(required)* | Path to the `policy.json` file for this service. See [*Oslo policy*](#oslo-policy) for details. |
 | `CASTELLUM_RABBITMQ_QUEUE_NAME`<br>(API only) | *(required for enabling audit trail)* | Name for the queue that will hold the audit events. The events are published to the default exchange. |
 | `CASTELLUM_RABBITMQ_USERNAME`<br>(API only) | `guest` | RabbitMQ Username. |
@@ -82,6 +81,43 @@ All components receive configuration via environment variables. The following va
 | `CASTELLUM_RABBITMQ_PORT`<br>(API only) | `5672` |  Port number to which the underlying connection is made. |
 | `CASTELLUM_AUDIT_SILENT`<br>(API only) | `false` | Disable audit event logging to standard output. |
 | `OS_...` | *(required)* | A full set of OpenStack auth environment variables for Castellum's service user. See [documentation for openstackclient][os-env] for details. |
+
+All components also expect a positional argument containing the path of a YAML configuration file.
+Below is a working example for a configuration file:
+
+```yaml
+max_asset_sizes:
+  - asset_type: 'nfs-shares(-group:.+)?'
+    value: 16384
+
+project_seeds:
+  - project_name: myproject
+    domain_name: mydomain
+    resources:
+      nfs-shares:
+        critical_threshold: { usage_percent: 95 }
+        size_steps: { percent: 10 }
+        size_constraints: { max_size: 8192 }
+    disabled_resources:
+      - 'project-quota:.*'
+```
+
+The following fields are allowed:
+
+| Field | Type | Explanation |
+| ----- | ---- | ----------- |
+| `max_asset_sizes` | array of objects | If present, resource configurations for matching asset types will only be allowed if they include a compatible `max_size` constraint. |
+| `max_asset_sizes[].asset_type` | list of regexes | Regex that specifies which asset types this constraint applies to. |
+| `max_asset_sizes[].value` | integer | Highest permissible value for the `max_size` constraint on matching resources. |
+| `project_seeds` | array of objects | Specification of projects that will have resources configured. The observer will apply these seeds, and the API will reject attempts to manually override the seeded configuration. |
+| `project_seeds[].project_name` | string | Name (not ID!) of the project. |
+| `project_seeds[].domain_name` | string | Name (not ID!) of the domain containing the project. |
+| `project_seeds[].resources.$type` | object | Specification of a resource that will be statically configured in this project. The contents of this object must be identical to the payload that will be accepted for `PUT /v1/projects/$project_id/resources/$type`. See [API spec](./api-spec.md) for details. |
+| `project_seeds[].disabled_resources` | list of strings | A list of regexes. Any asset type that matches one of these regexes will have autoscaling disabled and forbidden in this project. This can be used to delete resources that were configured by an earlier version of the seed. |
+
+All regexes are matched against the entire asset type string, i.e. a leading `^` and trailing `$` are always added implicitly.
+
+When applying project seeds, projects that do not exist in Keystone will be skipped without logging an error.
 
 ### Oslo policy
 

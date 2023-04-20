@@ -29,7 +29,7 @@ import (
 	"github.com/sapcc/castellum/internal/test"
 )
 
-func withContext(t test.T, action func(*Context, *plugins.AssetManagerStatic, *test.FakeClock, *prometheus.Registry)) {
+func withContext(t test.T, cfg core.Config, action func(*Context, *plugins.AssetManagerStatic, *test.FakeClock, *prometheus.Registry)) {
 	t.WithDB(nil, func(dbi *gorp.DbMap) {
 		amStatic := &plugins.AssetManagerStatic{AssetType: "foo"}
 		//clock starts at an easily recognizable value
@@ -37,11 +37,24 @@ func withContext(t test.T, action func(*Context, *plugins.AssetManagerStatic, *t
 		clock := &clockVar
 		registry := prometheus.NewPedanticRegistry()
 
+		mpc := test.MockProviderClient{
+			Domains: map[string]core.CachedDomain{
+				"domain1": {Name: "First Domain"},
+			},
+			Projects: map[string]core.CachedProject{
+				"project1": {Name: "First Project", DomainID: "domain1"},
+				"project2": {Name: "Second Project", DomainID: "domain1"},
+				"project3": {Name: "Third Project", DomainID: "domain1"},
+			},
+		}
+
 		action(&Context{
-			DB:        dbi,
-			Team:      core.AssetManagerTeam{amStatic},
-			TimeNow:   clock.Now,
-			AddJitter: noJitter,
+			Config:         cfg,
+			DB:             dbi,
+			Team:           core.AssetManagerTeam{amStatic},
+			ProviderClient: mpc,
+			TimeNow:        clock.Now,
+			AddJitter:      noJitter,
 		}, amStatic, clock, registry)
 	})
 }

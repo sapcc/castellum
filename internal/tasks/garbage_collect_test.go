@@ -25,6 +25,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-api-declarations/castellum"
 
+	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
@@ -32,7 +33,7 @@ import (
 
 func TestCollectGarbage(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withContext(t, func(c *Context, _ *plugins.AssetManagerStatic, _ *test.FakeClock, _ *prometheus.Registry) {
+	withContext(t, core.Config{}, func(c *Context, _ *plugins.AssetManagerStatic, _ *test.FakeClock, _ *prometheus.Registry) {
 		fakeNow := time.Unix(0, 0).UTC()
 
 		//setup some minimal scaffolding (we can only insert finished_operations

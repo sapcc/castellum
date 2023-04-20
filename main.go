@@ -62,17 +62,17 @@ import (
 
 func usage() {
 	fmt.Fprintf(os.Stderr,
-		"usage:\n\t%s [api|observer|worker]\n\t%s test-asset-type <type> [<resource-config-json>]\n",
+		"usage:\n\t%s [api|observer|worker] <config-file>\n\t%s test-asset-type <config-file> <type> [<resource-config-json>]\n",
 		os.Args[0], os.Args[0],
 	)
 	os.Exit(1)
 }
 
 func main() {
-	if len(os.Args) < 2 {
+	if len(os.Args) < 3 {
 		usage()
 	}
-	taskName := os.Args[1]
+	taskName, configPath := os.Args[1], os.Args[2]
 	bininfo.SetTaskName(taskName)
 
 	logg.ShowDebug = osext.GetenvBool("CASTELLUM_DEBUG")
@@ -109,8 +109,7 @@ func main() {
 	}
 
 	//get max asset sizes
-	var cfg core.Config
-	must.Succeed(cfg.SetMaxAssetSizeRules(osext.MustGetenv("CASTELLUM_MAX_ASSET_SIZES")))
+	cfg := must.Return(core.LoadConfig(configPath))
 
 	//initialize asset managers
 	team := must.Return(core.CreateAssetManagers(
@@ -121,29 +120,29 @@ func main() {
 	httpListenAddr := osext.GetenvOrDefault("CASTELLUM_HTTP_LISTEN_ADDRESS", ":8080")
 	switch taskName {
 	case "api":
-		if len(os.Args) != 2 {
+		if len(os.Args) != 3 {
 			usage()
 		}
-		runAPI(&cfg, dbi, team, providerClient, httpListenAddr)
+		runAPI(cfg, dbi, team, providerClient, httpListenAddr)
 	case "observer":
-		if len(os.Args) != 2 {
+		if len(os.Args) != 3 {
 			usage()
 		}
-		runObserver(dbi, team, httpListenAddr)
+		runObserver(cfg, dbi, team, providerClient, httpListenAddr)
 	case "worker":
-		if len(os.Args) != 2 {
+		if len(os.Args) != 3 {
 			usage()
 		}
 		runWorker(dbi, team, httpListenAddr)
 	case "test-asset-type":
-		if len(os.Args) != 3 && len(os.Args) != 4 {
+		if len(os.Args) != 4 && len(os.Args) != 5 {
 			usage()
 		}
 		configJSON := ""
-		if len(os.Args) == 4 {
-			configJSON = os.Args[3]
+		if len(os.Args) == 5 {
+			configJSON = os.Args[4]
 		}
-		runAssetTypeTestShell(team, db.AssetType(os.Args[2]), configJSON)
+		runAssetTypeTestShell(team, db.AssetType(os.Args[3]), configJSON)
 	default:
 		usage()
 	}
@@ -152,7 +151,7 @@ func main() {
 ////////////////////////////////////////////////////////////////////////////////
 // task: API
 
-func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
+func runAPI(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
 	identityV3, err := providerClient.CloudAdminClient(openstack.NewIdentityV3)
 	if err != nil {
 		logg.Fatal("cannot find Keystone V3 API: " + err.Error())
@@ -203,10 +202,10 @@ func runAPI(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provi
 ////////////////////////////////////////////////////////////////////////////////
 // task: observer
 
-func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
+func runObserver(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
 	ctx := httpext.ContextWithSIGINT(context.Background(), 1*time.Second)
 
-	c := tasks.Context{DB: dbi, Team: team}
+	c := tasks.Context{Config: cfg, DB: dbi, Team: team, ProviderClient: providerClient}
 	c.ApplyDefaults()
 	prometheus.MustRegister(tasks.StateMetricsCollector{Context: c})
 
@@ -215,6 +214,7 @@ func runObserver(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr str
 	//scraping. The rest is split between resource scrape and garbage collection.
 	go c.AssetScrapingJob(nil).Run(ctx, jobloop.NumGoroutines(12))
 	go c.ResourceScrapingJob(nil).Run(ctx, jobloop.NumGoroutines(3))
+	go c.ResourceSeedingJob(nil).Run(ctx)
 	go c.GarbageCollectionJob(nil).Run(ctx)
 
 	//use main goroutine to emit Prometheus metrics

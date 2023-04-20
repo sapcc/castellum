@@ -110,7 +110,7 @@ type AssetManager interface {
 	//
 	//Simple implementations should return nil for empty `configJSON` and
 	//`core.ErrNoConfigurationAllowed` otherwise.
-	CheckResourceAllowed(assetType db.AssetType, scopeUUID string, configJSON string, existingResources []db.AssetType) error
+	CheckResourceAllowed(assetType db.AssetType, scopeUUID string, configJSON string, existingResources map[db.AssetType]struct{}) error
 
 	ListAssets(res db.Resource) ([]string, error)
 	//The returned Outcome should be either Succeeded, Failed or Errored, but not Cancelled.

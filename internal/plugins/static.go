@@ -87,7 +87,7 @@ func (m AssetManagerStatic) InfoForAssetType(assetType db.AssetType) *core.Asset
 }
 
 // CheckResourceAllowed implements the core.AssetManager interface.
-func (m AssetManagerStatic) CheckResourceAllowed(assetType db.AssetType, scopeUUID, configJSON string, existingResources []db.AssetType) error {
+func (m AssetManagerStatic) CheckResourceAllowed(assetType db.AssetType, scopeUUID, configJSON string, existingResources map[db.AssetType]struct{}) error {
 	if m.ExpectsConfiguration {
 		if configJSON == "" {
 			return core.ErrNoConfigurationProvided
@@ -106,7 +106,7 @@ func (m AssetManagerStatic) CheckResourceAllowed(assetType db.AssetType, scopeUU
 	}
 
 	if m.ConflictsWithAssetType != "" {
-		for _, otherAssetType := range existingResources {
+		for otherAssetType := range existingResources {
 			if otherAssetType == m.ConflictsWithAssetType {
 				return fmt.Errorf("cannot create %s resource because there is a %s resource", string(assetType), string(otherAssetType))
 			}

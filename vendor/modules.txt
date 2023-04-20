@@ -118,8 +118,8 @@ github.com/rabbitmq/amqp091-go
 # github.com/rs/cors v1.9.0
 ## explicit; go 1.13
 github.com/rs/cors
-# github.com/sapcc/go-api-declarations v1.5.0
-## explicit; go 1.19
+# github.com/sapcc/go-api-declarations v1.5.1
+## explicit; go 1.20
 github.com/sapcc/go-api-declarations/bininfo
 github.com/sapcc/go-api-declarations/cadf
 github.com/sapcc/go-api-declarations/castellum
@@ -148,6 +148,7 @@ github.com/sapcc/go-bits/must
 github.com/sapcc/go-bits/osext
 github.com/sapcc/go-bits/pluggable
 github.com/sapcc/go-bits/promquery
+github.com/sapcc/go-bits/regexpext
 github.com/sapcc/go-bits/respondwith
 github.com/sapcc/go-bits/sqlext
 # github.com/sapcc/gophercloud-sapcc v0.0.0-20230412141637-d12efbe59583

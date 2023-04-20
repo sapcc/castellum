@@ -40,7 +40,7 @@ import (
 )
 
 type handler struct {
-	Config    *core.Config
+	Config    core.Config
 	DB        *gorp.DbMap
 	Team      core.AssetManagerTeam
 	Validator gopherpolicy.Validator
@@ -51,7 +51,7 @@ type handler struct {
 }
 
 // NewAPI constructs the main httpapi.API for this package.
-func NewHandler(cfg *core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClient) httpapi.API {
+func NewHandler(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClient) httpapi.API {
 	return &handler{Config: cfg, DB: dbi, Team: team, Validator: validator, Provider: provider, TimeNow: time.Now}
 }
 
@@ -241,6 +241,33 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 		return nil
 	}
 	return &res
+}
+
+func (h handler) rejectIfResourceSeeded(w http.ResponseWriter, r *http.Request, res db.Resource) bool {
+	proj, err := h.Provider.GetProject(res.ScopeUUID)
+	if respondwith.ErrorText(w, err) {
+		return true
+	}
+	if proj == nil {
+		http.Error(w, "project not found", http.StatusNotFound)
+		return true
+	}
+
+	domain, err := h.Provider.GetDomain(proj.DomainID)
+	if respondwith.ErrorText(w, err) {
+		return true
+	}
+	if domain == nil {
+		http.Error(w, "domain not found", http.StatusNotFound)
+		return true
+	}
+
+	if h.Config.IsSeededResource(*proj, *domain, res.AssetType) {
+		msg := fmt.Sprintf("cannot %s this resource because configuration comes from a static seed", r.Method)
+		http.Error(w, msg, http.StatusConflict)
+		return true
+	}
+	return false
 }
 
 var (
