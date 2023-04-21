@@ -7,13 +7,13 @@ require (
 	github.com/dlmiddlecote/sqlstats v1.0.2
 	github.com/go-gorp/gorp/v3 v3.1.0
 	github.com/gophercloud/gophercloud v1.3.0
-	github.com/gophercloud/utils v0.0.0-20230330070308-5bd5e1d608f8
+	github.com/gophercloud/utils v0.0.0-20230418172808-6eab72e966e1
 	github.com/gorilla/mux v1.8.0
 	github.com/prometheus/client_golang v1.15.0
 	github.com/rs/cors v1.9.0
 	github.com/sapcc/go-api-declarations v1.5.1
-	github.com/sapcc/go-bits v0.0.0-20230413144132-bee3aa4c8293
-	github.com/sapcc/gophercloud-sapcc v0.0.0-20230412141637-d12efbe59583
+	github.com/sapcc/go-bits v0.0.0-20230420083834-e3870701a14b
+	github.com/sapcc/gophercloud-sapcc v0.0.0-20230420084000-326e6b5e3351
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -24,10 +24,11 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
+	github.com/hashicorp/go-uuid v1.0.3 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.4 // indirect
-	github.com/lib/pq v1.10.7 // indirect
+	github.com/lib/pq v1.10.8 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/minio/sha256-simd v1.0.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
@@ -37,7 +38,6 @@ require (
 	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/rabbitmq/amqp091-go v1.8.0 // indirect
-	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	golang.org/x/sys v0.6.0 // indirect
