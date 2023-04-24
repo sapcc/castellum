@@ -51,6 +51,9 @@ import (
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
 
+	//importhing this automatically tunes GOMAXPROCS
+	_ "go.uber.org/automaxprocs"
+
 	"github.com/sapcc/castellum/internal/api"
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
