@@ -77,7 +77,8 @@ func main() {
 	bininfo.SetTaskName(taskName)
 
 	logg.ShowDebug = osext.GetenvBool("CASTELLUM_DEBUG")
-	maxprocs.Set(maxprocs.Logger(logg.Debug))
+	undoMaxprocs := must.Return(maxprocs.Set(maxprocs.Logger(logg.Debug)))
+	defer undoMaxprocs()
 
 	wrap := httpext.WrapTransport(&http.DefaultTransport)
 	wrap.SetInsecureSkipVerify(osext.GetenvBool("CASTELLUM_INSECURE")) //for debugging with mitmproxy etc. (DO NOT SET IN PRODUCTION)
