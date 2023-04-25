@@ -50,9 +50,7 @@ import (
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
-
-	//importhing this automatically tunes GOMAXPROCS
-	_ "go.uber.org/automaxprocs"
+	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/sapcc/castellum/internal/api"
 	"github.com/sapcc/castellum/internal/core"
@@ -79,6 +77,7 @@ func main() {
 	bininfo.SetTaskName(taskName)
 
 	logg.ShowDebug = osext.GetenvBool("CASTELLUM_DEBUG")
+	maxprocs.Set(maxprocs.Logger(logg.Debug))
 
 	wrap := httpext.WrapTransport(&http.DefaultTransport)
 	wrap.SetInsecureSkipVerify(osext.GetenvBool("CASTELLUM_INSECURE")) //for debugging with mitmproxy etc. (DO NOT SET IN PRODUCTION)

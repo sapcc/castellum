@@ -164,7 +164,6 @@ github.com/sergi/go-diff/diffmatchpatch
 go.uber.org/atomic
 # go.uber.org/automaxprocs v1.5.2
 ## explicit; go 1.18
-go.uber.org/automaxprocs
 go.uber.org/automaxprocs/internal/cgroups
 go.uber.org/automaxprocs/internal/runtime
 go.uber.org/automaxprocs/maxprocs
