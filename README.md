@@ -112,7 +112,7 @@ The following fields are allowed:
 | `project_seeds` | array of objects | Specification of projects that will have resources configured. The observer will apply these seeds, and the API will reject attempts to manually override the seeded configuration. |
 | `project_seeds[].project_name` | string | Name (not ID!) of the project. |
 | `project_seeds[].domain_name` | string | Name (not ID!) of the domain containing the project. |
-| `project_seeds[].resources.$type` | object | Specification of a resource that will be statically configured in this project. The contents of this object must be identical to the payload that will be accepted for `PUT /v1/projects/$project_id/resources/$type`. See [API spec](./api-spec.md) for details. |
+| `project_seeds[].resources.$type` | object | Specification of a resource that will be statically configured in this project. The contents of this object must be identical to the payload that will be accepted for `PUT /v1/projects/$project_id/resources/$type`. See [API spec](./docs/api-spec.md) for details. |
 | `project_seeds[].disabled_resources` | list of strings | A list of regexes. Any asset type that matches one of these regexes will have autoscaling disabled and forbidden in this project. This can be used to delete resources that were configured by an earlier version of the seed. |
 
 All regexes are matched against the entire asset type string, i.e. a leading `^` and trailing `$` are always added implicitly.
