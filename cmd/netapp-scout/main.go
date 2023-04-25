@@ -34,11 +34,15 @@ import (
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
 	"github.com/sapcc/go-bits/promquery"
+	"go.uber.org/automaxprocs/maxprocs"
 	"gopkg.in/yaml.v2"
 )
 
 func main() {
 	logg.ShowDebug = osext.GetenvBool("CASTELLUM_DEBUG")
+	undoMaxprocs := must.Return(maxprocs.Set(maxprocs.Logger(logg.Debug)))
+	defer undoMaxprocs()
+
 	if len(os.Args) != 2 {
 		fmt.Fprintln(os.Stderr, "usage:", os.Args[0], "<config-file>")
 	}
