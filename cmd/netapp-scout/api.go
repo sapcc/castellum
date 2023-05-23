@@ -121,6 +121,10 @@ func (e *Engine) handleGetExclusionReasons(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
+	// This endpoint makes a lot of noise that can easily obscure error logs.
+	// Therefore, do not log the request if it comes out ok.
+	httpapi.SkipRequestLog(r)
+
 	//Any field in the response being "true" will cause castellum-observer to ignore this share entirely.
 	respondwith.JSON(w, http.StatusOK, map[string]bool{
 		//We want to ignore "shares" that are actually snapmirror targets (sapcc-specific
