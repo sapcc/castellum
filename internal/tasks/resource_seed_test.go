@@ -20,6 +20,7 @@
 package tasks
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -66,7 +67,7 @@ project_seeds:
 func TestResourceSeedingSuccess(baseT *testing.T) {
 	t := test.T{T: baseT}
 	cfg := configFromYAML(t, resourceSeedingConfigGood)
-	withContext(t, cfg, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
+	withContext(t, cfg, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
 		job := c.ResourceSeedingJob(registry)
 
 		//create a resource in a project that is not seeded - this will be ignored by the seeding job
@@ -93,14 +94,14 @@ func TestResourceSeedingSuccess(baseT *testing.T) {
 		tr0.Ignore()
 
 		//test that seeding job applies the seeds (except for the one project that the MockProviderClient reports as nonexistent)
-		t.Must(job.ProcessOne())
+		t.Must(job.ProcessOne(ctx))
 		tr.DBChanges().AssertEqualf(`
 			DELETE FROM resources WHERE id = 2 AND scope_uuid = 'project2' AND asset_type = 'foo';
 			INSERT INTO resources (id, scope_uuid, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, domain_uuid, next_scrape_at) VALUES (3, 'project1', 'foo', '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":95}', 20, 'domain1', 0);
 		`)
 
 		//test that the next seeding run does not change anything
-		t.Must(job.ProcessOne())
+		t.Must(job.ProcessOne(ctx))
 		tr.DBChanges().AssertEmpty()
 
 		//perturb one of the seeded resources
@@ -108,7 +109,7 @@ func TestResourceSeedingSuccess(baseT *testing.T) {
 			castellum.UsageValues{castellum.SingularUsageMetric: 80}, 7200, "project1")
 
 		//test that the next seeding run resets these changes
-		t.Must(job.ProcessOne())
+		t.Must(job.ProcessOne(ctx))
 		tr.DBChanges().AssertEmpty()
 	})
 }
@@ -127,10 +128,10 @@ project_seeds:
 func TestResourceSeedingBadResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	cfg := configFromYAML(t, resourceSeedingConfigBadResource)
-	withContext(t, cfg, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
+	withContext(t, cfg, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
 		job := c.ResourceSeedingJob(registry)
 
-		err := job.ProcessOne()
+		err := job.ProcessOne(ctx)
 		if err == nil {
 			t.Error("expected ResourceSeedingJob to fail, but succeeded!")
 		} else {

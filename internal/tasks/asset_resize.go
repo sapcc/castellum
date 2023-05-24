@@ -19,6 +19,7 @@
 package tasks
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -68,12 +69,12 @@ func (c *Context) AssetResizingJob(registerer prometheus.Registerer) jobloop.Job
 	}).Setup(registerer)
 }
 
-func (c *Context) discoverAssetResize(tx *gorp.Transaction, labels prometheus.Labels) (op db.PendingOperation, err error) {
+func (c *Context) discoverAssetResize(ctx context.Context, tx *gorp.Transaction, labels prometheus.Labels) (op db.PendingOperation, err error) {
 	err = tx.SelectOne(&op, selectAndDeleteNextResizeQuery, c.TimeNow())
 	return op, err
 }
 
-func (c *Context) processAssetResize(tx *gorp.Transaction, op db.PendingOperation, labels prometheus.Labels) error {
+func (c *Context) processAssetResize(ctx context.Context, tx *gorp.Transaction, op db.PendingOperation, labels prometheus.Labels) error {
 	//find the corresponding asset, resource and asset manager
 	var asset db.Asset
 	err := tx.SelectOne(&asset, `SELECT * FROM assets WHERE id = $1`, op.AssetID)

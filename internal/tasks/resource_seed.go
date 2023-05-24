@@ -20,6 +20,7 @@
 package tasks
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -51,7 +52,7 @@ func (c *Context) ResourceSeedingJob(registerer prometheus.Registerer) jobloop.J
 			},
 		},
 		Interval: 5 * time.Minute,
-		Task: func(_ prometheus.Labels) error {
+		Task: func(ctx context.Context, _ prometheus.Labels) error {
 			return c.applyResourceSeeds()
 		},
 	}).Setup(registerer)

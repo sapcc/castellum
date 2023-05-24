@@ -19,6 +19,7 @@
 package jobloop
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -70,20 +71,30 @@ type TxGuardedJob[Tx sqlext.Rollbacker, P any] struct {
 	// Metadata.CounterLabels and all label values set to "early-db-access". The
 	// implementation is expected to substitute the actual label values as soon
 	// as they become known.
-	DiscoverRow func(Tx, prometheus.Labels) (P, error)
+	DiscoverRow func(context.Context, Tx, prometheus.Labels) (P, error)
 	// A function that will be called once for each discovered row to process it.
 	//
 	// The provided label set will have been prefilled with the labels from
 	// Metadata.CounterLabels and all label values set to "early-db-access". The
 	// implementation is expected to substitute the actual label values as soon
 	// as they become known.
-	ProcessRow func(Tx, P, prometheus.Labels) error
+	ProcessRow func(context.Context, Tx, P, prometheus.Labels) error
 }
 
 // Setup builds the Job interface for this job and registers the counter
 // metric. At runtime, `nil` can be given to use the default registry. In
 // tests, a test-local prometheus.Registry instance should be used instead.
 func (j *TxGuardedJob[Tx, P]) Setup(registerer prometheus.Registerer) Job {
+	if j.BeginTx == nil {
+		panic("BeginTx must be set!")
+	}
+	if j.DiscoverRow == nil {
+		panic("DiscoverRow must be set!")
+	}
+	if j.ProcessRow == nil {
+		panic("ProcessRow must be set!")
+	}
+
 	return (&ProducerConsumerJob[*txGuardedTask[Tx, P]]{
 		Metadata:     j.Metadata,
 		DiscoverTask: j.discoverTask,
@@ -98,7 +109,7 @@ type txGuardedTask[Tx sqlext.Rollbacker, P any] struct {
 
 // Core producer-side behavior. This is used by ProcessOne in unit tests, as
 // well as by runSingleThreaded and runMultiThreaded in production.
-func (j *TxGuardedJob[Tx, P]) discoverTask(labels prometheus.Labels) (task *txGuardedTask[Tx, P], returnedError error) {
+func (j *TxGuardedJob[Tx, P]) discoverTask(ctx context.Context, labels prometheus.Labels) (task *txGuardedTask[Tx, P], returnedError error) {
 	tx, err := j.BeginTx()
 	if err != nil {
 		return nil, err
@@ -109,7 +120,7 @@ func (j *TxGuardedJob[Tx, P]) discoverTask(labels prometheus.Labels) (task *txGu
 		}
 	}()
 
-	payload, err := j.DiscoverRow(tx, labels)
+	payload, err := j.DiscoverRow(ctx, tx, labels)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			//nolint:errcheck
@@ -124,7 +135,7 @@ func (j *TxGuardedJob[Tx, P]) discoverTask(labels prometheus.Labels) (task *txGu
 	}, nil
 }
 
-func (j *TxGuardedJob[Tx, P]) processTask(task *txGuardedTask[Tx, P], labels prometheus.Labels) error {
+func (j *TxGuardedJob[Tx, P]) processTask(ctx context.Context, task *txGuardedTask[Tx, P], labels prometheus.Labels) error {
 	defer sqlext.RollbackUnlessCommitted(task.Transaction)
-	return j.ProcessRow(task.Transaction, task.Payload, labels)
+	return j.ProcessRow(ctx, task.Transaction, task.Payload, labels)
 }

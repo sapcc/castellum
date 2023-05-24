@@ -19,6 +19,7 @@ n*
 package tasks
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -70,12 +71,12 @@ func (c *Context) AssetScrapingJob(registerer prometheus.Registerer) jobloop.Job
 	}).Setup(registerer)
 }
 
-func (c *Context) discoverAssetScrape(tx *gorp.Transaction, labels prometheus.Labels) (asset db.Asset, err error) {
+func (c *Context) discoverAssetScrape(ctx context.Context, tx *gorp.Transaction, labels prometheus.Labels) (asset db.Asset, err error) {
 	err = tx.SelectOne(&asset, scrapeAssetSearchQuery, c.TimeNow())
 	return asset, err
 }
 
-func (c *Context) processAssetScrape(tx *gorp.Transaction, asset db.Asset, labels prometheus.Labels) error {
+func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, asset db.Asset, labels prometheus.Labels) error {
 	//find resource for asset
 	var res db.Resource
 	err := tx.SelectOne(&res, `SELECT * FROM resources WHERE id = $1`, asset.ResourceID)

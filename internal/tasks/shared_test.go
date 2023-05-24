@@ -19,6 +19,7 @@
 package tasks
 
 import (
+	"context"
 	"time"
 
 	"github.com/go-gorp/gorp/v3"
@@ -29,7 +30,7 @@ import (
 	"github.com/sapcc/castellum/internal/test"
 )
 
-func withContext(t test.T, cfg core.Config, action func(*Context, *plugins.AssetManagerStatic, *test.FakeClock, *prometheus.Registry)) {
+func withContext(t test.T, cfg core.Config, action func(context.Context, *Context, *plugins.AssetManagerStatic, *test.FakeClock, *prometheus.Registry)) {
 	t.WithDB(nil, func(dbi *gorp.DbMap) {
 		amStatic := &plugins.AssetManagerStatic{AssetType: "foo"}
 		//clock starts at an easily recognizable value
@@ -48,7 +49,7 @@ func withContext(t test.T, cfg core.Config, action func(*Context, *plugins.Asset
 			},
 		}
 
-		action(&Context{
+		action(context.Background(), &Context{
 			Config:         cfg,
 			DB:             dbi,
 			Team:           core.AssetManagerTeam{amStatic},

@@ -19,6 +19,7 @@
 package tasks
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/go-gorp/gorp/v3"
@@ -62,7 +63,7 @@ func (c *Context) ResourceScrapingJob(registerer prometheus.Registerer) jobloop.
 	}).Setup(registerer)
 }
 
-func (c *Context) discoverResourceScrape(tx *gorp.Transaction, labels prometheus.Labels) (res db.Resource, err error) {
+func (c *Context) discoverResourceScrape(ctx context.Context, tx *gorp.Transaction, labels prometheus.Labels) (res db.Resource, err error) {
 	err = tx.SelectOne(&res, scrapeResourceSearchQuery, c.TimeNow())
 	if err == nil {
 		labels["asset_type"] = string(res.AssetType)
@@ -70,7 +71,7 @@ func (c *Context) discoverResourceScrape(tx *gorp.Transaction, labels prometheus
 	return res, err
 }
 
-func (c *Context) processResourceScrape(tx *gorp.Transaction, res db.Resource, labels prometheus.Labels) error {
+func (c *Context) processResourceScrape(ctx context.Context, tx *gorp.Transaction, res db.Resource, labels prometheus.Labels) error {
 	manager, info := c.Team.ForAssetType(res.AssetType)
 	if manager == nil {
 		return fmt.Errorf("no asset manager for asset type %q", res.AssetType)

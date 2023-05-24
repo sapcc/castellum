@@ -19,6 +19,7 @@
 package tasks
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"testing"
@@ -65,7 +66,7 @@ func setupAssetResizeTest(t test.T, c *Context, amStatic *plugins.AssetManagerSt
 
 func TestSuccessfulResize(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withContext(t, core.Config{}, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
+	withContext(t, core.Config{}, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
 		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
 		//add a greenlit PendingOperation
@@ -84,7 +85,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 
 		//ExecuteOne(AssetResizeJob{}) should do nothing right now because that operation is
 		//only greenlit in the future, but not right now
-		err := resizeJob.ProcessOne()
+		err := resizeJob.ProcessOne(ctx)
 		if err != sql.ErrNoRows {
 			t.Fatalf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
@@ -93,7 +94,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 
 		//go into the future and check that the operation gets executed
 		clock.StepBy(10 * time.Minute)
-		err = resizeJob.ProcessOne()
+		err = resizeJob.ProcessOne(ctx)
 		t.Must(err)
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
@@ -124,7 +125,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 
 func TestFailingResize(tBase *testing.T) {
 	t := test.T{T: tBase}
-	withContext(t, core.Config{}, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
+	withContext(t, core.Config{}, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
 		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
 		//add a greenlit PendingOperation
@@ -142,7 +143,7 @@ func TestFailingResize(tBase *testing.T) {
 		t.Must(c.DB.Insert(&pendingOp))
 
 		amStatic.SetAssetSizeFails = true
-		t.Must(resizeJob.ProcessOne())
+		t.Must(resizeJob.ProcessOne(ctx))
 
 		//check that resizing fails as expected
 		t.ExpectPendingOperations(c.DB /*, nothing */)
@@ -174,7 +175,7 @@ func TestFailingResize(tBase *testing.T) {
 
 func TestErroringResize(tBase *testing.T) {
 	t := test.T{T: tBase}
-	withContext(t, core.Config{}, func(c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
+	withContext(t, core.Config{}, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *test.FakeClock, registry *prometheus.Registry) {
 		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
 		//add a greenlit PendingOperation that will error in SetAssetSize()
@@ -194,7 +195,7 @@ func TestErroringResize(tBase *testing.T) {
 		//when the outcome of the resize is "errored", we can retry several times
 		for try := 0; try < maxRetries; try++ {
 			clock.StepBy(10 * time.Minute)
-			t.Must(resizeJob.ProcessOne())
+			t.Must(resizeJob.ProcessOne(ctx))
 
 			pendingOp.ID++
 			pendingOp.ErroredAttempts++
@@ -205,7 +206,7 @@ func TestErroringResize(tBase *testing.T) {
 
 		//ExecuteOne(AssetResizeJob{}) should do nothing right now because, although the
 		//operation is greenlit, its retry_at timestamp is in the future
-		err := resizeJob.ProcessOne()
+		err := resizeJob.ProcessOne(ctx)
 		if err != sql.ErrNoRows {
 			t.Fatalf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
@@ -214,7 +215,7 @@ func TestErroringResize(tBase *testing.T) {
 
 		//check that resizing errors as expected once the retry budget is exceeded
 		clock.StepBy(10 * time.Minute)
-		t.Must(resizeJob.ProcessOne())
+		t.Must(resizeJob.ProcessOne(ctx))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
 			AssetID:         1,
