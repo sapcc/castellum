@@ -35,8 +35,8 @@ github.com/gofrs/uuid v4.4.0+incompatible h1:3qXRTX8/NbyulANqlc0lchS1gqAVxRgsuW1
 github.com/gofrs/uuid v4.4.0+incompatible/go.mod h1:b2aQJv3Z4Fp6yNu3cdSllBxTCLRxnplIgP/c0N/04lM=
 github.com/gogo/protobuf v1.1.1/go.mod h1:r8qH/GZQm5c6nD/R0oafs1akxWv10x8SbQlK7atdtwQ=
 github.com/gogo/protobuf v1.3.2 h1:Ov1cvc58UF3b5XjBnZv7+opcTcQFZebYjWzi34vdm4Q=
-github.com/golang-migrate/migrate/v4 v4.16.1 h1:O+0C55RbMN66pWm5MjO6mw0px6usGpY0+bkSGW9zCo0=
-github.com/golang-migrate/migrate/v4 v4.16.1/go.mod h1:qXiwa/3Zeqaltm1MxOCZDYysW/F6folYiBgBG03l9hc=
+github.com/golang-migrate/migrate/v4 v4.16.2 h1:8coYbMKUyInrFk1lfGfRovTLAW7PhWp8qQDT2iKfuoA=
+github.com/golang-migrate/migrate/v4 v4.16.2/go.mod h1:pfcJX4nPHaVdc5nmdCikFBWtm+UBpiZjRNNsyBbp0/o=
 github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golang/protobuf v1.3.1/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golang/protobuf v1.3.2/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
@@ -133,10 +133,10 @@ github.com/rabbitmq/amqp091-go v1.8.1/go.mod h1:+jPrT9iY2eLjRaMSRHUhc3z14E/l85kv
 github.com/rogpeppe/go-internal v1.10.0 h1:TMyTOH3F/DB16zRVcYyreMH6GnZZrwQVAoYjRBZyWFQ=
 github.com/rs/cors v1.9.0 h1:l9HGsTsHJcvW14Nk7J9KFz8bzeAWXn3CG6bgt7LsrAE=
 github.com/rs/cors v1.9.0/go.mod h1:XyqrcTp5zjWr1wsJ8PIRZssZ8b/WMcMf71DJnit4EMU=
-github.com/sapcc/go-api-declarations v1.5.1 h1:K0dn7gy9uvBRn3qBUHOYli4J3eJCRrTBIUxWrpk+1yg=
-github.com/sapcc/go-api-declarations v1.5.1/go.mod h1:3OCDo75YJwpytM/I0SjwcZJf1ZNu89KeAZ55kdOTSqE=
-github.com/sapcc/go-bits v0.0.0-20230609124502-ada8add2e99b h1:tz0yQQ+mnNS+G4CO6IkydzrJOxMJA4iein18HGCsJp8=
-github.com/sapcc/go-bits v0.0.0-20230609124502-ada8add2e99b/go.mod h1:kTwPywJ474TQzcXRhK2j1IKIEs72Cl0j419aOJdleZ8=
+github.com/sapcc/go-api-declarations v1.6.0 h1:sPEnqSY6IumN59wGFTzl3VeehNxXjlE+pYroj1t91r4=
+github.com/sapcc/go-api-declarations v1.6.0/go.mod h1:3OCDo75YJwpytM/I0SjwcZJf1ZNu89KeAZ55kdOTSqE=
+github.com/sapcc/go-bits v0.0.0-20230614140115-83eb3a701632 h1:GK/Gw800kfYHe1nlyusq2PYFfb4xzYCIgxZkvvJV8Rk=
+github.com/sapcc/go-bits v0.0.0-20230614140115-83eb3a701632/go.mod h1:jjAzEgHWrGCqQFAsWA52Du/+2JC1EPaZkkLHs2PNXh0=
 github.com/sapcc/gophercloud-sapcc v0.0.0-20230602113015-b6ca39cd0679 h1:5O8CEhFHFf63DMQFew1SC9GI3eRzacZQZNDwIvK1vHA=
 github.com/sapcc/gophercloud-sapcc v0.0.0-20230602113015-b6ca39cd0679/go.mod h1:kbAro1qScwJa799Bhb+hRLhPLdtHvvkhmjqSt6FYOlo=
 github.com/sergi/go-diff v1.3.1 h1:xkr+Oxo4BOQKmkn/B9eMK0g5Kg/983T9DqqPHwYqD+8=

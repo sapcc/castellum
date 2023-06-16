@@ -87,7 +87,7 @@ const SingularUsageMetric UsageMetric = "singular"
 type UsageValues map[UsageMetric]float64
 
 // Scan implements the sql.Scanner interface.
-func (u *UsageValues) Scan(src interface{}) error {
+func (u *UsageValues) Scan(src any) error {
 	var srcBytes []byte
 	switch src := src.(type) {
 	case string:

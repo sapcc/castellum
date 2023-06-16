@@ -11,8 +11,8 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/prometheus/client_golang v1.16.0
 	github.com/rs/cors v1.9.0
-	github.com/sapcc/go-api-declarations v1.5.1
-	github.com/sapcc/go-bits v0.0.0-20230609124502-ada8add2e99b
+	github.com/sapcc/go-api-declarations v1.6.0
+	github.com/sapcc/go-bits v0.0.0-20230614140115-83eb3a701632
 	github.com/sapcc/gophercloud-sapcc v0.0.0-20230602113015-b6ca39cd0679
 	go.uber.org/automaxprocs v1.5.2
 	gopkg.in/yaml.v2 v2.4.0
@@ -22,7 +22,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
-	github.com/golang-migrate/migrate/v4 v4.16.1 // indirect
+	github.com/golang-migrate/migrate/v4 v4.16.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
