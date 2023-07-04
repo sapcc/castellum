@@ -61,14 +61,14 @@ func (d ShareData) pick(metricName string) (float64, error) {
 //
 //    cond  = netapp_volume_is_space_reporting_logical == 0 && netapp_volume_percentage_snapshot_reserve > 5
 //    size  = netapp_volume_total_bytes
-//    usage = netapp_volume_used_bytes
+//    usage = max(netapp_volume_used_bytes, netapp_volume_snapshot_used_bytes)
 //
 //Option 3: Same as option 2, but if logical space reporting is used, we need
 //to look at a different metric.
 //
 //    cond  = netapp_volume_is_space_reporting_logical == 1
 //    size  = netapp_volume_total_bytes
-//    usage = netapp_volume_logical_used_bytes
+//    usage = max(netapp_volume_logical_used_bytes, netapp_volume_snapshot_used_bytes)
 //
 //TODO Remove option 1 once all shares have migrated to the new layout.
 
@@ -108,13 +108,22 @@ func (d ShareData) GetSizeBytes() (float64, error) {
 // GetUsageBytes computes the usage of this share in bytes. If some required
 // metrics are missing, an error is returned.
 func (d ShareData) GetUsageBytes() (float64, error) {
+	bytesUsedBySnapshots, err := d.pick("netapp_volume_snapshot_used_bytes")
+	if err != nil {
+		return 0, err
+	}
+
 	//option 3
 	isSpaceReportingLogical, err := d.pick("netapp_volume_is_space_reporting_logical")
 	if err != nil {
 		return 0, err
 	}
 	if isSpaceReportingLogical == 1.0 {
-		return d.pick("netapp_volume_logical_used_bytes")
+		bytesUsed, err := d.pick("netapp_volume_logical_used_bytes")
+		if err != nil {
+			return 0, err
+		}
+		return math.Max(bytesUsed, bytesUsedBySnapshots), nil
 	}
 
 	//option 2
@@ -123,7 +132,11 @@ func (d ShareData) GetUsageBytes() (float64, error) {
 		return 0, err
 	}
 	if snapshotReservePercent != 5.0 {
-		return d.pick("netapp_volume_used_bytes")
+		bytesUsed, err := d.pick("netapp_volume_used_bytes")
+		if err != nil {
+			return 0, err
+		}
+		return math.Max(bytesUsed, bytesUsedBySnapshots), nil
 	}
 
 	//option 1
@@ -132,10 +145,6 @@ func (d ShareData) GetUsageBytes() (float64, error) {
 		return 0, err
 	}
 	bytesReservedBySnapshots, err := d.pick("netapp_volume_snapshot_reserved_bytes")
-	if err != nil {
-		return 0, err
-	}
-	bytesUsedBySnapshots, err := d.pick("netapp_volume_snapshot_used_bytes")
 	if err != nil {
 		return 0, err
 	}
