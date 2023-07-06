@@ -62,7 +62,7 @@ func ApplyResourceSpecInto(res *db.Resource, spec castellum.Resource, existingRe
 	errs.Append(applyThresholdSpecsInto(res, spec, info))
 	errs.Append(checkIntraThresholdConsistency(res, spec, info))
 	errs.Append(applySteppingSpecInto(res, spec))
-	errs.Append(applySizeConstraintsSpecInto(res, spec, cfg.MaxAssetSizeFor(res.AssetType)))
+	errs.Append(applySizeConstraintsSpecInto(res, spec, cfg.MaxAssetSizeFor(res.AssetType, res.ScopeUUID)))
 	return
 }
 

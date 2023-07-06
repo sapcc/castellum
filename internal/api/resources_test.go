@@ -353,21 +353,25 @@ func TestPutResource(baseT *testing.T) {
 
 func TestMaxAssetSizeFor(t *testing.T) {
 	var (
-		maxBarSize = uint64(42)
-		maxFooSize = uint64(30)
-		cfg        = core.Config{
+		maxBarSize  = uint64(42)
+		maxFooSize  = uint64(30)
+		maxSomeSize = uint64(23)
+		cfg         = core.Config{
 			MaxAssetSizeRules: []core.MaxAssetSizeRule{
-				{AssetTypeRx: "foo.*", Value: maxFooSize},
-				{AssetTypeRx: ".*bar", Value: maxBarSize},
+				{AssetTypeRx: "foo.*", ScopeUUID: "", Value: maxFooSize},
+				{AssetTypeRx: ".*bar", ScopeUUID: "", Value: maxBarSize},
+				{AssetTypeRx: "some.*", ScopeUUID: "somescope", Value: maxSomeSize},
 			},
 		}
 	)
 
-	assert.DeepEqual(t, "foo", *cfg.MaxAssetSizeFor(db.AssetType("foo")), maxFooSize)
-	assert.DeepEqual(t, "bar", *cfg.MaxAssetSizeFor(db.AssetType("bar")), maxBarSize)
-	assert.DeepEqual(t, "foobar", *cfg.MaxAssetSizeFor(db.AssetType("foobar")), maxFooSize)
-	assert.DeepEqual(t, "buz", cfg.MaxAssetSizeFor(db.AssetType("buz")), (*uint64)(nil))
-	assert.DeepEqual(t, "somefoo", cfg.MaxAssetSizeFor(db.AssetType("somefoo")), (*uint64)(nil))
+	assert.DeepEqual(t, "foo", *cfg.MaxAssetSizeFor(db.AssetType("foo"), ""), maxFooSize)
+	assert.DeepEqual(t, "bar", *cfg.MaxAssetSizeFor(db.AssetType("bar"), ""), maxBarSize)
+	assert.DeepEqual(t, "foobar", *cfg.MaxAssetSizeFor(db.AssetType("foobar"), ""), maxBarSize)
+	assert.DeepEqual(t, "somebar", *cfg.MaxAssetSizeFor(db.AssetType("somebar"), ""), maxBarSize)
+	assert.DeepEqual(t, "somebar+scope", *cfg.MaxAssetSizeFor(db.AssetType("somebar"), "somescope"), maxSomeSize)
+	assert.DeepEqual(t, "buz", cfg.MaxAssetSizeFor(db.AssetType("buz"), ""), (*uint64)(nil))
+	assert.DeepEqual(t, "somefoo", cfg.MaxAssetSizeFor(db.AssetType("somefoo"), ""), (*uint64)(nil))
 }
 
 func TestPutResourceValidationErrors(baseT *testing.T) {

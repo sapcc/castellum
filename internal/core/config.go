@@ -54,18 +54,17 @@ func LoadConfig(configPath string) (Config, error) {
 // MaxAssetSizeRule appears in type Config.
 type MaxAssetSizeRule struct {
 	AssetTypeRx regexpext.BoundedRegexp `yaml:"asset_type"`
+	ScopeUUID   string                  `yaml:"scope_uuid"` //leave empty to have the rule apply to all scopes
 	Value       uint64                  `yaml:"value"`
 }
 
 // MaxAssetSizeFor computes the highest permissible max_size value for this
 // asset type. If no constraints apply, nil is returned.
-func (c Config) MaxAssetSizeFor(assetType db.AssetType) (result *uint64) {
+func (c Config) MaxAssetSizeFor(assetType db.AssetType, scopeUUID string) (result *uint64) {
 	for _, rule := range c.MaxAssetSizeRules {
-		if rule.AssetTypeRx.MatchString(string(assetType)) {
-			if result == nil || rule.Value < *result {
-				val := rule.Value
-				result = &val
-			}
+		if rule.AssetTypeRx.MatchString(string(assetType)) && (rule.ScopeUUID == "" || rule.ScopeUUID == scopeUUID) {
+			val := rule.Value
+			result = &val
 		}
 	}
 

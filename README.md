@@ -106,8 +106,9 @@ The following fields are allowed:
 
 | Field | Type | Explanation |
 | ----- | ---- | ----------- |
-| `max_asset_sizes` | array of objects | If present, resource configurations for matching asset types will only be allowed if they include a compatible `max_size` constraint. |
-| `max_asset_sizes[].asset_type` | list of regexes | Regex that specifies which asset types this constraint applies to. |
+| `max_asset_sizes` | array of objects | If present, resource configurations for matching asset types will only be allowed if they include a compatible `max_size` constraint. If multiple constraints apply to the same resource, later constraints override earlier ones. |
+| `max_asset_sizes[].asset_type` | regex | Regex that specifies which asset types this constraint applies to. |
+| `max_asset_sizes[].scope_uuid` | string | If present, the constraint only applies to resources with exactly this `scope_uuid` value. This can be used to override a general constraint for a specific project or domain. |
 | `max_asset_sizes[].value` | integer | Highest permissible value for the `max_size` constraint on matching resources. |
 | `project_seeds` | array of objects | Specification of projects that will have resources configured. The observer will apply these seeds, and the API will reject attempts to manually override the seeded configuration. |
 | `project_seeds[].project_name` | string | Name (not ID!) of the project. |
