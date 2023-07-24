@@ -109,15 +109,15 @@ func (e *Engine) handleGetExclusionReasons(w http.ResponseWriter, r *http.Reques
 	//check the labels on the obtained samples
 	hasDPMetrics := false
 	hasNonDPMetrics := false
-	isOffline := false
+	isOnline := false
 	for _, sample := range resultVector {
 		if sample.Metric["volume_type"] == "dp" {
 			hasDPMetrics = true
 		} else {
 			hasNonDPMetrics = true
-		}
-		if sample.Metric["volume_state"] == "offline" {
-			isOffline = true
+			if sample.Metric["volume_state"] != "offline" {
+				isOnline = true
+			}
 		}
 	}
 
@@ -142,6 +142,6 @@ func (e *Engine) handleGetExclusionReasons(w http.ResponseWriter, r *http.Reques
 		"volume_type = dp": hasDPMetrics && !hasNonDPMetrics,
 		//Scraping will fail on shares in state "offline" because their size is
 		//always reported as 0.
-		"volume_state = offline": isOffline,
+		"volume_state = offline": !isOnline,
 	})
 }

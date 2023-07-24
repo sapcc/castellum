@@ -68,7 +68,9 @@ func (e *Engine) collect() error {
 		//NOTE: The `max by (share_id)` is necessary for when a share is being
 		//migrated to another shareserver and thus appears in the metrics twice.
 		//The `volume_type!="dp"` is required to filter out metrics for snapmirrors.
-		query := fmt.Sprintf(`max by (project_id, share_id) (%s{volume_type!="dp"})`, metricName)
+		//The `volume_state!="offline"` is required to filter out metrics for decom leftovers
+		//(where an online share is migrated away from an offline filer).
+		query := fmt.Sprintf(`max by (project_id, share_id) (%s{volume_type!="dp",volume_state!="offline"})`, metricName)
 		vector, err := e.PromClient.GetVector(query)
 		if err != nil {
 			return fmt.Errorf("cannot collect %s data: %w", metricName, err)
