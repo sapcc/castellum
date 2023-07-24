@@ -109,15 +109,18 @@ func (e *Engine) handleGetExclusionReasons(w http.ResponseWriter, r *http.Reques
 	//check the labels on the obtained samples
 	hasDPMetrics := false
 	hasNonDPMetrics := false
-	isOffline := false
+	isOffline := true
 	for _, sample := range resultVector {
+		if sample.Metric["volume_state"] == "offline" {
+			continue
+		}
+
+		isOffline = false
+
 		if sample.Metric["volume_type"] == "dp" {
 			hasDPMetrics = true
 		} else {
 			hasNonDPMetrics = true
-		}
-		if sample.Metric["volume_state"] == "offline" {
-			isOffline = true
 		}
 	}
 
