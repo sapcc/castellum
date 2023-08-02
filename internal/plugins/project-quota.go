@@ -19,6 +19,7 @@
 package plugins
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -146,7 +147,7 @@ func (m *assetManagerProjectQuota) CheckResourceAllowed(assetType db.AssetType, 
 }
 
 // ListAssets implements the core.AssetManager interface.
-func (m *assetManagerProjectQuota) ListAssets(res db.Resource) ([]string, error) {
+func (m *assetManagerProjectQuota) ListAssets(_ context.Context, res db.Resource) ([]string, error) {
 	//see notes on type declaration above
 	return []string{res.ScopeUUID}, nil
 }
@@ -191,7 +192,7 @@ func isUserError(err error) bool {
 }
 
 // GetAssetStatus implements the core.AssetManager interface.
-func (m *assetManagerProjectQuota) GetAssetStatus(res db.Resource, projectID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
+func (m *assetManagerProjectQuota) GetAssetStatus(_ context.Context, res db.Resource, projectID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
 	resource, err := m.getQuotaStatus(res.AssetType, projectID)
 	if err != nil {
 		return core.AssetStatus{}, err

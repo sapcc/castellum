@@ -19,6 +19,7 @@
 package plugins
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -129,7 +130,7 @@ var (
 )
 
 // ListAssets implements the core.AssetManager interface.
-func (m AssetManagerStatic) ListAssets(res db.Resource) ([]string, error) {
+func (m AssetManagerStatic) ListAssets(_ context.Context, res db.Resource) ([]string, error) {
 	if res.AssetType != m.AssetType {
 		return nil, errWrongAssetType
 	}
@@ -146,7 +147,7 @@ func (m AssetManagerStatic) ListAssets(res db.Resource) ([]string, error) {
 }
 
 // GetAssetStatus implements the core.AssetManager interface.
-func (m AssetManagerStatic) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
+func (m AssetManagerStatic) GetAssetStatus(_ context.Context, res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
 	if res.AssetType != m.AssetType {
 		return core.AssetStatus{}, errWrongAssetType
 	}

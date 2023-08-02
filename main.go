@@ -145,7 +145,7 @@ func main() {
 		if len(os.Args) == 5 {
 			configJSON = os.Args[4]
 		}
-		runAssetTypeTestShell(team, db.AssetType(os.Args[3]), configJSON)
+		runAssetTypeTestShell(context.Background(), team, db.AssetType(os.Args[3]), configJSON)
 	default:
 		usage()
 	}
@@ -251,7 +251,7 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 ////////////////////////////////////////////////////////////////////////////////
 // task: test-asset-type
 
-func runAssetTypeTestShell(team core.AssetManagerTeam, assetType db.AssetType, configJSON string) {
+func runAssetTypeTestShell(ctx context.Context, team core.AssetManagerTeam, assetType db.AssetType, configJSON string) {
 	manager, _ := team.ForAssetType(assetType)
 	if manager == nil {
 		logg.Fatal("no manager configured for asset type: %q", assetType)
@@ -299,7 +299,7 @@ PROMPT:
 				logg.Error("wrong number of arguments")
 				continue
 			}
-			result, err := manager.ListAssets(res)
+			result, err := manager.ListAssets(ctx, res)
 			if err != nil {
 				logg.Error(err.Error())
 				continue
@@ -338,7 +338,7 @@ PROMPT:
 				logg.Error("wrong number of arguments")
 				continue
 			}
-			result, err := manager.GetAssetStatus(res, fields[2], previousStatus)
+			result, err := manager.GetAssetStatus(ctx, res, fields[2], previousStatus)
 			if err != nil {
 				logg.Error(err.Error())
 				continue

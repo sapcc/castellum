@@ -19,6 +19,7 @@
 package plugins
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base32"
 	"encoding/json"
@@ -131,13 +132,13 @@ func (m *assetManagerServerGroups) CheckResourceAllowed(assetType db.AssetType, 
 }
 
 // ListAssets implements the core.AssetManager interface.
-func (m *assetManagerServerGroups) ListAssets(res db.Resource) ([]string, error) {
+func (m *assetManagerServerGroups) ListAssets(_ context.Context, res db.Resource) ([]string, error) {
 	groupUUID := strings.TrimPrefix(string(res.AssetType), "server-group:")
 	return []string{groupUUID}, nil
 }
 
 // GetAssetStatus implements the core.AssetManager interface.
-func (m *assetManagerServerGroups) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
+func (m *assetManagerServerGroups) GetAssetStatus(_ context.Context, res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
 	computeV2, err := m.Provider.CloudAdminClient(openstack.NewComputeV2)
 	if err != nil {
 		return core.AssetStatus{}, err

@@ -110,7 +110,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 		}
 	}
 	startedAt := c.TimeNow()
-	status, err := manager.GetAssetStatus(res, asset.UUID, oldStatus)
+	status, err := manager.GetAssetStatus(ctx, res, asset.UUID, oldStatus)
 	finishedAt := c.TimeNow()
 	if err != nil {
 		errMsg := fmt.Errorf("cannot query status of %s %s: %s", string(res.AssetType), asset.UUID, err.Error())
