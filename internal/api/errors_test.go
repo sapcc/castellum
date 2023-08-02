@@ -33,7 +33,7 @@ import (
 
 func TestGetResourceScrapeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
 		//endpoint requires a token with cluster access
 		mv.Forbid("cluster:access")
 		assert.HTTPRequest{
@@ -74,7 +74,7 @@ func TestGetResourceScrapeErrors(baseT *testing.T) {
 
 func TestGetAssetScrapeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
 		//endpoint requires a token with cluster access
 		mv.Forbid("cluster:access")
 		assert.HTTPRequest{

@@ -34,7 +34,7 @@ import (
 
 func TestCollectGarbage(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withContext(t, core.Config{}, func(ctx context.Context, c *Context, _ *plugins.AssetManagerStatic, _ *test.FakeClock, _ *prometheus.Registry) {
+	withContext(t, core.Config{}, func(_ context.Context, c *Context, _ *plugins.AssetManagerStatic, _ *test.FakeClock, _ *prometheus.Registry) {
 		fakeNow := time.Unix(0, 0).UTC()
 
 		//setup some minimal scaffolding (we can only insert finished_operations
