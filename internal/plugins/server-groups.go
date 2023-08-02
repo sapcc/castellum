@@ -40,6 +40,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/keymanager/v1/secrets"
 	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/pools"
 	"github.com/sapcc/go-api-declarations/castellum"
+	"github.com/sapcc/go-bits/errext"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
@@ -119,7 +120,7 @@ func (m *assetManagerServerGroups) CheckResourceAllowed(assetType db.AssetType, 
 	//check that the server group exists and is in the right project
 	groupID := strings.TrimPrefix(string(assetType), "server-group:")
 	group, err := m.getServerGroup(groupID)
-	if _, is404 := err.(gophercloud.ErrDefault404); is404 || (err == nil && group.ProjectID != scopeUUID) {
+	if errext.IsOfType[gophercloud.ErrDefault404](err) || (err == nil && group.ProjectID != scopeUUID) {
 		return fmt.Errorf("server group not found in Nova: %s", groupID)
 	}
 	if err != nil {
@@ -319,7 +320,7 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 		logg.Info("checking on %d servers being deleted...", len(serversInDeletion))
 		for serverID := range serversInDeletion {
 			server, err := servers.Get(computeV2, serverID).Extract()
-			if _, ok := err.(gophercloud.ErrDefault404); ok {
+			if errext.IsOfType[gophercloud.ErrDefault404](err) {
 				//server has disappeared - stop waiting for it
 				delete(serversInDeletion, serverID)
 				continue
@@ -439,7 +440,7 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 		logg.Info("checking on %d servers being created...", len(serversInCreation))
 		for serverID := range serversInCreation {
 			server, err := servers.Get(computeV2, serverID).Extract()
-			if _, ok := err.(gophercloud.ErrDefault404); ok {
+			if errext.IsOfType[gophercloud.ErrDefault404](err) {
 				//server has disappeared - complain, and stop checking for it
 				msgs = append(msgs, fmt.Sprintf("server %s has disappeared before going into ACTIVE", serverID))
 				delete(serversInCreation, serverID)
@@ -755,11 +756,11 @@ func (m *assetManagerServerGroups) pullKeypairFromBarbican(computeV2, keymgrV1 *
 	//check if present in Nova already
 	nameInNova := fmt.Sprintf("from-barbican-%s", secretID)
 	_, err := keypairs.Get(computeV2, nameInNova, nil).Extract()
-	switch err.(type) {
-	case nil:
+	switch {
+	case err == nil:
 		//keypair exists -> nothing to do
 		return nameInNova, nil
-	case gophercloud.ErrDefault404:
+	case errext.IsOfType[gophercloud.ErrDefault404](err):
 		//keypair does not exist -> pull from Barbican below
 		break
 	default:

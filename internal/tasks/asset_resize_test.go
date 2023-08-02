@@ -21,6 +21,7 @@ package tasks
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -86,7 +87,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 		//ExecuteOne(AssetResizeJob{}) should do nothing right now because that operation is
 		//only greenlit in the future, but not right now
 		err := resizeJob.ProcessOne(ctx)
-		if err != sql.ErrNoRows {
+		if !errors.Is(err, sql.ErrNoRows) {
 			t.Fatalf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
 		t.ExpectPendingOperations(c.DB, pendingOp)
@@ -207,7 +208,7 @@ func TestErroringResize(tBase *testing.T) {
 		//ExecuteOne(AssetResizeJob{}) should do nothing right now because, although the
 		//operation is greenlit, its retry_at timestamp is in the future
 		err := resizeJob.ProcessOne(ctx)
-		if err != sql.ErrNoRows {
+		if !errors.Is(err, sql.ErrNoRows) {
 			t.Fatalf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
 		t.ExpectPendingOperations(c.DB, pendingOp)

@@ -32,6 +32,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares"
 	"github.com/sapcc/go-api-declarations/castellum"
+	"github.com/sapcc/go-bits/errext"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/osext"
 
@@ -302,7 +303,7 @@ func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, a
 	//when netapp-scout reports a 404 for this share, we can check Manila to see if the share was deleted in the meantime
 	actionOn404 := func() error {
 		_, getErr := shares.Get(m.Manila, assetUUID).Extract()
-		if _, ok := getErr.(gophercloud.ErrDefault404); ok {
+		if errext.IsOfType[gophercloud.ErrDefault404](getErr) {
 			return core.AssetNotFoundErr{InnerError: fmt.Errorf("share not found in Manila: %s", getErr.Error())}
 		}
 		return nil //use the default error returned by m.queryScout()

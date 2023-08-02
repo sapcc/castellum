@@ -21,6 +21,7 @@ package tasks
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/go-gorp/gorp/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-api-declarations/castellum"
+	"github.com/sapcc/go-bits/errext"
 	"github.com/sapcc/go-bits/jobloop"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/osext"
@@ -95,7 +97,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 	//get pending operation for this asset
 	var pendingOp *db.PendingOperation
 	err = tx.SelectOne(&pendingOp, `SELECT * FROM pending_operations WHERE asset_id = $1`, asset.ID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		pendingOp = nil
 	} else if err != nil {
 		return err
@@ -114,7 +116,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 	finishedAt := c.TimeNow()
 	if err != nil {
 		errMsg := fmt.Errorf("cannot query status of %s %s: %s", string(res.AssetType), asset.UUID, err.Error())
-		if _, ok := err.(core.AssetNotFoundErr); ok {
+		if errext.IsOfType[core.AssetNotFoundErr](err) {
 			//asset was deleted since the last scrape of this resource
 			logg.Error(errMsg.Error())
 			logg.Info("removing deleted %s asset from DB: UUID = %s, scope UUID = %s", res.AssetType, asset.UUID, res.ScopeUUID)
