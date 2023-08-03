@@ -21,9 +21,10 @@ package plugins
 
 import "github.com/sapcc/go-api-declarations/castellum"
 
-// UserError is an error wrapper that simplifies
+// UserError is an error wrapper that allows to mark errors as "failed" instead
+// of "errored" without having to carry a separate OperationOutcome value.
 //
-// TODO upstream this into internal/core and make
+// TODO upstream this into internal/core and remove OperationOutcome return values from the fallible methods on AssetManager
 type UserError struct {
 	Inner error
 }
