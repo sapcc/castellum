@@ -19,7 +19,10 @@
 
 package plugins
 
-import "github.com/sapcc/go-api-declarations/castellum"
+import (
+	"github.com/sapcc/go-api-declarations/castellum"
+	"github.com/sapcc/go-bits/errext"
+)
 
 // UserError is an error wrapper that simplifies
 //
@@ -41,12 +44,12 @@ func (e UserError) Cause() error {
 // Classify inspects the given error, unwraps UserError if possible, and adds an
 // appropriate castellum.OperationOutcome to the result.
 func Classify(err error) (castellum.OperationOutcome, error) {
-	switch err := err.(type) {
-	case nil:
+	if err == nil {
 		return castellum.OperationOutcomeSucceeded, nil
-	case UserError:
-		return castellum.OperationOutcomeFailed, err.Inner
-	default:
+	}
+	if uerr, ok := errext.As[UserError](err); ok {
+		return castellum.OperationOutcomeFailed, uerr.Inner
+	} else {
 		return castellum.OperationOutcomeErrored, err
 	}
 }
