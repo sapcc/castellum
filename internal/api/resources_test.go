@@ -75,7 +75,7 @@ var (
 
 func TestGetProject(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
 		//endpoint requires a token with project access
 		mv.Forbid("project:access")
 		assert.HTTPRequest{
@@ -126,7 +126,7 @@ func TestGetProject(baseT *testing.T) {
 
 func TestGetResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
 		//endpoint requires a token with project access
 		mv.Forbid("project:access")
 		assert.HTTPRequest{
@@ -185,7 +185,7 @@ func TestGetResource(baseT *testing.T) {
 func TestPutResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	clock := test.FakeClock(3600)
-	withHandler(t, core.Config{}, clock.Now, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, clock.Now, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
 		tr0.Ignore()
 
@@ -382,7 +382,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 	}
 
 	t := test.T{T: baseT}
-	withHandler(t, cfg, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, _ []db.Asset) {
+	withHandler(t, cfg, nil, func(h *handler, hh http.Handler, _ *MockValidator, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
 		tr0.Ignore()
 
@@ -564,7 +564,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 
 func TestDeleteResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, allAssets []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
 		tr0.Ignore()
 
@@ -663,7 +663,7 @@ func TestSeedBlocksResourceUpdates(baseT *testing.T) {
 
 	t := test.T{T: baseT}
 	clock := test.FakeClock(3600)
-	withHandler(t, cfg, clock.Now, func(h *handler, hh http.Handler, mv *MockValidator, allResources []db.Resource, _ []db.Asset) {
+	withHandler(t, cfg, clock.Now, func(_ *handler, hh http.Handler, _ *MockValidator, _ []db.Resource, _ []db.Asset) {
 		//cannot PUT an existing resource defined by the seed
 		assert.HTTPRequest{
 			Method:       "PUT",

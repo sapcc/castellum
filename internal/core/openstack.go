@@ -28,6 +28,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/roles"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
+	"github.com/sapcc/go-bits/errext"
 )
 
 // ProviderClient is an interface for an internal type that wraps
@@ -142,7 +143,7 @@ func (p *providerClientImpl) projectScopedClientImpl(scope ProjectScope, firstPa
 		//NOTE: If we don't have any roles assigned in the project yet, we will get
 		//a 401, even if the provided credentials are correct. This is not a fatal
 		//error, we just need to carry on and assign roles.
-		if _, is401 := err.(gophercloud.ErrDefault401); is401 {
+		if errext.IsOfType[gophercloud.ErrDefault401](err) {
 			pc = nil
 		} else {
 			return nil, p.eo, fmt.Errorf("cannot authenticate into project %s: %w", scope.ID, err)
@@ -245,7 +246,7 @@ func (p *providerClientImpl) GetProject(projectID string) (*CachedProject, error
 	}
 	project, err := projects.Get(identityV3, projectID).Extract()
 	if err != nil {
-		if _, ok := err.(gophercloud.ErrDefault404); ok {
+		if errext.IsOfType[gophercloud.ErrDefault404](err) {
 			p.cacheMutex.Lock()
 			p.projectCache[projectID] = nil
 			p.cacheMutex.Unlock()
@@ -276,7 +277,7 @@ func (p *providerClientImpl) GetDomain(domainID string) (*CachedDomain, error) {
 	}
 	domain, err := domains.Get(identityV3, domainID).Extract()
 	if err != nil {
-		if _, ok := err.(gophercloud.ErrDefault404); ok {
+		if errext.IsOfType[gophercloud.ErrDefault404](err) {
 			p.cacheMutex.Lock()
 			p.domainCache[domainID] = nil
 			p.cacheMutex.Unlock()

@@ -21,6 +21,7 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -222,7 +223,7 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 		`SELECT * FROM resources WHERE scope_uuid = $1 AND asset_type = $2`,
 		projectUUID, assetType,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		if createIfMissing {
 			proj, err := h.Provider.GetProject(projectUUID)
 			if respondwith.ErrorText(w, err) {

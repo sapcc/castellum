@@ -20,6 +20,7 @@ package api
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 	"sort"
 
@@ -167,7 +168,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	err := h.DB.SelectOne(&dbAsset,
 		`SELECT * FROM assets WHERE resource_id = $1 AND uuid = $2`,
 		dbResource.ID, mux.Vars(r)["asset_uuid"])
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondWithNotFound(w)
 		return
 	}
@@ -180,7 +181,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	err = h.DB.SelectOne(&dbPendingOp,
 		`SELECT * FROM pending_operations WHERE asset_id = $1`,
 		dbAsset.ID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		asset.PendingOperation = nil
 	} else if respondwith.ErrorText(w, err) {
 		return

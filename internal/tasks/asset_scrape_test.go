@@ -21,6 +21,7 @@ package tasks
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
 	"time"
 
@@ -41,7 +42,7 @@ func runAssetScrapeTest(t test.T, resourceIsSingleStep bool, action func(context
 
 		//asset scrape without any resources just does nothing
 		err := scrapeJob.ProcessOne(ctx)
-		if err != sql.ErrNoRows {
+		if !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
 		_, dbDump := easypg.NewTracker(t.T, c.DB.Db)

@@ -19,6 +19,7 @@
 package plugins
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,6 +32,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares"
 	"github.com/sapcc/go-api-declarations/castellum"
+	"github.com/sapcc/go-bits/errext"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/osext"
 
@@ -114,7 +116,7 @@ func (m *assetManagerNFS) CheckResourceAllowed(assetType db.AssetType, scopeUUID
 }
 
 // ListAssets implements the core.AssetManager interface.
-func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
+func (m *assetManagerNFS) ListAssets(ctx context.Context, res db.Resource) ([]string, error) {
 	assetType := m.parseAssetType(res.AssetType)
 
 	page := 0
@@ -152,7 +154,7 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 
 		if len(s) > 0 {
 			for _, share := range s {
-				isIgnored, err := m.ignoreShare(share)
+				isIgnored, err := m.ignoreShare(ctx, share)
 				if err != nil {
 					return nil, err
 				}
@@ -172,7 +174,7 @@ func (m *assetManagerNFS) ListAssets(res db.Resource) ([]string, error) {
 	}
 }
 
-func (m *assetManagerNFS) ignoreShare(share shares.Share) (bool, error) {
+func (m *assetManagerNFS) ignoreShare(ctx context.Context, share shares.Share) (bool, error) {
 	//ignore shares in status "error" (we won't be able to resize them anyway)
 	if share.Status == "error" {
 		logg.Debug("ignoring share %s because of status = error", share.ID)
@@ -197,7 +199,7 @@ func (m *assetManagerNFS) ignoreShare(share shares.Share) (bool, error) {
 	//thus evaluated in the netapp-scout.
 	path := fmt.Sprintf("v1/projects/%s/shares/%s/exclusion-reasons", share.ProjectID, share.ID)
 	var exclusionReasons map[string]bool
-	err := m.queryScout(path, &exclusionReasons, nil)
+	err := m.queryScout(ctx, path, &exclusionReasons, nil)
 	if err != nil {
 		return false, err
 	}
@@ -211,9 +213,13 @@ func (m *assetManagerNFS) ignoreShare(share shares.Share) (bool, error) {
 	return false, nil
 }
 
-func (m *assetManagerNFS) queryScout(path string, data any, actionOn404 func() error) error {
+func (m *assetManagerNFS) queryScout(ctx context.Context, path string, data any, actionOn404 func() error) error {
 	url := strings.TrimSuffix(m.ScoutBaseURL, "/") + "/" + strings.TrimPrefix(path, "/")
-	resp, err := http.Get(url) //nolint:gosec
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	if err != nil {
+		return fmt.Errorf("could not GET %s: %w", url, err)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("could not GET %s: %w", url, err)
 	}
@@ -293,11 +299,11 @@ func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useR
 }
 
 // GetAssetStatus implements the core.AssetManager interface.
-func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
+func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
 	//when netapp-scout reports a 404 for this share, we can check Manila to see if the share was deleted in the meantime
 	actionOn404 := func() error {
 		_, getErr := shares.Get(m.Manila, assetUUID).Extract()
-		if _, ok := getErr.(gophercloud.ErrDefault404); ok {
+		if errext.IsOfType[gophercloud.ErrDefault404](getErr) {
 			return core.AssetNotFoundErr{InnerError: fmt.Errorf("share not found in Manila: %s", getErr.Error())}
 		}
 		return nil //use the default error returned by m.queryScout()
@@ -309,7 +315,7 @@ func (m *assetManagerNFS) GetAssetStatus(res db.Resource, assetUUID string, prev
 		UsageGiB float64 `json:"usage_gib"`
 	}
 	path := fmt.Sprintf("v1/projects/%s/shares/%s", res.ScopeUUID, assetUUID)
-	err := m.queryScout(path, &data, actionOn404)
+	err := m.queryScout(ctx, path, &data, actionOn404)
 	if err != nil {
 		return core.AssetStatus{}, err
 	}

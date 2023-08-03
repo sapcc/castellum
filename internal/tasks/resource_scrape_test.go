@@ -21,6 +21,7 @@ package tasks
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
 	"time"
 
@@ -41,7 +42,7 @@ func TestResourceScraping(baseT *testing.T) {
 
 		//ScrapeNextResource() without any resources just does nothing
 		err := job.ProcessOne(ctx)
-		if err != sql.ErrNoRows {
+		if !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
 		tr, tr0 := easypg.NewTracker(t.T, c.DB.Db)

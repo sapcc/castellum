@@ -80,7 +80,7 @@ func (c *Context) processResourceScrape(ctx context.Context, tx *gorp.Transactio
 
 	//check which assets exist in this resource in OpenStack
 	startedAt := c.TimeNow()
-	assetUUIDs, err := manager.ListAssets(res)
+	assetUUIDs, err := manager.ListAssets(ctx, res)
 	finishedAt := c.TimeNow()
 	if err != nil {
 		//In case of error we update next_scrape_at so that the next call continues
