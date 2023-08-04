@@ -13,7 +13,7 @@ require (
 	github.com/rs/cors v1.9.0
 	github.com/sapcc/go-api-declarations v1.7.0
 	github.com/sapcc/go-bits v0.0.0-20230803125152-91a869119633
-	github.com/sapcc/gophercloud-sapcc v0.0.0-20230714164029-731493e3d996
+	github.com/sapcc/gophercloud-sapcc v0.0.0-20230803124833-fdc19285f334
 	go.uber.org/automaxprocs v1.5.3
 	gopkg.in/yaml.v2 v2.4.0
 )
