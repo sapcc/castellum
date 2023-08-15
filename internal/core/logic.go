@@ -88,6 +88,16 @@ func checkReason(res db.Resource, asset db.Asset, info AssetTypeInfo, reason cas
 		c.forbidAbove(*res.MaximumSize)
 	}
 
+	//we also support asset-local MinimumSize and MaximumSize values for
+	//technical constraints that are difficult to express in terms of raw usage
+	//numbers
+	if reason == castellum.OperationReasonLow && asset.MinimumSize != nil {
+		c.forbidBelow(*asset.MinimumSize)
+	}
+	if reason != castellum.OperationReasonLow && asset.MaximumSize != nil {
+		c.forbidAbove(*asset.MaximumSize)
+	}
+
 	//do not allow downsize operations to cross above the high/critical thresholds
 	if reason == castellum.OperationReasonLow {
 		for _, metric := range info.UsageMetrics {

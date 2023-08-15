@@ -29,10 +29,15 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
-// AssetStatus shows the current state of an asset. It is returned by AssetManager.GetAssetStatus().
+// AssetStatus shows the current state of an asset.
+//
+// It is returned by AssetManager.GetAssetStatus(). The semantics of all fields
+// match their equivalently-named counterparts in the db.Asset type.
 type AssetStatus struct {
-	Size  uint64
-	Usage castellum.UsageValues
+	Size        uint64
+	Usage       castellum.UsageValues
+	MinimumSize *uint64
+	MaximumSize *uint64
 }
 
 // AssetTypeInfo describes an AssetType supported by an AssetManager.
@@ -42,7 +47,7 @@ type AssetTypeInfo struct {
 }
 
 // Identifier inserts the metric name into the given format string, but returns
-// the empty string for SingularUsageMetric.
+// the empty string for SingularUsageMetric. It is used when building log messages.
 func Identifier(metric castellum.UsageMetric, format string) string {
 	if metric == castellum.SingularUsageMetric {
 		return ""

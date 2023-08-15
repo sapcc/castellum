@@ -38,6 +38,8 @@ func AssetFromDB(asset db.Asset) castellum.Asset {
 	a := castellum.Asset{
 		UUID:         asset.UUID,
 		Size:         asset.Size,
+		MinimumSize:  asset.MinimumSize,
+		MaximumSize:  asset.MaximumSize,
 		UsagePercent: core.GetMultiUsagePercent(asset.Size, asset.Usage),
 		Stale:        asset.ExpectedSize != nil,
 	}

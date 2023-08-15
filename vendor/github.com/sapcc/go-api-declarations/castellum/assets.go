@@ -19,6 +19,8 @@ type Asset struct {
 	UUID               string                 `json:"id"`
 	Size               uint64                 `json:"size,omitempty"`
 	UsagePercent       UsageValues            `json:"usage_percent"`
+	MinimumSize        *uint64                `json:"min_size,omitempty"`
+	MaximumSize        *uint64                `json:"max_size,omitempty"`
 	Checked            *Checked               `json:"checked,omitempty"`
 	Stale              bool                   `json:"stale"`
 	PendingOperation   *StandaloneOperation   `json:"pending_operation,omitempty"`

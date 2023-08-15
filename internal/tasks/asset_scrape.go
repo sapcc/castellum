@@ -107,8 +107,10 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 	var oldStatus *core.AssetStatus
 	if !asset.NeverScraped {
 		oldStatus = &core.AssetStatus{
-			Size:  asset.Size,
-			Usage: asset.Usage,
+			Size:        asset.Size,
+			Usage:       asset.Usage,
+			MinimumSize: asset.MinimumSize,
+			MaximumSize: asset.MaximumSize,
 		}
 	}
 	startedAt := c.TimeNow()
@@ -145,15 +147,21 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 	}
 
 	if logScrapes {
-		var usageLogStrings []string
+		var valueLogStrings []string
+		if status.MinimumSize != nil {
+			valueLogStrings = append(valueLogStrings, fmt.Sprintf("minimum size = %d", *status.MinimumSize))
+		}
+		if status.MaximumSize != nil {
+			valueLogStrings = append(valueLogStrings, fmt.Sprintf("maximum size = %d", *status.MaximumSize))
+		}
 		for metric, usage := range status.Usage {
-			usageLogStrings = append(usageLogStrings, fmt.Sprintf(
+			valueLogStrings = append(valueLogStrings, fmt.Sprintf(
 				"usage%s = %.3f (%.3f%%)",
 				core.Identifier(metric, "[%s]"), usage, core.GetUsagePercent(status.Size, usage),
 			))
 		}
 		logg.Info("observed %s %s at size = %d, %s",
-			res.AssetType, asset.UUID, status.Size, strings.Join(usageLogStrings, ", "),
+			res.AssetType, asset.UUID, status.Size, strings.Join(valueLogStrings, ", "),
 		)
 	}
 
@@ -181,6 +189,8 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 		//in parallel and take that new value as the actual size
 		asset.Size = status.Size
 		asset.Usage = status.Usage
+		asset.MinimumSize = status.MinimumSize
+		asset.MaximumSize = status.MaximumSize
 		asset.ExpectedSize = nil
 	default:
 		//we are waiting for a resize operation to reflect in the backend, but

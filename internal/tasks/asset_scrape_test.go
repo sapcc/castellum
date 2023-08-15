@@ -100,6 +100,13 @@ func forAllSteppingStrategies(t test.T, action func(context.Context, *Context, d
 	})
 }
 
+func maybeU64(condition bool, value uint64) *uint64 {
+	if condition {
+		return &value
+	}
+	return nil
+}
+
 func TestNoOperationWhenNoThreshold(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock, scrapeJob jobloop.Job) {
@@ -640,95 +647,114 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 //nolint:dupl
 func TestSkipDownsizeBecauseOfMinimumSize(baseT *testing.T) {
 	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock, scrapeJob jobloop.Job) {
-		//configure a minimum size on the resource
-		t.MustExec(c.DB, `UPDATE resources SET min_size = 1000`)
+	for _, isAssetLocal := range []bool{false, true} {
+		t.Logf("running testcase with isAssetLocal = %t", isAssetLocal)
+		forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock, scrapeJob jobloop.Job) {
+			//configure a minimum size on the resource (or on the asset down below if isAssetLocal)
+			if !isAssetLocal {
+				t.MustExec(c.DB, `UPDATE resources SET min_size = 1000`)
+			}
 
-		//set a usage that is ripe for downsizing
-		setAsset(plugins.StaticAsset{Size: 1000, Usage: 100})
+			//set a usage that is ripe for downsizing
+			setAsset(plugins.StaticAsset{Size: 1000, Usage: 100, MinimumSize: maybeU64(isAssetLocal, 1000)})
 
-		//ScrapeNextAsset should *not* create a downsize operation because the
-		//minimum size would be crossed
-		clock.StepBy(5 * time.Minute)
-		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectPendingOperations(c.DB /*, nothing */)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
-	})
+			//ScrapeNextAsset should *not* create a downsize operation because the
+			//minimum size would be crossed
+			clock.StepBy(5 * time.Minute)
+			t.Must(scrapeJob.ProcessOne(ctx))
+			t.ExpectPendingOperations(c.DB /*, nothing */)
+			t.ExpectFinishedOperations(c.DB /*, nothing */)
+		})
+	}
 }
 
 func TestRestrictDownsizeBecauseOfMinimumSize(baseT *testing.T) {
 	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock, scrapeJob jobloop.Job) {
-		//configure a minimum size on the resource
-		t.MustExec(c.DB, `UPDATE resources SET min_size = 900`)
+	for _, isAssetLocal := range []bool{false, true} {
+		t.Logf("running testcase with isAssetLocal = %t", isAssetLocal)
+		forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock, scrapeJob jobloop.Job) {
+			//configure a minimum size on the resource (or on the asset down below if isAssetLocal)
+			if !isAssetLocal {
+				t.MustExec(c.DB, `UPDATE resources SET min_size = 900`)
+			}
 
-		//set a usage that is ripe for downsizing
-		setAsset(plugins.StaticAsset{Size: 1000, Usage: 100})
+			//set a usage that is ripe for downsizing
+			setAsset(plugins.StaticAsset{Size: 1000, Usage: 100, MinimumSize: maybeU64(isAssetLocal, 900)})
 
-		//ScrapeNextAsset should create a downsize operation with new size 900,
-		//even though percentage-step resizing would like to go to 800
-		clock.StepBy(5 * time.Minute)
-		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectPendingOperations(c.DB, db.PendingOperation{
-			ID:        1,
-			AssetID:   1,
-			Reason:    castellum.OperationReasonLow,
-			OldSize:   1000,
-			NewSize:   900,
-			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 100},
-			CreatedAt: c.TimeNow(),
+			//ScrapeNextAsset should create a downsize operation with new size 900,
+			//even though percentage-step resizing would like to go to 800
+			clock.StepBy(5 * time.Minute)
+			t.Must(scrapeJob.ProcessOne(ctx))
+			t.ExpectPendingOperations(c.DB, db.PendingOperation{
+				ID:        1,
+				AssetID:   1,
+				Reason:    castellum.OperationReasonLow,
+				OldSize:   1000,
+				NewSize:   900,
+				Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 100},
+				CreatedAt: c.TimeNow(),
+			})
+			t.ExpectFinishedOperations(c.DB /*, nothing */)
 		})
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
-	})
+	}
 }
 
 //nolint:dupl
 func TestSkipUpsizeBecauseOfMaximumSize(baseT *testing.T) {
 	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock, scrapeJob jobloop.Job) {
-		//configure a maximum size on the resource
-		t.MustExec(c.DB, `UPDATE resources SET max_size = 1000`)
+	for _, isAssetLocal := range []bool{false, true} {
+		t.Logf("running testcase with isAssetLocal = %t", isAssetLocal)
+		forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock, scrapeJob jobloop.Job) {
+			//configure a maximum size on the resource (or on the asset down below if isAssetLocal)
+			if !isAssetLocal {
+				t.MustExec(c.DB, `UPDATE resources SET max_size = 1000`)
+			}
 
-		//set a usage that is ripe for upsizing, even for critical upsizing
-		setAsset(plugins.StaticAsset{Size: 1000, Usage: 999})
+			//set a usage that is ripe for upsizing, even for critical upsizing
+			setAsset(plugins.StaticAsset{Size: 1000, Usage: 999, MaximumSize: maybeU64(isAssetLocal, 1000)})
 
-		//ScrapeNextAsset should *not* create any operations because the
-		//maximum size would be crossed
-		clock.StepBy(5 * time.Minute)
-		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectPendingOperations(c.DB /*, nothing */)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
-	})
+			//ScrapeNextAsset should *not* create any operations because the
+			//maximum size would be crossed
+			clock.StepBy(5 * time.Minute)
+			t.Must(scrapeJob.ProcessOne(ctx))
+			t.ExpectPendingOperations(c.DB /*, nothing */)
+			t.ExpectFinishedOperations(c.DB /*, nothing */)
+		})
+	}
 }
 
-//nolint:dupl
 func TestRestrictUpsizeBecauseOfMaximumSize(baseT *testing.T) {
 	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock, scrapeJob jobloop.Job) {
-		//configure a maximum size on the resource
-		t.MustExec(c.DB, `UPDATE resources SET max_size = 1100`)
+	for _, isAssetLocal := range []bool{false, true} {
+		t.Logf("running testcase with isAssetLocal = %t", isAssetLocal)
+		forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *test.FakeClock, scrapeJob jobloop.Job) {
+			//configure a maximum size on the resource (or on the asset down below if isAssetLocal)
+			if !isAssetLocal {
+				t.MustExec(c.DB, `UPDATE resources SET max_size = 1100`)
+			}
 
-		//set a usage that is ripe for upsizing, even for critical upsizing
-		setAsset(plugins.StaticAsset{Size: 1000, Usage: 999})
+			//set a usage that is ripe for upsizing, even for critical upsizing
+			setAsset(plugins.StaticAsset{Size: 1000, Usage: 999, MaximumSize: maybeU64(isAssetLocal, 1100)})
 
-		//ScrapeNextAsset should create a critical upsize operation: With either
-		//stepping strategy, the desired target size is greater than the max_size,
-		//so the max_size is chosen instead.
-		clock.StepBy(5 * time.Minute)
-		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectPendingOperations(c.DB, db.PendingOperation{
-			ID:          1,
-			AssetID:     1,
-			Reason:      castellum.OperationReasonCritical,
-			OldSize:     1000,
-			NewSize:     1100,
-			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 999},
-			CreatedAt:   c.TimeNow(),
-			ConfirmedAt: p2time(c.TimeNow()),
-			GreenlitAt:  p2time(c.TimeNow()),
+			//ScrapeNextAsset should create a critical upsize operation: With either
+			//stepping strategy, the desired target size is greater than the max_size,
+			//so the max_size is chosen instead.
+			clock.StepBy(5 * time.Minute)
+			t.Must(scrapeJob.ProcessOne(ctx))
+			t.ExpectPendingOperations(c.DB, db.PendingOperation{
+				ID:          1,
+				AssetID:     1,
+				Reason:      castellum.OperationReasonCritical,
+				OldSize:     1000,
+				NewSize:     1100,
+				Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 999},
+				CreatedAt:   c.TimeNow(),
+				ConfirmedAt: p2time(c.TimeNow()),
+				GreenlitAt:  p2time(c.TimeNow()),
+			})
+			t.ExpectFinishedOperations(c.DB /*, nothing */)
 		})
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
-	})
+	}
 }
 
 func TestExternalResizeWhileOperationPending(baseT *testing.T) {
@@ -862,7 +888,6 @@ func TestUpsizeForcedByMinimumFreeSize(baseT *testing.T) {
 	})
 }
 
-//nolint:dupl
 func TestCriticalUpsizeTakingMultipleStepsAtOnce(baseT *testing.T) {
 	t := test.T{T: baseT}
 	//This test is specific to percentage-step resizing because single-step

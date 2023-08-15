@@ -151,8 +151,8 @@ github.com/rogpeppe/go-internal v1.10.0 h1:TMyTOH3F/DB16zRVcYyreMH6GnZZrwQVAoYjR
 github.com/rogpeppe/go-internal v1.10.0/go.mod h1:UQnix2H7Ngw/k4C5ijL5+65zddjncjaFoBhdsK/akog=
 github.com/rs/cors v1.9.0 h1:l9HGsTsHJcvW14Nk7J9KFz8bzeAWXn3CG6bgt7LsrAE=
 github.com/rs/cors v1.9.0/go.mod h1:XyqrcTp5zjWr1wsJ8PIRZssZ8b/WMcMf71DJnit4EMU=
-github.com/sapcc/go-api-declarations v1.7.0 h1:fABKw/dw300ZQ5TKEjVnKPqMSH5aCOSbJ06XnfWtpuw=
-github.com/sapcc/go-api-declarations v1.7.0/go.mod h1:3OCDo75YJwpytM/I0SjwcZJf1ZNu89KeAZ55kdOTSqE=
+github.com/sapcc/go-api-declarations v1.8.0 h1:jlomBUa0IMgcibtUT1GQ6VOT9RYa8LCk6LuP0DxURWo=
+github.com/sapcc/go-api-declarations v1.8.0/go.mod h1:83R3hTANhuRXt/pXDby37IJetw8l7DG41s33Tp9NXxI=
 github.com/sapcc/go-bits v0.0.0-20230809145704-87e8e6f6b6ff h1:YnWMhDwRE3zjoXwzrQF57oZe/Nerevn1v7Ic5t8a4is=
 github.com/sapcc/go-bits v0.0.0-20230809145704-87e8e6f6b6ff/go.mod h1:GGAnoQk5gf/BWMy9HX55t9vZ02w6tkFTDEo0xnz53/o=
 github.com/sapcc/gophercloud-sapcc v0.0.0-20230810044435-55a2af60c7f9 h1:iVRzylD+lZoJXs+WilR+pmH3VNSNeyDBSY84dXZRKaY=

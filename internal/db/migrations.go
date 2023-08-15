@@ -158,4 +158,14 @@ var SQLMigrations = map[string]string{
 		ALTER TABLE assets
 			DROP COLUMN scrape_duration_secs;
 	`,
+	"020_asset_local_size_constraints.up.sql": `
+		ALTER TABLE assets
+			ADD COLUMN min_size REAL DEFAULT NULL,
+			ADD COLUMN max_size REAL DEFAULT NULL;
+	`,
+	"020_asset_local_size_constraints.down.sql": `
+		ALTER TABLE assets
+			DROP COLUMN min_size,
+			DROP COLUMN max_size;
+	`,
 }
