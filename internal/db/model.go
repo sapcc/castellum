@@ -119,6 +119,13 @@ type Asset struct {
 	Size uint64 `db:"size"`
 	//The asset's current utilization, in the same unit as .Size.
 	Usage castellum.UsageValues `db:"usage"`
+	//The asset's minimum size and maximum size as reported by OpenStack. This
+	//should only be filled if the size is limited by technical constraints that
+	//are difficult to express in terms of absolute usage (or where merging those
+	//hidden constraints into the usage value would cause unnecessary confusion
+	//to the end user).
+	MinimumSize *uint64 `db:"min_size"`
+	MaximumSize *uint64 `db:"max_size"`
 
 	//This flag is set by a Castellum worker after a resize operation to indicate
 	//that the .Size attribute is outdated. The value is the new_size of the
