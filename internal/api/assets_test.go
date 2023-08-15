@@ -48,6 +48,8 @@ func TestGetAssets(baseT *testing.T) {
 				"id":            "fooasset2",
 				"size":          512,
 				"usage_percent": 80,
+				"min_size":      256,
+				"max_size":      1024,
 				"checked": assert.JSONObject{
 					"error": "unexpected uptime",
 				},
