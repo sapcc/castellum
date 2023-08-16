@@ -22,10 +22,12 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
+	"github.com/sapcc/go-bits/mock"
 	"github.com/sapcc/go-bits/regexpext"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -75,15 +77,15 @@ var (
 
 func TestGetProject(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
 		//endpoint requires a token with project access
-		mv.Forbid("project:access")
+		mv.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/projects/project1",
 			ExpectStatus: http.StatusForbidden,
 		}.Check(t.T, hh)
-		mv.Allow("project:access")
+		mv.Enforcer.Allow("project:access")
 
 		//expect empty result for project with no resources
 		assert.HTTPRequest{
@@ -109,8 +111,8 @@ func TestGetProject(baseT *testing.T) {
 		}.Check(t.T, hh)
 
 		//expect partial result when user is not allowed to view certain resources
-		mv.Forbid("project:show:bar")
-		mv.Forbid("project:edit:foo") //this should not be an issue
+		mv.Enforcer.Forbid("project:show:bar")
+		mv.Enforcer.Forbid("project:edit:foo") //this should not be an issue
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/projects/project1",
@@ -126,15 +128,15 @@ func TestGetProject(baseT *testing.T) {
 
 func TestGetResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
 		//endpoint requires a token with project access
-		mv.Forbid("project:access")
+		mv.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/projects/project1/resources/foo",
 			ExpectStatus: http.StatusForbidden,
 		}.Check(t.T, hh)
-		mv.Allow("project:access")
+		mv.Enforcer.Allow("project:access")
 
 		//expect error for unknown project or resource
 		assert.HTTPRequest{
@@ -157,16 +159,16 @@ func TestGetResource(baseT *testing.T) {
 		}.Check(t.T, hh)
 
 		//expect error for inaccessible resource
-		mv.Forbid("project:show:foo")
+		mv.Enforcer.Forbid("project:show:foo")
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/projects/project1/resources/foo",
 			ExpectStatus: http.StatusForbidden,
 		}.Check(t.T, hh)
-		mv.Allow("project:show:foo")
+		mv.Enforcer.Allow("project:show:foo")
 
 		//happy path
-		mv.Forbid("project:edit:foo") //this should not be an issue
+		mv.Enforcer.Forbid("project:edit:foo") //this should not be an issue
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/projects/project1/resources/foo",
@@ -184,8 +186,10 @@ func TestGetResource(baseT *testing.T) {
 
 func TestPutResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	clock := test.FakeClock(3600)
-	withHandler(t, core.Config{}, clock.Now, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	clock := mock.NewClock()
+	clock.StepBy(time.Hour)
+
+	withHandler(t, core.Config{}, clock.Now, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
 		tr0.Ignore()
 
@@ -206,14 +210,14 @@ func TestPutResource(baseT *testing.T) {
 		}
 
 		//endpoint requires a token with project access
-		mv.Forbid("project:access")
+		mv.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
 			Method:       "PUT",
 			Path:         "/v1/projects/project1/resources/foo",
 			Body:         newFooResourceJSON1,
 			ExpectStatus: http.StatusForbidden,
 		}.Check(t.T, hh)
-		mv.Allow("project:access")
+		mv.Enforcer.Allow("project:access")
 
 		//expect error for unknown resource
 		assert.HTTPRequest{
@@ -233,23 +237,23 @@ func TestPutResource(baseT *testing.T) {
 		}.Check(t.T, hh)
 
 		//expect error for inaccessible resource
-		mv.Forbid("project:show:foo")
+		mv.Enforcer.Forbid("project:show:foo")
 		assert.HTTPRequest{
 			Method:       "PUT",
 			Path:         "/v1/projects/project1/resources/foo",
 			Body:         newFooResourceJSON1,
 			ExpectStatus: http.StatusForbidden,
 		}.Check(t.T, hh)
-		mv.Allow("project:show:foo")
+		mv.Enforcer.Allow("project:show:foo")
 
-		mv.Forbid("project:edit:foo")
+		mv.Enforcer.Forbid("project:edit:foo")
 		assert.HTTPRequest{
 			Method:       "PUT",
 			Path:         "/v1/projects/project1/resources/foo",
 			Body:         newFooResourceJSON1,
 			ExpectStatus: http.StatusForbidden,
 		}.Check(t.T, hh)
-		mv.Allow("project:edit:foo")
+		mv.Enforcer.Allow("project:edit:foo")
 
 		//expect error when CheckResourceAllowed fails
 		m, _ := h.Team.ForAssetType("foo")
@@ -382,7 +386,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 	}
 
 	t := test.T{T: baseT}
-	withHandler(t, cfg, nil, func(h *handler, hh http.Handler, _ *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, cfg, nil, func(h *handler, hh http.Handler, _ *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
 		tr0.Ignore()
 
@@ -564,18 +568,18 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 
 func TestDeleteResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
 		tr0.Ignore()
 
 		//endpoint requires a token with project access
-		mv.Forbid("project:access")
+		mv.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
 			Method:       "DELETE",
 			Path:         "/v1/projects/project1/resources/foo",
 			ExpectStatus: http.StatusForbidden,
 		}.Check(t.T, hh)
-		mv.Allow("project:access")
+		mv.Enforcer.Allow("project:access")
 
 		//expect error for unknown project or resource
 		assert.HTTPRequest{
@@ -598,21 +602,21 @@ func TestDeleteResource(baseT *testing.T) {
 		}.Check(t.T, hh)
 
 		//expect error for inaccessible resource
-		mv.Forbid("project:show:foo")
+		mv.Enforcer.Forbid("project:show:foo")
 		assert.HTTPRequest{
 			Method:       "DELETE",
 			Path:         "/v1/projects/project1/resources/foo",
 			ExpectStatus: http.StatusForbidden,
 		}.Check(t.T, hh)
-		mv.Allow("project:show:foo")
+		mv.Enforcer.Allow("project:show:foo")
 
-		mv.Forbid("project:edit:foo")
+		mv.Enforcer.Forbid("project:edit:foo")
 		assert.HTTPRequest{
 			Method:       "DELETE",
 			Path:         "/v1/projects/project1/resources/foo",
 			ExpectStatus: http.StatusForbidden,
 		}.Check(t.T, hh)
-		mv.Allow("project:edit:foo")
+		mv.Enforcer.Allow("project:edit:foo")
 
 		//since all tests above were error cases, expect all resources to still be there
 		tr.DBChanges().AssertEmpty()
@@ -662,8 +666,10 @@ func TestSeedBlocksResourceUpdates(baseT *testing.T) {
 	}
 
 	t := test.T{T: baseT}
-	clock := test.FakeClock(3600)
-	withHandler(t, cfg, clock.Now, func(_ *handler, hh http.Handler, _ *MockValidator, _ []db.Resource, _ []db.Asset) {
+	clock := mock.NewClock()
+	clock.StepBy(time.Hour)
+
+	withHandler(t, cfg, clock.Now, func(_ *handler, hh http.Handler, _ *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
 		//cannot PUT an existing resource defined by the seed
 		assert.HTTPRequest{
 			Method:       "PUT",

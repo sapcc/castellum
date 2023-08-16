@@ -25,6 +25,7 @@ import (
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
+	"github.com/sapcc/go-bits/mock"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -33,7 +34,7 @@ import (
 
 func TestGetAssets(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, mv,
 			"/v1/projects/%s/assets/%s")
 
@@ -58,7 +59,7 @@ func TestGetAssets(baseT *testing.T) {
 		}
 
 		//happy path
-		mv.Forbid("project:edit:foo") //this should not be an issue
+		mv.Enforcer.Forbid("project:edit:foo") //this should not be an issue
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/projects/project1/assets/foo",
@@ -70,7 +71,7 @@ func TestGetAssets(baseT *testing.T) {
 
 func TestGetAsset(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, mv,
 			"/v1/projects/%s/assets/%s/fooasset1")
 
@@ -82,7 +83,7 @@ func TestGetAsset(baseT *testing.T) {
 		}.Check(t.T, hh)
 
 		//happy path: just an asset without any operations
-		mv.Forbid("project:edit:foo") //this should not be an issue
+		mv.Enforcer.Forbid("project:edit:foo") //this should not be an issue
 		response := assert.JSONObject{
 			"id":            "fooasset1",
 			"size":          1024,

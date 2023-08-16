@@ -130,7 +130,7 @@ github.com/sapcc/go-api-declarations/castellum
 github.com/sapcc/go-api-declarations/internal/marshal
 github.com/sapcc/go-api-declarations/limes
 github.com/sapcc/go-api-declarations/limes/resources
-# github.com/sapcc/go-bits v0.0.0-20230809145704-87e8e6f6b6ff
+# github.com/sapcc/go-bits v0.0.0-20230816124253-7ed3dcbc093f
 ## explicit; go 1.21
 github.com/sapcc/go-bits/assert
 github.com/sapcc/go-bits/audittools
@@ -141,6 +141,7 @@ github.com/sapcc/go-bits/httpapi
 github.com/sapcc/go-bits/httpext
 github.com/sapcc/go-bits/jobloop
 github.com/sapcc/go-bits/logg
+github.com/sapcc/go-bits/mock
 github.com/sapcc/go-bits/must
 github.com/sapcc/go-bits/osext
 github.com/sapcc/go-bits/pluggable

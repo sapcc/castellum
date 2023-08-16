@@ -25,6 +25,7 @@ import (
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
+	"github.com/sapcc/go-bits/mock"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -33,15 +34,15 @@ import (
 
 func TestGetResourceScrapeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
 		//endpoint requires a token with cluster access
-		mv.Forbid("cluster:access")
+		mv.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/admin/resource-scrape-errors",
 			ExpectStatus: http.StatusForbidden,
 		}.Check(t.T, hh)
-		mv.Allow("cluster:access")
+		mv.Enforcer.Allow("cluster:access")
 
 		//happy path
 		assert.HTTPRequest{
@@ -74,15 +75,15 @@ func TestGetResourceScrapeErrors(baseT *testing.T) {
 
 func TestGetAssetScrapeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
 		//endpoint requires a token with cluster access
-		mv.Forbid("cluster:access")
+		mv.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/admin/asset-scrape-errors",
 			ExpectStatus: http.StatusForbidden,
 		}.Check(t.T, hh)
-		mv.Allow("cluster:access")
+		mv.Enforcer.Allow("cluster:access")
 
 		assert.HTTPRequest{
 			Method:       "GET",
@@ -107,15 +108,15 @@ func TestGetAssetScrapeErrors(baseT *testing.T) {
 
 func TestGetAssetResizeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *MockValidator, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
 		//endpoint requires a token with cluster access
-		mv.Forbid("cluster:access")
+		mv.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/admin/asset-resize-errors",
 			ExpectStatus: http.StatusForbidden,
 		}.Check(t.T, hh)
-		mv.Allow("cluster:access")
+		mv.Enforcer.Allow("cluster:access")
 
 		//check that the "errored" resize operation is rendered properly
 		req := assert.HTTPRequest{

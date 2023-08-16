@@ -24,18 +24,19 @@ import (
 
 	"github.com/go-gorp/gorp/v3"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sapcc/go-bits/mock"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
 )
 
-func withContext(t test.T, cfg core.Config, action func(context.Context, *Context, *plugins.AssetManagerStatic, *test.FakeClock, *prometheus.Registry)) {
+func withContext(t test.T, cfg core.Config, action func(context.Context, *Context, *plugins.AssetManagerStatic, *mock.Clock, *prometheus.Registry)) {
 	t.WithDB(nil, func(dbi *gorp.DbMap) {
 		amStatic := &plugins.AssetManagerStatic{AssetType: "foo"}
 		//clock starts at an easily recognizable value
-		clockVar := test.FakeClock(99990)
-		clock := &clockVar
+		clock := mock.NewClock()
+		clock.StepBy(99990 * time.Second)
 		registry := prometheus.NewPedanticRegistry()
 
 		mpc := test.MockProviderClient{

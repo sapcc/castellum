@@ -23,12 +23,11 @@ import (
 	"net/http"
 	"time"
 
-	policy "github.com/databus23/goslo.policy"
 	"github.com/go-gorp/gorp/v3"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
-	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpapi"
+	"github.com/sapcc/go-bits/mock"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -36,7 +35,7 @@ import (
 	"github.com/sapcc/castellum/internal/test"
 )
 
-func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action func(*handler, http.Handler, *MockValidator, []db.Resource, []db.Asset)) {
+func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action func(*handler, http.Handler, *mock.Validator[*mock.Enforcer], []db.Resource, []db.Asset)) {
 	baseline := "fixtures/start-data.sql"
 	t.WithDB(&baseline, func(dbi *gorp.DbMap) {
 		team := core.AssetManagerTeam{
@@ -44,7 +43,7 @@ func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action fun
 			&plugins.AssetManagerStatic{AssetType: "bar", UsageMetrics: []castellum.UsageMetric{"first", "second"}, ExpectsConfiguration: true},
 			&plugins.AssetManagerStatic{AssetType: "qux", ConflictsWithAssetType: "foo"},
 		}
-		mv := &MockValidator{}
+		mv := mock.NewValidator(mock.NewEnforcer(), nil)
 		mpc := test.MockProviderClient{
 			Domains: map[string]core.CachedDomain{
 				"domain1": {Name: "First Domain"},
@@ -73,50 +72,19 @@ func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action fun
 	})
 }
 
-// MockValidator implements the gopherpolicy.Enforcer and gopherpolicy.Validator
-// interfaces.
-type MockValidator struct {
-	ForbiddenRules map[string]bool
-}
-
-func (mv *MockValidator) Allow(rule string) {
-	if mv.ForbiddenRules == nil {
-		mv.ForbiddenRules = make(map[string]bool)
-	}
-	mv.ForbiddenRules[rule] = false
-}
-
-func (mv *MockValidator) Forbid(rule string) {
-	if mv.ForbiddenRules == nil {
-		mv.ForbiddenRules = make(map[string]bool)
-	}
-	mv.ForbiddenRules[rule] = true
-}
-
-func (mv *MockValidator) CheckToken(r *http.Request) *gopherpolicy.Token {
-	return &gopherpolicy.Token{
-		Enforcer: mv,
-		Context:  policy.Context{},
-	}
-}
-
-func (mv *MockValidator) Enforce(rule string, ctx policy.Context) bool {
-	return !mv.ForbiddenRules[rule]
-}
-
-func testCommonEndpointBehavior(t test.T, hh http.Handler, validator *MockValidator, pathPattern string) {
+func testCommonEndpointBehavior(t test.T, hh http.Handler, validator *mock.Validator[*mock.Enforcer], pathPattern string) {
 	path := func(projectID, resourceID string) string {
 		return fmt.Sprintf(pathPattern, projectID, resourceID)
 	}
 
 	//endpoint requires a token with project access
-	validator.Forbid("project:access")
+	validator.Enforcer.Forbid("project:access")
 	assert.HTTPRequest{
 		Method:       "GET",
 		Path:         path("project1", "foo"),
 		ExpectStatus: http.StatusForbidden,
 	}.Check(t.T, hh)
-	validator.Allow("project:access")
+	validator.Enforcer.Allow("project:access")
 
 	//expect error for unknown project or resource
 	assert.HTTPRequest{
@@ -139,11 +107,11 @@ func testCommonEndpointBehavior(t test.T, hh http.Handler, validator *MockValida
 	}.Check(t.T, hh)
 
 	//expect error for inaccessible resource
-	validator.Forbid("project:show:foo")
+	validator.Enforcer.Forbid("project:show:foo")
 	assert.HTTPRequest{
 		Method:       "GET",
 		Path:         path("project1", "foo"),
 		ExpectStatus: http.StatusForbidden,
 	}.Check(t.T, hh)
-	validator.Allow("project:show:foo")
+	validator.Enforcer.Allow("project:show:foo")
 }
