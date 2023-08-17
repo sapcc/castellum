@@ -3,7 +3,6 @@ module github.com/sapcc/castellum
 go 1.21
 
 require (
-	github.com/databus23/goslo.policy v0.0.0-20210929125152-81bf2876dbdb
 	github.com/dlmiddlecote/sqlstats v1.0.2
 	github.com/go-gorp/gorp/v3 v3.1.0
 	github.com/gophercloud/gophercloud v1.5.0
@@ -12,7 +11,7 @@ require (
 	github.com/prometheus/client_golang v1.16.0
 	github.com/rs/cors v1.9.0
 	github.com/sapcc/go-api-declarations v1.8.0
-	github.com/sapcc/go-bits v0.0.0-20230816124253-7ed3dcbc093f
+	github.com/sapcc/go-bits v0.0.0-20230817142210-d6d2e72f3d0a
 	github.com/sapcc/gophercloud-sapcc v0.0.0-20230810044435-55a2af60c7f9
 	go.uber.org/automaxprocs v1.5.3
 	gopkg.in/yaml.v2 v2.4.0
@@ -21,6 +20,7 @@ require (
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/databus23/goslo.policy v0.0.0-20210929125152-81bf2876dbdb // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/golang-migrate/migrate/v4 v4.16.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect

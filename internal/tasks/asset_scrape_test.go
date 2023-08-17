@@ -598,7 +598,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 
 		clock.StepBy(5 * time.Minute)
 		err := scrapeJob.ProcessOne(ctx)
-		expectedMsg := `could not process task for job "asset scraping": cannot query status of foo asset1: GetAssetStatus failing as requested`
+		expectedMsg := `cannot query status of foo asset1: GetAssetStatus failing as requested`
 		if err == nil {
 			t.Error("ScrapeNextAsset should have failed here")
 		} else if err.Error() != expectedMsg {
