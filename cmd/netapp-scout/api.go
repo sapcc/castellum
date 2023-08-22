@@ -22,6 +22,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"html"
 	"math"
 	"net/http"
 
@@ -102,7 +103,7 @@ func (e *Engine) handleGetExclusionReasons(w http.ResponseWriter, r *http.Reques
 	resultVector, err := e.PromClient.GetVector(query)
 	if err != nil {
 		msg := fmt.Sprintf("cannot check volume_type for share %q: %s", shareID, err.Error())
-		http.Error(w, msg, http.StatusInternalServerError)
+		http.Error(w, html.EscapeString(msg), http.StatusInternalServerError)
 		return
 	}
 
