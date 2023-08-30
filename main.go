@@ -176,8 +176,9 @@ func runAPI(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provid
 		httpapi.HealthCheckAPI{SkipRequestLog: true},
 		httpapi.WithGlobalMiddleware(corsMiddleware.Handler),
 	)
-	http.Handle("/", handler)
-	http.Handle("/metrics", promhttp.Handler())
+	mux := http.NewServeMux()
+	mux.Handle("/", handler)
+	mux.Handle("/metrics", promhttp.Handler())
 
 	//Start audit logging.
 	rabbitQueueName := os.Getenv("CASTELLUM_RABBITMQ_QUEUE_NAME")
@@ -199,7 +200,7 @@ func runAPI(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provid
 	}
 
 	ctx := httpext.ContextWithSIGINT(context.Background(), 10*time.Second)
-	must.Succeed(httpext.ListenAndServeContext(ctx, httpListenAddr, nil))
+	must.Succeed(httpext.ListenAndServeContext(ctx, httpListenAddr, mux))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -222,9 +223,10 @@ func runObserver(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, p
 
 	//use main goroutine to emit Prometheus metrics
 	handler := httpapi.Compose(httpapi.HealthCheckAPI{SkipRequestLog: true})
-	http.Handle("/", handler)
-	http.Handle("/metrics", promhttp.Handler())
-	must.Succeed(httpext.ListenAndServeContext(ctx, httpListenAddr, nil))
+	mux := http.NewServeMux()
+	mux.Handle("/", handler)
+	mux.Handle("/metrics", promhttp.Handler())
+	must.Succeed(httpext.ListenAndServeContext(ctx, httpListenAddr, mux))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -243,9 +245,10 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 
 	//use main goroutine to emit Prometheus metrics
 	handler := httpapi.Compose(httpapi.HealthCheckAPI{SkipRequestLog: true})
-	http.Handle("/", handler)
-	http.Handle("/metrics", promhttp.Handler())
-	must.Succeed(httpext.ListenAndServeContext(ctx, httpListenAddr, nil))
+	mux := http.NewServeMux()
+	mux.Handle("/", handler)
+	mux.Handle("/metrics", promhttp.Handler())
+	must.Succeed(httpext.ListenAndServeContext(ctx, httpListenAddr, mux))
 }
 
 ////////////////////////////////////////////////////////////////////////////////

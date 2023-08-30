@@ -62,11 +62,12 @@ func main() {
 		engine,
 		httpapi.HealthCheckAPI{Check: engine.CheckDataAvailability, SkipRequestLog: true},
 	)
-	http.Handle("/", handler)
-	http.Handle("/metrics", promhttp.Handler())
+	mux := http.NewServeMux()
+	mux.Handle("/", handler)
+	mux.Handle("/metrics", promhttp.Handler())
 
 	ctx := httpext.ContextWithSIGINT(context.Background(), 10*time.Second)
-	must.Succeed(httpext.ListenAndServeContext(ctx, httpListenAddr, nil))
+	must.Succeed(httpext.ListenAndServeContext(ctx, httpListenAddr, mux))
 }
 
 func readConfiguration(filePath string) (promClient promquery.Client, httpListenAddr string) {
