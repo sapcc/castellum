@@ -18,11 +18,12 @@ coverageTest:
 variables:
   GO_TESTENV: 'CASTELLUM_AUDIT_SILENT=true'
 
-vendoring:
-  enabled: true
-
 dockerfile:
   enabled: true
+
+golang:
+  enableVendoring: true
+  setGoModVersion: true
 
 golangciLint:
   createConfig: true
