@@ -45,6 +45,7 @@ import (
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpapi"
+	"github.com/sapcc/go-bits/httpapi/pprofapi"
 	"github.com/sapcc/go-bits/httpext"
 	"github.com/sapcc/go-bits/jobloop"
 	"github.com/sapcc/go-bits/logg"
@@ -175,6 +176,7 @@ func runAPI(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provid
 		api.NewHandler(cfg, dbi, team, &tv, providerClient),
 		httpapi.HealthCheckAPI{SkipRequestLog: true},
 		httpapi.WithGlobalMiddleware(corsMiddleware.Handler),
+		pprofapi.API{IsAuthorized: pprofapi.IsRequestFromLocalhost},
 	)
 	mux := http.NewServeMux()
 	mux.Handle("/", handler)
@@ -222,7 +224,10 @@ func runObserver(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, p
 	go c.GarbageCollectionJob(nil).Run(ctx)
 
 	//use main goroutine to emit Prometheus metrics
-	handler := httpapi.Compose(httpapi.HealthCheckAPI{SkipRequestLog: true})
+	handler := httpapi.Compose(
+		httpapi.HealthCheckAPI{SkipRequestLog: true},
+		pprofapi.API{IsAuthorized: pprofapi.IsRequestFromLocalhost},
+	)
 	mux := http.NewServeMux()
 	mux.Handle("/", handler)
 	mux.Handle("/metrics", promhttp.Handler())
@@ -244,7 +249,10 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 	go c.AssetResizingJob(nil).Run(ctx, jobloop.NumGoroutines(12))
 
 	//use main goroutine to emit Prometheus metrics
-	handler := httpapi.Compose(httpapi.HealthCheckAPI{SkipRequestLog: true})
+	handler := httpapi.Compose(
+		httpapi.HealthCheckAPI{SkipRequestLog: true},
+		pprofapi.API{IsAuthorized: pprofapi.IsRequestFromLocalhost},
+	)
 	mux := http.NewServeMux()
 	mux.Handle("/", handler)
 	mux.Handle("/metrics", promhttp.Handler())
