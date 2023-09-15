@@ -126,3 +126,21 @@ func NewArcV1(client *gophercloud.ProviderClient, endpointOpts gophercloud.Endpo
 		ResourceBase:   resourceBase,
 	}, nil
 }
+
+// NewMetisV1 creates a ServiceClient that may be used with the v1 metis package.
+func NewMetisV1(client *gophercloud.ProviderClient, endpointOpts gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	sc := new(gophercloud.ServiceClient)
+	endpointOpts.ApplyDefaults("metis")
+	url, err := client.EndpointLocator(endpointOpts)
+	if err != nil {
+		return sc, err
+	}
+
+	resourceBase := url + "v1/"
+	return &gophercloud.ServiceClient{
+		ProviderClient: client,
+		Endpoint:       url,
+		Type:           "metis",
+		ResourceBase:   resourceBase,
+	}, nil
+}
