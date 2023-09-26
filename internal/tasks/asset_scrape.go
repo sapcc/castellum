@@ -1,5 +1,5 @@
 /******************************************************************************
-n*
+*
 *  Copyright 2019 SAP SE
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -172,35 +172,47 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 	asset.ScrapeDurationSecs = finishedAt.Sub(startedAt).Seconds()
 	asset.ScrapeErrorMessage = ""
 	asset.NeverScraped = false
-	canTouchPendingOperations := true
+	var writeScrapeResults bool
 	switch {
 	case asset.ExpectedSize == nil:
 		//normal case: no resize operation has recently completed -> record
 		//status.Size as actual size
-		fallthrough
+		writeScrapeResults = true
 	case *asset.ExpectedSize == status.Size:
 		//a resize operation has completed, and now we're seeing the new size in
 		//the backend -> record status.Size as actualSize and clear ExpectedSize
-		fallthrough
+		writeScrapeResults = true
 	case asset.Size != status.Size:
 		//while waiting for a resize operation to be reflected in the backend,
 		//we're observing an entirely different size (i.e. neither the operation's
 		//OldSize nor its NewSize) -> assume that some other user changed the size
 		//in parallel and take that new value as the actual size
+		writeScrapeResults = true
+	case asset.ResizedAt != nil && asset.ResizedAt.Before(c.TimeNow().Add(-1*time.Hour)):
+		//we waited for a resize operation to be reflected in the backend, but it
+		//has been more than an hour since then -> assume that the resize was
+		//interrupted in some way and resume normal behavior
+		writeScrapeResults = true
+		logg.Info("giving up on waiting for resize of %s %s from size = %d to size = %d to be completed in the backend",
+			res.AssetType, asset.UUID,
+			asset.Size, *asset.ExpectedSize,
+		)
+	default:
+		//we are waiting for a resize operation to reflect in the backend, but
+		//the backend is still reporting the old size -> do not touch anything until the backend is showing the new size
+		writeScrapeResults = false
+		logg.Info("still waiting for resize of %s %s from size = %d to size = %d to be completed in the backend",
+			res.AssetType, asset.UUID,
+			asset.Size, *asset.ExpectedSize,
+		)
+	}
+	if writeScrapeResults {
 		asset.Size = status.Size
 		asset.Usage = status.Usage
 		asset.MinimumSize = status.MinimumSize
 		asset.MaximumSize = status.MaximumSize
 		asset.ExpectedSize = nil
 		asset.ResizedAt = nil
-	default:
-		//we are waiting for a resize operation to reflect in the backend, but
-		//the backend is still reporting the old size -> do not touch anything until the backend is showing the new size
-		canTouchPendingOperations = false
-		logg.Info("still waiting for resize of %s %s from size = %d to size = %d to be completed in the backend",
-			res.AssetType, asset.UUID,
-			asset.Size, *asset.ExpectedSize,
-		)
 	}
 
 	//compute value of `asset.CriticalUsages` field (for reporting to admin only)
@@ -220,7 +232,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 	if err != nil {
 		return err
 	}
-	if !canTouchPendingOperations {
+	if !writeScrapeResults {
 		return tx.Commit()
 	}
 

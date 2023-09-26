@@ -502,7 +502,7 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		//make asset look like it just completed a resize operation
-		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100`)
+		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, c.TimeNow())
 		setAsset(plugins.StaticAsset{
 			Size:           1000,
 			Usage:          1000,
@@ -516,6 +516,7 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 			Size:         1000,
 			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			ExpectedSize: p2uint64(1100),
+			ResizedAt:    p2time(c.TimeNow()),
 		}
 
 		//first scrape will not touch anything about the asset, and also not create
@@ -539,6 +540,7 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 		asset.Usage = castellum.UsageValues{castellum.SingularUsageMetric: 1000}
 		asset.NextScrapeAt = c.TimeNow().Add(5 * time.Minute)
 		asset.ExpectedSize = nil
+		asset.ResizedAt = nil
 		t.ExpectAssets(c.DB, asset)
 
 		t.ExpectPendingOperations(c.DB, db.PendingOperation{
@@ -561,7 +563,7 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		//make asset look like it just completed a resize operation
-		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100`)
+		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, c.TimeNow())
 		setAsset(plugins.StaticAsset{
 			Size:  1200, //!= asset.ExpectedSize (see above)
 			Usage: 600,
@@ -578,6 +580,49 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
 			NextScrapeAt: c.TimeNow().Add(5 * time.Minute),
 			ExpectedSize: nil,
 		})
+	})
+}
+
+func TestAssetScrapesGivesUpWaitingForResize(baseT *testing.T) {
+	//This is very similar to TestAssetScrapeReflectingResizeOperationWithDelay,
+	//but we simulate that the resize failed in the backend without error. After
+	//an hour, Castellum should give up waiting on the resize to complete and
+	//resume normal operation.
+	t := test.T{T: baseT}
+	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+		//make asset look like it just completed a resize operation
+		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, c.TimeNow())
+		setAsset(plugins.StaticAsset{
+			Size:  1000, //== asset.Size (i.e. size before resize)
+			Usage: 500,
+		})
+		asset := db.Asset{
+			ID:           1,
+			ResourceID:   1,
+			UUID:         "asset1",
+			Size:         1000,
+			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
+			ExpectedSize: p2uint64(1100),
+			ResizedAt:    p2time(c.TimeNow()),
+		}
+
+		// first scrape will not touch anything, since it's still waiting for the resize to complete
+		clock.StepBy(5 * time.Minute)
+		t.Must(scrapeJob.ProcessOne(ctx))
+
+		asset.NextScrapeAt = c.TimeNow().Add(5 * time.Minute)
+		t.ExpectAssets(c.DB, asset)
+		t.ExpectPendingOperations(c.DB /*, nothing */)
+
+		//after an hour, the scrape gives up waiting for the resize and resumes as normal
+		clock.StepBy(1 * time.Hour)
+		t.Must(scrapeJob.ProcessOne(ctx))
+
+		asset.ExpectedSize = nil
+		asset.ResizedAt = nil
+		asset.NextScrapeAt = c.TimeNow().Add(5 * time.Minute)
+		t.ExpectAssets(c.DB, asset)
+		t.ExpectPendingOperations(c.DB /*, nothing */)
 	})
 }
 
