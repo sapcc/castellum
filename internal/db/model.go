@@ -135,6 +135,8 @@ type Asset struct {
 	//detect when the resize operation has reflected in the datastore that we're
 	//polling for GetAssetStatus().
 	ExpectedSize *uint64 `db:"expected_size"`
+	//If ExpectedSize is not nil, this is the timestamp when ExpectedSize is filled.
+	ResizedAt *time.Time `db:"resized_at"`
 
 	//If the last scrape failed, contains the error message returned by
 	//GetAssetStatus(). Contains the empty string otherwise.

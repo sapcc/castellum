@@ -134,8 +134,8 @@ func (c *Context) processAssetResize(ctx context.Context, tx *gorp.Transaction, 
 	//mark asset as having just completed as resize operation (see
 	//logic in ScrapeNextAsset() for details)
 	if outcome == castellum.OperationOutcomeSucceeded {
-		_, err := tx.Exec(`UPDATE assets SET expected_size = $1 WHERE id = $2`,
-			finishedOp.NewSize, asset.ID)
+		_, err := tx.Exec(`UPDATE assets SET expected_size = $1, resized_at = $2 WHERE id = $3`,
+			finishedOp.NewSize, c.TimeNow(), asset.ID)
 		if err != nil {
 			return err
 		}

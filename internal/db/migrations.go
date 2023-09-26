@@ -168,4 +168,12 @@ var SQLMigrations = map[string]string{
 			DROP COLUMN min_size,
 			DROP COLUMN max_size;
 	`,
+	"021_asset_resized_at.up.sql": `
+		ALTER TABLE assets
+			ADD COLUMN resized_at TIMESTAMP DEFAULT NULL;
+	`,
+	"021_asset_resized_at.down.sql": `
+		ALTER TABLE assets
+			DROP COLUMN resized_at;
+	`,
 }

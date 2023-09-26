@@ -121,6 +121,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 			Size:         1000,
 			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			ExpectedSize: p2uint64(1200),
+			ResizedAt:    p2time(c.TimeNow()),
 		})
 	})
 }

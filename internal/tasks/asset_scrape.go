@@ -192,6 +192,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 		asset.MinimumSize = status.MinimumSize
 		asset.MaximumSize = status.MaximumSize
 		asset.ExpectedSize = nil
+		asset.ResizedAt = nil
 	default:
 		//we are waiting for a resize operation to reflect in the backend, but
 		//the backend is still reporting the old size -> do not touch anything until the backend is showing the new size
