@@ -68,6 +68,10 @@ func (e *Engine) handleGetShare(w http.ResponseWriter, r *http.Request) {
 	if respondwith.ErrorText(w, err) {
 		return
 	}
+	minSizeBytes, err := shareData.GetMinimumSizeBytes()
+	if respondwith.ErrorText(w, err) {
+		return
+	}
 	usageBytes, err := shareData.GetUsageBytes()
 	if respondwith.ErrorText(w, err) {
 		return
@@ -80,8 +84,9 @@ func (e *Engine) handleGetShare(w http.ResponseWriter, r *http.Request) {
 	httpapi.SkipRequestLog(r)
 
 	respondwith.JSON(w, http.StatusOK, map[string]any{
-		"size_gib":  uint64(math.Round(convertBytesToGiB(sizeBytes))),
-		"usage_gib": convertBytesToGiB(usageBytes),
+		"size_gib":     uint64(math.Round(convertBytesToGiB(sizeBytes))),
+		"min_size_gib": uint64(math.Ceil(convertBytesToGiB(minSizeBytes))),
+		"usage_gib":    convertBytesToGiB(usageBytes),
 	})
 }
 

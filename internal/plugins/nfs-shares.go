@@ -311,8 +311,9 @@ func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, a
 
 	//query Prometheus metrics (via netapp-scout) for size and usage
 	var data struct {
-		SizeGiB  uint64  `json:"size_gib"`
-		UsageGiB float64 `json:"usage_gib"`
+		SizeGiB        uint64  `json:"size_gib"`
+		MinimumSizeGiB uint64  `json:"min_size_gib"`
+		UsageGiB       float64 `json:"usage_gib"`
 	}
 	path := fmt.Sprintf("v1/projects/%s/shares/%s", res.ScopeUUID, assetUUID)
 	err := m.queryScout(ctx, path, &data, actionOn404)
@@ -320,8 +321,9 @@ func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, a
 		return core.AssetStatus{}, err
 	}
 	status := core.AssetStatus{
-		Size:  data.SizeGiB,
-		Usage: castellum.UsageValues{castellum.SingularUsageMetric: data.UsageGiB},
+		Size:        data.SizeGiB,
+		MinimumSize: &data.MinimumSizeGiB,
+		Usage:       castellum.UsageValues{castellum.SingularUsageMetric: data.UsageGiB},
 	}
 
 	//when size has changed compared to last time, double-check with the Manila
