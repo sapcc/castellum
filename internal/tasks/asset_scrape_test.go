@@ -1065,6 +1065,34 @@ func TestDownsizeWithZeroUsageAndMinimumFreeSize(baseT *testing.T) {
 	})
 }
 
+func TestUpsizeWithZeroUsageAndMinimumFreeSize(baseT *testing.T) {
+	t := test.T{T: baseT}
+	//This testcase is based on a bug discovered in the wild: A pending operation
+	//was not generated in this case because of the special-cased handling around
+	//`size == 0 && usage == 0`.
+	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+		t.MustExec(c.DB, `UPDATE resources SET low_threshold_percent = 99.9, high_delay_seconds = 0, high_threshold_percent = 0, critical_threshold_percent = 100, min_free_size = 10`)
+
+		clock.StepBy(10 * time.Minute)
+		setAsset(plugins.StaticAsset{Size: 0, Usage: 0})
+		t.Must(scrapeJob.ProcessOne(ctx))
+
+		expectedOp := db.PendingOperation{
+			ID:          1,
+			AssetID:     1,
+			Reason:      castellum.OperationReasonCritical,
+			OldSize:     0,
+			NewSize:     10,
+			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 0},
+			CreatedAt:   c.TimeNow(),
+			ConfirmedAt: p2time(c.TimeNow()),
+			GreenlitAt:  p2time(c.TimeNow()),
+		}
+		t.ExpectPendingOperations(c.DB, expectedOp)
+		t.ExpectFinishedOperations(c.DB /*, nothing */)
+	})
+}
+
 //nolint:dupl
 func TestDownsizeShouldNotGoIntoHighThreshold(baseT *testing.T) {
 	t := test.T{T: baseT}

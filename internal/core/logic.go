@@ -58,7 +58,10 @@ func GetMultiUsagePercent(size uint64, usage castellum.UsageValues) castellum.Us
 func GetEligibleOperations(res db.Resource, asset db.Asset, info AssetTypeInfo) map[castellum.OperationReason]uint64 {
 	//never touch a zero-sized asset unless it has non-zero usage
 	if asset.Size == 0 && !asset.Usage.IsNonZero() {
-		return nil
+		//UNLESS we need to force it larger because of configuration
+		if (res.MinimumSize == nil || *res.MinimumSize == 0) && (res.MinimumFreeSize == nil || *res.MinimumFreeSize == 0) {
+			return nil
+		}
 	}
 
 	result := make(map[castellum.OperationReason]uint64)
@@ -153,10 +156,10 @@ func checkReason(res db.Resource, asset db.Asset, info AssetTypeInfo, reason cas
 	if res.MinimumFreeSize != nil {
 		for _, metric := range info.UsageMetrics {
 			minSize := *res.MinimumFreeSize + uint64(math.Ceil(asset.Usage[metric]))
-			switch reason {
-			case castellum.OperationReasonLow:
-				c.forbidBelow(minSize)
-			case castellum.OperationReasonHigh:
+			//This handling for MinimumSize and MinimumFreeSize is preferably done on
+			//the "high" threshold, but if no "high" threshold is configured, it will
+			//be done on the "critical" threshold instead.
+			ensureMinSize := func() {
 				if asset.Size < minSize {
 					a.AddAction(action{Min: minSize, Desired: minSize}, *c)
 					//We also let the rest of this method behave as if the `high` threshold
@@ -165,6 +168,17 @@ func checkReason(res db.Resource, asset db.Asset, info AssetTypeInfo, reason cas
 					//override this action.
 					takeActionBecauseMinimumFreeSize = true
 				}
+			}
+
+			switch reason {
+			case castellum.OperationReasonLow:
+				c.forbidBelow(minSize)
+			case castellum.OperationReasonCritical:
+				if res.HighThresholdPercent[metric] == 0 {
+					ensureMinSize()
+				}
+			case castellum.OperationReasonHigh:
+				ensureMinSize()
 			}
 		}
 	}
