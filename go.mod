@@ -11,8 +11,8 @@ require (
 	github.com/prometheus/client_golang v1.17.0
 	github.com/rs/cors v1.10.1
 	github.com/sapcc/go-api-declarations v1.9.0
-	github.com/sapcc/go-bits v0.0.0-20231019122817-5f7ef7d291ac
-	github.com/sapcc/gophercloud-sapcc v0.0.0-20231019042219-a51e1b95c1fa
+	github.com/sapcc/go-bits v0.0.0-20231025110038-7e644a44c112
+	github.com/sapcc/gophercloud-sapcc v0.0.0-20231026032203-a84c0e0b876c
 	go.uber.org/automaxprocs v1.5.3
 	gopkg.in/yaml.v2 v2.4.0
 )
