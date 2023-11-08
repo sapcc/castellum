@@ -1247,6 +1247,28 @@ func TestUpsizeBecauseOfMinFreeSizePassingLowThreshold(baseT *testing.T) {
 	})
 }
 
+func TestUpsizeBecauseOfMinSizeAboveSize(baseT *testing.T) {
+	t := test.T{T: baseT}
+	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+		//usage is fine, but min_size is bigger than the current size
+		setAsset(plugins.StaticAsset{Size: 1000, Usage: 500, MinimumSize: p2uint64(1001)})
+
+		clock.StepBy(10 * time.Minute)
+		t.Must(scrapeJob.ProcessOne(ctx))
+
+		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+			ID:        1,
+			AssetID:   1,
+			Reason:    castellum.OperationReasonHigh,
+			OldSize:   1000,
+			NewSize:   ifthenelseU64(res.SingleStep, 1001, 1200),
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 500},
+			CreatedAt: c.TimeNow(),
+		})
+		t.ExpectFinishedOperations(c.DB /*, nothing */)
+	})
+}
+
 func ifthenelseF64(cond bool, thenValue, elseValue float64) float64 {
 	if cond {
 		return thenValue
