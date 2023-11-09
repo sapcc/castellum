@@ -115,7 +115,7 @@ func checkReason(res db.Resource, asset db.Asset, info AssetTypeInfo, reason cas
 	//We only add MinimumSize constraints for downsizing. For upsizing,
 	//it's okay if the target is below MinimumSize. It just means we're inching
 	//closer *towards* the happy area. (And vice versa for MaximumSize.)
-	actionableMinSize := minOfSlice(actionableMinSizes)
+	actionableMinSize := maxOfSlice(actionableMinSizes)
 	actionableMaxSize := minOfSlice(actionableMaxSizes)
 	c := emptyConstraints()
 	if reason == castellum.OperationReasonLow && actionableMinSize != nil {
