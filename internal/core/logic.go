@@ -128,12 +128,26 @@ func checkReason(res db.Resource, asset db.Asset, info AssetTypeInfo, reason cas
 	//do not allow downsize operations to cross above the high/critical thresholds
 	if reason == castellum.OperationReasonLow {
 		for _, metric := range info.UsageMetrics {
+			var thresholdPercent float64
 			if res.HighThresholdPercent[metric] != 0 {
-				c.forbidBelow(uint64(math.Floor(100*asset.Usage[metric]/res.HighThresholdPercent[metric])) + 1)
+				thresholdPercent = res.HighThresholdPercent[metric]
+			} else if res.CriticalThresholdPercent[metric] != 0 {
+				thresholdPercent = res.CriticalThresholdPercent[metric]
+			} else {
+				continue
 			}
-			if res.CriticalThresholdPercent[metric] != 0 {
-				c.forbidBelow(uint64(math.Floor(100*asset.Usage[metric]/res.CriticalThresholdPercent[metric])) + 1)
+			highSize := uint64(math.Floor(100*asset.Usage[metric]/thresholdPercent)) + 1
+
+			//BUT the MaximumSize takes precedence over the high/critical threshold;
+			//we will accept going into high usage levels if the MaximumSize forces
+			//our hand
+			if actionableMaxSize != nil {
+				if highSize > *actionableMaxSize {
+					highSize = *actionableMaxSize
+				}
 			}
+
+			c.forbidBelow(highSize)
 		}
 	}
 
@@ -157,12 +171,12 @@ func checkReason(res db.Resource, asset db.Asset, info AssetTypeInfo, reason cas
 					}
 				}
 
-				//ALSO the MinimumFreeSize takes precedence over the low threshold: we're
-				//allowed to go into low usage if it helps us satisfy the MinimumFreeSize
-				if res.MinimumFreeSize != nil {
-					minSize := *res.MinimumFreeSize + uint64(math.Ceil(asset.Usage[metric]))
-					if lowSize < minSize {
-						lowSize = minSize
+				//ALSO MinimumSize and MinimumFreeSize take precedence over the low
+				//threshold: we're allowed to go into low usage if it helps us satisfy
+				//MinimumSize or MinimumFreeSize
+				if actionableMinSize != nil {
+					if lowSize < *actionableMinSize {
+						lowSize = *actionableMinSize
 					}
 				}
 
