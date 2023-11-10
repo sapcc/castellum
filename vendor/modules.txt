@@ -13,9 +13,9 @@ github.com/dlmiddlecote/sqlstats
 # github.com/go-gorp/gorp/v3 v3.1.0
 ## explicit; go 1.18
 github.com/go-gorp/gorp/v3
-# github.com/gofrs/uuid v4.4.0+incompatible
-## explicit
-github.com/gofrs/uuid
+# github.com/gofrs/uuid/v5 v5.0.0
+## explicit; go 1.19
+github.com/gofrs/uuid/v5
 # github.com/golang-migrate/migrate/v4 v4.16.2
 ## explicit; go 1.18
 github.com/golang-migrate/migrate/v4
@@ -127,7 +127,7 @@ github.com/sapcc/go-api-declarations/castellum
 github.com/sapcc/go-api-declarations/internal/marshal
 github.com/sapcc/go-api-declarations/limes
 github.com/sapcc/go-api-declarations/limes/resources
-# github.com/sapcc/go-bits v0.0.0-20231102041756-024a91cb6958
+# github.com/sapcc/go-bits v0.0.0-20231106151414-f5f780233936
 ## explicit; go 1.21
 github.com/sapcc/go-bits/assert
 github.com/sapcc/go-bits/audittools
@@ -147,7 +147,7 @@ github.com/sapcc/go-bits/promquery
 github.com/sapcc/go-bits/regexpext
 github.com/sapcc/go-bits/respondwith
 github.com/sapcc/go-bits/sqlext
-# github.com/sapcc/gophercloud-sapcc v0.0.0-20231102102650-abba1a38cc7d
+# github.com/sapcc/gophercloud-sapcc v0.0.0-20231109014807-50a2b71c88ea
 ## explicit; go 1.21
 github.com/sapcc/gophercloud-sapcc/clients
 github.com/sapcc/gophercloud-sapcc/resources/v1/projects
