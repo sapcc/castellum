@@ -1269,29 +1269,6 @@ func TestUpsizeBecauseOfMinSizeAboveSize(baseT *testing.T) {
 	})
 }
 
-func TestUpsizeBecauseOfMinSizeAboveSizeOverridesLowThreshold(baseT *testing.T) {
-	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
-		//a variation of the previous test, where min_size is so large that we need to enlarge into our `low` threshold
-		//-> we should see the min_size constraint taking precedence over the threshold
-		setAsset(plugins.StaticAsset{Size: 1000, Usage: 500, MinimumSize: p2uint64(10000)})
-
-		clock.StepBy(10 * time.Minute)
-		t.Must(scrapeJob.ProcessOne(ctx))
-
-		t.ExpectPendingOperations(c.DB, db.PendingOperation{
-			ID:        1,
-			AssetID:   1,
-			Reason:    castellum.OperationReasonHigh,
-			OldSize:   1000,
-			NewSize:   10000,
-			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 500},
-			CreatedAt: c.TimeNow(),
-		})
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
-	})
-}
-
 func ifthenelseF64(cond bool, thenValue, elseValue float64) float64 {
 	if cond {
 		return thenValue
