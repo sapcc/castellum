@@ -281,7 +281,7 @@ func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, ass
 		CreatedAt: c.TimeNow(),
 	}
 
-	eligibleFor := core.GetEligibleOperations(res, asset, info)
+	eligibleFor := core.GetEligibleOperations(core.LogicOfResource(res, info), core.StatusOfAsset(asset))
 	if val, exists := eligibleFor[castellum.OperationReasonCritical]; exists {
 		op.Reason = castellum.OperationReasonCritical
 		op.NewSize = val
@@ -315,7 +315,7 @@ func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, ass
 
 func (c Context) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (*db.PendingOperation, error) {
 	//cancel when the threshold that triggered this operation is no longer being crossed
-	eligibleFor := core.GetEligibleOperations(res, asset, info)
+	eligibleFor := core.GetEligibleOperations(core.LogicOfResource(res, info), core.StatusOfAsset(asset))
 	_, isEligible := eligibleFor[op.Reason]
 	if op.Reason == castellum.OperationReasonHigh {
 		if _, canBeUpgraded := eligibleFor[castellum.OperationReasonCritical]; canBeUpgraded {
@@ -341,7 +341,7 @@ func (c Context) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, ass
 
 func (c Context) maybeUpdateOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (*db.PendingOperation, error) {
 	//do not touch `op` unless the corresponding threshold is still being crossed
-	eligibleFor := core.GetEligibleOperations(res, asset, info)
+	eligibleFor := core.GetEligibleOperations(core.LogicOfResource(res, info), core.StatusOfAsset(asset))
 	newSize, exists := eligibleFor[op.Reason]
 	if !exists {
 		return &op, nil
@@ -360,7 +360,7 @@ func (c Context) maybeUpdateOperation(tx *gorp.Transaction, res db.Resource, ass
 
 func (c Context) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (*db.PendingOperation, error) {
 	//can only confirm when the corresponding threshold is still being crossed
-	if _, exists := core.GetEligibleOperations(res, asset, info)[op.Reason]; !exists {
+	if _, exists := core.GetEligibleOperations(core.LogicOfResource(res, info), core.StatusOfAsset(asset))[op.Reason]; !exists {
 		return &op, nil
 	}
 

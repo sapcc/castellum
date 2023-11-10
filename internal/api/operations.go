@@ -211,7 +211,7 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 			if !exists {
 				continue
 			}
-			if _, exists := core.GetEligibleOperations(dbResource, asset, info)[op.Reason]; exists {
+			if _, exists := core.GetEligibleOperations(core.LogicOfResource(dbResource, info), core.StatusOfAsset(asset))[op.Reason]; exists {
 				relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &dbResource)) //nolint:gosec // FinishedOperationFromDB is not holding onto the pointer after it returns
 			}
 		}

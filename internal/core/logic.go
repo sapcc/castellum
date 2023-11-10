@@ -19,6 +19,7 @@
 package core
 
 import (
+	"fmt"
 	"math"
 	"sort"
 
@@ -51,11 +52,52 @@ func GetMultiUsagePercent(size uint64, usage castellum.UsageValues) castellum.Us
 	return result
 }
 
+// ResourceLogic contains all the attributes from `db.Resource` that pertain to
+// the calculation of resize actions for assets within a given resource.
+//
+// It does not include anything that is not needed for that calculation, in
+// order to avoid accidental dependencies on things like timing information,
+// UUIDs or error message strings.
+type ResourceLogic struct {
+	UsageMetrics             []castellum.UsageMetric
+	LowThresholdPercent      castellum.UsageValues
+	HighThresholdPercent     castellum.UsageValues
+	CriticalThresholdPercent castellum.UsageValues
+
+	SizeStepPercent float64
+	SingleStep      bool
+
+	MinimumSize     *uint64
+	MaximumSize     *uint64
+	MinimumFreeSize *uint64
+}
+
+// LogicOfResource converts a Resource into just its ResourceLogic.
+func LogicOfResource(res db.Resource, info AssetTypeInfo) ResourceLogic {
+	if res.AssetType != info.AssetType {
+		panic(fmt.Sprintf(
+			"LogicOfResource called with mismatching arguments: res.AssetType = %q, but info.AssetType = %q",
+			res.AssetType, info.AssetType,
+		))
+	}
+	return ResourceLogic{
+		UsageMetrics:             info.UsageMetrics,
+		LowThresholdPercent:      res.LowThresholdPercent,
+		HighThresholdPercent:     res.HighThresholdPercent,
+		CriticalThresholdPercent: res.CriticalThresholdPercent,
+		SizeStepPercent:          res.SizeStepPercent,
+		SingleStep:               res.SingleStep,
+		MinimumSize:              res.MinimumSize,
+		MaximumSize:              res.MaximumSize,
+		MinimumFreeSize:          res.MinimumFreeSize,
+	}
+}
+
 // GetEligibleOperations calculates which resizing operations the given asset
 // (within the given resource) is eligible for. In the result, each key-value
 // pair means that the asset has crossed the threshold `key` and thus should be
 // resized to `value`.
-func GetEligibleOperations(res db.Resource, asset db.Asset, info AssetTypeInfo) map[castellum.OperationReason]uint64 {
+func GetEligibleOperations(res ResourceLogic, asset AssetStatus) map[castellum.OperationReason]uint64 {
 	//never touch a zero-sized asset unless it has non-zero usage
 	if asset.Size == 0 && !asset.Usage.IsNonZero() {
 		//UNLESS we need to force it larger because of configuration
@@ -65,19 +107,19 @@ func GetEligibleOperations(res db.Resource, asset db.Asset, info AssetTypeInfo) 
 	}
 
 	result := make(map[castellum.OperationReason]uint64)
-	if val := checkReason(res, asset, info, castellum.OperationReasonLow); val != nil {
+	if val := checkReason(res, asset, castellum.OperationReasonLow); val != nil {
 		result[castellum.OperationReasonLow] = *val
 	}
-	if val := checkReason(res, asset, info, castellum.OperationReasonHigh); val != nil {
+	if val := checkReason(res, asset, castellum.OperationReasonHigh); val != nil {
 		result[castellum.OperationReasonHigh] = *val
 	}
-	if val := checkReason(res, asset, info, castellum.OperationReasonCritical); val != nil {
+	if val := checkReason(res, asset, castellum.OperationReasonCritical); val != nil {
 		result[castellum.OperationReasonCritical] = *val
 	}
 	return result
 }
 
-func checkReason(res db.Resource, asset db.Asset, info AssetTypeInfo, reason castellum.OperationReason) *uint64 {
+func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.OperationReason) *uint64 {
 	//phase 1: generate global constraints
 	//
 	//NOTE: We only add MinimumSize as a constraint for downsizing. For upsizing,
@@ -103,7 +145,7 @@ func checkReason(res db.Resource, asset db.Asset, info AssetTypeInfo, reason cas
 
 	//do not allow downsize operations to cross above the high/critical thresholds
 	if reason == castellum.OperationReasonLow {
-		for _, metric := range info.UsageMetrics {
+		for _, metric := range res.UsageMetrics {
 			if res.HighThresholdPercent[metric] != 0 {
 				c.forbidBelow(uint64(math.Floor(100*asset.Usage[metric]/res.HighThresholdPercent[metric])) + 1)
 			}
@@ -115,7 +157,7 @@ func checkReason(res db.Resource, asset db.Asset, info AssetTypeInfo, reason cas
 
 	//do not allow upsize operations to cross below the low threshold
 	if reason != castellum.OperationReasonLow {
-		for _, metric := range info.UsageMetrics {
+		for _, metric := range res.UsageMetrics {
 			if res.LowThresholdPercent[metric] != 0 {
 				lowSize := uint64(math.Floor(100*asset.Usage[metric]/res.LowThresholdPercent[metric])) - 1
 
@@ -154,7 +196,7 @@ func checkReason(res db.Resource, asset db.Asset, info AssetTypeInfo, reason cas
 	var a actions
 	takeActionBecauseMinimumFreeSize := false
 	if res.MinimumFreeSize != nil {
-		for _, metric := range info.UsageMetrics {
+		for _, metric := range res.UsageMetrics {
 			minSize := *res.MinimumFreeSize + uint64(math.Ceil(asset.Usage[metric]))
 			//This handling for MinimumSize and MinimumFreeSize is preferably done on
 			//the "high" threshold, but if no "high" threshold is configured, it will
@@ -185,7 +227,7 @@ func checkReason(res db.Resource, asset db.Asset, info AssetTypeInfo, reason cas
 
 	//phase 2: generate an action when the corresponding threshold is passed
 	takeActionBecauseThreshold := false
-	for _, metric := range info.UsageMetrics {
+	for _, metric := range res.UsageMetrics {
 		usagePercent := GetUsagePercent(asset.Size, asset.Usage[metric])
 		switch reason {
 		case castellum.OperationReasonLow:
@@ -204,11 +246,11 @@ func checkReason(res db.Resource, asset db.Asset, info AssetTypeInfo, reason cas
 	}
 	if takeActionBecauseThreshold || takeActionBecauseMinimumFreeSize {
 		if res.SingleStep {
-			for _, metric := range info.UsageMetrics {
+			for _, metric := range res.UsageMetrics {
 				a.AddAction(getActionSingleStep(res, asset, metric, reason), *c)
 			}
 		} else {
-			a.AddAction(getActionPercentageStep(res, asset, info, reason), *c)
+			a.AddAction(getActionPercentageStep(res, asset, reason), *c)
 		}
 	}
 
@@ -219,15 +261,15 @@ func checkReason(res db.Resource, asset db.Asset, info AssetTypeInfo, reason cas
 	return a.Max()
 }
 
-func getActionPercentageStep(res db.Resource, asset db.Asset, info AssetTypeInfo, reason castellum.OperationReason) action {
-	newSize := getNewSizePercentageStep(res, asset, info, reason, asset.Size)
+func getActionPercentageStep(res ResourceLogic, asset AssetStatus, reason castellum.OperationReason) action {
+	newSize := getNewSizePercentageStep(res, asset, reason, asset.Size)
 	if reason == castellum.OperationReasonLow {
 		return action{Min: newSize, Desired: newSize, Max: asset.Size}
 	}
 	return action{Min: asset.Size, Desired: newSize, Max: newSize}
 }
 
-func getNewSizePercentageStep(res db.Resource, asset db.Asset, info AssetTypeInfo, reason castellum.OperationReason, assetSize uint64) uint64 {
+func getNewSizePercentageStep(res ResourceLogic, asset AssetStatus, reason castellum.OperationReason, assetSize uint64) uint64 {
 	step := uint64(math.Floor((float64(assetSize) * res.SizeStepPercent) / 100))
 	//a small fraction of a small value (e.g. 10% of size = 6) may round down to zero
 	if step == 0 {
@@ -238,11 +280,11 @@ func getNewSizePercentageStep(res db.Resource, asset db.Asset, info AssetTypeInf
 	case castellum.OperationReasonCritical:
 		newSize := assetSize + step
 		//take multiple steps if usage continues to cross the critical threshold
-		for _, metric := range info.UsageMetrics {
+		for _, metric := range res.UsageMetrics {
 			newUsagePercent := GetUsagePercent(newSize, asset.Usage[metric])
 			if newUsagePercent >= res.CriticalThresholdPercent[metric] {
 				//restart call with newSize as old size to calculate the next step
-				return getNewSizePercentageStep(res, asset, info, reason, newSize)
+				return getNewSizePercentageStep(res, asset, reason, newSize)
 			}
 		}
 		return newSize
@@ -260,7 +302,7 @@ func getNewSizePercentageStep(res db.Resource, asset db.Asset, info AssetTypeInf
 	}
 }
 
-func getActionSingleStep(res db.Resource, asset db.Asset, metric castellum.UsageMetric, reason castellum.OperationReason) action {
+func getActionSingleStep(res ResourceLogic, asset AssetStatus, metric castellum.UsageMetric, reason castellum.OperationReason) action {
 	var (
 		thresholdPerc float64
 		delta         float64

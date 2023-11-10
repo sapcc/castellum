@@ -40,6 +40,21 @@ type AssetStatus struct {
 	MaximumSize *uint64
 }
 
+// StatusOfAsset converts an Asset into just its AssetStatus.
+//
+// This is used when passing an Asset from a high-level workflow function into
+// a low-level logic function. Low-level functions explicitly take only the
+// AssetStatus to avoid accidental dependencies on non-logic attributes
+// like timestamps, UUIDs or error message strings.
+func StatusOfAsset(asset db.Asset) AssetStatus {
+	return AssetStatus{
+		Size:        asset.Size,
+		Usage:       asset.Usage,
+		MinimumSize: asset.MinimumSize,
+		MaximumSize: asset.MaximumSize,
+	}
+}
+
 // AssetTypeInfo describes an AssetType supported by an AssetManager.
 type AssetTypeInfo struct {
 	AssetType    db.AssetType
