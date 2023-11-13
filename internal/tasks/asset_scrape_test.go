@@ -37,7 +37,7 @@ import (
 	"github.com/sapcc/castellum/internal/test"
 )
 
-func runAssetScrapeTest(t test.T, resourceIsSingleStep bool, action func(context.Context, *Context, func(plugins.StaticAsset), *mock.Clock, jobloop.Job)) {
+func runAssetScrapeTest(t test.T, action func(context.Context, *Context, func(plugins.StaticAsset), *mock.Clock, jobloop.Job)) {
 	withContext(t, core.Config{}, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
 		scrapeJob := c.AssetScrapingJob(registry)
 
@@ -58,8 +58,8 @@ func runAssetScrapeTest(t test.T, resourceIsSingleStep bool, action func(context
 			HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 80},
 			HighDelaySeconds:         3600,
 			CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 95},
-			SizeStepPercent:          ifthenelseF64(resourceIsSingleStep, 0, 20),
-			SingleStep:               resourceIsSingleStep,
+			SizeStepPercent:          20,
+			SingleStep:               false,
 		}))
 		t.Must(c.DB.Insert(&db.Asset{
 			ResourceID:   1,
@@ -85,25 +85,9 @@ func runAssetScrapeTest(t test.T, resourceIsSingleStep bool, action func(context
 	})
 }
 
-func forAllSteppingStrategies(t test.T, action func(context.Context, *Context, db.Resource, func(plugins.StaticAsset), *mock.Clock, jobloop.Job)) {
-	runAssetScrapeTest(t, false, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
-		var res db.Resource
-		t.Must(c.DB.SelectOne(&res, `SELECT * FROM resources WHERE id = 1`))
-		t.Log("running testcase with percentage-step resizing")
-		action(ctx, c, res, setAsset, clock, scrapeJob)
-	})
-
-	runAssetScrapeTest(t, true, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
-		var res db.Resource
-		t.Must(c.DB.SelectOne(&res, `SELECT * FROM resources WHERE id = 1`))
-		t.Log("running testcase with single-step resizing")
-		action(ctx, c, res, setAsset, clock, scrapeJob)
-	})
-}
-
 func TestNoOperationWhenNoThreshold(baseT *testing.T) {
 	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		//when no threshold is crossed, no operation gets created
 		clock.StepBy(10 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -112,9 +96,10 @@ func TestNoOperationWhenNoThreshold(baseT *testing.T) {
 	})
 }
 
+//nolint:dupl //dupl checks the functions/methods used and reports that there are duplicates. We can't refactor because although the methods used in unit tests might be similar, however they contain helpful comments in-place that are specific to that particular unit test.
 func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		//set a maximum size that does not contradict the following operations
 		//(down below, there's a separate test for when the maximum size actually
 		//inhibits upsizing)
@@ -131,7 +116,7 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 			AssetID:   1,
 			Reason:    castellum.OperationReasonHigh,
 			OldSize:   1000,
-			NewSize:   ifthenelseU64(res.SingleStep, 1001, 1200),
+			NewSize:   1200,
 			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 800},
 			CreatedAt: c.TimeNow(),
 		}
@@ -145,9 +130,6 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 820})
 		t.Must(scrapeJob.ProcessOne(ctx))
-		if res.SingleStep {
-			expectedOp.NewSize = 1026
-		}
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -157,9 +139,6 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 		t.Must(scrapeJob.ProcessOne(ctx))
 		expectedOp.ConfirmedAt = p2time(c.TimeNow())
 		expectedOp.GreenlitAt = p2time(c.TimeNow())
-		if res.SingleStep {
-			expectedOp.NewSize = 1051
-		}
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -173,10 +152,9 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 	})
 }
 
-//nolint:dupl //dupl checks the functions/methods used and reports that there are duplicates. We can't refactor because although the methods used in unit tests might be similar, however they contain helpful comments in-place that are specific to that particular unit test.
 func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		//when the "High" threshold gets crossed, a "High" operation gets created in
 		//state "created"
 		clock.StepBy(10 * time.Minute)
@@ -188,7 +166,7 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 			AssetID:   1,
 			Reason:    castellum.OperationReasonHigh,
 			OldSize:   1000,
-			NewSize:   ifthenelseU64(res.SingleStep, 1001, 1200),
+			NewSize:   1200,
 			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 800},
 			CreatedAt: c.TimeNow(),
 		})
@@ -205,7 +183,7 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 			Reason:     castellum.OperationReasonHigh,
 			Outcome:    castellum.OperationOutcomeCancelled,
 			OldSize:    1000,
-			NewSize:    ifthenelseU64(res.SingleStep, 1001, 1200),
+			NewSize:    1200,
 			Usage:      castellum.UsageValues{castellum.SingularUsageMetric: 800},
 			CreatedAt:  c.TimeNow().Add(-40 * time.Minute),
 			FinishedAt: c.TimeNow(),
@@ -213,9 +191,10 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 	})
 }
 
+//nolint:dupl
 func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		//set a minimum size that does not contradict the following operations
 		//(down below, there's a separate test for when the minimum size actually
 		//inhibits upsizing)
@@ -232,7 +211,7 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 			AssetID:   1,
 			Reason:    castellum.OperationReasonLow,
 			OldSize:   1000,
-			NewSize:   ifthenelseU64(res.SingleStep, 999, 800),
+			NewSize:   800,
 			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 200},
 			CreatedAt: c.TimeNow(),
 		}
@@ -246,9 +225,6 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 180})
 		t.Must(scrapeJob.ProcessOne(ctx))
-		if res.SingleStep {
-			expectedOp.NewSize = 899
-		}
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
@@ -256,9 +232,6 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 160})
 		t.Must(scrapeJob.ProcessOne(ctx))
-		if res.SingleStep {
-			expectedOp.NewSize = 799
-		}
 		expectedOp.ConfirmedAt = p2time(c.TimeNow())
 		expectedOp.GreenlitAt = p2time(c.TimeNow())
 		t.ExpectPendingOperations(c.DB, expectedOp)
@@ -274,10 +247,9 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 	})
 }
 
-//nolint:dupl
 func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		//when the "Low" threshold gets crossed, a "Low" operation gets created in
 		//state "created"
 		clock.StepBy(10 * time.Minute)
@@ -289,7 +261,7 @@ func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 			AssetID:   1,
 			Reason:    castellum.OperationReasonLow,
 			OldSize:   1000,
-			NewSize:   ifthenelseU64(res.SingleStep, 999, 800),
+			NewSize:   800,
 			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 200},
 			CreatedAt: c.TimeNow(),
 		})
@@ -306,7 +278,7 @@ func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 			Reason:     castellum.OperationReasonLow,
 			Outcome:    castellum.OperationOutcomeCancelled,
 			OldSize:    1000,
-			NewSize:    ifthenelseU64(res.SingleStep, 999, 800),
+			NewSize:    800,
 			Usage:      castellum.UsageValues{castellum.SingularUsageMetric: 200},
 			CreatedAt:  c.TimeNow().Add(-40 * time.Minute),
 			FinishedAt: c.TimeNow(),
@@ -316,7 +288,7 @@ func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 
 func TestCriticalUpsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		//when the "Critical" threshold gets crossed, a "Critical" operation gets
 		//created and immediately confirmed/greenlit
 		clock.StepBy(10 * time.Minute)
@@ -328,7 +300,7 @@ func TestCriticalUpsizeTowardsGreenlight(baseT *testing.T) {
 			AssetID:     1,
 			Reason:      castellum.OperationReasonCritical,
 			OldSize:     1000,
-			NewSize:     ifthenelseU64(res.SingleStep, 1188, 1200),
+			NewSize:     1200,
 			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 950},
 			CreatedAt:   c.TimeNow(),
 			ConfirmedAt: p2time(c.TimeNow()),
@@ -341,7 +313,7 @@ func TestCriticalUpsizeTowardsGreenlight(baseT *testing.T) {
 
 func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		//when the "High" threshold gets crossed, a "High" operation gets created in
 		//state "created"
 		clock.StepBy(10 * time.Minute)
@@ -353,7 +325,7 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 			AssetID:   1,
 			Reason:    castellum.OperationReasonHigh,
 			OldSize:   1000,
-			NewSize:   ifthenelseU64(res.SingleStep, 1126, 1200),
+			NewSize:   1200,
 			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 900},
 			CreatedAt: c.TimeNow(),
 		})
@@ -371,7 +343,7 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 			AssetID:     1,
 			Reason:      castellum.OperationReasonCritical,
 			OldSize:     1000,
-			NewSize:     ifthenelseU64(res.SingleStep, 1201, 1200),
+			NewSize:     1200,
 			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 960},
 			CreatedAt:   c.TimeNow(),
 			ConfirmedAt: p2time(c.TimeNow()),
@@ -382,7 +354,7 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 			Reason:     castellum.OperationReasonHigh,
 			Outcome:    castellum.OperationOutcomeCancelled,
 			OldSize:    1000,
-			NewSize:    ifthenelseU64(res.SingleStep, 1126, 1200),
+			NewSize:    1200,
 			Usage:      castellum.UsageValues{castellum.SingularUsageMetric: 900},
 			CreatedAt:  c.TimeNow().Add(-10 * time.Minute),
 			FinishedAt: c.TimeNow(),
@@ -480,7 +452,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 
 func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		//make asset look like it just completed a resize operation
 		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, c.TimeNow())
 		setAsset(plugins.StaticAsset{
@@ -528,7 +500,7 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 			AssetID:   1,
 			Reason:    castellum.OperationReasonHigh,
 			OldSize:   1100,
-			NewSize:   ifthenelseU64(res.SingleStep, 1251, 1320),
+			NewSize:   1320,
 			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 1000},
 			CreatedAt: c.TimeNow(),
 		})
@@ -541,7 +513,7 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
 	//in parallel with Castellum's resize operation, so we observe a new size
 	//that's different from the expected size.
 	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		//make asset look like it just completed a resize operation
 		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, c.TimeNow())
 		setAsset(plugins.StaticAsset{
@@ -569,7 +541,7 @@ func TestAssetScrapesGivesUpWaitingForResize(baseT *testing.T) {
 	//an hour, Castellum should give up waiting on the resize to complete and
 	//resume normal operation.
 	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		//make asset look like it just completed a resize operation
 		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, c.TimeNow())
 		setAsset(plugins.StaticAsset{
@@ -614,7 +586,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 	//but the asset's next_scrape_at timestamp is still updated to ensure that
 	//the main loop progresses to the next asset.
 	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		setAsset(plugins.StaticAsset{
 			Size:                 1000,
 			Usage:                600,
@@ -672,7 +644,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 
 func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 	t := test.T{T: baseT}
-	forAllSteppingStrategies(t, func(ctx context.Context, c *Context, res db.Resource, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		//create a "High" operation
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 900})
@@ -683,7 +655,7 @@ func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 			AssetID:   1,
 			Reason:    castellum.OperationReasonHigh,
 			OldSize:   1000,
-			NewSize:   ifthenelseU64(res.SingleStep, 1126, 1200),
+			NewSize:   1200,
 			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 900},
 			CreatedAt: c.TimeNow(),
 		}
@@ -697,22 +669,8 @@ func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 		t.Must(scrapeJob.ProcessOne(ctx))
 
 		//ScrapeNextAsset should have adjusted the NewSize to CurrentSize + SizeStep
-		expectedOp.NewSize = ifthenelseU64(res.SingleStep, 1126, 1320)
+		expectedOp.NewSize = 1320
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 	})
-}
-
-func ifthenelseF64(cond bool, thenValue, elseValue float64) float64 {
-	if cond {
-		return thenValue
-	}
-	return elseValue
-}
-
-func ifthenelseU64(cond bool, thenValue, elseValue uint64) uint64 {
-	if cond {
-		return thenValue
-	}
-	return elseValue
 }
