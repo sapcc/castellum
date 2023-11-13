@@ -107,10 +107,10 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 	var oldStatus *core.AssetStatus
 	if !asset.NeverScraped {
 		oldStatus = &core.AssetStatus{
-			Size:        asset.Size,
-			Usage:       asset.Usage,
-			MinimumSize: asset.MinimumSize,
-			MaximumSize: asset.MaximumSize,
+			Size:              asset.Size,
+			Usage:             asset.Usage,
+			StrictMinimumSize: asset.StrictMinimumSize,
+			StrictMaximumSize: asset.StrictMaximumSize,
 		}
 	}
 	startedAt := c.TimeNow()
@@ -148,11 +148,11 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 
 	if logScrapes {
 		var valueLogStrings []string
-		if status.MinimumSize != nil {
-			valueLogStrings = append(valueLogStrings, fmt.Sprintf("minimum size = %d", *status.MinimumSize))
+		if status.StrictMinimumSize != nil {
+			valueLogStrings = append(valueLogStrings, fmt.Sprintf("minimum size = %d", *status.StrictMinimumSize))
 		}
-		if status.MaximumSize != nil {
-			valueLogStrings = append(valueLogStrings, fmt.Sprintf("maximum size = %d", *status.MaximumSize))
+		if status.StrictMaximumSize != nil {
+			valueLogStrings = append(valueLogStrings, fmt.Sprintf("maximum size = %d", *status.StrictMaximumSize))
 		}
 		for metric, usage := range status.Usage {
 			valueLogStrings = append(valueLogStrings, fmt.Sprintf(
@@ -209,8 +209,8 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 	if writeScrapeResults {
 		asset.Size = status.Size
 		asset.Usage = status.Usage
-		asset.MinimumSize = status.MinimumSize
-		asset.MaximumSize = status.MaximumSize
+		asset.StrictMinimumSize = status.StrictMinimumSize
+		asset.StrictMaximumSize = status.StrictMaximumSize
 		asset.ExpectedSize = nil
 		asset.ResizedAt = nil
 	}

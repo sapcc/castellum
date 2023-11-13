@@ -321,9 +321,9 @@ func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, a
 		return core.AssetStatus{}, err
 	}
 	status := core.AssetStatus{
-		Size:        data.SizeGiB,
-		MinimumSize: &data.MinimumSizeGiB,
-		Usage:       castellum.UsageValues{castellum.SingularUsageMetric: data.UsageGiB},
+		Size:              data.SizeGiB,
+		StrictMinimumSize: &data.MinimumSizeGiB,
+		Usage:             castellum.UsageValues{castellum.SingularUsageMetric: data.UsageGiB},
 	}
 
 	//when size has changed compared to last time, double-check with the Manila

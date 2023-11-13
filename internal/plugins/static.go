@@ -33,10 +33,10 @@ import (
 // StaticAsset represents an asset managed by AssetManagerStatic. It is only
 // used in tests as a double for an actual asset.
 type StaticAsset struct {
-	Size        uint64
-	Usage       uint64
-	MinimumSize *uint64
-	MaximumSize *uint64
+	Size              uint64
+	Usage             uint64
+	StrictMinimumSize *uint64
+	StrictMaximumSize *uint64
 
 	//When non-zero, these fields model a resize operation that will only be
 	//reflected after GetAssetStatus() has been called for as many times as
@@ -178,10 +178,10 @@ func (m AssetManagerStatic) GetAssetStatus(_ context.Context, res db.Resource, a
 	}
 
 	return core.AssetStatus{
-		Size:        asset.Size,
-		Usage:       castellum.UsageValues{castellum.SingularUsageMetric: float64(asset.Usage)},
-		MinimumSize: clonePointer(asset.MinimumSize),
-		MaximumSize: clonePointer(asset.MaximumSize),
+		Size:              asset.Size,
+		Usage:             castellum.UsageValues{castellum.SingularUsageMetric: float64(asset.Usage)},
+		StrictMinimumSize: clonePointer(asset.StrictMinimumSize),
+		StrictMaximumSize: clonePointer(asset.StrictMaximumSize),
 	}, nil
 }
 
