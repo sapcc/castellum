@@ -110,11 +110,10 @@ func GetEligibleOperations(res ResourceLogic, asset AssetStatus) map[castellum.O
 	if val := checkReason(res, asset, castellum.OperationReasonLow); val != nil {
 		result[castellum.OperationReasonLow] = *val
 	}
-	if val := checkReason(res, asset, castellum.OperationReasonHigh); val != nil {
-		result[castellum.OperationReasonHigh] = *val
-	}
 	if val := checkReason(res, asset, castellum.OperationReasonCritical); val != nil {
 		result[castellum.OperationReasonCritical] = *val
+	} else if val := checkReason(res, asset, castellum.OperationReasonHigh); val != nil {
+		result[castellum.OperationReasonHigh] = *val
 	}
 	return result
 }
@@ -255,10 +254,18 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 	}
 
 	//phase 3: take the boldest action that satisfies the constraints
+	var target *uint64
 	if reason == castellum.OperationReasonLow {
-		return a.Min()
+		target = a.Min()
+	} else {
+		target = a.Max()
 	}
-	return a.Max()
+
+	//...but only if it's actually a resize
+	if target != nil && *target == asset.Size {
+		return nil
+	}
+	return target
 }
 
 func getActionPercentageStep(res ResourceLogic, asset AssetStatus, reason castellum.OperationReason) action {
