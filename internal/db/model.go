@@ -66,8 +66,9 @@ type Resource struct {
 	//operations will never move to a size outside this range.
 	MinimumSize *uint64 `db:"min_size"`
 	MaximumSize *uint64 `db:"max_size"`
-	//If configured, downsize operations will be inhibited when `newSize -
-	//absoluteUsage` would be smaller than this.
+	//If configured, downsize operations will be inhibited when
+	//`newSize - absoluteUsage` would be smaller than this, and upsize operations
+	//will be forced when `currentSize - absoluteUsage` is smaller than this.
 	MinimumFreeSize *uint64 `db:"min_free_size"`
 
 	//Contains the error message if the last scrape failed, otherwise an empty string.
@@ -119,13 +120,21 @@ type Asset struct {
 	Size uint64 `db:"size"`
 	//The asset's current utilization, in the same unit as .Size.
 	Usage castellum.UsageValues `db:"usage"`
+
 	//The asset's minimum size and maximum size as reported by OpenStack. This
 	//should only be filled if the size is limited by technical constraints that
 	//are difficult to express in terms of absolute usage (or where merging those
 	//hidden constraints into the usage value would cause unnecessary confusion
 	//to the end user).
-	MinimumSize *uint64 `db:"min_size"`
-	MaximumSize *uint64 `db:"max_size"`
+	//
+	//This differs from the MinimumSize and MaximumSize fields on type Resource
+	//in the level of enforcement: The constraints on type Resource just say that
+	//we will not actively move beyond these size boundaries. These limits here,
+	//by contrast, are actively enforced: Sizes beyond these boundaries will
+	//result in a resize operation to move back into the boundary (hence the
+	//qualifier "strict").
+	StrictMinimumSize *uint64 `db:"min_size"`
+	StrictMaximumSize *uint64 `db:"max_size"`
 
 	//This flag is set by a Castellum worker after a resize operation to indicate
 	//that the .Size attribute is outdated. The value is the new_size of the

@@ -157,87 +157,107 @@ func TestGetEligibleOperations(t *testing.T) {
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min=200",
 		"size=1000, usage=100",
-		"low->800", "low->499", //not restricted by resource-level MinimumSize
+		"low->800", "low->499", //not restricted by MinimumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
-		"size=1000, usage=100, min=200",
-		"low->800", "low->499", //not restricted by asset-level MinimumSize
+		"size=1000, usage=100, smin=200",
+		"low->800", "low->499", //not restricted by StrictMinimumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min=1000",
 		"size=1000, usage=100",
-		"", "", //overridden by resource-level MinimumSize
+		"", "", //overridden by MinimumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
-		"size=1000, usage=100, min=1000",
-		"", "", //overridden by asset-level MinimumSize
+		"size=1000, usage=100, smin=1000",
+		"", "", //overridden by StrictMinimumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min=900",
 		"size=1000, usage=100",
-		"low->900", "low->900", //restricted by resource-level MinimumSize
+		"low->900", "low->900", //restricted by MinimumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
-		"size=1000, usage=100, min=900",
-		"low->900", "low->900", //restricted by asset-level MinimumSize
+		"size=1000, usage=100, smin=900",
+		"low->900", "low->900", //restricted by StrictMinimumSize
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, min=1100",
+		"size=1000, usage=500",
+		"", "", //MinimumSize does not force upsizes (only StrictMinimumSize does)
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%",
+		"size=1000, usage=500, smin=1100",
+		"high->1200", "high->1100", //forced by StrictMinimumSize
 	)
 
 	//MaximumSize constraint
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, max=2000",
 		"size=1000, usage=990",
-		"critical->1200", "critical->1238", //not restricted by resource-level MaximumSize
+		"critical->1200", "critical->1238", //not restricted by MaximumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
-		"size=1000, usage=990, max=2000",
-		"critical->1200", "critical->1238", //not restricted by asset-level MaximumSize
+		"size=1000, usage=990, smax=2000",
+		"critical->1200", "critical->1238", //not restricted by StrictMaximumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, max=1000",
 		"size=1000, usage=990",
-		"", "", //overridden by resource-level MaximumSize
+		"", "", //overridden by MaximumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
-		"size=1000, usage=990, max=1000",
-		"", "", //overridden by asset-level MaximumSize
+		"size=1000, usage=990, smax=1000",
+		"", "", //overridden by StrictMaximumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, max=1100",
 		"size=1000, usage=990",
-		"critical->1100", "critical->1100", //restricted by resource-level MaximumSize
+		"critical->1100", "critical->1100", //restricted by MaximumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
-		"size=1000, usage=990, max=1100",
+		"size=1000, usage=990, smax=1100",
 		"critical->1100",
-		"critical->1100", //restricted by asset-level MaximumSize
+		"critical->1100", //restricted by StrictMaximumSize
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, min=900",
+		"size=1000, usage=500",
+		"", "", //MaximumSize does not force upsizes (only StrictMaximumSize does)
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%",
+		"size=1000, usage=500, smax=900",
+		"low->800", "low->900", //forced by StrictMaximumSize
 	)
 
 	//MinimumFreeSize constraint
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min_free=600",
 		"size=1000, usage=100",
-		"low->800", "low->700", //downsize not restricted by MinimumFreeSize
+		"low->800", "low->700", //not restricted by MinimumFreeSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min_free=800",
 		"size=1000, usage=100",
-		"low->900", "low->900", //downsize restricted by MinimumFreeSize
+		"low->900", "low->900", //restricted by MinimumFreeSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min_free=800",
 		"size=1000, usage=200",
-		"", "", //downsize overridden by MinimumFreeSize
+		"", "", //overridden by MinimumFreeSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min_free=600",
 		"size=1000, usage=500",
-		"high->1200", "high->1100", //no threshold crossed, but upsize forced by MinimumFreeSize
+		"high->1200", "high->1100", //forced by MinimumFreeSize
 	)
 
 	//test behavior around zero size and/or zero usage without constraints
@@ -298,6 +318,45 @@ func TestGetEligibleOperations(t *testing.T) {
 		//passed.)
 		"high->3000", "high->3000",
 	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%",
+		"size=1000, usage=500, smin=3000",
+		//StrictMinimumSize takes precedence over the low threshold
+		"high->3000", "high->3000",
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%",
+		"size=1000, usage=500, smax=500",
+		//StrictMaximumSize takes precedence over the high and critical thresholds
+		"low->500", "low->500",
+	)
+
+	//test conflicts between constraints
+	//
+	//Entirely conflicting constraints (max < min) shall paralyze Castellum and
+	//suppress all actions.
+	check(
+		"low=20%, high=80%, crit=95%, step=200%, min=1000",
+		"size=1000, usage=500, smax=900",
+		"", "", //MinimumSize is upheld, but StrictMaximumSize is trying to get us to break it
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=200%, min=1000",
+		"size=900, usage=500, smax=800",
+		"", "", //MinimumSize is already broken, and StrictMaximumSize is trying to get us to break it further
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=200%, max=1000",
+		"size=1000, usage=500, smin=1100",
+		"", "", //MaximumSize is upheld, but StrictMinimumSize is trying to get us to break it
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=200%, max=1000",
+		"size=1100, usage=500, smin=1200",
+		"", "", //MaximumSize is already broken, and StrictMinimumSize is trying to get us to break it further
+	)
+
+	//TODO: precedence between limiting and enforceable constraints
 }
 
 // Builds a ResourceLogic from a compact string representation like "low=20%, high=80%, step=single, min=200".
@@ -330,7 +389,7 @@ func mustParseResourceLogic(t *testing.T, input string) (result ResourceLogic) {
 	return result
 }
 
-// Builds an AssetStatus from a compact string representation like "size=1000, usage=500, min=1100".
+// Builds an AssetStatus from a compact string representation like "size=1000, usage=500, smin=1100".
 func mustParseAssetStatus(t *testing.T, input string) (result AssetStatus) {
 	t.Helper()
 	for _, assignment := range strings.Split(input, ",") {
@@ -341,10 +400,10 @@ func mustParseAssetStatus(t *testing.T, input string) (result AssetStatus) {
 			result.Size = mustParseUint64(t, parts[1])
 		case "usage":
 			result.Usage = singular(mustParseFloat(t, parts[1]))
-		case "min":
-			result.MinimumSize = mustParsePointerToUint64(t, parts[1])
-		case "max":
-			result.MaximumSize = mustParsePointerToUint64(t, parts[1])
+		case "smin":
+			result.StrictMinimumSize = mustParsePointerToUint64(t, parts[1])
+		case "smax":
+			result.StrictMaximumSize = mustParsePointerToUint64(t, parts[1])
 		}
 	}
 	return result

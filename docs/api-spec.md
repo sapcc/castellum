@@ -209,7 +209,7 @@ For each asset, the following fields may be returned:
 | `id` | string | UUID of asset. |
 | `size` | integer | Size of asset. The unit depends on the asset type. Refer to the [asset managers' documentation](asset-managers/) for more information. |
 | `usage_percent` | [float or object](#multi-usage-resources) | Usage of asset as percentage of size. When the asset has multiple usage types (e.g. instances have both CPU usage and RAM usage), usually the higher value is reported here. |
-| `min_size`<br>`max_size` | integer | Size value that the asset will never be resized below or above, respectively. These fields are only shown when there are hidden size constraints on the infrastructure level that the `usage_percent` number cannot adequately communicate on its own. |
+| `min_size`<br>`max_size` | integer | Size value that the asset may not undercut or exceed, respectively. (Assets that cross these boundaries will be automatically upsized or downsized, respectively.) These fields are only shown when there are hidden size constraints on the infrastructure level that the `usage_percent` number cannot adequately communicate on its own. |
 | `checked.error` | string | If the last attempt by Castellum to retrieve the size and usage of the asset failed, this field contains the error message that was returned from the backend. |
 | `stale` | bool | This flag is set by Castellum after a resize operation to indicate that the reported size and usage are probably not accurate anymore. Will be cleared by the next scrape. |
 

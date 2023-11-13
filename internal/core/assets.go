@@ -34,10 +34,10 @@ import (
 // It is returned by AssetManager.GetAssetStatus(). The semantics of all fields
 // match their equivalently-named counterparts in the db.Asset type.
 type AssetStatus struct {
-	Size        uint64
-	Usage       castellum.UsageValues
-	MinimumSize *uint64
-	MaximumSize *uint64
+	Size              uint64
+	Usage             castellum.UsageValues
+	StrictMinimumSize *uint64
+	StrictMaximumSize *uint64
 }
 
 // StatusOfAsset converts an Asset into just its AssetStatus.
@@ -48,10 +48,10 @@ type AssetStatus struct {
 // like timestamps, UUIDs or error message strings.
 func StatusOfAsset(asset db.Asset) AssetStatus {
 	return AssetStatus{
-		Size:        asset.Size,
-		Usage:       asset.Usage,
-		MinimumSize: asset.MinimumSize,
-		MaximumSize: asset.MaximumSize,
+		Size:              asset.Size,
+		Usage:             asset.Usage,
+		StrictMinimumSize: asset.StrictMinimumSize,
+		StrictMaximumSize: asset.StrictMaximumSize,
 	}
 }
 
