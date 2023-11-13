@@ -253,19 +253,20 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 		}
 	}
 
-	//phase 3: take the boldest action that satisfies the constraints
-	var target *uint64
+	//phase 3: take the boldest action that satisfies the constraints,
+	//but only if it is actually a proper downsize or upsize
 	if reason == castellum.OperationReasonLow {
-		target = a.Min()
+		target := a.Min()
+		if target != nil && *target < asset.Size {
+			return target
+		}
 	} else {
-		target = a.Max()
+		target := a.Max()
+		if target != nil && *target > asset.Size {
+			return target
+		}
 	}
-
-	//...but only if it's actually a resize
-	if target != nil && *target == asset.Size {
-		return nil
-	}
-	return target
+	return nil
 }
 
 func getActionPercentageStep(res ResourceLogic, asset AssetStatus, reason castellum.OperationReason) action {

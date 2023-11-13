@@ -284,7 +284,7 @@ func TestGetEligibleOperations(t *testing.T) {
 		"low=99.9%, crit=100%, min_free=10",
 		//Another bug discovered in the wild, this time for `size = 0`.
 		"size=0, usage=0",
-		"critical->10, low->10", "critical->10, low->10", //TODO remove the superfluous "low->" action
+		"critical->10", "critical->10",
 	)
 
 	//test priority order between thresholds and constraints
@@ -298,8 +298,6 @@ func TestGetEligibleOperations(t *testing.T) {
 		//passed.)
 		"high->3000", "high->3000",
 	)
-
-	//TODO: move testcases here from internal/tasks/asset_scrape_test.go, starting from line 706 downwards
 }
 
 // Builds a ResourceLogic from a compact string representation like "low=20%, high=80%, step=single, min=200".
