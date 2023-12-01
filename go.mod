@@ -5,14 +5,14 @@ go 1.21
 require (
 	github.com/dlmiddlecote/sqlstats v1.0.2
 	github.com/go-gorp/gorp/v3 v3.1.0
-	github.com/gophercloud/gophercloud v1.7.0
+	github.com/gophercloud/gophercloud v1.8.0
 	github.com/gophercloud/utils v0.0.0-20231010081019-80377eca5d56
 	github.com/gorilla/mux v1.8.1
 	github.com/prometheus/client_golang v1.17.0
 	github.com/rs/cors v1.10.1
 	github.com/sapcc/go-api-declarations v1.10.3
-	github.com/sapcc/go-bits v0.0.0-20231114102838-b69ff7fedd7f
-	github.com/sapcc/gophercloud-sapcc v0.0.0-20231116042502-4fec2badfd31
+	github.com/sapcc/go-bits v0.0.0-20231130134726-6ee9377708fc
+	github.com/sapcc/gophercloud-sapcc v0.0.0-20231130134757-d737dedd4227
 	go.uber.org/automaxprocs v1.5.3
 	gopkg.in/yaml.v2 v2.4.0
 )
