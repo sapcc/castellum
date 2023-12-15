@@ -10,9 +10,9 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/prometheus/client_golang v1.17.0
 	github.com/rs/cors v1.10.1
-	github.com/sapcc/go-api-declarations v1.10.4
-	github.com/sapcc/go-bits v0.0.0-20231207102323-7b1f750ed23f
-	github.com/sapcc/gophercloud-sapcc v0.0.0-20231207102321-ccb7578c58b1
+	github.com/sapcc/go-api-declarations v1.10.5
+	github.com/sapcc/go-bits v0.0.0-20231213211425-ddd5e41f8535
+	github.com/sapcc/gophercloud-sapcc v0.0.0-20231214091214-e4517ca1b6a4
 	go.uber.org/automaxprocs v1.5.3
 	gopkg.in/yaml.v2 v2.4.0
 )
