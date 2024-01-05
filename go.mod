@@ -11,8 +11,8 @@ require (
 	github.com/prometheus/client_golang v1.18.0
 	github.com/rs/cors v1.10.1
 	github.com/sapcc/go-api-declarations v1.10.6
-	github.com/sapcc/go-bits v0.0.0-20240103103536-5c1dba42a5f7
-	github.com/sapcc/gophercloud-sapcc v0.0.0-20240103103531-2411033406f1
+	github.com/sapcc/go-bits v0.0.0-20240104033923-b834f0c87cf8
+	github.com/sapcc/gophercloud-sapcc v0.0.0-20240104060255-10c05a26b1f0
 	go.uber.org/automaxprocs v1.5.3
 	gopkg.in/yaml.v2 v2.4.0
 )
@@ -22,7 +22,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/databus23/goslo.policy v0.0.0-20210929125152-81bf2876dbdb // indirect
 	github.com/gofrs/uuid/v5 v5.0.0 // indirect
-	github.com/golang-migrate/migrate/v4 v4.16.2 // indirect
+	github.com/golang-migrate/migrate/v4 v4.17.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
@@ -40,6 +40,6 @@ require (
 	github.com/sergi/go-diff v1.3.1 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect
-	golang.org/x/text v0.13.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 )
