@@ -121,6 +121,7 @@ func (m *assetManagerProjectQuota) InfoForAssetType(assetType db.AssetType) *cor
 	return nil
 }
 
+var errAutomaticQuotaDistribution = errors.New("autoscaling is not permitted for this resource because its quota is assigned automatically by Limes")
 var errNotAllowedForThisProject = errors.New("autoscaling is not permitted for this resource because of cluster-level policies")
 
 // CheckResourceAllowed implements the core.AssetManager interface.
@@ -133,6 +134,10 @@ func (m *assetManagerProjectQuota) CheckResourceAllowed(assetType db.AssetType, 
 	if err != nil {
 		return err
 	}
+	if resource.QuotaDistributionModel != limesresources.HierarchicalQuotaDistribution {
+		return errAutomaticQuotaDistribution
+	}
+
 	switch val := resource.Annotations["can_autoscale"].(type) {
 	case string:
 		if val == "true" {
