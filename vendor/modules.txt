@@ -116,7 +116,7 @@ github.com/rabbitmq/amqp091-go
 # github.com/rs/cors v1.10.1
 ## explicit; go 1.13
 github.com/rs/cors
-# github.com/sapcc/go-api-declarations v1.10.6
+# github.com/sapcc/go-api-declarations v1.10.7
 ## explicit; go 1.21
 github.com/sapcc/go-api-declarations/bininfo
 github.com/sapcc/go-api-declarations/cadf
@@ -124,7 +124,7 @@ github.com/sapcc/go-api-declarations/castellum
 github.com/sapcc/go-api-declarations/internal/marshal
 github.com/sapcc/go-api-declarations/limes
 github.com/sapcc/go-api-declarations/limes/resources
-# github.com/sapcc/go-bits v0.0.0-20240118093656-a4f981f7fa46
+# github.com/sapcc/go-bits v0.0.0-20240201031405-faeba90d7591
 ## explicit; go 1.21
 github.com/sapcc/go-bits/assert
 github.com/sapcc/go-bits/audittools
@@ -144,7 +144,7 @@ github.com/sapcc/go-bits/promquery
 github.com/sapcc/go-bits/regexpext
 github.com/sapcc/go-bits/respondwith
 github.com/sapcc/go-bits/sqlext
-# github.com/sapcc/gophercloud-sapcc v0.0.0-20240125035216-6d086c751ea6
+# github.com/sapcc/gophercloud-sapcc v0.0.0-20240201060604-a720edf45038
 ## explicit; go 1.21
 github.com/sapcc/gophercloud-sapcc/clients
 github.com/sapcc/gophercloud-sapcc/resources/v1/projects
