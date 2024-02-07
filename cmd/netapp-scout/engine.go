@@ -20,6 +20,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -92,7 +93,7 @@ func (e *Engine) collect() error {
 
 	//there should never be no data at all (if there are no shares, what do we need an autoscaler for?)
 	if len(result) == 0 {
-		return fmt.Errorf("collected no NetApp metrics at all (is the netapp-api-exporter scrape working correctly?)")
+		return errors.New("collected no NetApp metrics at all (is the netapp-api-exporter scrape working correctly?)")
 	}
 	//check that we have complete data for all shares
 	for shareIdentity, shareData := range result {

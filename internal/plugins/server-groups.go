@@ -23,6 +23,7 @@ import (
 	"crypto/rand"
 	"encoding/base32"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -508,7 +509,7 @@ func (m *assetManagerServerGroups) findServerIPForLoadbalancer(server *servers.S
 			}
 		}
 	}
-	return "", fmt.Errorf("cannot find IP address for server")
+	return "", errors.New("cannot find IP address for server")
 }
 
 func (m *assetManagerServerGroups) addServerToLoadbalancer(server *servers.Server, cfg configForLBPoolMembership, loadbalancerV2 *gophercloud.ServiceClient) error {
@@ -754,7 +755,7 @@ func (m *assetManagerServerGroups) resolveFlavorIntoID(computeV2 *gophercloud.Se
 
 func (m *assetManagerServerGroups) pullKeypairFromBarbican(computeV2, keymgrV1 *gophercloud.ServiceClient, secretID string) (string, error) {
 	//check if present in Nova already
-	nameInNova := fmt.Sprintf("from-barbican-%s", secretID)
+	nameInNova := "from-barbican-" + secretID
 	_, err := keypairs.Get(computeV2, nameInNova, nil).Extract()
 	switch {
 	case err == nil:

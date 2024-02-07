@@ -271,7 +271,7 @@ func Init(dbURL *url.URL) (*gorp.DbMap, error) {
 
 	dbConn, err := easypg.Connect(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("cannot connect to database: " + err.Error())
+		return nil, fmt.Errorf("cannot connect to database: %w", err)
 	}
 
 	//ensure that this process does not starve other Castellum processes for DB connections
