@@ -25,35 +25,36 @@ The Castellum API does not accept any additional configuration for `nfs-shares` 
 ## Operational considerations
 
 Because Manila only reports the size of its shares, not their usage, the `nfs-shares` asset manager also reads
-Prometheus metrics emitted by the [netapp-api-exporter](https://github.com/sapcc/netapp-api-exporter).
+Prometheus metrics emitted by the [netapp-api-exporter](https://github.com/sapcc/netapp-api-exporter). The following
+metrics are expected:
 
-If you want Castellum to ignore a Manila share, you can set the metadata key `snapmirror` to value `1`, e.g.
+```
+# for shares where this query does not yield any results...
+manila_share_exclusion_reasons_for_castellum{share_id="...",project_id="...",reason!=""} == 1
 
-    manila metadata SHARE_ID set snapmirror=1
+# ...size and usage data is retrieved from these metrics
+manila_share_minimal_size_bytes_for_castellum{volume_type!="dp",volume_state!="offline",share_id="...",project_id="..."}
+manila_share_size_bytes_for_castellum{volume_type!="dp",volume_state!="offline",share_id="...",project_id="..."}
+manila_share_used_bytes_for_castellum{volume_type!="dp",volume_state!="offline",share_id="...",project_id="..."}
+```
 
-Usually you want that, if your share is a target in a NetApp SnapMirror setup. Size modification is anyhow not possible in this case.
+If you want Castellum to ignore a Manila share, fill the `manila_share_exclusion_reasons_for_castellum` metric as
+described above, or set the metadata key `snapmirror` to value `1`:
+
+```
+manila metadata $SHARE_ID set snapmirror=1
+```
+
+Usually you want that if your share is a target in a NetApp SnapMirror setup. Resizing is not possible in this case anyway.
 
 ### Configuration
 
 | Variable | Default | Explanation |
 | -------- | ------- | ----------- |
-| `CASTELLUM_NFS_NETAPP_SCOUT_URL` | *(required)* | The base URL of the castellum-netapp-scout (see below for details), e.g. `https://castellum-netapp-scout.example.com:8080`. |
-
-### Scout deployment
-
-To avoid overwhelming the Prometheus API with queries, Castellum uses a caching component (**castellum-netapp-scout**)
-that requests metric values in bulk and provides a simple API for the `nfs-shares` asset manager to query data for a
-single share. The scout must be deployed next to the observer, and its API must be reachable from the observer. The
-scout is run as `castellum-netapp-scout /path/to/config.yaml` and expected a configuration file with the following
-fields:
-
-| Variable | Default | Explanation |
-| -------- | ------- | ----------- |
-| `http.listen_address` | `:8080` | Listen address for the internal HTTP server. This exposes the API required by castellum-observer, a healthcheck probe endpoint on `/healthcheck`, and Prometheus metrics on `/metrics`. |
-| `prometheus.url` | *(required)* | The URL of the Prometheus instance providing netapp-api-exporter metrics, e.g. `https://prometheus.example.org:9090`. |
-| `prometheus.cacert` | *(optional)* | A CA certificate that the Prometheus instance's server certificate is signed by (only when HTTPS is used). Only required if the CA certificate is not included in the system-wide CA bundle. |
-| `prometheus.cert` | *(optional)* | A client certificate to present to the Prometheus instance (only when HTTPS is used). |
-| `prometheus.key` | *(optional)* | The private key for the aforementioned client certificate. |
+| `CASTELLUM_NFS_PROMETHEUS_URL` | *(required)* | The URL of the Prometheus instance providing usage metrics to this asset manager, e.g. `https://prometheus.example.org:9090`. |
+| `CASTELLUM_NFS_PROMETHEUS_CACERT` | *(optional)* | A CA certificate that the Prometheus instance's server certificate is signed by (only when HTTPS is used). Only required if the CA certificate is not included in the system-wide CA bundle. |
+| `CASTELLUM_NFS_PROMETHEUS_CERT` | *(optional)* | A client certificate to present to the Prometheus instance (only when HTTPS is used). |
+| `CASTELLUM_NFS_PROMETHEUS_KEY` | *(optional)* | The private key for the aforementioned client certificate. |
 
 ### Required permissions
 

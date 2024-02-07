@@ -20,21 +20,20 @@ package plugins
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"math"
-	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares"
+	"github.com/prometheus/common/model"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/errext"
 	"github.com/sapcc/go-bits/logg"
-	"github.com/sapcc/go-bits/osext"
+	"github.com/sapcc/go-bits/promquery"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -64,7 +63,7 @@ func (m *assetManagerNFS) parseAssetType(assetType db.AssetType) *assetTypeNFS {
 
 type assetManagerNFS struct {
 	Manila       *gophercloud.ServiceClient
-	ScoutBaseURL string
+	ShareMetrics *promquery.BulkQueryCache[manilaShareMetricsKey, manilaShareMetrics]
 }
 
 func init() {
@@ -82,8 +81,13 @@ func (m *assetManagerNFS) Init(provider core.ProviderClient) (err error) {
 	}
 	m.Manila.Microversion = "2.64" //for "force" field on .Extend(), requires Manila at least on Xena
 
-	m.ScoutBaseURL, err = osext.NeedGetenv("CASTELLUM_NFS_NETAPP_SCOUT_URL")
-	return err
+	promClient, err := promquery.ConfigFromEnv("CASTELLUM_NFS_PROMETHEUS").Connect()
+	if err != nil {
+		return err
+	}
+	m.ShareMetrics = promquery.NewBulkQueryCache(manilaShareQueries, 30*time.Second, promClient)
+
+	return nil
 }
 
 // InfoForAssetType implements the core.AssetManager interface.
@@ -154,7 +158,7 @@ func (m *assetManagerNFS) ListAssets(ctx context.Context, res db.Resource) ([]st
 
 		if len(s) > 0 {
 			for _, share := range s {
-				isIgnored, err := m.ignoreShare(ctx, share)
+				isIgnored, err := m.ignoreShare(share)
 				if err != nil {
 					return nil, err
 				}
@@ -174,7 +178,7 @@ func (m *assetManagerNFS) ListAssets(ctx context.Context, res db.Resource) ([]st
 	}
 }
 
-func (m *assetManagerNFS) ignoreShare(ctx context.Context, share shares.Share) (bool, error) {
+func (m *assetManagerNFS) ignoreShare(share shares.Share) (bool, error) {
 	//ignore shares in status "error" (we won't be able to resize them anyway)
 	if share.Status == "error" {
 		logg.Debug("ignoring share %s because of status = error", share.ID)
@@ -195,58 +199,20 @@ func (m *assetManagerNFS) ignoreShare(ctx context.Context, share shares.Share) (
 		}
 	}
 
-	//There are further exclusion rules that are based on Prometheus metrics and
-	//thus evaluated in the netapp-scout.
-	path := fmt.Sprintf("v1/projects/%s/shares/%s/exclusion-reasons", share.ProjectID, share.ID)
-	var exclusionReasons map[string]bool
-	err := m.queryScout(ctx, path, &exclusionReasons, nil)
+	//evaluate exclusion rules based on Prometheus metrics
+	metrics, err := m.ShareMetrics.Get(manilaShareMetricsKey{
+		ProjectUUID: share.ProjectID,
+		ShareUUID:   share.ID,
+	})
 	if err != nil {
 		return false, err
 	}
-	for reason, isExcluded := range exclusionReasons {
-		if isExcluded {
-			logg.Debug("ignoring share %s because of %s", share.ID, reason)
-			return true, nil
-		}
+	if metrics.ExclusionReason != "" {
+		logg.Debug("ignoring share %s because of %s", share.ID, metrics.ExclusionReason)
+		return true, nil
 	}
 
 	return false, nil
-}
-
-func (m *assetManagerNFS) queryScout(ctx context.Context, path string, data any, actionOn404 func() error) error {
-	url := strings.TrimSuffix(m.ScoutBaseURL, "/") + "/" + strings.TrimPrefix(path, "/")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
-	if err != nil {
-		return fmt.Errorf("could not GET %s: %w", url, err)
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("could not GET %s: %w", url, err)
-	}
-	defer resp.Body.Close()
-
-	buf, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("could not GET %s: %w", url, err)
-	}
-
-	if resp.StatusCode == http.StatusNotFound && actionOn404 != nil {
-		//when netapp-scout reports a 404, we can sometimes return a more specific
-		//error than a generic HTTP request error
-		err := actionOn404()
-		if err != nil {
-			return err
-		}
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("could not GET %s: expected 200 OK, but got %d and response: %q", url, resp.StatusCode, strings.TrimSpace(string(buf)))
-	}
-
-	err = json.Unmarshal(buf, data)
-	if err != nil {
-		return fmt.Errorf("could not GET %s: %w", url, err)
-	}
-	return nil
 }
 
 var (
@@ -300,30 +266,31 @@ func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useR
 
 // GetAssetStatus implements the core.AssetManager interface.
 func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
-	//when netapp-scout reports a 404 for this share, we can check Manila to see if the share was deleted in the meantime
-	actionOn404 := func() error {
-		_, getErr := shares.Get(m.Manila, assetUUID).Extract()
-		if errext.IsOfType[gophercloud.ErrDefault404](getErr) {
-			return core.AssetNotFoundErr{InnerError: fmt.Errorf("share not found in Manila: %s", getErr.Error())}
-		}
-		return nil //use the default error returned by m.queryScout()
-	}
-
-	//query Prometheus metrics (via netapp-scout) for size and usage
-	var data struct {
-		SizeGiB        uint64  `json:"size_gib"`
-		MinimumSizeGiB uint64  `json:"min_size_gib"`
-		UsageGiB       float64 `json:"usage_gib"`
-	}
-	path := fmt.Sprintf("v1/projects/%s/shares/%s", res.ScopeUUID, assetUUID)
-	err := m.queryScout(ctx, path, &data, actionOn404)
+	//query Prometheus metrics for size and usage
+	metrics, err := m.ShareMetrics.Get(manilaShareMetricsKey{
+		ProjectUUID: res.ScopeUUID,
+		ShareUUID:   assetUUID,
+	})
 	if err != nil {
 		return core.AssetStatus{}, err
 	}
+	if metrics.ExclusionReason != "" {
+		//defense in depth: this share should already have been ignored during ListAssets
+		return core.AssetStatus{}, core.AssetNotFoundErr{InnerError: fmt.Errorf("ignoring because of %s", metrics.ExclusionReason)}
+	}
+
+	//if there are no metrics for this share, we can check Manila to see if the share was deleted in the meantime
+	if metrics.SizeGiB == nil || metrics.UsedGiB == nil {
+		_, err := shares.Get(m.Manila, assetUUID).Extract()
+		if errext.IsOfType[gophercloud.ErrDefault404](err) {
+			return core.AssetStatus{}, core.AssetNotFoundErr{InnerError: fmt.Errorf("share not found in Manila: %w", err)}
+		}
+	}
+
 	status := core.AssetStatus{
-		Size:              data.SizeGiB,
-		StrictMinimumSize: &data.MinimumSizeGiB,
-		Usage:             castellum.UsageValues{castellum.SingularUsageMetric: data.UsageGiB},
+		Size:              *metrics.SizeGiB,
+		StrictMinimumSize: &metrics.MinSizeGiB,
+		Usage:             castellum.UsageValues{castellum.SingularUsageMetric: *metrics.UsedGiB},
 	}
 
 	//when size has changed compared to last time, double-check with the Manila
@@ -331,9 +298,7 @@ func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, a
 	if previousStatus == nil || previousStatus.Size != status.Size {
 		share, err := shares.Get(m.Manila, assetUUID).Extract()
 		if err != nil {
-			return core.AssetStatus{}, fmt.Errorf(
-				"cannot get status of share %s from Manila API: %s",
-				assetUUID, err.Error())
+			return core.AssetStatus{}, fmt.Errorf("cannot get status of share %s from Manila API: %w", assetUUID, err)
 		}
 		if uint64(share.Size) != status.Size {
 			return core.AssetStatus{}, fmt.Errorf(
@@ -355,4 +320,79 @@ type shareExtendOpts struct {
 // ToShareExtendMap implements the shares.ExtendOptsBuilder interface.
 func (opts shareExtendOpts) ToShareExtendMap() (map[string]interface{}, error) {
 	return gophercloud.BuildRequestBody(opts, "extend")
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// type declarations and configuration for promquery.BulkQueryCache
+
+const (
+	manilaExclusionReasonsQuery = `max by (project_id, share_id, reason) (manila_share_exclusion_reasons_for_castellum{reason!=""} == 1)`
+
+	manilaSizeBytesQuery    = `max by (project_id, share_id) (manila_share_size_bytes_for_castellum        {volume_type!="dp",volume_state!="offline"})`
+	manilaUsedBytesQuery    = `max by (project_id, share_id) (manila_share_used_bytes_for_castellum        {volume_type!="dp",volume_state!="offline"})`
+	manilaMinSizeBytesQuery = `max by (project_id, share_id) (manila_share_minimal_size_bytes_for_castellum{volume_type!="dp",volume_state!="offline"})`
+)
+
+type manilaShareMetricsKey struct {
+	ProjectUUID string
+	ShareUUID   string
+}
+
+func manilaShareMetricsKeyer(sample *model.Sample) manilaShareMetricsKey {
+	return manilaShareMetricsKey{
+		ProjectUUID: string(sample.Metric["project_id"]),
+		ShareUUID:   string(sample.Metric["share_id"]),
+	}
+}
+
+type manilaShareMetrics struct {
+	ExclusionReason string
+	SizeGiB         *uint64
+	UsedGiB         *float64
+	MinSizeGiB      uint64
+}
+
+var (
+	manilaShareQueries = []promquery.BulkQuery[manilaShareMetricsKey, manilaShareMetrics]{
+		{
+			Query:       manilaExclusionReasonsQuery,
+			Description: "Manila share exclusion reasons",
+			Keyer:       manilaShareMetricsKeyer,
+			Filler: func(entry *manilaShareMetrics, sample *model.Sample) {
+				entry.ExclusionReason = string(sample.Metric["reason"])
+			},
+		},
+		{
+			Query:       manilaSizeBytesQuery,
+			Description: "Manila share size bytes",
+			Keyer:       manilaShareMetricsKeyer,
+			Filler: func(entry *manilaShareMetrics, sample *model.Sample) {
+				entry.SizeGiB = pointerTo(uint64(math.Round(asGigabytes(sample.Value))))
+			},
+		},
+		{
+			Query:       manilaMinSizeBytesQuery,
+			Description: "Manila share minimum size bytes",
+			Keyer:       manilaShareMetricsKeyer,
+			Filler: func(entry *manilaShareMetrics, sample *model.Sample) {
+				entry.MinSizeGiB = uint64(math.Ceil(asGigabytes(sample.Value)))
+			},
+		},
+		{
+			Query:       manilaUsedBytesQuery,
+			Description: "Manila share used bytes",
+			Keyer:       manilaShareMetricsKeyer,
+			Filler: func(entry *manilaShareMetrics, sample *model.Sample) {
+				entry.UsedGiB = pointerTo(asGigabytes(sample.Value))
+			},
+		},
+	}
+)
+
+func asGigabytes(bytes model.SampleValue) float64 {
+	return float64(bytes) / (1 << 30)
+}
+
+func pointerTo[T any](value T) *T {
+	return &value
 }
