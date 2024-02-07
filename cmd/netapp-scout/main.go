@@ -40,6 +40,7 @@ import (
 )
 
 func main() {
+	bininfo.HandleVersionArgument()
 	logg.ShowDebug = osext.GetenvBool("CASTELLUM_DEBUG")
 	undoMaxprocs := must.Return(maxprocs.Set(maxprocs.Logger(logg.Debug)))
 	defer undoMaxprocs()

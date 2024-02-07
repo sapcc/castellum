@@ -71,6 +71,7 @@ func usage() {
 }
 
 func main() {
+	bininfo.HandleVersionArgument()
 	if len(os.Args) < 3 {
 		usage()
 	}
