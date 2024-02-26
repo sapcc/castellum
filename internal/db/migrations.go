@@ -20,9 +20,9 @@ package db
 
 // SQLMigrations must be public because it's also used by tests.
 var SQLMigrations = map[string]string{
-	//NOTE: Migrations 1 through 16 have been rolled up into one at 2023-01-09
+	//NOTE: Migrations 1 through 21 have been rolled up into one at 2024-02-26
 	//to better represent the current baseline of the DB schema.
-	"016_rollup.down.sql": `
+	"021_rollup.down.sql": `
 		DROP TABLE resources;
 		DROP TABLE assets;
 		DROP TYPE op_reason;
@@ -30,12 +30,11 @@ var SQLMigrations = map[string]string{
 		DROP TABLE pending_operations;
 		DROP TABLE finished_operations;
 	`,
-	"016_rollup.up.sql": `
+	"021_rollup.up.sql": `
 		CREATE TABLE resources (
 			id                          BIGSERIAL         NOT NULL PRIMARY KEY,
 			scope_uuid                  TEXT              NOT NULL,
 			asset_type                  TEXT              NOT NULL,
-			scraped_at                  TIMESTAMP         DEFAULT NULL,
 			low_threshold_percent       TEXT              NOT NULL,
 			low_delay_seconds           INTEGER           NOT NULL,
 			high_threshold_percent      TEXT              NOT NULL,
@@ -47,9 +46,10 @@ var SQLMigrations = map[string]string{
 			min_free_size               BIGINT            DEFAULT NULL,
 			single_step                 BOOLEAN           NOT NULL DEFAULT FALSE,
 			domain_uuid                 TEXT              NOT NULL DEFAULT 'unknown',
-			checked_at                  TIMESTAMP         NOT NULL,
 			scrape_error_message        TEXT              NOT NULL DEFAULT '',
 			config_json                 TEXT              NOT NULL DEFAULT '',
+			next_scrape_at              TIMESTAMP         NOT NULL DEFAULT NOW(),
+			scrape_duration_secs        REAL              NOT NULL DEFAULT 0,
 			UNIQUE(scope_uuid, asset_type)
 		);
 
@@ -58,12 +58,16 @@ var SQLMigrations = map[string]string{
 			resource_id           BIGINT     NOT NULL REFERENCES resources ON DELETE CASCADE,
 			uuid                  TEXT       NOT NULL,
 			size                  BIGINT     NOT NULL,
-			scraped_at            TIMESTAMP  DEFAULT NULL,
 			expected_size         BIGINT     DEFAULT NULL,
-			checked_at            TIMESTAMP  NOT NULL,
 			scrape_error_message  TEXT       NOT NULL DEFAULT '',
 			usage                 TEXT       NOT NULL,
 			critical_usages       TEXT       NOT NULL DEFAULT '',
+			next_scrape_at        TIMESTAMP  NOT NULL DEFAULT NOW(),
+			never_scraped         BOOLEAN    NOT NULL DEFAULT FALSE,
+			scrape_duration_secs  REAL       NOT NULL DEFAULT 0,
+			min_size              REAL       DEFAULT NULL,
+			max_size              REAL       DEFAULT NULL,
+			resized_at            TIMESTAMP  DEFAULT NULL,
 			UNIQUE(resource_id, uuid)
 		);
 
@@ -102,78 +106,5 @@ var SQLMigrations = map[string]string{
 			errored_attempts       INT         DEFAULT 0,
 			usage                  TEXT        NOT NULL
 		);
-	`,
-	"017_next_scrape_at.up.sql": `
-		ALTER TABLE resources
-			ADD COLUMN next_scrape_at TIMESTAMP NOT NULL DEFAULT NOW();
-		ALTER TABLE assets
-			ADD COLUMN next_scrape_at TIMESTAMP NOT NULL DEFAULT NOW(),
-			ADD COLUMN never_scraped  BOOLEAN   NOT NULL DEFAULT FALSE;
-
-		UPDATE resources
-			SET next_scrape_at = scraped_at + interval '30 minutes'
-			WHERE scraped_at IS NOT NULL;
-		UPDATE assets
-			SET next_scrape_at = checked_at + interval '5 minutes', never_scraped = (scraped_at IS NULL);
-	`,
-	"017_next_check_at.down.sql": `
-		UPDATE resources
-			SET scraped_at = next_scrape_at - interval '30 minutes';
-		UPDATE assets
-			SET checked_at = next_scrape_at - interval '5 minutes';
-		UPDATE assets
-			SET scraped_at = CASE WHEN never_scraped THEN NULL ELSE checked_at END;
-
-		ALTER TABLE resources
-			DROP COLUMN next_scrape_at;
-		ALTER TABLE assets
-			DROP COLUMN next_scrape_at,
-			DROP COLUMN never_scraped;
-	`,
-	"018_remove_checked_at_and_scraped_at.up.sql": `
-		ALTER TABLE resources
-			DROP COLUMN scraped_at,
-			DROP COLUMN checked_at;
-		ALTER TABLE assets
-			DROP COLUMN scraped_at,
-			DROP COLUMN checked_at;
-	`,
-	"018_remove_checked_at_and_scraped_at.down.sql": `
-		ALTER TABLE resources
-			ADD COLUMN scraped_at TIMESTAMP DEFAULT NULL,
-			ADD COLUMN checked_at TIMESTAMP NOT NULL DEFAULT NOW();
-		ALTER TABLE assets
-			ADD COLUMN scraped_at TIMESTAMP DEFAULT NULL,
-			ADD COLUMN checked_at TIMESTAMP NOT NULL DEFAULT NOW();
-	`,
-	"019_scrape_duration_secs.up.sql": `
-		ALTER TABLE resources
-			ADD COLUMN scrape_duration_secs REAL NOT NULL DEFAULT 0;
-		ALTER TABLE assets
-			ADD COLUMN scrape_duration_secs REAL NOT NULL DEFAULT 0;
-	`,
-	"019_scrape_duration_secs.down.sql": `
-		ALTER TABLE resources
-			DROP COLUMN scrape_duration_secs;
-		ALTER TABLE assets
-			DROP COLUMN scrape_duration_secs;
-	`,
-	"020_asset_local_size_constraints.up.sql": `
-		ALTER TABLE assets
-			ADD COLUMN min_size REAL DEFAULT NULL,
-			ADD COLUMN max_size REAL DEFAULT NULL;
-	`,
-	"020_asset_local_size_constraints.down.sql": `
-		ALTER TABLE assets
-			DROP COLUMN min_size,
-			DROP COLUMN max_size;
-	`,
-	"021_asset_resized_at.up.sql": `
-		ALTER TABLE assets
-			ADD COLUMN resized_at TIMESTAMP DEFAULT NULL;
-	`,
-	"021_asset_resized_at.down.sql": `
-		ALTER TABLE assets
-			DROP COLUMN resized_at;
 	`,
 }
