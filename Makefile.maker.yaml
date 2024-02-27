@@ -7,9 +7,6 @@ binaries:
   - name:        castellum
     fromPackage: .
     installTo:   bin/
-  - name:        castellum-netapp-scout
-    fromPackage: ./cmd/netapp-scout
-    installTo:   bin/
 
 coverageTest:
   only: '/internal'

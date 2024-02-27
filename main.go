@@ -359,6 +359,9 @@ PROMPT:
 			for metric, value := range result.Usage {
 				logg.Info("usage[%s] = %g", metric, value)
 			}
+			if result.StrictMinimumSize != nil {
+				logg.Info("minsize = %d", *result.StrictMinimumSize)
+			}
 
 		case "resize":
 			if len(fields) != 5 {
