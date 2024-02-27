@@ -284,6 +284,8 @@ func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, a
 		_, err := shares.Get(m.Manila, assetUUID).Extract()
 		if errext.IsOfType[gophercloud.ErrDefault404](err) {
 			return core.AssetStatus{}, core.AssetNotFoundErr{InnerError: fmt.Errorf("share not found in Manila: %w", err)}
+		} else {
+			return core.AssetStatus{}, fmt.Errorf("incomplete metrics for share %q: %#v", assetUUID, metrics)
 		}
 	}
 
