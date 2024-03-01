@@ -5,15 +5,15 @@ go 1.22
 require (
 	github.com/dlmiddlecote/sqlstats v1.0.2
 	github.com/go-gorp/gorp/v3 v3.1.0
-	github.com/gophercloud/gophercloud v1.9.0
+	github.com/gophercloud/gophercloud v1.10.0
 	github.com/gophercloud/utils v0.0.0-20231010081019-80377eca5d56
 	github.com/gorilla/mux v1.8.1
-	github.com/prometheus/client_golang v1.18.0
-	github.com/prometheus/common v0.47.0
+	github.com/prometheus/client_golang v1.19.0
+	github.com/prometheus/common v0.48.0
 	github.com/rs/cors v1.10.1
 	github.com/sapcc/go-api-declarations v1.10.9
-	github.com/sapcc/go-bits v0.0.0-20240222221204-90b493ffdee9
-	github.com/sapcc/gophercloud-sapcc v0.0.0-20240215094949-3ad59ebe5916
+	github.com/sapcc/go-bits v0.0.0-20240229224940-f0612298e3a6
+	github.com/sapcc/gophercloud-sapcc v0.0.0-20240229224942-48971af8db42
 	go.uber.org/automaxprocs v1.5.3
 	gopkg.in/yaml.v2 v2.4.0
 )
