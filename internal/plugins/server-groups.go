@@ -496,10 +496,10 @@ func (m *assetManagerServerGroups) findServerIPForLoadbalancer(server *servers.S
 	//only configure one private network on the auto-created instances, which
 	//means that there is no question which IP to choose.
 	for _, entry := range server.Addresses {
-		addrInfos, ok := entry.([]interface{})
+		addrInfos, ok := entry.([]any)
 		if ok {
 			for _, info := range addrInfos {
-				addrInfo, ok := info.(map[string]interface{})
+				addrInfo, ok := info.(map[string]any)
 				if ok && addrInfo["OS-EXT-IPS:type"] == "fixed" {
 					ip, ok := addrInfo["addr"].(string)
 					if ok && ip != "" {
@@ -609,7 +609,7 @@ func (m *assetManagerServerGroups) parseAndValidateConfig(configJSON string) (co
 	}
 
 	var errs []string
-	complain := func(msg string, args ...interface{}) {
+	complain := func(msg string, args ...any) {
 		if len(args) > 0 {
 			msg = fmt.Sprintf(msg, args...)
 		}

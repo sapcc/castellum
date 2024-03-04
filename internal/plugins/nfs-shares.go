@@ -320,7 +320,7 @@ type shareExtendOpts struct {
 }
 
 // ToShareExtendMap implements the shares.ExtendOptsBuilder interface.
-func (opts shareExtendOpts) ToShareExtendMap() (map[string]interface{}, error) {
+func (opts shareExtendOpts) ToShareExtendMap() (map[string]any, error) {
 	return gophercloud.BuildRequestBody(opts, "extend")
 }
 

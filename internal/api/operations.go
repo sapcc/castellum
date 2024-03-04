@@ -67,9 +67,9 @@ func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (
 	//find all matching resources
 	var (
 		sqlConditions []string
-		sqlBindValues []interface{}
+		sqlBindValues []any
 	)
-	addSQLCondition := func(key string, value interface{}) {
+	addSQLCondition := func(key string, value any) {
 		cond := fmt.Sprintf("%s = $%d", key, len(sqlBindValues)+1)
 		sqlConditions = append(sqlConditions, cond)
 		sqlBindValues = append(sqlBindValues, value)

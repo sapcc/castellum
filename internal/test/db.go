@@ -57,7 +57,7 @@ func (t T) WithDB(fixtureFile *string, action func(dbi *gorp.DbMap)) {
 }
 
 // MustUpdate aborts the test if dbi.Update(row) throws an error.
-func (t T) MustUpdate(dbi *gorp.DbMap, row interface{}) {
+func (t T) MustUpdate(dbi *gorp.DbMap, row any) {
 	_, err := dbi.Update(row)
 	t.Must(err)
 }
@@ -99,7 +99,7 @@ func (t T) ExpectFinishedOperations(dbi *gorp.DbMap, ops ...db.FinishedOperation
 }
 
 // AssertJSONEqual checks that both given values have identical JSON serializations.
-func (t T) AssertJSONEqual(variable string, actual, expected interface{}) {
+func (t T) AssertJSONEqual(variable string, actual, expected any) {
 	t.Helper()
 	expectedJSON, _ := json.Marshal(expected) //nolint:errcheck
 	actualJSON, _ := json.Marshal(actual)     //nolint:errcheck

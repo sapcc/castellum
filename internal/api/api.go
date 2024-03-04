@@ -112,7 +112,7 @@ func (h *handler) AddTo(router *mux.Router) {
 
 // RequireJSON will parse the request body into the given data structure, or
 // write an error response if that fails.
-func RequireJSON(w http.ResponseWriter, r *http.Request, data interface{}) bool {
+func RequireJSON(w http.ResponseWriter, r *http.Request, data any) bool {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	err := dec.Decode(data)
