@@ -40,6 +40,7 @@ import (
 
 type assetManagerNFS struct {
 	Manila       *gophercloud.ServiceClient
+	Discovery    promquery.Client
 	ShareMetrics *promquery.BulkQueryCache[manilaShareMetricsKey, manilaShareMetrics]
 }
 
@@ -64,7 +65,8 @@ func (m *assetManagerNFS) Init(provider core.ProviderClient) (err error) {
 	}
 	m.ShareMetrics = promquery.NewBulkQueryCache(manilaShareQueries, 30*time.Second, promClient)
 
-	return nil
+	m.Discovery, err = promquery.ConfigFromEnv("CASTELLUM_NFS_DISCOVERY_PROMETHEUS").Connect()
+	return err
 }
 
 // InfoForAssetType implements the core.AssetManager interface.
@@ -89,93 +91,36 @@ func (m *assetManagerNFS) CheckResourceAllowed(assetType db.AssetType, scopeUUID
 
 // ListAssets implements the core.AssetManager interface.
 func (m *assetManagerNFS) ListAssets(ctx context.Context, res db.Resource) ([]string, error) {
-	page := 0
-	pageSize := 1000
-	var shareIDs []string
-
-	//NOTE: Since Manila uses a shitty pagination strategy (limit/offset instead
-	//of marker), we could miss existing shares or observe them doubly if the
-	//pages shift around (due to creation or deletion of shares) between
-	//requests. Therefore we increment the offset by `pageSize-10` instead of
-	//`pageSize` between pages, so that pages overlap by 10 items. This decreases
-	//the chance of us missing items.
-	wasSeen := make(map[string]bool)
-
-	for {
-		opts := shares.ListOpts{
-			ProjectID:  res.ScopeUUID,
-			AllTenants: true,
-			Limit:      pageSize,
-			Offset:     page * (pageSize - 10),
-		}
-
-		p, err := shares.ListDetail(m.Manila, opts).AllPages()
-		if err != nil {
-			return nil, err
-		}
-
-		s, err := shares.ExtractShares(p)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(s) > 0 {
-			for _, share := range s {
-				isIgnored, err := m.ignoreShare(share)
-				if err != nil {
-					return nil, err
-				}
-				if isIgnored {
-					continue
-				}
-				if !wasSeen[share.ID] {
-					shareIDs = append(shareIDs, share.ID)
-					wasSeen[share.ID] = true
-				}
-			}
-			page++
-		} else {
-			//last page reached
-			return shareIDs, nil
-		}
-	}
-}
-
-func (m *assetManagerNFS) ignoreShare(share shares.Share) (bool, error) {
-	//ignore shares in status "error" (we won't be able to resize them anyway)
-	if share.Status == "error" {
-		logg.Debug("ignoring share %s because of status = error", share.ID)
-		return true, nil
-	}
-
-	//ignore "shares" that are actually snapmirror targets (sapcc-specific
-	//extension); old-style check: check for the "snapmirror" metadata key
-	//
-	//NOTE: Just because it's the "old-style check" doesn't mean we can remove
-	//this without careful thought. As of Dec 2020, some snapmirrors are only
-	//detected with the old-style check. And vice versa as well: We built the new
-	//check because some snapmirrors are only detected by it, not by the old one.
-	if snapmirrorStr, ok := share.Metadata["snapmirror"]; ok {
-		if snapmirrorStr == "1" {
-			logg.Debug("ignoring share %s because of snapmirror = 1", share.ID)
-			return true, nil
-		}
-	}
-
-	//evaluate exclusion rules based on Prometheus metrics
-	metrics, err := m.ShareMetrics.Get(manilaShareMetricsKey{
-		ProjectUUID: share.ProjectID,
-		ShareUUID:   share.ID,
-	})
+	//shares are discovered via Prometheus metrics since that is way faster than
+	//going through the Manila API
+	vector, err := m.Discovery.GetVector(fmt.Sprintf(
+		`count by (id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error",snapmirror!="1"})`,
+		res.ScopeUUID,
+	))
 	if err != nil {
-		return false, err
-	}
-	if metrics.ExclusionReason != "" {
-		logg.Debug("ignoring share %s because of %s", share.ID, metrics.ExclusionReason)
-		return true, nil
+		return nil, fmt.Errorf("while discovering shares for project %s in Prometheus: %w", res.ScopeUUID, err)
 	}
 
-	return false, nil
+	var allShareIDs []string
+	for _, sample := range vector {
+		shareID := string(sample.Metric["id"])
+
+		//evaluate exclusion rules based on Prometheus metrics
+		metrics, err := m.ShareMetrics.Get(manilaShareMetricsKey{
+			ProjectUUID: res.ScopeUUID,
+			ShareUUID:   shareID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if metrics.ExclusionReason == "" {
+			allShareIDs = append(allShareIDs, shareID)
+		} else {
+			logg.Debug("ignoring share %s because of %s", shareID, metrics.ExclusionReason)
+		}
+	}
+
+	return allShareIDs, nil
 }
 
 var (

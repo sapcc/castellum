@@ -18,7 +18,10 @@ Prometheus metrics emitted by the [netapp-api-exporter](https://github.com/sapcc
 metrics are expected:
 
 ```
-# for shares where this query does not yield any results...
+# shares are discovered using this query (share ID is expected to be stored in the label `id`)
+openstack_manila_shares_size_gauge{project_id="...",status!="error",snapmirror!="1"}
+
+# then, for shares where this query does not yield any results...
 manila_share_exclusion_reasons_for_castellum{share_id="...",project_id="...",reason!=""} == 1
 
 # ...size and usage data is retrieved from these metrics
@@ -26,6 +29,9 @@ manila_share_minimal_size_bytes_for_castellum{volume_type!="dp",volume_state!="o
 manila_share_size_bytes_for_castellum{volume_type!="dp",volume_state!="offline",share_id="...",project_id="..."}
 manila_share_used_bytes_for_castellum{volume_type!="dp",volume_state!="offline",share_id="...",project_id="..."}
 ```
+
+Discovery of Manila shares also happens via Prometheus because Prometheus queries are usually faster at scale than
+Manila API queries.
 
 If you want Castellum to ignore a Manila share, fill the `manila_share_exclusion_reasons_for_castellum` metric as
 described above, or set the metadata key `snapmirror` to value `1`:
@@ -40,10 +46,11 @@ Usually you want that if your share is a target in a NetApp SnapMirror setup. Re
 
 | Variable | Default | Explanation |
 | -------- | ------- | ----------- |
-| `CASTELLUM_NFS_PROMETHEUS_URL` | *(required)* | The URL of the Prometheus instance providing usage metrics to this asset manager, e.g. `https://prometheus.example.org:9090`. |
+| `CASTELLUM_NFS_PROMETHEUS_URL` | *(required)* | The URL of the Prometheus instance providing the `manila_share_..._for_castellum` metrics (see above), e.g. `https://prometheus.example.org:9090`. |
 | `CASTELLUM_NFS_PROMETHEUS_CACERT` | *(optional)* | A CA certificate that the Prometheus instance's server certificate is signed by (only when HTTPS is used). Only required if the CA certificate is not included in the system-wide CA bundle. |
 | `CASTELLUM_NFS_PROMETHEUS_CERT` | *(optional)* | A client certificate to present to the Prometheus instance (only when HTTPS is used). |
 | `CASTELLUM_NFS_PROMETHEUS_KEY` | *(optional)* | The private key for the aforementioned client certificate. |
+| `CASTELLUM_NFS_DISCOVERY_PROMETHEUS_URL`<br>`CASTELLUM_NFS_DISCOVERY_PROMETHEUS_CACERT`<br>`CASTELLUM_NFS_DISCOVERY_PROMETHEUS_CERT`<br>`CASTELLUM_NFS_DISCOVERY_PROMETHEUS_KEY` | *(required)*<br>*(optional)*<br>*(optional)*<br>*(optional)* | A similar set of configuration variables for finding and connecting to the Prometheus instance providing the `openstack_manila_shares_size_gauge` metric (see above). May be identical to the former set. |
 
 ### Required permissions
 
