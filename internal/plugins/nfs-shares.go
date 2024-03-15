@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"math"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/gophercloud/gophercloud"
@@ -38,28 +37,6 @@ import (
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 )
-
-var (
-	nfsGroupRx = regexp.MustCompile(`^[A-Za-z0-9-]+$`)
-)
-
-type assetTypeNFS struct {
-	AllShares bool
-	GroupName string
-}
-
-func (m *assetManagerNFS) parseAssetType(assetType db.AssetType) *assetTypeNFS {
-	if assetType == "nfs-shares" {
-		return &assetTypeNFS{AllShares: true}
-	}
-	if strings.HasPrefix(string(assetType), "nfs-shares-group:") {
-		groupName := strings.TrimPrefix(string(assetType), "nfs-shares-group:")
-		if nfsGroupRx.MatchString(groupName) {
-			return &assetTypeNFS{AllShares: false, GroupName: groupName}
-		}
-	}
-	return nil
-}
 
 type assetManagerNFS struct {
 	Manila       *gophercloud.ServiceClient
@@ -92,7 +69,7 @@ func (m *assetManagerNFS) Init(provider core.ProviderClient) (err error) {
 
 // InfoForAssetType implements the core.AssetManager interface.
 func (m *assetManagerNFS) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
-	if m.parseAssetType(assetType) != nil {
+	if assetType == "nfs-shares" {
 		return &core.AssetTypeInfo{
 			AssetType:    assetType,
 			UsageMetrics: []castellum.UsageMetric{castellum.SingularUsageMetric},
@@ -107,22 +84,11 @@ func (m *assetManagerNFS) CheckResourceAllowed(assetType db.AssetType, scopeUUID
 		return core.ErrNoConfigurationAllowed
 	}
 
-	parsed := m.parseAssetType(assetType)
-	for otherAssetType := range existingResources {
-		parsedOther := m.parseAssetType(otherAssetType)
-		if parsedOther != nil && (parsed.AllShares != parsedOther.AllShares) {
-			return fmt.Errorf("cannot create a %q resource because of possible contradiction with existing %q resource",
-				string(assetType), string(otherAssetType))
-		}
-	}
-
 	return nil
 }
 
 // ListAssets implements the core.AssetManager interface.
 func (m *assetManagerNFS) ListAssets(ctx context.Context, res db.Resource) ([]string, error) {
-	assetType := m.parseAssetType(res.AssetType)
-
 	page := 0
 	pageSize := 1000
 	var shareIDs []string
@@ -141,9 +107,6 @@ func (m *assetManagerNFS) ListAssets(ctx context.Context, res db.Resource) ([]st
 			AllTenants: true,
 			Limit:      pageSize,
 			Offset:     page * (pageSize - 10),
-		}
-		if !assetType.AllShares {
-			opts.Metadata = map[string]string{"autoscaling_group": assetType.GroupName}
 		}
 
 		p, err := shares.ListDetail(m.Manila, opts).AllPages()
