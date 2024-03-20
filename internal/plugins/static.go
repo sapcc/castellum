@@ -38,16 +38,16 @@ type StaticAsset struct {
 	StrictMinimumSize *uint64
 	StrictMaximumSize *uint64
 
-	//When non-zero, these fields model a resize operation that will only be
-	//reflected after GetAssetStatus() has been called for as many times as
-	//indicated in the .RemainingDelay field.
+	// When non-zero, these fields model a resize operation that will only be
+	// reflected after GetAssetStatus() has been called for as many times as
+	// indicated in the .RemainingDelay field.
 	NewSize        uint64
 	RemainingDelay uint
 
-	//When true, return a bogus error from GetAssetStatus().
+	// When true, return a bogus error from GetAssetStatus().
 	CannotGetAssetStatus bool
 
-	//When true, return a core.AssetNotFoundErr from GetAssetStatus().
+	// When true, return a core.AssetNotFoundErr from GetAssetStatus().
 	CannotFindAsset bool
 }
 
@@ -71,7 +71,7 @@ func (m AssetManagerStatic) PluginTypeID() string { return "static" }
 
 // Init implements the core.AssetManager interface.
 func (m AssetManagerStatic) Init(provider core.ProviderClient) (err error) {
-	return nil //unused
+	return nil // unused
 }
 
 // InfoForAssetType implements the core.AssetManager interface.
@@ -98,10 +98,8 @@ func (m AssetManagerStatic) CheckResourceAllowed(assetType db.AssetType, scopeUU
 		if configJSON != `{"foo":"bar"}` {
 			return errors.New("wrong configuration was supplied")
 		}
-	} else {
-		if configJSON != "" {
-			return core.ErrNoConfigurationAllowed
-		}
+	} else if configJSON != "" {
+		return core.ErrNoConfigurationAllowed
 	}
 
 	if m.CheckResourceAllowedFails {
@@ -144,7 +142,7 @@ func (m AssetManagerStatic) ListAssets(_ context.Context, res db.Resource) ([]st
 	for uuid := range assets {
 		uuids = append(uuids, uuid)
 	}
-	sort.Strings(uuids) //for deterministic test behavior
+	sort.Strings(uuids) // for deterministic test behavior
 	return uuids, nil
 }
 

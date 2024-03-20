@@ -183,11 +183,12 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	err = h.DB.SelectOne(&dbPendingOp,
 		`SELECT * FROM pending_operations WHERE asset_id = $1`,
 		dbAsset.ID)
-	if errors.Is(err, sql.ErrNoRows) {
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
 		asset.PendingOperation = nil
-	} else if respondwith.ErrorText(w, err) {
+	case respondwith.ErrorText(w, err):
 		return
-	} else {
+	default:
 		op := PendingOperationFromDB(dbPendingOp, "", nil)
 		asset.PendingOperation = &op
 	}

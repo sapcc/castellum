@@ -50,7 +50,7 @@ func (c *Context) ResourceScrapingJob(registerer prometheus.Registerer) jobloop.
 	return (&jobloop.TxGuardedJob[*gorp.Transaction, db.Resource]{
 		Metadata: jobloop.JobMetadata{
 			ReadableName:    "resource scraping",
-			ConcurrencySafe: true, //because "FOR UPDATE SKIP LOCKED" is used
+			ConcurrencySafe: true, // because "FOR UPDATE SKIP LOCKED" is used
 			CounterOpts: prometheus.CounterOpts{
 				Name: "castellum_resource_scrapes",
 				Help: "Counter for resource scrape operations.",
@@ -78,13 +78,13 @@ func (c *Context) processResourceScrape(ctx context.Context, tx *gorp.Transactio
 	}
 	logg.Debug("scraping %s resource in scope %s using manager %v", res.AssetType, res.ScopeUUID, manager)
 
-	//check which assets exist in this resource in OpenStack
+	// check which assets exist in this resource in OpenStack
 	startedAt := c.TimeNow()
 	assetUUIDs, err := manager.ListAssets(ctx, res)
 	finishedAt := c.TimeNow()
 	if err != nil {
-		//In case of error we update next_scrape_at so that the next call continues
-		//but fill the error message to indicate old data
+		// In case of error we update next_scrape_at so that the next call continues
+		// but fill the error message to indicate old data
 		res.ScrapeErrorMessage = err.Error()
 		res.NextScrapeAt = c.TimeNow().Add(c.AddJitter(ResourceScrapeInterval))
 		_, dbErr := tx.Update(&res)
@@ -103,14 +103,14 @@ func (c *Context) processResourceScrape(ctx context.Context, tx *gorp.Transactio
 		isExistingAsset[uuid] = true
 	}
 
-	//load existing asset entries from DB
+	// load existing asset entries from DB
 	var dbAssets []db.Asset
 	_, err = tx.Select(&dbAssets, `SELECT * FROM assets WHERE resource_id = $1`, res.ID)
 	if err != nil {
 		return err
 	}
 
-	//cleanup asset entries for deleted assets
+	// cleanup asset entries for deleted assets
 	isAssetInDB := make(map[string]bool)
 	for _, dbAsset := range dbAssets {
 		isAssetInDB[dbAsset.UUID] = true
@@ -124,7 +124,7 @@ func (c *Context) processResourceScrape(ctx context.Context, tx *gorp.Transactio
 		}
 	}
 
-	//create entries for new assets
+	// create entries for new assets
 	for _, assetUUID := range assetUUIDs {
 		if isAssetInDB[assetUUID] {
 			continue
@@ -143,7 +143,7 @@ func (c *Context) processResourceScrape(ctx context.Context, tx *gorp.Transactio
 		}
 	}
 
-	//record successful scrape
+	// record successful scrape
 	res.ScrapeErrorMessage = ""
 	res.NextScrapeAt = finishedAt.Add(c.AddJitter(ResourceScrapeInterval))
 	res.ScrapeDurationSecs = finishedAt.Sub(startedAt).Seconds()

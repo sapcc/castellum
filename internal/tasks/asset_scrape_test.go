@@ -41,7 +41,7 @@ func runAssetScrapeTest(t test.T, action func(context.Context, *Context, func(pl
 	withContext(t, core.Config{}, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
 		scrapeJob := c.AssetScrapingJob(registry)
 
-		//asset scrape without any resources just does nothing
+		// asset scrape without any resources just does nothing
 		err := scrapeJob.ProcessOne(ctx)
 		if !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
@@ -49,7 +49,7 @@ func runAssetScrapeTest(t test.T, action func(context.Context, *Context, func(pl
 		_, dbDump := easypg.NewTracker(t.T, c.DB.Db)
 		dbDump.AssertEmpty()
 
-		//create a resource and asset to test with
+		// create a resource and asset to test with
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",
 			AssetType:                "foo",
@@ -71,7 +71,7 @@ func runAssetScrapeTest(t test.T, action func(context.Context, *Context, func(pl
 			ExpectedSize: nil,
 		}))
 
-		//setup asset with configurable size
+		// setup asset with configurable size
 		amStatic.Assets = map[string]map[string]plugins.StaticAsset{
 			"project1": {
 				"asset1": {Size: 1000, Usage: 500},
@@ -88,7 +88,7 @@ func runAssetScrapeTest(t test.T, action func(context.Context, *Context, func(pl
 func TestNoOperationWhenNoThreshold(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
-		//when no threshold is crossed, no operation gets created
+		// when no threshold is crossed, no operation gets created
 		clock.StepBy(10 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
@@ -100,13 +100,13 @@ func TestNoOperationWhenNoThreshold(baseT *testing.T) {
 func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
-		//set a maximum size that does not contradict the following operations
-		//(down below, there's a separate test for when the maximum size actually
-		//inhibits upsizing)
+		// set a maximum size that does not contradict the following operations
+		// (down below, there's a separate test for when the maximum size actually
+		// inhibits upsizing)
 		t.MustExec(c.DB, `UPDATE resources SET max_size = 2000`)
 
-		//when the "High" threshold gets crossed, a "High" operation gets created in
-		//state "created"
+		// when the "High" threshold gets crossed, a "High" operation gets created in
+		// state "created"
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 800})
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -123,17 +123,17 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
-		//another scrape while the delay is not over should not change the state
-		//(but for single-step resizing which takes the current usage into account,
-		//the NewSize is updated to put the target size outside of the high
-		//threshold again)
+		// another scrape while the delay is not over should not change the state
+		// (but for single-step resizing which takes the current usage into account,
+		// the NewSize is updated to put the target size outside of the high
+		// threshold again)
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 820})
 		t.Must(scrapeJob.ProcessOne(ctx))
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
-		//when the delay is over, the next scrape moves into state "Confirmed/Greenlit"
+		// when the delay is over, the next scrape moves into state "Confirmed/Greenlit"
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 840})
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -142,8 +142,8 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
-		//since the operation is now greenlit and can be picked up by a worker at any
-		//moment, we should not touch it anymore even if the reason disappears
+		// since the operation is now greenlit and can be picked up by a worker at any
+		// moment, we should not touch it anymore even if the reason disappears
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 780})
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -155,8 +155,8 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
-		//when the "High" threshold gets crossed, a "High" operation gets created in
-		//state "created"
+		// when the "High" threshold gets crossed, a "High" operation gets created in
+		// state "created"
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 800})
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -172,7 +172,7 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
-		//when the reason disappears within the delay, the operation is cancelled
+		// when the reason disappears within the delay, the operation is cancelled
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 790})
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -195,13 +195,13 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
-		//set a minimum size that does not contradict the following operations
-		//(down below, there's a separate test for when the minimum size actually
-		//inhibits upsizing)
+		// set a minimum size that does not contradict the following operations
+		// (down below, there's a separate test for when the minimum size actually
+		// inhibits upsizing)
 		t.MustExec(c.DB, `UPDATE resources SET min_size = 200`)
 
-		//when the "Low" threshold gets crossed, a "Low" operation gets created in
-		//state "created"
+		// when the "Low" threshold gets crossed, a "Low" operation gets created in
+		// state "created"
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 200})
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -218,17 +218,17 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
-		//another scrape while the delay is not over should not change the state
-		//(but for single-step resizing which takes the current usage into account,
-		//the NewSize is updated to put the target size above the low threshold
-		//again)
+		// another scrape while the delay is not over should not change the state
+		// (but for single-step resizing which takes the current usage into account,
+		// the NewSize is updated to put the target size above the low threshold
+		// again)
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 180})
 		t.Must(scrapeJob.ProcessOne(ctx))
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
-		//when the delay is over, the next scrape moves into state "Confirmed/Greenlit"
+		// when the delay is over, the next scrape moves into state "Confirmed/Greenlit"
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 160})
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -237,8 +237,8 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
-		//since the operation is now greenlit and can be picked up by a worker at any
-		//moment, we should not touch it anymore even if the reason disappears
+		// since the operation is now greenlit and can be picked up by a worker at any
+		// moment, we should not touch it anymore even if the reason disappears
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 220})
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -250,8 +250,8 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
-		//when the "Low" threshold gets crossed, a "Low" operation gets created in
-		//state "created"
+		// when the "Low" threshold gets crossed, a "Low" operation gets created in
+		// state "created"
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 200})
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -267,7 +267,7 @@ func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
-		//when the reason disappears within the delay, the operation is cancelled
+		// when the reason disappears within the delay, the operation is cancelled
 		clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 210})
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -289,8 +289,8 @@ func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 func TestCriticalUpsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
-		//when the "Critical" threshold gets crossed, a "Critical" operation gets
-		//created and immediately confirmed/greenlit
+		// when the "Critical" threshold gets crossed, a "Critical" operation gets
+		// created and immediately confirmed/greenlit
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 950})
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -314,8 +314,8 @@ func TestCriticalUpsizeTowardsGreenlight(baseT *testing.T) {
 func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
-		//when the "High" threshold gets crossed, a "High" operation gets created in
-		//state "created"
+		// when the "High" threshold gets crossed, a "High" operation gets created in
+		// state "created"
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 900})
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -331,9 +331,9 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 		})
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
-		//when the "Critical" threshold gets crossed while the "High" operation
-		//is not yet confirmed, the "High" operation is cancelled and a "Critical"
-		//operation replaces it
+		// when the "Critical" threshold gets crossed while the "High" operation
+		// is not yet confirmed, the "High" operation is cancelled and a "Critical"
+		// operation replaces it
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 960})
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -366,7 +366,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withContext(t, core.Config{}, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
 		scrapeJob := c.AssetScrapingJob(registry)
-		//create a resource and multiple assets to test with
+		// create a resource and multiple assets to test with
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",
 			AssetType:                "foo",
@@ -415,7 +415,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 			},
 		}
 
-		//this should scrape each asset once, in order
+		// this should scrape each asset once, in order
 		clock.StepBy(10 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
 		clock.StepBy(time.Minute)
@@ -423,7 +423,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 		clock.StepBy(time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		//so the asset table should look like this now
+		// so the asset table should look like this now
 		assets[0].NextScrapeAt = c.TimeNow().Add(3 * time.Minute)
 		assets[1].NextScrapeAt = c.TimeNow().Add(4 * time.Minute)
 		assets[2].NextScrapeAt = c.TimeNow().Add(5 * time.Minute)
@@ -432,7 +432,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 		assets[2].Usage = castellum.UsageValues{castellum.SingularUsageMetric: 530}
 		t.ExpectAssets(c.DB, assets...)
 
-		//next scrape should work identically
+		// next scrape should work identically
 		clock.StepBy(10 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
 		clock.StepBy(time.Minute)
@@ -444,7 +444,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 		assets[2].NextScrapeAt = c.TimeNow().Add(5 * time.Minute)
 		t.ExpectAssets(c.DB, assets...)
 
-		//and all of this should not have created any operations
+		// and all of this should not have created any operations
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 	})
@@ -453,7 +453,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
-		//make asset look like it just completed a resize operation
+		// make asset look like it just completed a resize operation
 		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, c.TimeNow())
 		setAsset(plugins.StaticAsset{
 			Size:           1000,
@@ -471,9 +471,9 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 			ResizedAt:    p2time(c.TimeNow()),
 		}
 
-		//first scrape will not touch anything about the asset, and also not create
-		//any operations (even though it could because of the currently high usage)
-		//because the backend does not yet reflect the changed size
+		// first scrape will not touch anything about the asset, and also not create
+		// any operations (even though it could because of the currently high usage)
+		// because the backend does not yet reflect the changed size
 		clock.StepBy(5 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
 
@@ -482,9 +482,9 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 
-		//second scrape will see the new size and update the asset accordingly, and
-		//it will also create an operation because the usage is still above 80% after
-		//the resize
+		// second scrape will see the new size and update the asset accordingly, and
+		// it will also create an operation because the usage is still above 80% after
+		// the resize
 		clock.StepBy(5 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
 
@@ -508,13 +508,13 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 }
 
 func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
-	//This is very similar to TestAssetScrapeReflectingResizeOperationWithDelay,
-	//but we simulate an unrelated user-triggered resize operation taking place
-	//in parallel with Castellum's resize operation, so we observe a new size
-	//that's different from the expected size.
+	// This is very similar to TestAssetScrapeReflectingResizeOperationWithDelay,
+	// but we simulate an unrelated user-triggered resize operation taking place
+	// in parallel with Castellum's resize operation, so we observe a new size
+	// that's different from the expected size.
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
-		//make asset look like it just completed a resize operation
+		// make asset look like it just completed a resize operation
 		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, c.TimeNow())
 		setAsset(plugins.StaticAsset{
 			Size:  1200, //!= asset.ExpectedSize (see above)
@@ -536,16 +536,16 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
 }
 
 func TestAssetScrapesGivesUpWaitingForResize(baseT *testing.T) {
-	//This is very similar to TestAssetScrapeReflectingResizeOperationWithDelay,
-	//but we simulate that the resize failed in the backend without error. After
-	//an hour, Castellum should give up waiting on the resize to complete and
-	//resume normal operation.
+	// This is very similar to TestAssetScrapeReflectingResizeOperationWithDelay,
+	// but we simulate that the resize failed in the backend without error. After
+	// an hour, Castellum should give up waiting on the resize to complete and
+	// resume normal operation.
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
-		//make asset look like it just completed a resize operation
+		// make asset look like it just completed a resize operation
 		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, c.TimeNow())
 		setAsset(plugins.StaticAsset{
-			Size:  1000, //== asset.Size (i.e. size before resize)
+			Size:  1000, // == asset.Size (i.e. size before resize)
 			Usage: 500,
 		})
 		asset := db.Asset{
@@ -566,7 +566,7 @@ func TestAssetScrapesGivesUpWaitingForResize(baseT *testing.T) {
 		t.ExpectAssets(c.DB, asset)
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 
-		//after an hour, the scrape gives up waiting for the resize and resumes as normal
+		// after an hour, the scrape gives up waiting for the resize and resumes as normal
 		clock.StepBy(1 * time.Hour)
 		t.Must(scrapeJob.ProcessOne(ctx))
 
@@ -579,12 +579,12 @@ func TestAssetScrapesGivesUpWaitingForResize(baseT *testing.T) {
 }
 
 func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
-	//This tests the behavior when GetAssetStatus returns an error:
-	//1. If core.AssetNotFoundErr is returned then the asset is deleted from
-	//the db.
-	//2. All other errors are passed through to the caller of ScrapeNextAsset,
-	//but the asset's next_scrape_at timestamp is still updated to ensure that
-	//the main loop progresses to the next asset.
+	// This tests the behavior when GetAssetStatus returns an error:
+	// 1. If core.AssetNotFoundErr is returned then the asset is deleted from
+	// the db.
+	// 2. All other errors are passed through to the caller of ScrapeNextAsset,
+	// but the asset's next_scrape_at timestamp is still updated to ensure that
+	// the main loop progresses to the next asset.
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		setAsset(plugins.StaticAsset{
@@ -607,15 +607,15 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 			ResourceID:         1,
 			UUID:               "asset1",
 			Size:               1000,
-			Usage:              castellum.UsageValues{castellum.SingularUsageMetric: 500}, //changed usage not observed because of error
+			Usage:              castellum.UsageValues{castellum.SingularUsageMetric: 500}, // changed usage not observed because of error
 			NextScrapeAt:       c.TimeNow().Add(5 * time.Minute),
 			ExpectedSize:       nil,
 			ScrapeErrorMessage: "GetAssetStatus failing as requested",
 			NeverScraped:       true,
 		})
 
-		//when GetAssetStatus starts working again, next ScrapeNextAsset should clear
-		//the error field
+		// when GetAssetStatus starts working again, next ScrapeNextAsset should clear
+		// the error field
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 600})
 		clock.StepBy(5 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -633,8 +633,8 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 		})
 
 		//Note: this test should be at the end, see below.
-		//Run GetAssetStatus on the same asset again except this time the
-		//ScrapeNextAsset should delete the asset from the db.
+		// Run GetAssetStatus on the same asset again except this time the
+		// ScrapeNextAsset should delete the asset from the db.
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 600, CannotFindAsset: true})
 		clock.StepBy(5 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -645,7 +645,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
-		//create a "High" operation
+		// create a "High" operation
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 900})
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -662,13 +662,13 @@ func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
-		//while it is not greenlit yet, simulate a resize operation
-		//being performed by an unrelated user
+		// while it is not greenlit yet, simulate a resize operation
+		// being performed by an unrelated user
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1100, Usage: 900}) // bigger, but still >80% usage
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		//ScrapeNextAsset should have adjusted the NewSize to CurrentSize + SizeStep
+		// ScrapeNextAsset should have adjusted the NewSize to CurrentSize + SizeStep
 		expectedOp.NewSize = 1320
 		t.ExpectPendingOperations(c.DB, expectedOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)

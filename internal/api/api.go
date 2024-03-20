@@ -47,7 +47,7 @@ type handler struct {
 	Validator gopherpolicy.Validator
 	Provider  core.ProviderClient
 
-	//dependency injection slots (filled with doubles in tests)
+	// dependency injection slots (filled with doubles in tests)
 	TimeNow func() time.Time
 }
 
@@ -136,13 +136,13 @@ func respondWithNotFound(w http.ResponseWriter) {
 }
 
 func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *gopherpolicy.Token) {
-	//for endpoints requiring the `project_id` variable, check that it's not empty
+	// for endpoints requiring the `project_id` variable, check that it's not empty
 	projectUUID, projectScoped := mux.Vars(r)["project_id"]
 	if projectScoped && projectUUID == "" {
 		respondWithNotFound(w)
 		return "", nil
 	}
-	//other endpoints might have a project ID in the `project` query argument instead
+	// other endpoints might have a project ID in the `project` query argument instead
 	if !projectScoped {
 		if id := r.URL.Query().Get("project"); id != "" {
 			projectScoped = true
@@ -151,16 +151,16 @@ func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *go
 	}
 
 	token := h.Validator.CheckToken(r)
-	//all project-scoped endpoints require the user to have access to the
-	//selected project
+	// all project-scoped endpoints require the user to have access to the
+	// selected project
 	if projectScoped {
 		projectExists, err := h.SetTokenToProjectScope(token, projectUUID)
 		if respondwith.ErrorText(w, err) || !token.Require(w, "project:access") {
 			return "", nil
 		}
 
-		//only report 404 after having checked access rules, otherwise we might leak
-		//information about which projects exist to unauthorized users
+		// only report 404 after having checked access rules, otherwise we might leak
+		// information about which projects exist to unauthorized users
 		if !projectExists {
 			respondWithNotFound(w)
 			return "", nil
@@ -209,7 +209,7 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 	}
 	manager, _ := h.Team.ForAssetType(assetType)
 	if manager == nil {
-		//only report resources when we have an asset manager configured
+		// only report resources when we have an asset manager configured
 		respondWithNotFound(w)
 		return nil
 	}

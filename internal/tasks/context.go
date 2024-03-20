@@ -35,8 +35,8 @@ type Context struct {
 	Team           core.AssetManagerTeam
 	ProviderClient core.ProviderClient
 
-	//dependency injection slots (usually filled by ApplyDefaults(), but filled
-	//with doubles in tests)
+	// dependency injection slots (usually filled by ApplyDefaults(), but filled
+	// with doubles in tests)
 	TimeNow   func() time.Time
 	AddJitter func(time.Duration) time.Duration
 }

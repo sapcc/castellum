@@ -21,7 +21,7 @@ package db
 // SQLMigrations must be public because it's also used by tests.
 var SQLMigrations = map[string]string{
 	//NOTE: Migrations 1 through 21 have been rolled up into one at 2024-02-26
-	//to better represent the current baseline of the DB schema.
+	// to better represent the current baseline of the DB schema.
 	"021_rollup.down.sql": `
 		DROP TABLE resources;
 		DROP TABLE assets;

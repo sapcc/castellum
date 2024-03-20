@@ -62,14 +62,14 @@ func (c MockProviderClient) GetDomain(domainID string) (*core.CachedDomain, erro
 func (c MockProviderClient) FindProjectID(projectName, projectDomainName string) (string, error) {
 	domainID := c.findDomainID(projectDomainName)
 	if domainID == "" {
-		return "", nil //no such project
+		return "", nil // no such project
 	}
 	for projectID, project := range c.Projects {
 		if project.Name == projectName && project.DomainID == domainID {
 			return projectID, nil
 		}
 	}
-	return "", nil //no such project
+	return "", nil // no such project
 }
 
 func (c MockProviderClient) findDomainID(domainName string) string {
@@ -78,5 +78,5 @@ func (c MockProviderClient) findDomainID(domainName string) string {
 			return domainID
 		}
 	}
-	return "" //no such domain
+	return "" // no such domain
 }

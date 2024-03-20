@@ -38,8 +38,8 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 		testCommonEndpointBehavior(t, hh, mv,
 			"/v1/projects/%s/resources/%s/operations/pending")
 
-		//start-data.sql contains no pending operations
-		mv.Enforcer.Forbid("project:edit:foo") //this should not be an issue
+		// start-data.sql contains no pending operations
+		mv.Enforcer.Forbid("project:edit:foo") // this should not be an issue
 		response := []assert.JSONObject{}
 		req := assert.HTTPRequest{
 			Method:       "GET",
@@ -49,7 +49,7 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 		}
 		req.Check(t.T, hh)
 
-		//check rendering of a pending operation in state "created"
+		// check rendering of a pending operation in state "created"
 		pendingOp := db.PendingOperation{
 			AssetID:   1,
 			Reason:    castellum.OperationReasonHigh,
@@ -77,14 +77,14 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 		}
 		req.Check(t.T, hh)
 
-		//check rendering of a pending operation in state "confirmed"
+		// check rendering of a pending operation in state "confirmed"
 		pendingOp.ConfirmedAt = p2time(time.Unix(22, 0).UTC())
 		t.MustUpdate(h.DB, &pendingOp)
 		pendingOpJSON["state"] = "confirmed"
 		pendingOpJSON["confirmed"] = assert.JSONObject{"at": 22}
 		req.Check(t.T, hh)
 
-		//check rendering of a pending operation in state "greenlit"
+		// check rendering of a pending operation in state "greenlit"
 		pendingOp.GreenlitAt = p2time(time.Unix(23, 0).UTC())
 		t.MustUpdate(h.DB, &pendingOp)
 		pendingOpJSON["state"] = "greenlit"
@@ -96,13 +96,13 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 		pendingOpJSON["greenlit"] = assert.JSONObject{"at": 23, "by_user": "user1"}
 		req.Check(t.T, hh)
 
-		//check querying by domain
+		// check querying by domain
 		req.Path = "/v1/operations/pending?domain=domain1"
 		req.Check(t.T, hh)
 		req.Path = "/v1/operations/pending?domain=domain1&asset-type=foo"
 		req.Check(t.T, hh)
 
-		//check queries with URL arguments where nothing matches
+		// check queries with URL arguments where nothing matches
 		req.ExpectStatus = http.StatusNotFound
 		req.ExpectBody = nil
 		req.Path = "/v1/operations/pending?domain=unknown"
@@ -115,10 +115,10 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 }
 
 func withEitherFailedOrErroredOperation(action func(castellum.OperationOutcome)) {
-	//start-data.sql has a FinishedOperation with outcome "errored". This helper
-	//function enables us to re-run tests concerning this "errored" operation with
-	//its outcome changed to "failed", to check that "failed" behaves like
-	//"errored" for the operations report endpoints.
+	// start-data.sql has a FinishedOperation with outcome "errored". This helper
+	// function enables us to re-run tests concerning this "errored" operation with
+	// its outcome changed to "failed", to check that "failed" behaves like
+	// "errored" for the operations report endpoints.
 	action(castellum.OperationOutcomeErrored)
 	action(castellum.OperationOutcomeFailed)
 }
@@ -134,11 +134,11 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 				failedOperationOutcome, castellum.OperationOutcomeErrored,
 			)
 
-			//start-data.sql has a recently failed critical operation for fooasset1, but
-			//it will not be shown because fooasset1 does not have critical usage levels
-			//anymore
+			// start-data.sql has a recently failed critical operation for fooasset1, but
+			// it will not be shown because fooasset1 does not have critical usage levels
+			// anymore
 			expectedOps := []assert.JSONObject{}
-			mv.Enforcer.Forbid("project:edit:foo") //this should not be an issue
+			mv.Enforcer.Forbid("project:edit:foo") // this should not be an issue
 			assert.HTTPRequest{
 				Method:       "GET",
 				Path:         "/v1/projects/project1/resources/foo/operations/recently-failed",
@@ -146,8 +146,8 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 				ExpectBody:   assert.JSONObject{"recently_failed_operations": expectedOps},
 			}.Check(t.T, hh)
 
-			//to make the recently-failed operation appear, move fooasset1 back to
-			//critical usage levels
+			// to make the recently-failed operation appear, move fooasset1 back to
+			// critical usage levels
 			t.MustExec(h.DB, `UPDATE resources SET critical_threshold_percent = 95 WHERE id = 1`)
 			t.MustExec(h.DB, `UPDATE assets SET usage = $1 WHERE id = $2`,
 				castellum.UsageValues{castellum.SingularUsageMetric: 0.97 * 1024},
@@ -183,8 +183,8 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 				ExpectBody:   assert.JSONObject{"recently_failed_operations": expectedOps},
 			}.Check(t.T, hh)
 
-			//operation should NOT disappear when there is a pending operation that has
-			//not yet finished
+			// operation should NOT disappear when there is a pending operation that has
+			// not yet finished
 			t.Must(h.DB.Insert(&db.PendingOperation{
 				AssetID:   1,
 				Reason:    castellum.OperationReasonHigh,
@@ -200,8 +200,8 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 				ExpectBody:   assert.JSONObject{"recently_failed_operations": expectedOps},
 			}.Check(t.T, hh)
 
-			//operation should disappear when there is a non-failed operation that
-			//finished after the failed one
+			// operation should disappear when there is a non-failed operation that
+			// finished after the failed one
 			t.Must(h.DB.Insert(&db.FinishedOperation{
 				AssetID:     1,
 				Reason:      castellum.OperationReasonHigh,
@@ -223,13 +223,13 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 			}
 			req.Check(t.T, hh)
 
-			//check querying by domain
+			// check querying by domain
 			req.Path = "/v1/operations/recently-failed?domain=domain1"
 			req.Check(t.T, hh)
 			req.Path = "/v1/operations/recently-failed?domain=domain1&asset-type=foo"
 			req.Check(t.T, hh)
 
-			//check queries with URL arguments where nothing matches
+			// check queries with URL arguments where nothing matches
 			req.ExpectStatus = http.StatusNotFound
 			req.ExpectBody = nil
 			req.Path = "/v1/operations/recently-failed?domain=unknown"
@@ -256,10 +256,10 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 				failedOperationOutcome, castellum.OperationOutcomeErrored,
 			)
 
-			//start-data.sql has a succeeded operation, but also a failed/errored one on the same
-			//asset after that, so we should not see anything yet
+			// start-data.sql has a succeeded operation, but also a failed/errored one on the same
+			// asset after that, so we should not see anything yet
 			expectedOps := []assert.JSONObject{}
-			mv.Enforcer.Forbid("project:edit:foo") //this should not be an issue
+			mv.Enforcer.Forbid("project:edit:foo") // this should not be an issue
 			assert.HTTPRequest{
 				Method:       "GET",
 				Path:         "/v1/projects/project1/resources/foo/operations/recently-succeeded",
@@ -267,7 +267,7 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 				ExpectBody:   assert.JSONObject{"recently_succeeded_operations": expectedOps},
 			}.Check(t.T, hh)
 
-			//make the failed operation a cancelled one to surface the succeeded operation
+			// make the failed operation a cancelled one to surface the succeeded operation
 			t.MustExec(h.DB, `UPDATE finished_operations SET outcome = $1 WHERE outcome = $2`,
 				castellum.OperationOutcomeCancelled, failedOperationOutcome,
 			)
@@ -301,8 +301,8 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 				ExpectBody:   assert.JSONObject{"recently_succeeded_operations": expectedOps},
 			}.Check(t.T, hh)
 
-			//operation should NOT disappear when there is a pending operation that has
-			//not yet finished
+			// operation should NOT disappear when there is a pending operation that has
+			// not yet finished
 			t.Must(h.DB.Insert(&db.PendingOperation{
 				AssetID:   1,
 				Reason:    castellum.OperationReasonHigh,
@@ -319,13 +319,13 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 			}
 			req.Check(t.T, hh)
 
-			//check querying by domain
+			// check querying by domain
 			req.Path = "/v1/operations/recently-succeeded?domain=domain1"
 			req.Check(t.T, hh)
 			req.Path = "/v1/operations/recently-succeeded?domain=domain1&asset-type=foo"
 			req.Check(t.T, hh)
 
-			//check queries with URL arguments where nothing matches
+			// check queries with URL arguments where nothing matches
 			req.ExpectStatus = http.StatusNotFound
 			req.ExpectBody = nil
 			req.Path = "/v1/operations/recently-succeeded?domain=unknown"
@@ -335,7 +335,7 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 			req.Path = "/v1/operations/recently-succeeded?domain=domain1&asset-type=unknown"
 			req.Check(t.T, hh)
 
-			//check with shortened max-age
+			// check with shortened max-age
 			assert.HTTPRequest{
 				Method:       "GET",
 				Path:         "/v1/projects/project1/resources/foo/operations/recently-succeeded?max-age=10m",

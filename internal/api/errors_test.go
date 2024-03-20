@@ -35,7 +35,7 @@ import (
 func TestGetResourceScrapeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
-		//endpoint requires a token with cluster access
+		// endpoint requires a token with cluster access
 		mv.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
 			Method:       "GET",
@@ -44,7 +44,7 @@ func TestGetResourceScrapeErrors(baseT *testing.T) {
 		}.Check(t.T, hh)
 		mv.Enforcer.Allow("cluster:access")
 
-		//happy path
+		// happy path
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/admin/resource-scrape-errors",
@@ -76,7 +76,7 @@ func TestGetResourceScrapeErrors(baseT *testing.T) {
 func TestGetAssetScrapeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
-		//endpoint requires a token with cluster access
+		// endpoint requires a token with cluster access
 		mv.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
 			Method:       "GET",
@@ -109,7 +109,7 @@ func TestGetAssetScrapeErrors(baseT *testing.T) {
 func TestGetAssetResizeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
-		//endpoint requires a token with cluster access
+		// endpoint requires a token with cluster access
 		mv.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
 			Method:       "GET",
@@ -118,7 +118,7 @@ func TestGetAssetResizeErrors(baseT *testing.T) {
 		}.Check(t.T, hh)
 		mv.Enforcer.Allow("cluster:access")
 
-		//check that the "errored" resize operation is rendered properly
+		// check that the "errored" resize operation is rendered properly
 		req := assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/admin/asset-resize-errors",
@@ -142,8 +142,8 @@ func TestGetAssetResizeErrors(baseT *testing.T) {
 		}
 		req.Check(t.T, hh)
 
-		//add a new operation on the same asset that results with outcome
-		//"succeeded" and check that we get an empty list
+		// add a new operation on the same asset that results with outcome
+		// "succeeded" and check that we get an empty list
 		t.Must(h.DB.Insert(&db.FinishedOperation{
 			AssetID:     1,
 			Reason:      castellum.OperationReasonCritical,

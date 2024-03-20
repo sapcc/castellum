@@ -34,7 +34,7 @@ import (
 func withContext(t test.T, cfg core.Config, action func(context.Context, *Context, *plugins.AssetManagerStatic, *mock.Clock, *prometheus.Registry)) {
 	t.WithDB(nil, func(dbi *gorp.DbMap) {
 		amStatic := &plugins.AssetManagerStatic{AssetType: "foo"}
-		//clock starts at an easily recognizable value
+		// clock starts at an easily recognizable value
 		clock := mock.NewClock()
 		clock.StepBy(99990 * time.Second)
 		registry := prometheus.NewPedanticRegistry()

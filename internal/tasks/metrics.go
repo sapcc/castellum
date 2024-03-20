@@ -64,18 +64,18 @@ func (c StateMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 
 func (c StateMetricsCollector) doCollect(ch chan<- prometheus.Metric) error {
 	//NOTE: I use NewConstMetric() instead of storing the values in the GaugeVec
-	//instances,
+	// instances,
 	//
-	//1. because it is faster.
-	//2. because this automatically handles deleted resources correctly.
+	// 1. because it is faster.
+	// 2. because this automatically handles deleted resources correctly.
 	//   (Their metrics just disappear when Prometheus scrapes next time.)
 
-	//fetch Descs for all metrics
+	// fetch Descs for all metrics
 	descCh := make(chan *prometheus.Desc, 1)
 	projectResourceExistsGauge.Describe(descCh)
 	projectResourceExistsDesc := <-descCh
 
-	//fetch values
+	// fetch values
 	err := sqlext.ForeachRow(c.Context.DB, resourceStateQuery, nil, func(rows *sql.Rows) error {
 		var (
 			scopeUUID string

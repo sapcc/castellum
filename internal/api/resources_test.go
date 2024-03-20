@@ -78,7 +78,7 @@ var (
 func TestGetProject(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
-		//endpoint requires a token with project access
+		// endpoint requires a token with project access
 		mv.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
 			Method:       "GET",
@@ -87,7 +87,7 @@ func TestGetProject(baseT *testing.T) {
 		}.Check(t.T, hh)
 		mv.Enforcer.Allow("project:access")
 
-		//expect empty result for project with no resources
+		// expect empty result for project with no resources
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/projects/project2",
@@ -97,7 +97,7 @@ func TestGetProject(baseT *testing.T) {
 			},
 		}.Check(t.T, hh)
 
-		//expect non-empty result for project with resources
+		// expect non-empty result for project with resources
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/projects/project1",
@@ -110,9 +110,9 @@ func TestGetProject(baseT *testing.T) {
 			},
 		}.Check(t.T, hh)
 
-		//expect partial result when user is not allowed to view certain resources
+		// expect partial result when user is not allowed to view certain resources
 		mv.Enforcer.Forbid("project:show:bar")
-		mv.Enforcer.Forbid("project:edit:foo") //this should not be an issue
+		mv.Enforcer.Forbid("project:edit:foo") // this should not be an issue
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/projects/project1",
@@ -129,7 +129,7 @@ func TestGetProject(baseT *testing.T) {
 func TestGetResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
-		//endpoint requires a token with project access
+		// endpoint requires a token with project access
 		mv.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
 			Method:       "GET",
@@ -138,7 +138,7 @@ func TestGetResource(baseT *testing.T) {
 		}.Check(t.T, hh)
 		mv.Enforcer.Allow("project:access")
 
-		//expect error for unknown project or resource
+		// expect error for unknown project or resource
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/projects/project2/resources/foo",
@@ -150,15 +150,15 @@ func TestGetResource(baseT *testing.T) {
 			ExpectStatus: http.StatusNotFound,
 		}.Check(t.T, hh)
 
-		//the "unknown" resource exists, but it should be 404 regardless because we
-		//don't have an asset manager for it
+		// the "unknown" resource exists, but it should be 404 regardless because we
+		// don't have an asset manager for it
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/projects/project1/resources/unknown",
 			ExpectStatus: http.StatusNotFound,
 		}.Check(t.T, hh)
 
-		//expect error for inaccessible resource
+		// expect error for inaccessible resource
 		mv.Enforcer.Forbid("project:show:foo")
 		assert.HTTPRequest{
 			Method:       "GET",
@@ -167,8 +167,8 @@ func TestGetResource(baseT *testing.T) {
 		}.Check(t.T, hh)
 		mv.Enforcer.Allow("project:show:foo")
 
-		//happy path
-		mv.Enforcer.Forbid("project:edit:foo") //this should not be an issue
+		// happy path
+		mv.Enforcer.Forbid("project:edit:foo") // this should not be an issue
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/projects/project1/resources/foo",
@@ -193,8 +193,8 @@ func TestPutResource(baseT *testing.T) {
 		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
 		tr0.Ignore()
 
-		//mostly like `initialFooResourceJSON`, but with some delays changed and
-		//single-step resizing instead of percentage-based resizing
+		// mostly like `initialFooResourceJSON`, but with some delays changed and
+		// single-step resizing instead of percentage-based resizing
 		newFooResourceJSON1 := assert.JSONObject{
 			"low_threshold": assert.JSONObject{
 				"usage_percent": 20,
@@ -209,7 +209,7 @@ func TestPutResource(baseT *testing.T) {
 			},
 		}
 
-		//endpoint requires a token with project access
+		// endpoint requires a token with project access
 		mv.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
 			Method:       "PUT",
@@ -219,7 +219,7 @@ func TestPutResource(baseT *testing.T) {
 		}.Check(t.T, hh)
 		mv.Enforcer.Allow("project:access")
 
-		//expect error for unknown resource
+		// expect error for unknown resource
 		assert.HTTPRequest{
 			Method:       "PUT",
 			Path:         "/v1/projects/project1/resources/doesnotexist",
@@ -227,8 +227,8 @@ func TestPutResource(baseT *testing.T) {
 			ExpectStatus: http.StatusNotFound,
 		}.Check(t.T, hh)
 
-		//the "unknown" resource exists, but it should be 404 regardless because we
-		//don't have an asset manager for it
+		// the "unknown" resource exists, but it should be 404 regardless because we
+		// don't have an asset manager for it
 		assert.HTTPRequest{
 			Method:       "PUT",
 			Path:         "/v1/projects/project1/resources/unknown",
@@ -236,7 +236,7 @@ func TestPutResource(baseT *testing.T) {
 			ExpectStatus: http.StatusNotFound,
 		}.Check(t.T, hh)
 
-		//expect error for inaccessible resource
+		// expect error for inaccessible resource
 		mv.Enforcer.Forbid("project:show:foo")
 		assert.HTTPRequest{
 			Method:       "PUT",
@@ -255,7 +255,7 @@ func TestPutResource(baseT *testing.T) {
 		}.Check(t.T, hh)
 		mv.Enforcer.Allow("project:edit:foo")
 
-		//expect error when CheckResourceAllowed fails
+		// expect error when CheckResourceAllowed fails
 		m, _ := h.Team.ForAssetType("foo")
 		m.(*plugins.AssetManagerStatic).CheckResourceAllowedFails = true
 		assert.HTTPRequest{
@@ -267,10 +267,10 @@ func TestPutResource(baseT *testing.T) {
 		}.Check(t.T, hh)
 		m.(*plugins.AssetManagerStatic).CheckResourceAllowedFails = false
 
-		//since all tests above were error cases, expect the DB to be unchanged
+		// since all tests above were error cases, expect the DB to be unchanged
 		tr.DBChanges().AssertEmpty()
 
-		//happy path
+		// happy path
 		assert.HTTPRequest{
 			Method:       "PUT",
 			Path:         "/v1/projects/project1/resources/foo",
@@ -278,12 +278,12 @@ func TestPutResource(baseT *testing.T) {
 			ExpectStatus: http.StatusAccepted,
 		}.Check(t.T, hh)
 
-		//expect the resource to have been updated
+		// expect the resource to have been updated
 		tr.DBChanges().AssertEqualf(`
 			UPDATE resources SET low_delay_seconds = 1800, high_delay_seconds = 900, size_step_percent = 0, single_step = TRUE WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 		`)
 
-		//test disabling low and high thresholds, and enabling critical threshold
+		// test disabling low and high thresholds, and enabling critical threshold
 		newFooResourceJSON2 := assert.JSONObject{
 			"critical_threshold": assert.JSONObject{
 				"usage_percent": 98,
@@ -305,7 +305,7 @@ func TestPutResource(baseT *testing.T) {
 			UPDATE resources SET low_threshold_percent = '{"singular":0}', low_delay_seconds = 0, high_threshold_percent = '{"singular":0}', high_delay_seconds = 0, critical_threshold_percent = '{"singular":98}', size_step_percent = 15, min_free_size = 23, single_step = FALSE WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 		`)
 
-		//test enabling low and high thresholds, and disabling critical threshold
+		// test enabling low and high thresholds, and disabling critical threshold
 		assert.HTTPRequest{
 			Method:       "PUT",
 			Path:         "/v1/projects/project1/resources/foo",
@@ -316,7 +316,7 @@ func TestPutResource(baseT *testing.T) {
 			UPDATE resources SET low_threshold_percent = '{"singular":20}', low_delay_seconds = 1800, high_threshold_percent = '{"singular":80}', high_delay_seconds = 900, critical_threshold_percent = '{"singular":0}', size_step_percent = 0, min_free_size = NULL, single_step = TRUE WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 		`)
 
-		//test creating a new resource from scratch (rather than updating an existing one)
+		// test creating a new resource from scratch (rather than updating an existing one)
 		assert.HTTPRequest{
 			Method:       "PUT",
 			Path:         "/v1/projects/project3/resources/foo",
@@ -327,7 +327,7 @@ func TestPutResource(baseT *testing.T) {
 			INSERT INTO resources (id, scope_uuid, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_free_size, domain_uuid, next_scrape_at) VALUES (5, 'project3', 'foo', '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":98}', 15, 23, 'domain1', 0);
 		`)
 
-		//test setting constraints
+		// test setting constraints
 		newFooResourceJSON3 := assert.JSONObject{
 			"critical_threshold": assert.JSONObject{
 				"usage_percent": 98,
@@ -336,9 +336,9 @@ func TestPutResource(baseT *testing.T) {
 				"percent": 15,
 			},
 			"size_constraints": assert.JSONObject{
-				"minimum":      0, //gets normalized into NULL
+				"minimum":      0, // gets normalized into NULL
 				"maximum":      42000,
-				"minimum_free": 0, //gets normalized into NULL
+				"minimum_free": 0, // gets normalized into NULL
 			},
 		}
 		assert.HTTPRequest{
@@ -348,7 +348,7 @@ func TestPutResource(baseT *testing.T) {
 			ExpectStatus: http.StatusAccepted,
 		}.Check(t.T, hh)
 
-		//expect the resource to have been updated
+		// expect the resource to have been updated
 		tr.DBChanges().AssertEqualf(`
 			UPDATE resources SET low_threshold_percent = '{"singular":0}', low_delay_seconds = 0, high_threshold_percent = '{"singular":0}', high_delay_seconds = 0, critical_threshold_percent = '{"singular":98}', size_step_percent = 15, max_size = 42000, single_step = FALSE WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 		`)
@@ -561,7 +561,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 			"cannot create qux resource because there is a foo resource",
 		)
 
-		//none of this should have touched the DB
+		// none of this should have touched the DB
 		tr.DBChanges().AssertEmpty()
 	})
 }
@@ -572,7 +572,7 @@ func TestDeleteResource(baseT *testing.T) {
 		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
 		tr0.Ignore()
 
-		//endpoint requires a token with project access
+		// endpoint requires a token with project access
 		mv.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
 			Method:       "DELETE",
@@ -581,7 +581,7 @@ func TestDeleteResource(baseT *testing.T) {
 		}.Check(t.T, hh)
 		mv.Enforcer.Allow("project:access")
 
-		//expect error for unknown project or resource
+		// expect error for unknown project or resource
 		assert.HTTPRequest{
 			Method:       "DELETE",
 			Path:         "/v1/projects/project2/resources/foo",
@@ -593,15 +593,15 @@ func TestDeleteResource(baseT *testing.T) {
 			ExpectStatus: http.StatusNotFound,
 		}.Check(t.T, hh)
 
-		//the "unknown" resource exists, but it should be 404 regardless because we
-		//don't have an asset manager for it
+		// the "unknown" resource exists, but it should be 404 regardless because we
+		// don't have an asset manager for it
 		assert.HTTPRequest{
 			Method:       "DELETE",
 			Path:         "/v1/projects/project1/resources/unknown",
 			ExpectStatus: http.StatusNotFound,
 		}.Check(t.T, hh)
 
-		//expect error for inaccessible resource
+		// expect error for inaccessible resource
 		mv.Enforcer.Forbid("project:show:foo")
 		assert.HTTPRequest{
 			Method:       "DELETE",
@@ -618,17 +618,17 @@ func TestDeleteResource(baseT *testing.T) {
 		}.Check(t.T, hh)
 		mv.Enforcer.Allow("project:edit:foo")
 
-		//since all tests above were error cases, expect all resources to still be there
+		// since all tests above were error cases, expect all resources to still be there
 		tr.DBChanges().AssertEmpty()
 
-		//happy path
+		// happy path
 		assert.HTTPRequest{
 			Method:       "DELETE",
 			Path:         "/v1/projects/project1/resources/foo",
 			ExpectStatus: http.StatusNoContent,
 		}.Check(t.T, hh)
 
-		//expect this resource and its assets to be gone
+		// expect this resource and its assets to be gone
 		tr.DBChanges().AssertEqualf(`
 			DELETE FROM assets WHERE id = 1 AND resource_id = 1 AND uuid = 'fooasset1';
 			DELETE FROM assets WHERE id = 2 AND resource_id = 1 AND uuid = 'fooasset2';
@@ -641,7 +641,7 @@ func TestDeleteResource(baseT *testing.T) {
 }
 
 func TestSeedBlocksResourceUpdates(baseT *testing.T) {
-	//this seed matches what we have in fixtures/start-data.sql
+	// this seed matches what we have in fixtures/start-data.sql
 	cfg := core.Config{
 		ProjectSeeds: []core.ProjectSeed{{
 			ProjectName: "First Project",
@@ -670,7 +670,7 @@ func TestSeedBlocksResourceUpdates(baseT *testing.T) {
 	clock.StepBy(time.Hour)
 
 	withHandler(t, cfg, clock.Now, func(_ *handler, hh http.Handler, _ *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
-		//cannot PUT an existing resource defined by the seed
+		// cannot PUT an existing resource defined by the seed
 		assert.HTTPRequest{
 			Method:       "PUT",
 			Path:         "/v1/projects/project1/resources/foo",
@@ -678,7 +678,7 @@ func TestSeedBlocksResourceUpdates(baseT *testing.T) {
 			ExpectStatus: http.StatusConflict,
 		}.Check(t.T, hh)
 
-		//cannot DELETE an existing resource defined by the seed
+		// cannot DELETE an existing resource defined by the seed
 		assert.HTTPRequest{
 			Method:       "DELETE",
 			Path:         "/v1/projects/project1/resources/foo",
@@ -686,7 +686,7 @@ func TestSeedBlocksResourceUpdates(baseT *testing.T) {
 			ExpectStatus: http.StatusConflict,
 		}.Check(t.T, hh)
 
-		//cannot PUT a missing resource disabled by the seed
+		// cannot PUT a missing resource disabled by the seed
 		assert.HTTPRequest{
 			Method:       "PUT",
 			Path:         "/v1/projects/project1/resources/qux",
@@ -694,7 +694,7 @@ func TestSeedBlocksResourceUpdates(baseT *testing.T) {
 			ExpectStatus: http.StatusConflict,
 		}.Check(t.T, hh)
 
-		//cannot DELETE a missing resource disabled by the seed
+		// cannot DELETE a missing resource disabled by the seed
 		assert.HTTPRequest{
 			Method:       "PUT",
 			Path:         "/v1/projects/project1/resources/qux",

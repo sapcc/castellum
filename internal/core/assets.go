@@ -90,13 +90,13 @@ func (e AssetNotFoundErr) Error() string {
 }
 
 var (
-	//ErrNoConfigurationAllowed is returned by AssetManager.CheckResourceAllowed()
-	//when the user has given configuration, but the asset type in question does
-	//not accept any configuration.
+	// ErrNoConfigurationAllowed is returned by AssetManager.CheckResourceAllowed()
+	// when the user has given configuration, but the asset type in question does
+	// not accept any configuration.
 	ErrNoConfigurationAllowed = errors.New("no configuration allowed for this asset type")
-	//ErrNoConfigurationProvided is returned by
-	//AssetManager.CheckResourceAllowed() when the user has not given
-	//configuration, but the asset type in question requires configuration.
+	// ErrNoConfigurationProvided is returned by
+	// AssetManager.CheckResourceAllowed() when the user has not given
+	// configuration, but the asset type in question requires configuration.
 	ErrNoConfigurationProvided = errors.New("type-specific configuration must be provided for this asset type")
 )
 
@@ -107,38 +107,38 @@ var (
 type AssetManager interface {
 	pluggable.Plugin
 
-	//Init is called before all other interface methods, and can be used by the
-	//AssetManager to receive a reference to the ProviderClient, as well as
-	//perform any first-time initialization.
+	// Init is called before all other interface methods, and can be used by the
+	// AssetManager to receive a reference to the ProviderClient, as well as
+	// perform any first-time initialization.
 	//
-	//The supplied ProviderClient should be stored inside the AssetManager
-	//instance for later usage and/or used to query OpenStack capabilities.
+	// The supplied ProviderClient should be stored inside the AssetManager
+	// instance for later usage and/or used to query OpenStack capabilities.
 	Init(provider ProviderClient) error
 
-	//If this asset type is supported by this asset manager, return information
-	//about it. Otherwise return nil.
+	// If this asset type is supported by this asset manager, return information
+	// about it. Otherwise return nil.
 	InfoForAssetType(assetType db.AssetType) *AssetTypeInfo
 
-	//A non-nil return value makes the API deny any attempts to create a resource
-	//with that scope and asset type with that error.
+	// A non-nil return value makes the API deny any attempts to create a resource
+	// with that scope and asset type with that error.
 	//
-	//This can perform multiple types of validations:
+	// This can perform multiple types of validations:
 	//- allowing resources for some scopes, but not others (e.g. only projects
 	//  with a specific marker)
 	//- validating plugin-specific configuration in `configJSON`
 	//- allowing resources depending on which other resources exist in the same
-	//scope, by checking `existingResources`
+	// scope, by checking `existingResources`
 	//
-	//Simple implementations should return nil for empty `configJSON` and
-	//`core.ErrNoConfigurationAllowed` otherwise.
+	// Simple implementations should return nil for empty `configJSON` and
+	// `core.ErrNoConfigurationAllowed` otherwise.
 	CheckResourceAllowed(assetType db.AssetType, scopeUUID string, configJSON string, existingResources map[db.AssetType]struct{}) error
 
 	ListAssets(ctx context.Context, res db.Resource) ([]string, error)
-	//The returned Outcome should be either Succeeded, Failed or Errored, but not Cancelled.
-	//The returned error should be nil if and only if the outcome is Succeeded.
+	// The returned Outcome should be either Succeeded, Failed or Errored, but not Cancelled.
+	// The returned error should be nil if and only if the outcome is Succeeded.
 	SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error)
-	//previousStatus will be nil when this function is called for the first time
-	//for the given asset.
+	// previousStatus will be nil when this function is called for the first time
+	// for the given asset.
 	GetAssetStatus(ctx context.Context, res db.Resource, assetUUID string, previousStatus *AssetStatus) (AssetStatus, error)
 }
 
@@ -177,7 +177,7 @@ func (team AssetManagerTeam) ForAssetType(assetType db.AssetType) (AssetManager,
 		}
 	}
 	return nil, AssetTypeInfo{
-		//provide a reasonable fallback for AssetTypeInfo
+		// provide a reasonable fallback for AssetTypeInfo
 		AssetType:    assetType,
 		UsageMetrics: []castellum.UsageMetric{castellum.SingularUsageMetric},
 	}

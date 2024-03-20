@@ -57,7 +57,7 @@ func (m *assetManagerNFS) Init(provider core.ProviderClient) (err error) {
 	if err != nil {
 		return err
 	}
-	m.Manila.Microversion = "2.64" //for "force" field on .Extend(), requires Manila at least on Xena
+	m.Manila.Microversion = "2.64" // for "force" field on .Extend(), requires Manila at least on Xena
 
 	promClient, err := promquery.ConfigFromEnv("CASTELLUM_NFS_PROMETHEUS").Connect()
 	if err != nil {
@@ -91,8 +91,8 @@ func (m *assetManagerNFS) CheckResourceAllowed(assetType db.AssetType, scopeUUID
 
 // ListAssets implements the core.AssetManager interface.
 func (m *assetManagerNFS) ListAssets(ctx context.Context, res db.Resource) ([]string, error) {
-	//shares are discovered via Prometheus metrics since that is way faster than
-	//going through the Manila API
+	// shares are discovered via Prometheus metrics since that is way faster than
+	// going through the Manila API
 	vector, err := m.Discovery.GetVector(fmt.Sprintf(
 		`count by (id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error",snapmirror!="1"})`,
 		res.ScopeUUID,
@@ -105,7 +105,7 @@ func (m *assetManagerNFS) ListAssets(ctx context.Context, res db.Resource) ([]st
 	for _, sample := range vector {
 		shareID := string(sample.Metric["id"])
 
-		//evaluate exclusion rules based on Prometheus metrics
+		// evaluate exclusion rules based on Prometheus metrics
 		metrics, err := m.ShareMetrics.Get(manilaShareMetricsKey{
 			ProjectUUID: res.ScopeUUID,
 			ShareUUID:   shareID,
@@ -135,25 +135,25 @@ func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSiz
 	if err != nil {
 		match := sizeInconsistencyErrorRx.FindStringSubmatch(err.Error())
 		if match != nil {
-			//ignore idiotic complaints about the share already having the size we
-			//want to resize to
+			// ignore idiotic complaints about the share already having the size we
+			// want to resize to
 			if match[1] == match[2] {
 				return castellum.OperationOutcomeSucceeded, nil
 			}
 
-			//We only rely on sizes reported by NetApp. But bugs in the Manila API may
-			//cause it to have a different expectation of how big the share is, therefore
-			//rejecting shrink/extend requests because it thinks they go in the wrong
-			//direction. In this case, we try the opposite direction to see if it helps.
+			// We only rely on sizes reported by NetApp. But bugs in the Manila API may
+			// cause it to have a different expectation of how big the share is, therefore
+			// rejecting shrink/extend requests because it thinks they go in the wrong
+			// direction. In this case, we try the opposite direction to see if it helps.
 			err2 := m.resize(assetUUID, oldSize, newSize /* useReverseOperation = */, true)
 			if err2 == nil {
 				return castellum.OperationOutcomeSucceeded, nil
 			}
-			//If not successful, still return the original error (to avoid confusion).
+			// If not successful, still return the original error (to avoid confusion).
 		}
 
-		//If the resize fails because of missing quota or because the share is in
-		//status "error", it's the user's fault, not ours.
+		// If the resize fails because of missing quota or because the share is in
+		// status "error", it's the user's fault, not ours.
 		if quotaErrorRx.MatchString(err.Error()) || shareStatusErrorRx.MatchString(err.Error()) {
 			return castellum.OperationOutcomeFailed, err
 		}
@@ -174,7 +174,7 @@ func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useR
 
 // GetAssetStatus implements the core.AssetManager interface.
 func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
-	//query Prometheus metrics for size and usage
+	// query Prometheus metrics for size and usage
 	metrics, err := m.ShareMetrics.Get(manilaShareMetricsKey{
 		ProjectUUID: res.ScopeUUID,
 		ShareUUID:   assetUUID,
@@ -183,11 +183,11 @@ func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, a
 		return core.AssetStatus{}, err
 	}
 	if metrics.ExclusionReason != "" {
-		//defense in depth: this share should already have been ignored during ListAssets
+		// defense in depth: this share should already have been ignored during ListAssets
 		return core.AssetStatus{}, core.AssetNotFoundErr{InnerError: fmt.Errorf("ignoring because of %s", metrics.ExclusionReason)}
 	}
 
-	//if there are no metrics for this share, we can check Manila to see if the share was deleted in the meantime
+	// if there are no metrics for this share, we can check Manila to see if the share was deleted in the meantime
 	if metrics.SizeGiB == nil || metrics.UsedGiB == nil {
 		_, err := shares.Get(m.Manila, assetUUID).Extract()
 		if errext.IsOfType[gophercloud.ErrDefault404](err) {
@@ -203,8 +203,8 @@ func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, a
 		Usage:             castellum.UsageValues{castellum.SingularUsageMetric: *metrics.UsedGiB},
 	}
 
-	//when size has changed compared to last time, double-check with the Manila
-	//API (this call is expensive, so we only do it when really necessary)
+	// when size has changed compared to last time, double-check with the Manila
+	// API (this call is expensive, so we only do it when really necessary)
 	if previousStatus == nil || previousStatus.Size != status.Size {
 		share, err := shares.Get(m.Manila, assetUUID).Extract()
 		if err != nil {

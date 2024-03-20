@@ -44,7 +44,7 @@ func (t T) WithDB(fixtureFile *string, action func(dbi *gorp.DbMap)) {
 		t.FailNow()
 	}
 
-	//reset the DB contents and populate with initial resources if requested
+	// reset the DB contents and populate with initial resources if requested
 	easypg.ClearTables(t.T, dbi.Db, "resources", "assets", "pending_operations", "finished_operations")
 	if fixtureFile != nil {
 		easypg.ExecSQLFile(t.T, dbi.Db, *fixtureFile)

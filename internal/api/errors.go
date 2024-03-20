@@ -143,9 +143,9 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 	assetResizeErrs := []castellum.AssetResizeError{}
 	for _, res := range dbResources {
 		var ops []db.FinishedOperation
-		//We only care about assets that are still problematic.
-		//So we want to skip "errored" operations where a more recent operation
-		//on the same asset finished as "succeeded", "cancelled", or "failed".
+		// We only care about assets that are still problematic.
+		// So we want to skip "errored" operations where a more recent operation
+		// on the same asset finished as "succeeded", "cancelled", or "failed".
 		_, err := h.DB.Select(&ops, `
 			WITH latest_finished_operations AS (
 				SELECT DISTINCT ON (asset_id) o.* FROM finished_operations o
@@ -165,7 +165,7 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 			projectID = res.ScopeUUID
 		}
 
-		//find asset UUIDs
+		// find asset UUIDs
 		assetUUIDs, err := h.getAssetUUIDMap(res)
 		if respondwith.ErrorText(w, err) {
 			return

@@ -52,14 +52,14 @@ import (
 )
 
 const (
-	//ServerDeletionTimeout is how long the "server-groups" asset manager will
-	//wait for servers to be deleted before reporting an error.
+	// ServerDeletionTimeout is how long the "server-groups" asset manager will
+	// wait for servers to be deleted before reporting an error.
 	ServerDeletionTimeout = 3 * time.Minute
-	//ServerCreationTimeout is how long the "server-groups" asset manager will
-	//wait for new servers to go into state ACTIVE before reporting an error.
+	// ServerCreationTimeout is how long the "server-groups" asset manager will
+	// wait for new servers to go into state ACTIVE before reporting an error.
 	ServerCreationTimeout = 5 * time.Minute
-	//ServerPollInterval is how often servers are polled during state transitions
-	//when the desired state has not been reached yet.
+	// ServerPollInterval is how often servers are polled during state transitions
+	// when the desired state has not been reached yet.
 	ServerPollInterval = 10 * time.Second
 )
 
@@ -118,7 +118,7 @@ func (m *assetManagerServerGroups) InfoForAssetType(assetType db.AssetType) *cor
 
 // CheckResourceAllowed implements the core.AssetManager interface.
 func (m *assetManagerServerGroups) CheckResourceAllowed(assetType db.AssetType, scopeUUID, configJSON string, existingResources map[db.AssetType]struct{}) error {
-	//check that the server group exists and is in the right project
+	// check that the server group exists and is in the right project
 	groupID := strings.TrimPrefix(string(assetType), "server-group:")
 	group, err := m.getServerGroup(groupID)
 	if errext.IsOfType[gophercloud.ErrDefault404](err) || (err == nil && group.ProjectID != scopeUUID) {
@@ -128,7 +128,7 @@ func (m *assetManagerServerGroups) CheckResourceAllowed(assetType db.AssetType, 
 		return err
 	}
 
-	//check that the config is valid
+	// check that the config is valid
 	_, err = m.parseAndValidateConfig(configJSON)
 	return err
 }
@@ -152,26 +152,26 @@ func (m *assetManagerServerGroups) GetAssetStatus(_ context.Context, res db.Reso
 		return core.AssetStatus{}, fmt.Errorf("cannot GET server group: %w", err)
 	}
 
-	//check instance status
+	// check instance status
 	isNewServer := make(map[string]bool)
 	for _, serverID := range group.Members {
 		server, err := servers.Get(computeV2, serverID).Extract()
 		if err != nil {
 			return core.AssetStatus{}, fmt.Errorf("cannot inspect server %s: %w", serverID, err)
 		}
-		//if any instance is not in a running state, that's a huge red flag and we
-		//should not attempt any autoscaling until all servers are back into a
-		//running state
+		// if any instance is not in a running state, that's a huge red flag and we
+		// should not attempt any autoscaling until all servers are back into a
+		// running state
 		if server.Status == "ERROR" || server.Status == "SHUTOFF" {
 			return core.AssetStatus{}, fmt.Errorf("server %s is in status %s", serverID, server.Status)
 		}
-		//for new servers, we will be more lenient wrt metric availability
+		// for new servers, we will be more lenient wrt metric availability
 		if time.Since(server.Created) < 10*time.Minute {
 			isNewServer[server.ID] = true
 		}
 	}
 
-	//get usage values for all servers
+	// get usage values for all servers
 	result := core.AssetStatus{
 		Size:  uint64(len(group.Members)),
 		Usage: make(castellum.UsageValues),
@@ -181,13 +181,13 @@ func (m *assetManagerServerGroups) GetAssetStatus(_ context.Context, res db.Reso
 	}
 	for _, serverID := range group.Members {
 		for metric, queryTemplate := range serverUsageQueries {
-			queryStr := strings.Replace(queryTemplate, "${ID}", serverID, -1)
+			queryStr := strings.ReplaceAll(queryTemplate, "${ID}", serverID)
 			value, err := m.Prometheus.GetSingleValue(queryStr, nil)
 			if promquery.IsErrNoRows(err) && isNewServer[serverID] {
-				//within a few minutes of instance creation, it's not a hard error if
-				//the vrops metric has not showed up in Prometheus yet; we'll just
-				//assume zero usage for now, which should be okay since downscaling
-				//usually has a delay of way more than those few minutes
+				// within a few minutes of instance creation, it's not a hard error if
+				// the vrops metric has not showed up in Prometheus yet; we'll just
+				// assume zero usage for now, which should be okay since downscaling
+				// usually has a delay of way more than those few minutes
 				value = 0
 			} else if err != nil {
 				return core.AssetStatus{}, err
@@ -209,13 +209,13 @@ func (m *assetManagerServerGroups) GetAssetStatus(_ context.Context, res db.Reso
 func (m *assetManagerServerGroups) SetAssetSize(res db.Resource, assetUUID string, _, newSize uint64) (castellum.OperationOutcome, error) {
 	cfg, err := m.parseAndValidateConfig(res.ConfigJSON)
 	if err != nil {
-		//if validation fails here, we should not have accepted the configuration
-		//in the first place; so this is really a problem with the application
-		//("errored") instead of the user's fault ("failed")
+		// if validation fails here, we should not have accepted the configuration
+		// in the first place; so this is really a problem with the application
+		// ("errored") instead of the user's fault ("failed")
 		return castellum.OperationOutcomeErrored, err
 	}
 
-	//double-check actual `oldSize` by counting current group members
+	// double-check actual `oldSize` by counting current group members
 	groupID := strings.TrimPrefix(string(res.AssetType), "server-group:")
 	group, err := m.getServerGroup(groupID)
 	if err != nil {
@@ -223,7 +223,7 @@ func (m *assetManagerServerGroups) SetAssetSize(res db.Resource, assetUUID strin
 	}
 	oldSize := uint64(len(group.Members))
 
-	//perform server creations/deletions
+	// perform server creations/deletions
 	if oldSize > newSize {
 		return m.terminateServers(res, cfg, group, oldSize-newSize)
 	}
@@ -231,7 +231,7 @@ func (m *assetManagerServerGroups) SetAssetSize(res db.Resource, assetUUID strin
 		return m.createServers(res, cfg, group, newSize-oldSize)
 	}
 
-	//nothing to do (should be unreachable in practice since we would not get called at all when `oldSize == newSize`)
+	// nothing to do (should be unreachable in practice since we would not get called at all when `oldSize == newSize`)
 	return castellum.OperationOutcomeSucceeded, nil
 }
 
@@ -252,7 +252,7 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 		return castellum.OperationOutcomeErrored, err
 	}
 
-	//get creation timestamps for all servers in this group
+	// get creation timestamps for all servers in this group
 	var allServers []*servers.Server
 	for _, serverID := range group.Members {
 		server, err := servers.Get(computeV2, serverID).Extract()
@@ -262,24 +262,24 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 		allServers = append(allServers, server)
 	}
 
-	//sort servers such that those that we want to delete are in front
+	// sort servers such that those that we want to delete are in front
 	if cfg.DeleteNewestFirst {
-		//The non-default behavior is to terminate the newest servers. This has
-		//been requested by customers who prefer to keep their old servers because
-		//they're tried and true.
+		// The non-default behavior is to terminate the newest servers. This has
+		// been requested by customers who prefer to keep their old servers because
+		// they're tried and true.
 		sort.Slice(allServers, func(i, j int) bool {
 			return allServers[i].Created.After(allServers[j].Created)
 		})
 	} else {
-		//The default behavior is to terminate the oldest servers. This enables the
-		//user to roll out config changes by updating the resource config, scaling
-		//up to make new servers, then scaling down to remove the old servers.
+		// The default behavior is to terminate the oldest servers. This enables the
+		// user to roll out config changes by updating the resource config, scaling
+		// up to make new servers, then scaling down to remove the old servers.
 		sort.Slice(allServers, func(i, j int) bool {
 			return allServers[i].Created.Before(allServers[j].Created)
 		})
 	}
 
-	//delete oldest servers
+	// delete oldest servers
 	serversInDeletion := make(map[string]string)
 	for idx := 0; uint64(idx) < countToDelete && idx < len(allServers); idx++ {
 		server := allServers[idx]
@@ -292,7 +292,7 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 			}
 		}
 		if len(cfg.LoadbalancerPoolMemberships) > 0 {
-			//give some extra time for the server to answer its last outstanding client requests
+			// give some extra time for the server to answer its last outstanding client requests
 			time.Sleep(5 * time.Second)
 		}
 		err := servers.Delete(computeV2, server.ID).ExtractErr()
@@ -302,12 +302,12 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 		serversInDeletion[server.ID] = server.Status
 	}
 
-	//wait for servers to be deleted
+	// wait for servers to be deleted
 	start := time.Now()
 	for len(serversInDeletion) > 0 {
 		time.Sleep(ServerPollInterval)
 
-		//error if servers are still deleting after timeout
+		// error if servers are still deleting after timeout
 		if time.Since(start) > ServerDeletionTimeout {
 			var msgs []string
 			for serverID, status := range serversInDeletion {
@@ -317,19 +317,19 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 			return castellum.OperationOutcomeErrored, fmt.Errorf("timeout waiting for server deletion in %s: %s", res.AssetType, strings.Join(msgs, ", "))
 		}
 
-		//check if servers are still there
+		// check if servers are still there
 		logg.Info("checking on %d servers being deleted...", len(serversInDeletion))
 		for serverID := range serversInDeletion {
 			server, err := servers.Get(computeV2, serverID).Extract()
 			if errext.IsOfType[gophercloud.ErrDefault404](err) {
-				//server has disappeared - stop waiting for it
+				// server has disappeared - stop waiting for it
 				delete(serversInDeletion, serverID)
 				continue
 			}
 			if err != nil {
 				return castellum.OperationOutcomeErrored, fmt.Errorf("cannot inspect deleted server %s in %s: %w", serverID, res.AssetType, err)
 			}
-			//note down changes in server status (we may want to use these for the timeout error message)
+			// note down changes in server status (we may want to use these for the timeout error message)
 			serversInDeletion[server.ID] = server.Status
 		}
 	}
@@ -375,7 +375,7 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 		return Classify(err)
 	}
 
-	//build creation request template
+	// build creation request template
 	var networkOpts []servers.Network
 	for _, net := range cfg.Template.Networks {
 		networkOpts = append(networkOpts, servers.Network{UUID: net.UUID, Tag: net.Tag})
@@ -410,7 +410,7 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 		return opts
 	}
 
-	//create servers
+	// create servers
 	serversInCreation := make(map[string]string)
 	for idx := 0; uint64(idx) < countToCreate; idx++ {
 		name := fmt.Sprintf("%s-%s", group.Name, makeNameDisambiguator())
@@ -423,13 +423,13 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 		serversInCreation[server.ID] = server.Status
 	}
 
-	//wait for servers to get into ACTIVE
+	// wait for servers to get into ACTIVE
 	start := time.Now()
-	var msgs []string //accumulates all errors during the following loop
+	var msgs []string // accumulates all errors during the following loop
 	for len(serversInCreation) > 0 {
 		time.Sleep(ServerPollInterval)
 
-		//error if servers are still creating after timeout
+		// error if servers are still creating after timeout
 		if time.Since(start) > ServerCreationTimeout {
 			for serverID, status := range serversInCreation {
 				msgs = append(msgs, fmt.Sprintf("server %s has not reached status ACTIVE (currently in status %q)", serverID, status))
@@ -437,22 +437,22 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 			break
 		}
 
-		//check if servers have progressed
+		// check if servers have progressed
 		logg.Info("checking on %d servers being created...", len(serversInCreation))
 		for serverID := range serversInCreation {
 			server, err := servers.Get(computeV2, serverID).Extract()
 			if errext.IsOfType[gophercloud.ErrDefault404](err) {
-				//server has disappeared - complain, and stop checking for it
+				// server has disappeared - complain, and stop checking for it
 				msgs = append(msgs, fmt.Sprintf("server %s has disappeared before going into ACTIVE", serverID))
 				delete(serversInCreation, serverID)
 				continue
 			}
 			if err != nil {
-				//This is not a fatal error. There can always be short API outages and
-				//such; that should not make the entire resize fail. Most such errors
-				//are caught with a retry logic on the level of ExecuteNextResize(),
-				//but this is one instance where we have it inside of SetAssetSize()
-				//since it would not helpful to restart the entire SetAssetSize().
+				// This is not a fatal error. There can always be short API outages and
+				// such; that should not make the entire resize fail. Most such errors
+				// are caught with a retry logic on the level of ExecuteNextResize(),
+				// but this is one instance where we have it inside of SetAssetSize()
+				// since it would not helpful to restart the entire SetAssetSize().
 				logg.Error("could not check status for created server %s in %s: %s", serverID, res.AssetType, err.Error())
 				continue
 			}
@@ -471,7 +471,7 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 				msgs = append(msgs, fmt.Sprintf("server %s has entered status ERROR with message %q", serverID, server.Fault.Code))
 				delete(serversInCreation, serverID)
 			default:
-				//keep waiting for this server to get into ACTIVE (or ERROR)
+				// keep waiting for this server to get into ACTIVE (or ERROR)
 			}
 		}
 	}
@@ -484,17 +484,17 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 }
 
 func makeNameDisambiguator() string {
-	//5 bytes of data encode to exactly 8 base32 characters without padding
+	// 5 bytes of data encode to exactly 8 base32 characters without padding
 	var buf [5]byte
-	_ = must.Return(rand.Read(buf[:])) //ignores result value (number of bytes read)
+	_ = must.Return(rand.Read(buf[:])) // ignores result value (number of bytes read)
 	return base32.StdEncoding.EncodeToString(buf[:])
 }
 
 func (m *assetManagerServerGroups) findServerIPForLoadbalancer(server *servers.Server, _ configForLBPoolMembership) (string, error) {
 	//TODO: We should probably check that the IP address is from a subnet that
-	//the LB can actually reach. For now, I'll just assume that the user will
-	//only configure one private network on the auto-created instances, which
-	//means that there is no question which IP to choose.
+	// the LB can actually reach. For now, I'll just assume that the user will
+	// only configure one private network on the auto-created instances, which
+	// means that there is no question which IP to choose.
 	for _, entry := range server.Addresses {
 		addrInfos, ok := entry.([]any)
 		if ok {
@@ -624,7 +624,7 @@ func (m *assetManagerServerGroups) parseAndValidateConfig(configJSON string) (co
 				idx, strings.Join(validBDMSourceTypes, `", "`))
 		}
 		if bd.DestinationType == "" {
-			//this is acceptable apparently
+			// this is acceptable apparently
 		} else if !containsString(validBDMDestinationTypes, string(bd.DestinationType)) {
 			complain("value for template.block_device_mapping_v2[%d].destination_type must be one of: %q",
 				idx, strings.Join(validBDMDestinationTypes, `", "`))
@@ -694,7 +694,7 @@ type serverGroup struct {
 	ID        string   `json:"id"`
 	Name      string   `json:"name"`
 	Members   []string `json:"members"`
-	ProjectID string   `json:"project_id"` //not in Gophercloud (TODO)
+	ProjectID string   `json:"project_id"` // not in Gophercloud (TODO)
 }
 
 func (m *assetManagerServerGroups) getServerGroup(id string) (serverGroup, error) {
@@ -702,7 +702,7 @@ func (m *assetManagerServerGroups) getServerGroup(id string) (serverGroup, error
 	if err != nil {
 		return serverGroup{}, err
 	}
-	computeV2.Microversion = "2.13" //for ProjectID attribute on server group
+	computeV2.Microversion = "2.13" // for ProjectID attribute on server group
 
 	var data struct {
 		ServerGroup serverGroup `json:"server_group"`
@@ -754,28 +754,28 @@ func (m *assetManagerServerGroups) resolveFlavorIntoID(computeV2 *gophercloud.Se
 }
 
 func (m *assetManagerServerGroups) pullKeypairFromBarbican(computeV2, keymgrV1 *gophercloud.ServiceClient, secretID string) (string, error) {
-	//check if present in Nova already
+	// check if present in Nova already
 	nameInNova := "from-barbican-" + secretID
 	_, err := keypairs.Get(computeV2, nameInNova, nil).Extract()
 	switch {
 	case err == nil:
-		//keypair exists -> nothing to do
+		// keypair exists -> nothing to do
 		return nameInNova, nil
 	case errext.IsOfType[gophercloud.ErrDefault404](err):
-		//keypair does not exist -> pull from Barbican below
+		// keypair does not exist -> pull from Barbican below
 		break
 	default:
-		//unexpected error
+		// unexpected error
 		return "", nil
 	}
 
-	//keypair does not exist -> pull from Barbican
+	// keypair does not exist -> pull from Barbican
 	payload, err := secrets.GetPayload(keymgrV1, secretID, nil).Extract()
 	if err != nil {
-		//This is not guaranteed to be a UserError, but the most common errors are
-		//going to be 401 Forbidden (the secret was created as private and cannot
-		//be read by our service user) and 404 Not Found (the wrong ID was given or
-		//the secret was deleted in the meantime).
+		// This is not guaranteed to be a UserError, but the most common errors are
+		// going to be 401 Forbidden (the secret was created as private and cannot
+		// be read by our service user) and 404 Not Found (the wrong ID was given or
+		// the secret was deleted in the meantime).
 		return "", UserError{fmt.Errorf("cannot get public key from Barbican: %w", err)}
 	}
 	_, err = keypairs.Create(computeV2, keypairs.CreateOpts{Name: nameInNova, PublicKey: string(payload)}).Extract()

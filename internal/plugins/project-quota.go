@@ -72,7 +72,7 @@ func (m *assetManagerProjectQuota) Init(provider core.ProviderClient) (err error
 		return err
 	}
 
-	//get project ID where we're authenticated (see below for why)
+	// get project ID where we're authenticated (see below for why)
 	var (
 		currentProjectID       string
 		currentProjectDomainID string
@@ -89,7 +89,7 @@ func (m *assetManagerProjectQuota) Init(provider core.ProviderClient) (err error
 		return fmt.Errorf("cannot extract project ID from %t", provider.GetAuthResult())
 	}
 
-	//list all resources that exist, by looking at the current project
+	// list all resources that exist, by looking at the current project
 	report, err := projects.Get(m.Limes, currentProjectDomainID, currentProjectID, nil).Extract()
 	if err != nil {
 		return fmt.Errorf("could not get project report for %s", currentProjectID)
@@ -153,7 +153,7 @@ func (m *assetManagerProjectQuota) CheckResourceAllowed(assetType db.AssetType, 
 
 // ListAssets implements the core.AssetManager interface.
 func (m *assetManagerProjectQuota) ListAssets(_ context.Context, res db.Resource) ([]string, error) {
-	//see notes on type declaration above
+	// see notes on type declaration above
 	return []string{res.ScopeUUID}, nil
 }
 

@@ -38,8 +38,8 @@ func TestCollectGarbage(baseT *testing.T) {
 	withContext(t, core.Config{}, func(_ context.Context, c *Context, _ *plugins.AssetManagerStatic, _ *mock.Clock, _ *prometheus.Registry) {
 		fakeNow := time.Unix(0, 0).UTC()
 
-		//setup some minimal scaffolding (we can only insert finished_operations
-		//with valid asset IDs into the DB)
+		// setup some minimal scaffolding (we can only insert finished_operations
+		// with valid asset IDs into the DB)
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID: "project1",
 			AssetType: "foo",

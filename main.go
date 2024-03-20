@@ -58,7 +58,7 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/tasks"
 
-	//load asset managers
+	// load asset managers
 	_ "github.com/sapcc/castellum/internal/plugins"
 )
 
@@ -83,10 +83,10 @@ func main() {
 	defer undoMaxprocs()
 
 	wrap := httpext.WrapTransport(&http.DefaultTransport)
-	wrap.SetInsecureSkipVerify(osext.GetenvBool("CASTELLUM_INSECURE")) //for debugging with mitmproxy etc. (DO NOT SET IN PRODUCTION)
+	wrap.SetInsecureSkipVerify(osext.GetenvBool("CASTELLUM_INSECURE")) // for debugging with mitmproxy etc. (DO NOT SET IN PRODUCTION)
 	wrap.SetOverrideUserAgent(bininfo.Component(), bininfo.VersionOr("rolling"))
 
-	//initialize DB connection
+	// initialize DB connection
 	dbURL := must.Return(easypg.URLFrom(easypg.URLParts{
 		HostName:          osext.GetenvOrDefault("CASTELLUM_DB_HOSTNAME", "localhost"),
 		Port:              osext.GetenvOrDefault("CASTELLUM_DB_PORT", "5432"),
@@ -98,14 +98,14 @@ func main() {
 	dbi := must.Return(db.Init(dbURL))
 	prometheus.MustRegister(sqlstats.NewStatsCollector("castellum", dbi.Db))
 
-	//initialize OpenStack connection
+	// initialize OpenStack connection
 	ao, err := clientconfig.AuthOptions(nil)
 	if err != nil {
 		logg.Fatal("cannot find OpenStack credentials: " + err.Error())
 	}
 	ao.AllowReauth = true
 	providerClient, err := core.NewProviderClient(*ao, gophercloud.EndpointOpts{
-		//note that empty values are acceptable in both fields
+		// note that empty values are acceptable in both fields
 		Region:       os.Getenv("OS_REGION_NAME"),
 		Availability: gophercloud.Availability(os.Getenv("OS_INTERFACE")),
 	})
@@ -113,10 +113,10 @@ func main() {
 		logg.Fatal("cannot connect to OpenStack: " + err.Error())
 	}
 
-	//get max asset sizes
+	// get max asset sizes
 	cfg := must.Return(core.LoadConfig(configPath))
 
-	//initialize asset managers
+	// initialize asset managers
 	team := must.Return(core.CreateAssetManagers(
 		strings.Split(osext.MustGetenv("CASTELLUM_ASSET_MANAGERS"), ","),
 		providerClient,
@@ -167,7 +167,7 @@ func runAPI(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provid
 	}
 	must.Succeed(tv.LoadPolicyFile(osext.MustGetenv("CASTELLUM_OSLO_POLICY_PATH")))
 
-	//wrap the main API handler in several layers of middleware
+	// wrap the main API handler in several layers of middleware
 	corsMiddleware := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{"HEAD", "GET", "POST", "PUT", "DELETE"},
@@ -183,7 +183,7 @@ func runAPI(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provid
 	mux.Handle("/", handler)
 	mux.Handle("/metrics", promhttp.Handler())
 
-	//Start audit logging.
+	// Start audit logging.
 	rabbitQueueName := os.Getenv("CASTELLUM_RABBITMQ_QUEUE_NAME")
 	if rabbitQueueName != "" {
 		username := osext.GetenvOrDefault("CASTELLUM_RABBITMQ_USERNAME", "guest")
@@ -216,15 +216,15 @@ func runObserver(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, p
 	c.ApplyDefaults()
 	prometheus.MustRegister(tasks.StateMetricsCollector{Context: c})
 
-	//The observer process has a budget of 16 DB connections. Since there are
-	//much more assets than resources, we give most of these (12 of 16) to asset
-	//scraping. The rest is split between resource scrape and garbage collection.
+	// The observer process has a budget of 16 DB connections. Since there are
+	// much more assets than resources, we give most of these (12 of 16) to asset
+	// scraping. The rest is split between resource scrape and garbage collection.
 	go c.AssetScrapingJob(nil).Run(ctx, jobloop.NumGoroutines(12))
 	go c.ResourceScrapingJob(nil).Run(ctx, jobloop.NumGoroutines(3))
 	go c.ResourceSeedingJob(nil).Run(ctx)
 	go c.GarbageCollectionJob(nil).Run(ctx)
 
-	//use main goroutine to emit Prometheus metrics
+	// use main goroutine to emit Prometheus metrics
 	handler := httpapi.Compose(
 		httpapi.HealthCheckAPI{SkipRequestLog: true},
 		pprofapi.API{IsAuthorized: pprofapi.IsRequestFromLocalhost},
@@ -244,12 +244,12 @@ func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr strin
 	c := tasks.Context{DB: dbi, Team: team}
 	c.ApplyDefaults()
 
-	//The worker process has a budget of 16 DB connections. We need one of that
-	//for polling, the rest can go towards resizing workers. Therefore, 12 resize
-	//workers is a safe number that even leaves some headroom for future tasks.
+	// The worker process has a budget of 16 DB connections. We need one of that
+	// for polling, the rest can go towards resizing workers. Therefore, 12 resize
+	// workers is a safe number that even leaves some headroom for future tasks.
 	go c.AssetResizingJob(nil).Run(ctx, jobloop.NumGoroutines(12))
 
-	//use main goroutine to emit Prometheus metrics
+	// use main goroutine to emit Prometheus metrics
 	handler := httpapi.Compose(
 		httpapi.HealthCheckAPI{SkipRequestLog: true},
 		pprofapi.API{IsAuthorized: pprofapi.IsRequestFromLocalhost},
@@ -281,7 +281,7 @@ func runAssetTypeTestShell(ctx context.Context, team core.AssetManagerTeam, asse
 	eof := false
 PROMPT:
 	for !eof {
-		//show prompt
+		// show prompt
 		os.Stdout.Write([]byte("> "))
 		input, err := stdin.ReadString('\n')
 		eof = err == io.EOF

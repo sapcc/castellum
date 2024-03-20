@@ -104,7 +104,7 @@ type scalingEventTarget struct {
 	action            cadf.Action
 	projectID         string
 	resourceType      string
-	attachmentContent targetAttachmentContent //only used for enable/update action events
+	attachmentContent targetAttachmentContent // only used for enable/update action events
 }
 
 func (t scalingEventTarget) Render() cadf.Resource {
@@ -126,11 +126,11 @@ type targetAttachmentContent struct {
 
 // MarshalJSON implements the json.Marshaler interface.
 func (a targetAttachmentContent) MarshalJSON() ([]byte, error) {
-	//copy resource data into a struct that does not have a custom MarshalJSON
+	// copy resource data into a struct that does not have a custom MarshalJSON
 	data := a.resource
 
-	//Hermes does not accept a JSON object at target.attachments[].content, so
-	//we need to wrap the marshaled JSON into a JSON string
+	// Hermes does not accept a JSON object at target.attachments[].content, so
+	// we need to wrap the marshaled JSON into a JSON string
 	bytes, err := json.Marshal(data)
 	if err != nil {
 		return nil, err

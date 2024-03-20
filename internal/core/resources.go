@@ -123,7 +123,7 @@ func checkThresholdCommon(info AssetTypeInfo, tType string, vals castellum.Usage
 	for metric := range vals {
 		providedMetrics = append(providedMetrics, string(metric))
 	}
-	sort.Strings(providedMetrics) //for deterministic order of error messages in unit test
+	sort.Strings(providedMetrics) // for deterministic order of error messages in unit test
 	for _, metric := range providedMetrics {
 		if !isMetric[castellum.UsageMetric(metric)] {
 			errs.Addf("%s threshold specified for metric %q which is not valid for this asset type", tType, metric)

@@ -31,7 +31,7 @@ import (
 )
 
 func TestGetEligibleOperations(t *testing.T) {
-	//define some shorthands for use in this test
+	// define some shorthands for use in this test
 	check := func(resLogicStr string, assetStatusStr string, expectedWithPercentageStep string, expectedWithSingleStep string) {
 		t.Helper()
 		resLogic := mustParseResourceLogic(t, resLogicStr)
@@ -49,234 +49,234 @@ func TestGetEligibleOperations(t *testing.T) {
 		)
 	}
 
-	//if no threshold is crossed, do not do anything
+	// if no threshold is crossed, do not do anything
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
 		"size=1000, usage=500",
-		"", "", //no operations are generated
+		"", "", // no operations are generated
 	)
 
-	//if thresholds are crossed, resizes will be suggested
+	// if thresholds are crossed, resizes will be suggested
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
-		"size=1000, usage=200", //exactly at low
+		"size=1000, usage=200", // exactly at low
 		"low->800", "low->999",
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
-		"size=1000, usage=160", //clearly below low
+		"size=1000, usage=160", // clearly below low
 		"low->800", "low->799",
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
-		"size=1000, usage=800", //exactly at high
+		"size=1000, usage=800", // exactly at high
 		"high->1200", "high->1001",
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
-		"size=1000, usage=840", //clearly above high
+		"size=1000, usage=840", // clearly above high
 		"high->1200", "high->1051",
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
-		"size=1000, usage=950", //exactly at critical
+		"size=1000, usage=950", // exactly at critical
 		"critical->1200",
-		//In single-step resizing, critical resize also moves out of the high threshold.
+		// In single-step resizing, critical resize also moves out of the high threshold.
 		"critical->1188",
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
-		"size=1000, usage=990", //clearly above critical
+		"size=1000, usage=990", // clearly above critical
 		"critical->1200", "critical->1238",
 	)
 
-	//critical resize can take multiple steps at once
+	// critical resize can take multiple steps at once
 	check(
 		"crit=95%, step=1%",
 		"size=1380, usage=1350",
-		//Percentage-step resizing will take four steps at once here (1380 -> 1393 -> 1406 -> 1420 -> 1434).
+		// Percentage-step resizing will take four steps at once here (1380 -> 1393 -> 1406 -> 1420 -> 1434).
 		//
-		//This example is manufactured specifically such that the step size changes
-		//between steps, to validate that a new step size is calculated each time,
-		//same as if multiple steps had been taken in successive operations.
+		// This example is manufactured specifically such that the step size changes
+		// between steps, to validate that a new step size is calculated each time,
+		// same as if multiple steps had been taken in successive operations.
 		//
 		//NOTE: This testcase used to require a target size of 1420, but that was wrong.
-		//A size of 1420 would lead to 95% usage (or rather, 95.07%) which is still
-		//above the critical threshold.
+		// A size of 1420 would lead to 95% usage (or rather, 95.07%) which is still
+		// above the critical threshold.
 		"critical->1434",
-		//Single-step resizing will move just beyond the critical threshold.
+		// Single-step resizing will move just beyond the critical threshold.
 		"critical->1422",
 	)
 
-	//resize in one direction should not go into a threshold on the opposite side
+	// resize in one direction should not go into a threshold on the opposite side
 	check(
 		"low=75%, high=80%, crit=95%, step=20%",
 		"size=1000, usage=700",
-		//Single-step resizing targets just above the low threshold and thus does
-		//not come near the high threshold, but percentage-step resizing would
-		//(if it ignored the high threshold) go down to size 800 which is too far.
+		// Single-step resizing targets just above the low threshold and thus does
+		// not come near the high threshold, but percentage-step resizing would
+		// (if it ignored the high threshold) go down to size 800 which is too far.
 		"low->876", "low->933",
 	)
 	check(
 		"low=90%, crit=95%, step=20%",
 		"size=1000, usage=800",
-		//Same as above, but this time we're bounded by the critical threshold.
+		// Same as above, but this time we're bounded by the critical threshold.
 		"low->843", "low->888",
 	)
 	check(
 		"low=20%, high=22%, crit=95%, step=20%",
 		"size=1000, usage=230",
-		//Same as above, but in the other direction (upsizing instead of downsizing).
+		// Same as above, but in the other direction (upsizing instead of downsizing).
 		"high->1149", "high->1046",
 	)
 
-	//test priority order of thresholds
+	// test priority order of thresholds
 	//
-	//For quota autoscaling, we recommend setting thresholds very close to each
-	//other like in these tests. This is usually not a problem for large asset
-	//sizes because there is always a size value that satisfies both constraints.
+	// For quota autoscaling, we recommend setting thresholds very close to each
+	// other like in these tests. This is usually not a problem for large asset
+	// sizes because there is always a size value that satisfies both constraints.
 	//
-	//However, for really small asset sizes, there can be usage values like
-	//below such that there is no size value in the acceptable range of 98%-99%.
+	// However, for really small asset sizes, there can be usage values like
+	// below such that there is no size value in the acceptable range of 98%-99%.
 	check(
 		"low=98%, high=99%, crit=100%, step=1%",
 		"size=15, usage=14",
-		//Right below the low threshold, no downsize should be generated because
-		//that would put us above the high and critical thresholds.
+		// Right below the low threshold, no downsize should be generated because
+		// that would put us above the high and critical thresholds.
 		"", "",
 	)
 	check(
 		"low=98%, high=99%, crit=100%, step=1%",
 		"size=14, usage=14",
-		//Right above the high and critical threshold, the low threshold must be
-		//disregarded. It's better to be slightly too large than slightly too small.
+		// Right above the high and critical threshold, the low threshold must be
+		// disregarded. It's better to be slightly too large than slightly too small.
 		"critical->15", "critical->15",
 	)
 
-	//MinimumSize constraint
+	// MinimumSize constraint
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min=200",
 		"size=1000, usage=100",
-		"low->800", "low->499", //not restricted by MinimumSize
+		"low->800", "low->499", // not restricted by MinimumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
 		"size=1000, usage=100, smin=200",
-		"low->800", "low->499", //not restricted by StrictMinimumSize
+		"low->800", "low->499", // not restricted by StrictMinimumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min=1000",
 		"size=1000, usage=100",
-		"", "", //overridden by MinimumSize
+		"", "", // overridden by MinimumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
 		"size=1000, usage=100, smin=1000",
-		"", "", //overridden by StrictMinimumSize
+		"", "", // overridden by StrictMinimumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min=900",
 		"size=1000, usage=100",
-		"low->900", "low->900", //restricted by MinimumSize
+		"low->900", "low->900", // restricted by MinimumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
 		"size=1000, usage=100, smin=900",
-		"low->900", "low->900", //restricted by StrictMinimumSize
+		"low->900", "low->900", // restricted by StrictMinimumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min=1100",
 		"size=1000, usage=500",
-		"", "", //MinimumSize does not force upsizes (only StrictMinimumSize does)
+		"", "", // MinimumSize does not force upsizes (only StrictMinimumSize does)
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
 		"size=1000, usage=500, smin=1100",
-		"high->1200", "high->1100", //forced by StrictMinimumSize
+		"high->1200", "high->1100", // forced by StrictMinimumSize
 	)
 
-	//MaximumSize constraint
+	// MaximumSize constraint
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, max=2000",
 		"size=1000, usage=990",
-		"critical->1200", "critical->1238", //not restricted by MaximumSize
+		"critical->1200", "critical->1238", // not restricted by MaximumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
 		"size=1000, usage=990, smax=2000",
-		"critical->1200", "critical->1238", //not restricted by StrictMaximumSize
+		"critical->1200", "critical->1238", // not restricted by StrictMaximumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, max=1000",
 		"size=1000, usage=990",
-		"", "", //overridden by MaximumSize
+		"", "", // overridden by MaximumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
 		"size=1000, usage=990, smax=1000",
-		"", "", //overridden by StrictMaximumSize
+		"", "", // overridden by StrictMaximumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, max=1100",
 		"size=1000, usage=990",
-		"critical->1100", "critical->1100", //restricted by MaximumSize
+		"critical->1100", "critical->1100", // restricted by MaximumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
 		"size=1000, usage=990, smax=1100",
 		"critical->1100",
-		"critical->1100", //restricted by StrictMaximumSize
+		"critical->1100", // restricted by StrictMaximumSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min=900",
 		"size=1000, usage=500",
-		"", "", //MaximumSize does not force upsizes (only StrictMaximumSize does)
+		"", "", // MaximumSize does not force upsizes (only StrictMaximumSize does)
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
 		"size=1000, usage=500, smax=900",
-		"low->800", "low->900", //forced by StrictMaximumSize
+		"low->800", "low->900", // forced by StrictMaximumSize
 	)
 
-	//MinimumFreeSize constraint
+	// MinimumFreeSize constraint
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min_free=600",
 		"size=1000, usage=100",
-		"low->800", "low->700", //not restricted by MinimumFreeSize
+		"low->800", "low->700", // not restricted by MinimumFreeSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min_free=800",
 		"size=1000, usage=100",
-		"low->900", "low->900", //restricted by MinimumFreeSize
+		"low->900", "low->900", // restricted by MinimumFreeSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min_free=800",
 		"size=1000, usage=200",
-		"", "", //overridden by MinimumFreeSize
+		"", "", // overridden by MinimumFreeSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min_free=600",
 		"size=1000, usage=500",
-		"high->1200", "high->1100", //forced by MinimumFreeSize
+		"high->1200", "high->1100", // forced by MinimumFreeSize
 	)
 
-	//test behavior around zero size and/or zero usage without constraints
+	// test behavior around zero size and/or zero usage without constraints
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
 		"size=1, usage=1",
-		//This tests that the step is never rounded down to zero.
+		// This tests that the step is never rounded down to zero.
 		"critical->2", "critical->2",
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
 		"size=1, usage=0",
-		//This tests that downsizing to size = 0 is forbidden.
+		// This tests that downsizing to size = 0 is forbidden.
 		"", "",
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
-		//Zero size and usage occurs e.g. in the project-quota asset manager, when the project
-		//in question has no quota at all. We expect Castellum to:
+		// Zero size and usage occurs e.g. in the project-quota asset manager, when the project
+		// in question has no quota at all. We expect Castellum to:
 		//
 		//- leave assets with 0 size and 0 usage alone (and not crash on divide-by-zero while doing so)
 		//- never resize assets with non-zero size and 0 usage to zero size
@@ -286,74 +286,74 @@ func TestGetEligibleOperations(t *testing.T) {
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
 		"size=0, usage=5",
-		//Single-step resizing will end up one higher than percentage-step
-		//resizing because it also wants to leave the high threshold.
+		// Single-step resizing will end up one higher than percentage-step
+		// resizing because it also wants to leave the high threshold.
 		"critical->6", "critical->7",
 	)
 
-	//test behavior around zero size and/or zero usage with MinimumFreeSize constraint
+	// test behavior around zero size and/or zero usage with MinimumFreeSize constraint
 	check(
 		"low=89.9%, crit=90%, min_free=2",
-		//This testcase is based on a bug discovered in the wild: Single-step
-		//resizing did not generate a pending operation in this case because of the
-		//special-cased handling around `usage = 0`.
+		// This testcase is based on a bug discovered in the wild: Single-step
+		// resizing did not generate a pending operation in this case because of the
+		// special-cased handling around `usage = 0`.
 		"size=5, usage=0",
 		"low->4", "low->2",
 	)
 	check(
 		"low=99.9%, crit=100%, min_free=10",
-		//Another bug discovered in the wild, this time for `size = 0`.
+		// Another bug discovered in the wild, this time for `size = 0`.
 		"size=0, usage=0",
 		"critical->10", "critical->10",
 	)
 
-	//test priority order between thresholds and constraints
+	// test priority order between thresholds and constraints
 	check(
 		"low=20%, high=80%, crit=95%, step=200%, min_free=2500",
 		"size=1000, usage=500",
-		//MinimumFreeSize takes precedence over the low threshold: We should upsize
-		//the asset to guarantee the MinimumFreeSize, even if this puts us below
-		//the low threshold. (For percentage-step resizing, we chose a comically
-		//large step size above to ensure that we can see the low threshold being
-		//passed.)
+		// MinimumFreeSize takes precedence over the low threshold: We should upsize
+		// the asset to guarantee the MinimumFreeSize, even if this puts us below
+		// the low threshold. (For percentage-step resizing, we chose a comically
+		// large step size above to ensure that we can see the low threshold being
+		// passed.)
 		"high->3000", "high->3000",
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
 		"size=1000, usage=500, smin=3000",
-		//StrictMinimumSize takes precedence over the low threshold
+		// StrictMinimumSize takes precedence over the low threshold
 		"high->3000", "high->3000",
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
 		"size=1000, usage=500, smax=500",
-		//StrictMaximumSize takes precedence over the high and critical thresholds
+		// StrictMaximumSize takes precedence over the high and critical thresholds
 		"low->500", "low->500",
 	)
 
-	//test conflicts between constraints
+	// test conflicts between constraints
 	//
-	//Entirely conflicting constraints (max < min) shall paralyze Castellum and
-	//suppress all actions.
+	// Entirely conflicting constraints (max < min) shall paralyze Castellum and
+	// suppress all actions.
 	check(
 		"low=20%, high=80%, crit=95%, step=200%, min=1000",
 		"size=1000, usage=500, smax=900",
-		"", "", //MinimumSize is upheld, but StrictMaximumSize is trying to get us to break it
+		"", "", // MinimumSize is upheld, but StrictMaximumSize is trying to get us to break it
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=200%, min=1000",
 		"size=900, usage=500, smax=800",
-		"", "", //MinimumSize is already broken, and StrictMaximumSize is trying to get us to break it further
+		"", "", // MinimumSize is already broken, and StrictMaximumSize is trying to get us to break it further
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=200%, max=1000",
 		"size=1000, usage=500, smin=1100",
-		"", "", //MaximumSize is upheld, but StrictMinimumSize is trying to get us to break it
+		"", "", // MaximumSize is upheld, but StrictMinimumSize is trying to get us to break it
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=200%, max=1000",
 		"size=1100, usage=500, smin=1200",
-		"", "", //MaximumSize is already broken, and StrictMinimumSize is trying to get us to break it further
+		"", "", // MaximumSize is already broken, and StrictMinimumSize is trying to get us to break it further
 	)
 }
 

@@ -66,7 +66,7 @@ func (c *Context) applyResourceSeeds() error {
 			return fmt.Errorf(`cannot find project "%s/%s": %w`, seed.DomainName, seed.ProjectName, err)
 		}
 		if projectUUID == "" {
-			//project does not exist in Keystone -> skip this project seed this time
+			// project does not exist in Keystone -> skip this project seed this time
 			missingProjects = append(missingProjects, fmt.Sprintf(`"%s/%s"`, seed.DomainName, seed.ProjectName))
 			continue
 		}
@@ -87,7 +87,7 @@ func (c *Context) applyResourceSeeds() error {
 }
 
 func (c *Context) applyProjectSeed(projectUUID string, seed core.ProjectSeed) error {
-	//list existing resources
+	// list existing resources
 	var dbResources []db.Resource
 	_, err := c.DB.Select(&dbResources,
 		`SELECT * FROM resources WHERE scope_uuid = $1`, projectUUID)
@@ -99,11 +99,11 @@ func (c *Context) applyProjectSeed(projectUUID string, seed core.ProjectSeed) er
 		isExistingResource[dbResource.AssetType] = struct{}{}
 	}
 
-	//check existing resources (positive seeds take preference over negative seeds)
+	// check existing resources (positive seeds take preference over negative seeds)
 	for _, dbResource := range dbResources {
 		resource, exists := seed.Resources[dbResource.AssetType]
 		if exists {
-			//apply positive seed
+			// apply positive seed
 			dbResourceCopy := dbResource
 			errs := core.ApplyResourceSpecInto(&dbResourceCopy, resource, isExistingResource, c.Config, c.Team)
 			if !errs.IsEmpty() {
@@ -117,7 +117,7 @@ func (c *Context) applyProjectSeed(projectUUID string, seed core.ProjectSeed) er
 				}
 			}
 		} else if seed.ForbidsResource(dbResource.AssetType) {
-			//enforce negative seed
+			// enforce negative seed
 			logg.Info("enforcing negative %s seed for project %s/%s...", dbResource.AssetType, seed.DomainName, seed.ProjectName)
 			_, err := c.DB.Delete(&dbResource) //nolint:gosec // we drop this pointer before the end of the loop iteration
 			if err != nil {
@@ -127,7 +127,7 @@ func (c *Context) applyProjectSeed(projectUUID string, seed core.ProjectSeed) er
 		}
 	}
 
-	//create missing resources from positive seeds
+	// create missing resources from positive seeds
 	for assetType, resource := range seed.Resources {
 		_, exists := isExistingResource[assetType]
 		if exists {
@@ -142,7 +142,7 @@ func (c *Context) applyProjectSeed(projectUUID string, seed core.ProjectSeed) er
 			ScopeUUID:    projectUUID,
 			DomainUUID:   proj.DomainID,
 			AssetType:    assetType,
-			NextScrapeAt: time.Unix(0, 0).UTC(), //give new resources a very early next_scrape_at to prioritize them in the scrape queue
+			NextScrapeAt: time.Unix(0, 0).UTC(), // give new resources a very early next_scrape_at to prioritize them in the scrape queue
 		}
 		errs := core.ApplyResourceSpecInto(&dbResource, resource, isExistingResource, c.Config, c.Team)
 		if !errs.IsEmpty() {

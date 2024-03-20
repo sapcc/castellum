@@ -56,7 +56,7 @@ func (c *Context) AssetResizingJob(registerer prometheus.Registerer) jobloop.Job
 	return (&jobloop.TxGuardedJob[*gorp.Transaction, db.PendingOperation]{
 		Metadata: jobloop.JobMetadata{
 			ReadableName:    "asset resizing",
-			ConcurrencySafe: true, //because "FOR UPDATE SKIP LOCKED" is used
+			ConcurrencySafe: true, // because "FOR UPDATE SKIP LOCKED" is used
 			CounterOpts: prometheus.CounterOpts{
 				Name: "castellum_asset_resizes",
 				Help: "Counter for asset resize operations.",
@@ -75,7 +75,7 @@ func (c *Context) discoverAssetResize(ctx context.Context, tx *gorp.Transaction,
 }
 
 func (c *Context) processAssetResize(ctx context.Context, tx *gorp.Transaction, op db.PendingOperation, labels prometheus.Labels) error {
-	//find the corresponding asset, resource and asset manager
+	// find the corresponding asset, resource and asset manager
 	var asset db.Asset
 	err := tx.SelectOne(&asset, `SELECT * FROM assets WHERE id = $1`, op.AssetID)
 	if err != nil {
@@ -94,8 +94,8 @@ func (c *Context) processAssetResize(ctx context.Context, tx *gorp.Transaction, 
 		return fmt.Errorf("no asset manager for asset type %q", res.AssetType)
 	}
 
-	//perform the resize operation (we give asset.Size instead of op.OldSize
-	//since this is the most up-to-date asset size that we have)
+	// perform the resize operation (we give asset.Size instead of op.OldSize
+	// since this is the most up-to-date asset size that we have)
 	outcome, err := manager.SetAssetSize(res, asset.UUID, asset.Size, op.NewSize)
 	errorMessage := ""
 	if err != nil {
@@ -103,14 +103,14 @@ func (c *Context) processAssetResize(ctx context.Context, tx *gorp.Transaction, 
 		errorMessage = err.Error()
 	}
 
-	//if we have not exceeded our retry budget, put this operation back in the queue
+	// if we have not exceeded our retry budget, put this operation back in the queue
 	//
-	//We only do this for outcome "errored", which indicates a system error.
-	//These problems are usually discovered via alerts and quickly resolved, so
-	//there is actual hope that everything will be better in a few minutes
-	//without us failing the entire operation. For outcome "failed", we have a
-	//user error and the user will likely only notice once they see the failed
-	//operation in Castellum, so there is little use retrying here.
+	// We only do this for outcome "errored", which indicates a system error.
+	// These problems are usually discovered via alerts and quickly resolved, so
+	// there is actual hope that everything will be better in a few minutes
+	// without us failing the entire operation. For outcome "failed", we have a
+	// user error and the user will likely only notice once they see the failed
+	// operation in Castellum, so there is little use retrying here.
 	if outcome == castellum.OperationOutcomeErrored && op.ErroredAttempts < maxRetries {
 		op.ID = 0
 		op.ErroredAttempts++
@@ -131,8 +131,8 @@ func (c *Context) processAssetResize(ctx context.Context, tx *gorp.Transaction, 
 		return err
 	}
 
-	//mark asset as having just completed as resize operation (see
-	//logic in ScrapeNextAsset() for details)
+	// mark asset as having just completed as resize operation (see
+	// logic in ScrapeNextAsset() for details)
 	if outcome == castellum.OperationOutcomeSucceeded {
 		_, err := tx.Exec(`UPDATE assets SET expected_size = $1, resized_at = $2 WHERE id = $3`,
 			finishedOp.NewSize, c.TimeNow(), asset.ID)

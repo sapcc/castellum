@@ -35,8 +35,8 @@ func GetUsagePercent(size uint64, usage float64) float64 {
 		if usage == 0 {
 			return 0
 		}
-		//This value is a somewhat arbitrary choice, but it should be above 100%
-		//because `usage > size`.
+		// This value is a somewhat arbitrary choice, but it should be above 100%
+		// because `usage > size`.
 		return 200
 	}
 
@@ -98,9 +98,9 @@ func LogicOfResource(res db.Resource, info AssetTypeInfo) ResourceLogic {
 // pair means that the asset has crossed the threshold `key` and thus should be
 // resized to `value`.
 func GetEligibleOperations(res ResourceLogic, asset AssetStatus) map[castellum.OperationReason]uint64 {
-	//never touch a zero-sized asset unless it has non-zero usage
+	// never touch a zero-sized asset unless it has non-zero usage
 	if asset.Size == 0 && !asset.Usage.IsNonZero() {
-		//UNLESS we need to force it larger because of configuration
+		// UNLESS we need to force it larger because of configuration
 		if (res.MinimumSize == nil || *res.MinimumSize == 0) && (res.MinimumFreeSize == nil || *res.MinimumFreeSize == 0) {
 			return nil
 		}
@@ -119,11 +119,11 @@ func GetEligibleOperations(res ResourceLogic, asset AssetStatus) map[castellum.O
 }
 
 func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.OperationReason) *uint64 {
-	//phase 1: generate global constraints
+	// phase 1: generate global constraints
 	//
 	//NOTE: We only add MinimumSize as a constraint for downsizing. For upsizing,
-	//it's okay if the target is below MinimumSize. It just means we're inching
-	//closer *towards* the happy area. (And vice versa for MaximumSize.)
+	// it's okay if the target is below MinimumSize. It just means we're inching
+	// closer *towards* the happy area. (And vice versa for MaximumSize.)
 	c := emptyConstraints()
 	if reason == castellum.OperationReasonLow && res.MinimumSize != nil {
 		c.forbidBelow(*res.MinimumSize)
@@ -132,14 +132,14 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 		c.forbidAbove(*res.MaximumSize)
 	}
 
-	//We have a bunch of constraints that can cause action if they are crossed:
+	// We have a bunch of constraints that can cause action if they are crossed:
 	//- On the Asset, StrictMinimumSize and StrictMaximumSize values describe
 	//  technical constraints that the raw usage numbers cannot represent.
 	//- On the Resource, MinimumFreeSize is enforceable, whereas MinimumSize
 	//  and MaximumSize just inhibit action.
 	//
-	//Because the logic for all of these is identical, we start out by merging
-	//them (strongest constraint wins).
+	// Because the logic for all of these is identical, we start out by merging
+	// them (strongest constraint wins).
 	enforceableMinSize := asset.StrictMinimumSize
 	if res.MinimumFreeSize != nil {
 		for _, metric := range res.UsageMetrics {
@@ -158,7 +158,7 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 		c.forbidAbove(*enforceableMaxSize)
 	}
 
-	//do not allow downsize operations to cross above the high/critical thresholds
+	// do not allow downsize operations to cross above the high/critical thresholds
 	if reason == castellum.OperationReasonLow {
 		for _, metric := range res.UsageMetrics {
 			highThresholdPerc := res.HighThresholdPercent[metric]
@@ -170,8 +170,8 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 			}
 			highSize := uint64(math.Floor(100*asset.Usage[metric]/highThresholdPerc)) + 1
 
-			//BUT enforceable constraints take precedence over the high/critical threshold:
-			//we're allowed to go into high/critical usage if it helps us satisfy them
+			// BUT enforceable constraints take precedence over the high/critical threshold:
+			// we're allowed to go into high/critical usage if it helps us satisfy them
 			if enforceableMaxSize != nil {
 				if highSize > *enforceableMaxSize {
 					highSize = *enforceableMaxSize
@@ -182,16 +182,16 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 		}
 	}
 
-	//do not allow upsize operations to cross below the low threshold
+	// do not allow upsize operations to cross below the low threshold
 	if reason != castellum.OperationReasonLow {
 		for _, metric := range res.UsageMetrics {
 			if res.LowThresholdPercent[metric] != 0 {
 				lowSize := uint64(math.Floor(100*asset.Usage[metric]/res.LowThresholdPercent[metric])) - 1
 
-				//BUT ensure that this threshold does not prevent us from taking action
-				//at all (if in doubt, the high or critical threshold is more important
-				//than the low threshold; it's better to have an asset slightly too large
-				//than slightly too small)
+				// BUT ensure that this threshold does not prevent us from taking action
+				// at all (if in doubt, the high or critical threshold is more important
+				// than the low threshold; it's better to have an asset slightly too large
+				// than slightly too small)
 				highThresholdPerc := res.HighThresholdPercent[metric]
 				if highThresholdPerc == 0 {
 					highThresholdPerc = res.CriticalThresholdPercent[metric]
@@ -202,8 +202,8 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 					}
 				}
 
-				//ALSO enforceable constraints take precedence over the low threshold:
-				//we're allowed to go into low usage if it helps us satisfy them
+				// ALSO enforceable constraints take precedence over the low threshold:
+				// we're allowed to go into low usage if it helps us satisfy them
 				if enforceableMinSize != nil {
 					if lowSize < *enforceableMinSize {
 						lowSize = *enforceableMinSize
@@ -217,15 +217,15 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 		}
 	}
 
-	//MinimumFreeSize is a constraint, but can also cause action, so it
-	//technically falls in both phase 1 and phase 2
+	// MinimumFreeSize is a constraint, but can also cause action, so it
+	// technically falls in both phase 1 and phase 2
 	var a actions
 	takeActionBecauseEnforceableConstraint := false
 
 	if enforceableMinSize != nil && asset.Size < *enforceableMinSize {
-		//Enforceable minimum size constraints are preferably enforced on the
-		//"high" threshold, but if no "high" threshold is configured, it will
-		//be done on the "critical" threshold instead.
+		// Enforceable minimum size constraints are preferably enforced on the
+		// "high" threshold, but if no "high" threshold is configured, it will
+		// be done on the "critical" threshold instead.
 		enforcer := castellum.OperationReasonHigh
 		for _, metric := range res.UsageMetrics {
 			if res.HighThresholdPercent[metric] == 0 {
@@ -236,10 +236,10 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 
 		if reason == enforcer {
 			a.AddAction(action{Min: *enforceableMinSize, Desired: *enforceableMinSize}, *c)
-			//We also let the rest of this method behave as if the `high` threshold
-			//was crossed. The percentage-step resizing may generate a larger
-			//target size than this action right now did, in which case it will
-			//override this action.
+			// We also let the rest of this method behave as if the `high` threshold
+			// was crossed. The percentage-step resizing may generate a larger
+			// target size than this action right now did, in which case it will
+			// override this action.
 			takeActionBecauseEnforceableConstraint = true
 		}
 	}
@@ -247,11 +247,11 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 	if enforceableMaxSize != nil && asset.Size > *enforceableMaxSize {
 		if reason == castellum.OperationReasonLow {
 			a.AddAction(action{Desired: *enforceableMaxSize, Max: *enforceableMaxSize}, *c)
-			takeActionBecauseEnforceableConstraint = true //same reasoning as above
+			takeActionBecauseEnforceableConstraint = true // same reasoning as above
 		}
 	}
 
-	//phase 2: generate an action when the corresponding threshold is passed
+	// phase 2: generate an action when the corresponding threshold is passed
 	takeActionBecauseThreshold := false
 	for _, metric := range res.UsageMetrics {
 		usagePercent := GetUsagePercent(asset.Size, asset.Usage[metric])
@@ -280,8 +280,8 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 		}
 	}
 
-	//phase 3: take the boldest action that satisfies the constraints,
-	//but only if it is actually a proper downsize or upsize
+	// phase 3: take the boldest action that satisfies the constraints,
+	// but only if it is actually a proper downsize or upsize
 	if reason == castellum.OperationReasonLow {
 		target := a.Min()
 		if target != nil && *target < asset.Size {
@@ -306,7 +306,7 @@ func getActionPercentageStep(res ResourceLogic, asset AssetStatus, reason castel
 
 func getNewSizePercentageStep(res ResourceLogic, asset AssetStatus, reason castellum.OperationReason, assetSize uint64) uint64 {
 	step := uint64(math.Floor((float64(assetSize) * res.SizeStepPercent) / 100))
-	//a small fraction of a small value (e.g. 10% of size = 6) may round down to zero
+	// a small fraction of a small value (e.g. 10% of size = 6) may round down to zero
 	if step == 0 {
 		step = 1
 	}
@@ -314,11 +314,11 @@ func getNewSizePercentageStep(res ResourceLogic, asset AssetStatus, reason caste
 	switch reason {
 	case castellum.OperationReasonCritical:
 		newSize := assetSize + step
-		//take multiple steps if usage continues to cross the critical threshold
+		// take multiple steps if usage continues to cross the critical threshold
 		for _, metric := range res.UsageMetrics {
 			newUsagePercent := GetUsagePercent(newSize, asset.Usage[metric])
 			if newUsagePercent >= res.CriticalThresholdPercent[metric] {
-				//restart call with newSize as old size to calculate the next step
+				// restart call with newSize as old size to calculate the next step
 				return getNewSizePercentageStep(res, asset, reason, newSize)
 			}
 		}
@@ -326,9 +326,9 @@ func getNewSizePercentageStep(res ResourceLogic, asset AssetStatus, reason caste
 	case castellum.OperationReasonHigh:
 		return assetSize + step
 	case castellum.OperationReasonLow:
-		//when going down, we have to take care not to end up with zero
+		// when going down, we have to take care not to end up with zero
 		if assetSize < 1+step {
-			//^ This condition is equal to `assetSize - step < 1`, but cannot overflow below 0.
+			// ^ This condition is equal to `assetSize - step < 1`, but cannot overflow below 0.
 			return 1
 		}
 		return assetSize - step
@@ -344,9 +344,9 @@ func getActionSingleStep(res ResourceLogic, asset AssetStatus, metric castellum.
 	)
 	switch reason {
 	case castellum.OperationReasonCritical:
-		//A "critical" resize should also leave the "high" threshold if there is
-		//one. Otherwise we would have to do a "high" resize directly afterwards
-		//which contradicts the whole "single-step" business.
+		// A "critical" resize should also leave the "high" threshold if there is
+		// one. Otherwise we would have to do a "high" resize directly afterwards
+		// which contradicts the whole "single-step" business.
 		thresholdPerc = res.CriticalThresholdPercent[metric]
 		if res.HighThresholdPercent[metric] > 0 {
 			thresholdPerc = res.HighThresholdPercent[metric]
@@ -362,15 +362,15 @@ func getActionSingleStep(res ResourceLogic, asset AssetStatus, metric castellum.
 		panic("unreachable")
 	}
 
-	//the new size should be close to the threshold, but with a small delta to
-	//avoid hitting the threshold exactly
+	// the new size should be close to the threshold, but with a small delta to
+	// avoid hitting the threshold exactly
 	newSizeFloat := 100 * asset.Usage[metric] / (thresholdPerc + delta)
 	if reason == castellum.OperationReasonLow {
-		//for "low", round size down to ensure usage-% comes out above the threshold
+		// for "low", round size down to ensure usage-% comes out above the threshold
 		newSize := uint64(math.Floor(newSizeFloat))
 		return action{Desired: newSize, Max: asset.Size}
 	}
-	//for "high"/"critical", round size up to ensure usage-% comes out below the threshold
+	// for "high"/"critical", round size up to ensure usage-% comes out below the threshold
 	newSize := uint64(math.Ceil(newSizeFloat))
 	return action{Desired: newSize, Min: asset.Size}
 }
@@ -384,7 +384,7 @@ type constraints struct {
 }
 
 func emptyConstraints() *constraints {
-	//Min starts at 1 because we never want to resize to 0
+	// Min starts at 1 because we never want to resize to 0
 	return &constraints{1, math.MaxUint64}
 }
 
@@ -409,7 +409,7 @@ func (c *constraints) isSatisfiable() bool {
 
 type action struct {
 	Min     uint64
-	Max     uint64 //can be 0 to signify absence
+	Max     uint64 // can be 0 to signify absence
 	Desired uint64
 }
 

@@ -54,7 +54,7 @@ func LoadConfig(configPath string) (Config, error) {
 // MaxAssetSizeRule appears in type Config.
 type MaxAssetSizeRule struct {
 	AssetTypeRx regexpext.BoundedRegexp `yaml:"asset_type"`
-	ScopeUUID   string                  `yaml:"scope_uuid"` //leave empty to have the rule apply to all scopes
+	ScopeUUID   string                  `yaml:"scope_uuid"` // leave empty to have the rule apply to all scopes
 	Value       uint64                  `yaml:"value"`
 }
 

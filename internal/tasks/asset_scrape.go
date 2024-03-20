@@ -60,7 +60,7 @@ func (c *Context) AssetScrapingJob(registerer prometheus.Registerer) jobloop.Job
 	return (&jobloop.TxGuardedJob[*gorp.Transaction, db.Asset]{
 		Metadata: jobloop.JobMetadata{
 			ReadableName:    "asset scraping",
-			ConcurrencySafe: true, //because "FOR UPDATE SKIP LOCKED" is used
+			ConcurrencySafe: true, // because "FOR UPDATE SKIP LOCKED" is used
 			CounterOpts: prometheus.CounterOpts{
 				Name: "castellum_asset_scrapes",
 				Help: "Counter for asset scrape operations.",
@@ -79,7 +79,7 @@ func (c *Context) discoverAssetScrape(ctx context.Context, tx *gorp.Transaction,
 }
 
 func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, asset db.Asset, labels prometheus.Labels) error {
-	//find resource for asset
+	// find resource for asset
 	var res db.Resource
 	err := tx.SelectOne(&res, `SELECT * FROM resources WHERE id = $1`, asset.ResourceID)
 	if err != nil {
@@ -94,7 +94,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 
 	logg.Debug("scraping %s asset %s in scope %s using manager %v", res.AssetType, asset.UUID, res.ScopeUUID, manager)
 
-	//get pending operation for this asset
+	// get pending operation for this asset
 	var pendingOp *db.PendingOperation
 	err = tx.SelectOne(&pendingOp, `SELECT * FROM pending_operations WHERE asset_id = $1`, asset.ID)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -103,7 +103,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 		return err
 	}
 
-	//check asset status
+	// check asset status
 	var oldStatus *core.AssetStatus
 	if !asset.NeverScraped {
 		oldStatus = &core.AssetStatus{
@@ -119,7 +119,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 	if err != nil {
 		errMsg := fmt.Errorf("cannot query status of %s %s: %s", string(res.AssetType), asset.UUID, err.Error())
 		if errext.IsOfType[core.AssetNotFoundErr](err) {
-			//asset was deleted since the last scrape of this resource
+			// asset was deleted since the last scrape of this resource
 			logg.Error(errMsg.Error())
 			logg.Info("removing deleted %s asset from DB: UUID = %s, scope UUID = %s", res.AssetType, asset.UUID, res.ScopeUUID)
 			_, dbErr := tx.Delete(&asset)
@@ -129,10 +129,10 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 			return tx.Commit()
 		}
 
-		//GetAssetStatus may fail for single assets, e.g. for Manila shares in
-		//transitional states like Creating/Deleting; in that case, update
-		//next_scrape_at so that the next call continues with the next asset, but
-		//fill the scrape error message to indicate old data
+		// GetAssetStatus may fail for single assets, e.g. for Manila shares in
+		// transitional states like Creating/Deleting; in that case, update
+		// next_scrape_at so that the next call continues with the next asset, but
+		// fill the scrape error message to indicate old data
 		asset.ScrapeErrorMessage = err.Error()
 		asset.NextScrapeAt = c.TimeNow().Add(c.AddJitter(AssetScrapeInterval))
 		_, dbErr := tx.Update(&asset)
@@ -165,9 +165,9 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 		)
 	}
 
-	//update asset attributes - We have four separate cases here, which
-	//correspond to the branches of the `switch` statement. When changing any of
-	//this, tread very carefully.
+	// update asset attributes - We have four separate cases here, which
+	// correspond to the branches of the `switch` statement. When changing any of
+	// this, tread very carefully.
 	asset.NextScrapeAt = finishedAt.Add(c.AddJitter(AssetScrapeInterval))
 	asset.ScrapeDurationSecs = finishedAt.Sub(startedAt).Seconds()
 	asset.ScrapeErrorMessage = ""
@@ -175,31 +175,31 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 	var writeScrapeResults bool
 	switch {
 	case asset.ExpectedSize == nil:
-		//normal case: no resize operation has recently completed -> record
-		//status.Size as actual size
+		// normal case: no resize operation has recently completed -> record
+		// status.Size as actual size
 		writeScrapeResults = true
 	case *asset.ExpectedSize == status.Size:
-		//a resize operation has completed, and now we're seeing the new size in
-		//the backend -> record status.Size as actualSize and clear ExpectedSize
+		// a resize operation has completed, and now we're seeing the new size in
+		// the backend -> record status.Size as actualSize and clear ExpectedSize
 		writeScrapeResults = true
 	case asset.Size != status.Size:
-		//while waiting for a resize operation to be reflected in the backend,
-		//we're observing an entirely different size (i.e. neither the operation's
-		//OldSize nor its NewSize) -> assume that some other user changed the size
-		//in parallel and take that new value as the actual size
+		// while waiting for a resize operation to be reflected in the backend,
+		// we're observing an entirely different size (i.e. neither the operation's
+		// OldSize nor its NewSize) -> assume that some other user changed the size
+		// in parallel and take that new value as the actual size
 		writeScrapeResults = true
 	case asset.ResizedAt != nil && asset.ResizedAt.Before(c.TimeNow().Add(-1*time.Hour)):
-		//we waited for a resize operation to be reflected in the backend, but it
-		//has been more than an hour since then -> assume that the resize was
-		//interrupted in some way and resume normal behavior
+		// we waited for a resize operation to be reflected in the backend, but it
+		// has been more than an hour since then -> assume that the resize was
+		// interrupted in some way and resume normal behavior
 		writeScrapeResults = true
 		logg.Info("giving up on waiting for resize of %s %s from size = %d to size = %d to be completed in the backend",
 			res.AssetType, asset.UUID,
 			asset.Size, *asset.ExpectedSize,
 		)
 	default:
-		//we are waiting for a resize operation to reflect in the backend, but
-		//the backend is still reporting the old size -> do not touch anything until the backend is showing the new size
+		// we are waiting for a resize operation to reflect in the backend, but
+		// the backend is still reporting the old size -> do not touch anything until the backend is showing the new size
 		writeScrapeResults = false
 		logg.Info("still waiting for resize of %s %s from size = %d to size = %d to be completed in the backend",
 			res.AssetType, asset.UUID,
@@ -215,7 +215,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 		asset.ResizedAt = nil
 	}
 
-	//compute value of `asset.CriticalUsages` field (for reporting to admin only)
+	// compute value of `asset.CriticalUsages` field (for reporting to admin only)
 	var criticalUsageMetrics []string
 	if res.CriticalThresholdPercent.IsNonZero() && (res.MaximumSize == nil || asset.Size < *res.MaximumSize) {
 		usagePerc := core.GetMultiUsagePercent(asset.Size, asset.Usage)
@@ -227,7 +227,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 	}
 	asset.CriticalUsages = strings.Join(criticalUsageMetrics, ",")
 
-	//update asset in DB
+	// update asset in DB
 	_, err = tx.Update(&asset)
 	if err != nil {
 		return err
@@ -236,13 +236,13 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 		return tx.Commit()
 	}
 
-	//never touch operations in status "greenlit" - they may be executing on a
-	//worker right now
+	// never touch operations in status "greenlit" - they may be executing on a
+	// worker right now
 	if pendingOp != nil && pendingOp.GreenlitAt != nil && !pendingOp.GreenlitAt.After(c.TimeNow()) {
 		return tx.Commit()
 	}
 
-	//if there is a pending operation, try to move it forward
+	// if there is a pending operation, try to move it forward
 	if pendingOp != nil {
 		pendingOp, err = c.maybeCancelOperation(tx, res, asset, info, *pendingOp)
 		if err != nil {
@@ -262,7 +262,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 		}
 	}
 
-	//if there is no pending operation (or if we just cancelled it), see if we can start one
+	// if there is no pending operation (or if we just cancelled it), see if we can start one
 	if pendingOp == nil {
 		err = c.maybeCreateOperation(tx, res, asset, info)
 		if err != nil {
@@ -292,20 +292,20 @@ func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, ass
 		op.Reason = castellum.OperationReasonLow
 		op.NewSize = val
 	} else {
-		//no threshold exceeded -> do not create an operation
+		// no threshold exceeded -> do not create an operation
 		return nil
 	}
 
-	//skip the operation if the size would not change (this is especially true
-	//for reason "low" and oldSize = 1)
+	// skip the operation if the size would not change (this is especially true
+	// for reason "low" and oldSize = 1)
 	if op.OldSize == op.NewSize {
 		return nil
 	}
 
-	//critical operations can be confirmed immediately
+	// critical operations can be confirmed immediately
 	if op.Reason == castellum.OperationReasonCritical {
 		op.ConfirmedAt = &op.CreatedAt
-		//right now, nothing requires operator approval
+		// right now, nothing requires operator approval
 		op.GreenlitAt = op.ConfirmedAt
 	}
 
@@ -314,15 +314,15 @@ func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, ass
 }
 
 func (c Context) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (*db.PendingOperation, error) {
-	//cancel when the threshold that triggered this operation is no longer being crossed
+	// cancel when the threshold that triggered this operation is no longer being crossed
 	eligibleFor := core.GetEligibleOperations(core.LogicOfResource(res, info), core.StatusOfAsset(asset))
 	_, isEligible := eligibleFor[op.Reason]
 	if op.Reason == castellum.OperationReasonHigh {
 		if _, canBeUpgraded := eligibleFor[castellum.OperationReasonCritical]; canBeUpgraded {
-			//as an exception, cancel a "High" operation when we've crossed the
-			//"Critical" threshold in the meantime - when we get to
-			//maybeCreateOperation() next, a new operation with reason "Critical" will
-			//be created instead
+			// as an exception, cancel a "High" operation when we've crossed the
+			// "Critical" threshold in the meantime - when we get to
+			// maybeCreateOperation() next, a new operation with reason "Critical" will
+			// be created instead
 			isEligible = false
 		}
 	}
@@ -340,17 +340,17 @@ func (c Context) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, ass
 }
 
 func (c Context) maybeUpdateOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (*db.PendingOperation, error) {
-	//do not touch `op` unless the corresponding threshold is still being crossed
+	// do not touch `op` unless the corresponding threshold is still being crossed
 	eligibleFor := core.GetEligibleOperations(core.LogicOfResource(res, info), core.StatusOfAsset(asset))
 	newSize, exists := eligibleFor[op.Reason]
 	if !exists {
 		return &op, nil
 	}
 
-	//if the asset size has changed since the operation has been created
-	//(because of resizes not performed by Castellum), calculate a new target size
+	// if the asset size has changed since the operation has been created
+	// (because of resizes not performed by Castellum), calculate a new target size
 	if op.NewSize == newSize {
-		//nothing to do
+		// nothing to do
 		return &op, nil
 	}
 	op.NewSize = newSize
@@ -359,12 +359,12 @@ func (c Context) maybeUpdateOperation(tx *gorp.Transaction, res db.Resource, ass
 }
 
 func (c Context) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (*db.PendingOperation, error) {
-	//can only confirm when the corresponding threshold is still being crossed
+	// can only confirm when the corresponding threshold is still being crossed
 	if _, exists := core.GetEligibleOperations(core.LogicOfResource(res, info), core.StatusOfAsset(asset))[op.Reason]; !exists {
 		return &op, nil
 	}
 
-	//can only confirm when it has been like this for at least the configured delay
+	// can only confirm when it has been like this for at least the configured delay
 	var earliestConfirm time.Time
 	switch op.Reason {
 	case castellum.OperationReasonLow:
@@ -372,7 +372,7 @@ func (c Context) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, as
 	case castellum.OperationReasonHigh:
 		earliestConfirm = op.CreatedAt.Add(time.Duration(res.HighDelaySeconds) * time.Second)
 	case castellum.OperationReasonCritical:
-		//defense in depth - maybeCreateOperation() should already have confirmed this
+		// defense in depth - maybeCreateOperation() should already have confirmed this
 		earliestConfirm = op.CreatedAt
 	}
 	if c.TimeNow().Before(earliestConfirm) {
@@ -382,7 +382,7 @@ func (c Context) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, as
 	previousState := op.State()
 	confirmedAt := c.TimeNow()
 	op.ConfirmedAt = &confirmedAt
-	op.GreenlitAt = op.ConfirmedAt //right now, nothing requires operator approval
+	op.GreenlitAt = op.ConfirmedAt // right now, nothing requires operator approval
 	_, err := tx.Update(&op)
 	core.CountStateTransition(res, asset.UUID, previousState, op.State())
 	return &op, err

@@ -39,7 +39,7 @@ func (c *Context) GarbageCollectionJob(registerer prometheus.Registerer) jobloop
 		},
 		Interval: 1 * time.Hour,
 		Task: func(ctx context.Context, _ prometheus.Labels) error {
-			return CollectGarbage(c.DB, time.Now().Add(-14*24*time.Hour)) //14 days
+			return CollectGarbage(c.DB, time.Now().Add(-14*24*time.Hour)) // 14 days
 		},
 	}).Setup(registerer)
 }

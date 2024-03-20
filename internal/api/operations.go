@@ -37,7 +37,7 @@ import (
 )
 
 func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (map[int64]db.Resource, bool) {
-	//CheckToken discovers project ID in both URL path and query
+	// CheckToken discovers project ID in both URL path and query
 	var token *gopherpolicy.Token
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
@@ -45,7 +45,7 @@ func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (
 	}
 	domainUUID := r.URL.Query().Get("domain")
 
-	//get asset type from URL path or query
+	// get asset type from URL path or query
 	assetTypeStr, exists := mux.Vars(r)["asset_type"]
 	if exists {
 		if assetTypeStr == "" {
@@ -58,13 +58,13 @@ func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (
 	if assetTypeStr != "" {
 		manager, _ := h.Team.ForAssetType(db.AssetType(assetTypeStr))
 		if manager == nil {
-			//only report resources when we have an asset manager configured
+			// only report resources when we have an asset manager configured
 			respondWithNotFound(w)
 			return nil, false
 		}
 	}
 
-	//find all matching resources
+	// find all matching resources
 	var (
 		sqlConditions []string
 		sqlBindValues []any
@@ -93,7 +93,7 @@ func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (
 		return nil, false
 	}
 
-	//check if user has access to all these resources
+	// check if user has access to all these resources
 	allowedResources := make(map[int64]db.Resource)
 	canAccessAnyMatchingProject := false
 	for _, res := range allResources {
@@ -110,12 +110,12 @@ func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (
 		}
 	}
 
-	//if there are no allowed resources, generate 4xx response
+	// if there are no allowed resources, generate 4xx response
 	if len(allowedResources) == 0 {
 		if canAccessAnyMatchingProject {
 			respondWithForbidden(w)
 		} else {
-			//do not leak information about project/resource existence to unauthorized users
+			// do not leak information about project/resource existence to unauthorized users
 			respondWithNotFound(w)
 		}
 		return nil, false
@@ -133,7 +133,7 @@ func (h handler) GetPendingOperations(w http.ResponseWriter, r *http.Request) {
 
 	allOps := []castellum.StandaloneOperation{}
 	for _, dbResource := range dbResources {
-		//find operations
+		// find operations
 		var ops []db.PendingOperation
 		_, err := h.DB.Select(&ops, `
 			SELECT o.* FROM pending_operations o
@@ -144,13 +144,13 @@ func (h handler) GetPendingOperations(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		//find asset UUIDs
+		// find asset UUIDs
 		assetUUIDs, err := h.getAssetUUIDMap(dbResource)
 		if respondwith.ErrorText(w, err) {
 			return
 		}
 
-		//prepare for response body
+		// prepare for response body
 		for _, op := range ops {
 			allOps = append(allOps, PendingOperationFromDB(op, assetUUIDs[op.AssetID], &dbResource)) //nolint:gosec // PendingOperationFromDB is not holding onto the pointer after it returns
 		}
@@ -199,7 +199,7 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 			return
 		}
 
-		//check if the assets in question are still eligible for resizing
+		// check if the assets in question are still eligible for resizing
 		var assets []db.Asset
 		_, err = h.DB.Select(&assets,
 			`SELECT * FROM assets WHERE resource_id = $1 ORDER BY uuid`, dbResource.ID)
@@ -237,7 +237,7 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 
 	relevantOps := []castellum.StandaloneOperation{}
 	for _, dbResource := range dbResources {
-		//find succeeded operations
+		// find succeeded operations
 		succeededOpsByAssetID, err := recentOperationQuery{
 			DB:           h.DB,
 			ResourceID:   dbResource.ID,
@@ -248,7 +248,7 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 			return
 		}
 
-		//apply filters and collect response data
+		// apply filters and collect response data
 		var assets []db.Asset
 		_, err = h.DB.Select(&assets,
 			`SELECT * FROM assets WHERE resource_id = $1 ORDER BY uuid`, dbResource.ID)
@@ -273,7 +273,7 @@ type recentOperationQuery struct {
 	DB           *gorp.DbMap
 	ResourceID   int64
 	Outcomes     []castellum.OperationOutcome
-	OverriddenBy string //contains a condition for an SQL WHERE clause
+	OverriddenBy string // contains a condition for an SQL WHERE clause
 }
 
 // This returns the most recent finished operation with the outcomes `%[2]s` for
@@ -300,7 +300,7 @@ func (q recentOperationQuery) Execute() (map[int64]db.FinishedOperation, error) 
 
 	queryStr := fmt.Sprintf(recentOperationQueryStr,
 		q.OverriddenBy,
-		strings.Join(outcomes, "', '"), //interpolating string constants into the query is safe here because q.Outcomes is always hardcoded
+		strings.Join(outcomes, "', '"), // interpolating string constants into the query is safe here because q.Outcomes is always hardcoded
 	)
 
 	var matchingOps []db.FinishedOperation

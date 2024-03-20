@@ -38,7 +38,7 @@ import (
 )
 
 func setupAssetResizeTest(t test.T, c *Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry, assetCount int) jobloop.Job {
-	//create a resource and assets to test with
+	// create a resource and assets to test with
 	t.Must(c.DB.Insert(&db.Resource{
 		ScopeUUID: "project1",
 		AssetType: "foo",
@@ -71,7 +71,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 	withContext(t, core.Config{}, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
 		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
-		//add a greenlit PendingOperation
+		// add a greenlit PendingOperation
 		clock.StepBy(5 * time.Minute)
 		pendingOp := db.PendingOperation{
 			AssetID:     1,
@@ -85,8 +85,8 @@ func TestSuccessfulResize(baseT *testing.T) {
 		}
 		t.Must(c.DB.Insert(&pendingOp))
 
-		//ExecuteOne(AssetResizeJob{}) should do nothing right now because that operation is
-		//only greenlit in the future, but not right now
+		// ExecuteOne(AssetResizeJob{}) should do nothing right now because that operation is
+		// only greenlit in the future, but not right now
 		err := resizeJob.ProcessOne(ctx)
 		if !errors.Is(err, sql.ErrNoRows) {
 			t.Fatalf("expected sql.ErrNoRows, got %s instead", err.Error())
@@ -94,7 +94,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 		t.ExpectPendingOperations(c.DB, pendingOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
-		//go into the future and check that the operation gets executed
+		// go into the future and check that the operation gets executed
 		clock.StepBy(10 * time.Minute)
 		err = resizeJob.ProcessOne(ctx)
 		t.Must(err)
@@ -112,8 +112,8 @@ func TestSuccessfulResize(baseT *testing.T) {
 			Outcome:     castellum.OperationOutcomeSucceeded,
 		})
 
-		//expect asset to report an expected size, but still show the old size
-		//(until the next asset scrape)
+		// expect asset to report an expected size, but still show the old size
+		// (until the next asset scrape)
 		t.ExpectAssets(c.DB, db.Asset{
 			ID:           1,
 			ResourceID:   1,
@@ -131,7 +131,7 @@ func TestFailingResize(tBase *testing.T) {
 	withContext(t, core.Config{}, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
 		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
-		//add a greenlit PendingOperation
+		// add a greenlit PendingOperation
 		clock.StepBy(10 * time.Minute)
 		pendingOp := db.PendingOperation{
 			AssetID:     1,
@@ -148,7 +148,7 @@ func TestFailingResize(tBase *testing.T) {
 		amStatic.SetAssetSizeFails = true
 		t.Must(resizeJob.ProcessOne(ctx))
 
-		//check that resizing fails as expected
+		// check that resizing fails as expected
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
 			AssetID:      1,
@@ -164,7 +164,7 @@ func TestFailingResize(tBase *testing.T) {
 			ErrorMessage: "SetAssetSize failing as requested",
 		})
 
-		//check that asset does not have an ExpectedSize
+		// check that asset does not have an ExpectedSize
 		t.ExpectAssets(c.DB, db.Asset{
 			ID:           1,
 			ResourceID:   1,
@@ -181,13 +181,13 @@ func TestErroringResize(tBase *testing.T) {
 	withContext(t, core.Config{}, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
 		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
-		//add a greenlit PendingOperation that will error in SetAssetSize()
+		// add a greenlit PendingOperation that will error in SetAssetSize()
 		clock.StepBy(10 * time.Minute)
 		pendingOp := db.PendingOperation{
 			AssetID:     1,
 			Reason:      castellum.OperationReasonLow,
 			OldSize:     1000,
-			NewSize:     400, //will error because `new_size < usage` (usage = 500, see above)
+			NewSize:     400, // will error because `new_size < usage` (usage = 500, see above)
 			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			CreatedAt:   c.TimeNow().Add(-10 * time.Minute),
 			ConfirmedAt: p2time(c.TimeNow().Add(-5 * time.Minute)),
@@ -195,7 +195,7 @@ func TestErroringResize(tBase *testing.T) {
 		}
 		t.Must(c.DB.Insert(&pendingOp))
 
-		//when the outcome of the resize is "errored", we can retry several times
+		// when the outcome of the resize is "errored", we can retry several times
 		for try := 0; try < maxRetries; try++ {
 			clock.StepBy(10 * time.Minute)
 			t.Must(resizeJob.ProcessOne(ctx))
@@ -207,8 +207,8 @@ func TestErroringResize(tBase *testing.T) {
 			t.ExpectFinishedOperations(c.DB /*, nothing */)
 		}
 
-		//ExecuteOne(AssetResizeJob{}) should do nothing right now because, although the
-		//operation is greenlit, its retry_at timestamp is in the future
+		// ExecuteOne(AssetResizeJob{}) should do nothing right now because, although the
+		// operation is greenlit, its retry_at timestamp is in the future
 		err := resizeJob.ProcessOne(ctx)
 		if !errors.Is(err, sql.ErrNoRows) {
 			t.Fatalf("expected sql.ErrNoRows, got %s instead", err.Error())
@@ -216,7 +216,7 @@ func TestErroringResize(tBase *testing.T) {
 		t.ExpectPendingOperations(c.DB, pendingOp)
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
-		//check that resizing errors as expected once the retry budget is exceeded
+		// check that resizing errors as expected once the retry budget is exceeded
 		clock.StepBy(10 * time.Minute)
 		t.Must(resizeJob.ProcessOne(ctx))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
@@ -235,7 +235,7 @@ func TestErroringResize(tBase *testing.T) {
 			ErroredAttempts: maxRetries,
 		})
 
-		//check that asset does not have an ExpectedSize
+		// check that asset does not have an ExpectedSize
 		t.ExpectAssets(c.DB, db.Asset{
 			ID:           1,
 			ResourceID:   1,

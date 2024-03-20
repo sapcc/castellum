@@ -41,7 +41,7 @@ func TestResourceScraping(baseT *testing.T) {
 	withContext(t, core.Config{}, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
 		job := c.ResourceScrapingJob(registry)
 
-		//ScrapeNextResource() without any resources just does nothing
+		// ScrapeNextResource() without any resources just does nothing
 		err := job.ProcessOne(ctx)
 		if !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
@@ -49,7 +49,7 @@ func TestResourceScraping(baseT *testing.T) {
 		tr, tr0 := easypg.NewTracker(t.T, c.DB.Db)
 		tr0.AssertEmpty()
 
-		//create some project resources for testing
+		// create some project resources for testing
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",
 			DomainUUID:               "domain1",
@@ -69,7 +69,7 @@ func TestResourceScraping(baseT *testing.T) {
 			NextScrapeAt:             c.TimeNow(),
 		}))
 
-		//create some mock assets that ScrapeNextResource() can find
+		// create some mock assets that ScrapeNextResource() can find
 		amStatic.Assets = map[string]map[string]plugins.StaticAsset{
 			"project1": {
 				"asset1": {Size: 1000, Usage: 400},
@@ -82,7 +82,7 @@ func TestResourceScraping(baseT *testing.T) {
 		}
 		tr.DBChanges().Ignore()
 
-		//first ScrapeNextResource() should scrape project1/foo
+		// first ScrapeNextResource() should scrape project1/foo
 		clock.StepBy(time.Hour)
 		t.Must(job.ProcessOne(ctx))
 		tr.DBChanges().AssertEqualf(`
@@ -94,7 +94,7 @@ func TestResourceScraping(baseT *testing.T) {
 			c.TimeNow().Add(30*time.Minute).Unix(),
 		)
 
-		//first ScrapeNextResource() should scrape project3/foo
+		// first ScrapeNextResource() should scrape project3/foo
 		clock.StepBy(time.Hour)
 		t.Must(job.ProcessOne(ctx))
 		tr.DBChanges().AssertEqualf(`
@@ -106,9 +106,9 @@ func TestResourceScraping(baseT *testing.T) {
 			c.TimeNow().Add(30*time.Minute).Unix(),
 		)
 
-		//next ScrapeNextResource() should scrape project1/foo again because its
-		//next_scrape_at timestamp is the smallest; there should be no changes except for
-		//resources.next_scrape_at
+		// next ScrapeNextResource() should scrape project1/foo again because its
+		// next_scrape_at timestamp is the smallest; there should be no changes except for
+		// resources.next_scrape_at
 		clock.StepBy(time.Hour)
 		t.Must(job.ProcessOne(ctx))
 		tr.DBChanges().AssertEqualf(`
@@ -117,7 +117,7 @@ func TestResourceScraping(baseT *testing.T) {
 			c.TimeNow().Add(30*time.Minute).Unix(),
 		)
 
-		//simulate deletion of an asset
+		// simulate deletion of an asset
 		delete(amStatic.Assets["project3"], "asset6")
 		clock.StepBy(time.Hour)
 		t.Must(job.ProcessOne(ctx))
@@ -128,7 +128,7 @@ func TestResourceScraping(baseT *testing.T) {
 			c.TimeNow().Add(30*time.Minute).Unix(),
 		)
 
-		//simulate addition of a new asset
+		// simulate addition of a new asset
 		amStatic.Assets["project1"]["asset7"] = plugins.StaticAsset{Size: 10, Usage: 3}
 		t.Must(job.ProcessOne(ctx))
 		tr.DBChanges().AssertEqualf(`
@@ -139,7 +139,7 @@ func TestResourceScraping(baseT *testing.T) {
 			c.TimeNow().Add(30*time.Minute).Unix(),
 		)
 
-		//check behavior on a resource without assets
+		// check behavior on a resource without assets
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:    "project2",
 			DomainUUID:   "domain1",

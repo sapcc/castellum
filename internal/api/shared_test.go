@@ -77,7 +77,7 @@ func testCommonEndpointBehavior(t test.T, hh http.Handler, validator *mock.Valid
 		return fmt.Sprintf(pathPattern, projectID, resourceID)
 	}
 
-	//endpoint requires a token with project access
+	// endpoint requires a token with project access
 	validator.Enforcer.Forbid("project:access")
 	assert.HTTPRequest{
 		Method:       "GET",
@@ -86,7 +86,7 @@ func testCommonEndpointBehavior(t test.T, hh http.Handler, validator *mock.Valid
 	}.Check(t.T, hh)
 	validator.Enforcer.Allow("project:access")
 
-	//expect error for unknown project or resource
+	// expect error for unknown project or resource
 	assert.HTTPRequest{
 		Method:       "GET",
 		Path:         path("project2", "foo"),
@@ -98,15 +98,15 @@ func testCommonEndpointBehavior(t test.T, hh http.Handler, validator *mock.Valid
 		ExpectStatus: http.StatusNotFound,
 	}.Check(t.T, hh)
 
-	//the "unknown" resource exists, but it should be 404 regardless because we
-	//don't have an asset manager for it
+	// the "unknown" resource exists, but it should be 404 regardless because we
+	// don't have an asset manager for it
 	assert.HTTPRequest{
 		Method:       "GET",
 		Path:         path("project1", "unknown"),
 		ExpectStatus: http.StatusNotFound,
 	}.Check(t.T, hh)
 
-	//expect error for inaccessible resource
+	// expect error for inaccessible resource
 	validator.Enforcer.Forbid("project:show:foo")
 	assert.HTTPRequest{
 		Method:       "GET",

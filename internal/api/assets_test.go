@@ -58,8 +58,8 @@ func TestGetAssets(baseT *testing.T) {
 			},
 		}
 
-		//happy path
-		mv.Enforcer.Forbid("project:edit:foo") //this should not be an issue
+		// happy path
+		mv.Enforcer.Forbid("project:edit:foo") // this should not be an issue
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/projects/project1/assets/foo",
@@ -75,15 +75,15 @@ func TestGetAsset(baseT *testing.T) {
 		testCommonEndpointBehavior(t, hh, mv,
 			"/v1/projects/%s/assets/%s/fooasset1")
 
-		//expect error for unknown asset
+		// expect error for unknown asset
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/projects/project1/assets/foo/doesnotexist",
 			ExpectStatus: http.StatusNotFound,
 		}.Check(t.T, hh)
 
-		//happy path: just an asset without any operations
-		mv.Enforcer.Forbid("project:edit:foo") //this should not be an issue
+		// happy path: just an asset without any operations
+		mv.Enforcer.Forbid("project:edit:foo") // this should not be an issue
 		response := assert.JSONObject{
 			"id":            "fooasset1",
 			"size":          1024,
@@ -98,7 +98,7 @@ func TestGetAsset(baseT *testing.T) {
 		}
 		req.Check(t.T, hh)
 
-		//check rendering of a pending operation in state "created"
+		// check rendering of a pending operation in state "created"
 		pendingOp := db.PendingOperation{
 			AssetID:   1,
 			Reason:    castellum.OperationReasonHigh,
@@ -121,14 +121,14 @@ func TestGetAsset(baseT *testing.T) {
 		response["pending_operation"] = pendingOpJSON
 		req.Check(t.T, hh)
 
-		//check rendering of a pending operation in state "confirmed"
+		// check rendering of a pending operation in state "confirmed"
 		pendingOp.ConfirmedAt = p2time(time.Unix(22, 0).UTC())
 		t.MustUpdate(h.DB, &pendingOp)
 		pendingOpJSON["state"] = "confirmed"
 		pendingOpJSON["confirmed"] = assert.JSONObject{"at": 22}
 		req.Check(t.T, hh)
 
-		//check rendering of a pending operation in state "greenlit"
+		// check rendering of a pending operation in state "greenlit"
 		pendingOp.GreenlitAt = p2time(time.Unix(23, 0).UTC())
 		t.MustUpdate(h.DB, &pendingOp)
 		pendingOpJSON["state"] = "greenlit"
@@ -140,14 +140,14 @@ func TestGetAsset(baseT *testing.T) {
 		pendingOpJSON["greenlit"] = assert.JSONObject{"at": 23, "by_user": "user1"}
 		req.Check(t.T, hh)
 
-		//check rendering of a scraping error
+		// check rendering of a scraping error
 		t.MustExec(h.DB, `UPDATE assets SET scrape_error_message = $1 WHERE id = 1`, "filer is on fire")
 		response["checked"] = assert.JSONObject{
 			"error": "filer is on fire",
 		}
 		req.Check(t.T, hh)
 
-		//check rendering of finished operations in all possible states
+		// check rendering of finished operations in all possible states
 		response["finished_operations"] = []assert.JSONObject{
 			{
 				"reason":   "low",
@@ -206,7 +206,7 @@ func TestGetAsset(baseT *testing.T) {
 		req.Path += "?history"
 		req.Check(t.T, hh)
 
-		//check rendering of an asset that has never had a successful scrape
+		// check rendering of an asset that has never had a successful scrape
 		t.Must(h.DB.Insert(&db.Asset{
 			ResourceID:         1,
 			UUID:               "fooasset3",
