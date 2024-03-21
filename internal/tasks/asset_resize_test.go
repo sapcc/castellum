@@ -196,7 +196,7 @@ func TestErroringResize(tBase *testing.T) {
 		t.Must(c.DB.Insert(&pendingOp))
 
 		// when the outcome of the resize is "errored", we can retry several times
-		for try := 0; try < maxRetries; try++ {
+		for try := range maxRetries {
 			clock.StepBy(10 * time.Minute)
 			t.Must(resizeJob.ProcessOne(ctx))
 

@@ -129,9 +129,9 @@ type Asset struct {
 	//
 	// This differs from the MinimumSize and MaximumSize fields on type Resource
 	// in the level of enforcement: The constraints on type Resource just say that
-	//we will not actively move beyond these size boundaries. These limits here,
-	//by contrast, are actively enforced: Sizes beyond these boundaries will
-	//result in a resize operation to move back into the boundary (hence the
+	// we will not actively move beyond these size boundaries. These limits here,
+	// by contrast, are actively enforced: Sizes beyond these boundaries will
+	// result in a resize operation to move back into the boundary (hence the
 	//qualifier "strict").
 	StrictMinimumSize *uint64 `db:"min_size"`
 	StrictMaximumSize *uint64 `db:"max_size"`
