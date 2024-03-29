@@ -9,11 +9,11 @@ require (
 	github.com/gophercloud/utils v0.0.0-20231010081019-80377eca5d56
 	github.com/gorilla/mux v1.8.1
 	github.com/prometheus/client_golang v1.19.0
-	github.com/prometheus/common v0.51.0
+	github.com/prometheus/common v0.51.1
 	github.com/rs/cors v1.10.1
-	github.com/sapcc/go-api-declarations v1.10.9
-	github.com/sapcc/go-bits v0.0.0-20240321130422-af7405f5e67d
-	github.com/sapcc/gophercloud-sapcc v0.0.0-20240321130357-022151c85de7
+	github.com/sapcc/go-api-declarations v1.10.10
+	github.com/sapcc/go-bits v0.0.0-20240328092936-0e0b562825d4
+	github.com/sapcc/gophercloud-sapcc v0.0.0-20240328042652-ea67c703afd6
 	go.uber.org/automaxprocs v1.5.3
 	gopkg.in/yaml.v2 v2.4.0
 )
