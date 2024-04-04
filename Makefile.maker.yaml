@@ -19,7 +19,6 @@ dockerfile:
   enabled: true
 
 golang:
-  enableVendoring: true
   setGoModVersion: true
 
 golangciLint:
@@ -30,6 +29,7 @@ githubWorkflow:
     enabled: true
     coveralls: true
     postgres: true
+
 renovate:
   enabled: true
   assignees:
