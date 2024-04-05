@@ -79,13 +79,13 @@ func (info AssetTypeInfo) MakeZeroUsageValues() castellum.UsageValues {
 	return vals
 }
 
-// AssetNotFoundErr is returned by AssetManager.GetAssetStatus() if the
+// AssetNotFoundError is returned by AssetManager.GetAssetStatus() if the
 // concerning asset can not be found in the respective backend.
-type AssetNotFoundErr struct {
+type AssetNotFoundError struct {
 	InnerError error
 }
 
-func (e AssetNotFoundErr) Error() string {
+func (e AssetNotFoundError) Error() string {
 	return e.InnerError.Error()
 }
 

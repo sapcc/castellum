@@ -118,7 +118,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 	finishedAt := c.TimeNow()
 	if err != nil {
 		errMsg := fmt.Errorf("cannot query status of %s %s: %s", string(res.AssetType), asset.UUID, err.Error())
-		if errext.IsOfType[core.AssetNotFoundErr](err) {
+		if errext.IsOfType[core.AssetNotFoundError](err) {
 			// asset was deleted since the last scrape of this resource
 			logg.Error(errMsg.Error())
 			logg.Info("removing deleted %s asset from DB: UUID = %s, scope UUID = %s", res.AssetType, asset.UUID, res.ScopeUUID)

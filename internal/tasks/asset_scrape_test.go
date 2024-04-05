@@ -580,7 +580,7 @@ func TestAssetScrapesGivesUpWaitingForResize(baseT *testing.T) {
 
 func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 	// This tests the behavior when GetAssetStatus returns an error:
-	// 1. If core.AssetNotFoundErr is returned then the asset is deleted from
+	// 1. If core.AssetNotFoundError is returned then the asset is deleted from
 	// the db.
 	// 2. All other errors are passed through to the caller of ScrapeNextAsset,
 	// but the asset's next_scrape_at timestamp is still updated to ensure that

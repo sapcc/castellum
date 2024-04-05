@@ -47,7 +47,7 @@ type StaticAsset struct {
 	// When true, return a bogus error from GetAssetStatus().
 	CannotGetAssetStatus bool
 
-	// When true, return a core.AssetNotFoundErr from GetAssetStatus().
+	// When true, return a core.AssetNotFoundError from GetAssetStatus().
 	CannotFindAsset bool
 }
 
@@ -164,7 +164,7 @@ func (m AssetManagerStatic) GetAssetStatus(_ context.Context, res db.Resource, a
 		return core.AssetStatus{}, errSimulatedGetFailure
 	}
 	if asset.CannotFindAsset {
-		return core.AssetStatus{}, core.AssetNotFoundErr{InnerError: errSimulatedNotFound}
+		return core.AssetStatus{}, core.AssetNotFoundError{InnerError: errSimulatedNotFound}
 	}
 
 	if asset.NewSize != 0 {

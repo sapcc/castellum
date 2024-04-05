@@ -184,14 +184,14 @@ func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, a
 	}
 	if metrics.ExclusionReason != "" {
 		// defense in depth: this share should already have been ignored during ListAssets
-		return core.AssetStatus{}, core.AssetNotFoundErr{InnerError: fmt.Errorf("ignoring because of %s", metrics.ExclusionReason)}
+		return core.AssetStatus{}, core.AssetNotFoundError{InnerError: fmt.Errorf("ignoring because of %s", metrics.ExclusionReason)}
 	}
 
 	// if there are no metrics for this share, we can check Manila to see if the share was deleted in the meantime
 	if metrics.SizeGiB == nil || metrics.UsedGiB == nil {
 		_, err := shares.Get(m.Manila, assetUUID).Extract()
 		if errext.IsOfType[gophercloud.ErrDefault404](err) {
-			return core.AssetStatus{}, core.AssetNotFoundErr{InnerError: fmt.Errorf("share not found in Manila: %w", err)}
+			return core.AssetStatus{}, core.AssetNotFoundError{InnerError: fmt.Errorf("share not found in Manila: %w", err)}
 		} else {
 			return core.AssetStatus{}, fmt.Errorf("incomplete metrics for share %q: %#v", assetUUID, metrics)
 		}
