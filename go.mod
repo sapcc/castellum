@@ -6,7 +6,7 @@ require (
 	github.com/dlmiddlecote/sqlstats v1.0.2
 	github.com/go-gorp/gorp/v3 v3.1.0
 	github.com/gophercloud/gophercloud v1.11.0
-	github.com/gophercloud/utils v0.0.0-20231010081019-80377eca5d56
+	github.com/gophercloud/utils d912c2538aea
 	github.com/gorilla/mux v1.8.1
 	github.com/prometheus/client_golang v1.19.0
 	github.com/prometheus/common v0.52.2
