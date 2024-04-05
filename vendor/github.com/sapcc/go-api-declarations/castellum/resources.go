@@ -21,11 +21,11 @@ import "encoding/json"
 // This type also has YAML annotations because it appears in Castellum's
 // configuration file.
 type Resource struct {
-	//fields that only appear in GET responses
+	// fields that only appear in GET responses
 	Checked    *Checked `json:"checked,omitempty" yaml:"-"`
 	AssetCount int64    `json:"asset_count" yaml:"-"`
 
-	//fields that are also allowed in PUT requests
+	// fields that are also allowed in PUT requests
 	ConfigJSON        *json.RawMessage `json:"config,omitempty" yaml:"config,omitempty"`
 	LowThreshold      *Threshold       `json:"low_threshold,omitempty" yaml:"low_threshold,omitempty"`
 	HighThreshold     *Threshold       `json:"high_threshold,omitempty" yaml:"high_threshold,omitempty"`

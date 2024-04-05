@@ -48,8 +48,8 @@ type assetManagerProjectQuota struct {
 }
 
 type limesResourceInfo struct {
-	ServiceType  string
-	ResourceName string
+	ServiceType  limes.ServiceType
+	ResourceName limesresources.ResourceName
 	Unit         limes.Unit
 }
 
@@ -224,7 +224,7 @@ func (m *assetManagerProjectQuota) getQuotaStatus(assetType db.AssetType, projec
 		return nil, fmt.Errorf("project not found in Keystone: %s", projectID)
 	}
 
-	opts := projects.GetOpts{Services: []string{info.ServiceType}, Resources: []string{info.ResourceName}}
+	opts := projects.GetOpts{Services: []limes.ServiceType{info.ServiceType}, Resources: []limesresources.ResourceName{info.ResourceName}}
 	report, err := projects.Get(m.Limes, project.DomainID, projectID, opts).Extract()
 	if err != nil {
 		return nil, err
