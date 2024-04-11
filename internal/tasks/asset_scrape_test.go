@@ -96,7 +96,7 @@ func TestNoOperationWhenNoThreshold(baseT *testing.T) {
 	})
 }
 
-//nolint:dupl //dupl checks the functions/methods used and reports that there are duplicates. We can't refactor because although the methods used in unit tests might be similar, however they contain helpful comments in-place that are specific to that particular unit test.
+
 func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
@@ -191,7 +191,7 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 	})
 }
 
-//nolint:dupl
+
 func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
