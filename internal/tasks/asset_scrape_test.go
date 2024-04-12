@@ -96,7 +96,6 @@ func TestNoOperationWhenNoThreshold(baseT *testing.T) {
 	})
 }
 
-
 func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
@@ -190,7 +189,6 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 		})
 	})
 }
-
 
 func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
