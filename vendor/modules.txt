@@ -16,7 +16,7 @@ github.com/go-gorp/gorp/v3
 # github.com/gofrs/uuid/v5 v5.1.0
 ## explicit; go 1.19
 github.com/gofrs/uuid/v5
-# github.com/golang-migrate/migrate/v4 v4.17.0
+# github.com/golang-migrate/migrate/v4 v4.17.1
 ## explicit; go 1.18
 github.com/golang-migrate/migrate/v4
 github.com/golang-migrate/migrate/v4/database
@@ -116,7 +116,7 @@ github.com/rabbitmq/amqp091-go
 # github.com/rs/cors v1.10.1
 ## explicit; go 1.13
 github.com/rs/cors
-# github.com/sapcc/go-api-declarations v1.10.12
+# github.com/sapcc/go-api-declarations v1.11.0
 ## explicit; go 1.21
 github.com/sapcc/go-api-declarations/bininfo
 github.com/sapcc/go-api-declarations/cadf
@@ -124,7 +124,7 @@ github.com/sapcc/go-api-declarations/castellum
 github.com/sapcc/go-api-declarations/internal/marshal
 github.com/sapcc/go-api-declarations/limes
 github.com/sapcc/go-api-declarations/limes/resources
-# github.com/sapcc/go-bits v0.0.0-20240418035538-c509bd89fb1a
+# github.com/sapcc/go-bits v0.0.0-20240425084953-de3210f2772e
 ## explicit; go 1.22
 github.com/sapcc/go-bits/assert
 github.com/sapcc/go-bits/audittools
@@ -144,7 +144,7 @@ github.com/sapcc/go-bits/promquery
 github.com/sapcc/go-bits/regexpext
 github.com/sapcc/go-bits/respondwith
 github.com/sapcc/go-bits/sqlext
-# github.com/sapcc/gophercloud-sapcc v0.0.0-20240418091604-612364ab440e
+# github.com/sapcc/gophercloud-sapcc v0.0.0-20240425084956-3aa7add805ed
 ## explicit; go 1.21
 github.com/sapcc/gophercloud-sapcc/clients
 github.com/sapcc/gophercloud-sapcc/resources/v1/projects
