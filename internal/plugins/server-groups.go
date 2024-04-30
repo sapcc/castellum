@@ -418,7 +418,12 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 
 		server, err := servers.Create(computeV2, opts(name)).Extract()
 		if err != nil {
-			return castellum.OperationOutcomeErrored, fmt.Errorf("cannot create server %s in %s: %w", name, res.AssetType, err)
+			err = fmt.Errorf("cannot create server %s in %s: %w", name, res.AssetType, err)
+			if strings.Contains(err.Error(), "Quota exceeded for ") {
+				return castellum.OperationOutcomeFailed, err
+			} else {
+				return castellum.OperationOutcomeErrored, err
+			}
 		}
 		serversInCreation[server.ID] = server.Status
 	}
