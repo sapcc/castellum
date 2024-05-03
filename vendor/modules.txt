@@ -125,7 +125,7 @@ github.com/sapcc/go-api-declarations/castellum
 github.com/sapcc/go-api-declarations/internal/marshal
 github.com/sapcc/go-api-declarations/limes
 github.com/sapcc/go-api-declarations/limes/resources
-# github.com/sapcc/go-bits v0.0.0-20240425084953-de3210f2772e
+# github.com/sapcc/go-bits v0.0.0-20240429130232-fdc0102c61a4
 ## explicit; go 1.22
 github.com/sapcc/go-bits/assert
 github.com/sapcc/go-bits/audittools
@@ -145,7 +145,7 @@ github.com/sapcc/go-bits/promquery
 github.com/sapcc/go-bits/regexpext
 github.com/sapcc/go-bits/respondwith
 github.com/sapcc/go-bits/sqlext
-# github.com/sapcc/gophercloud-sapcc v0.0.0-20240425084956-3aa7add805ed
+# github.com/sapcc/gophercloud-sapcc v0.0.0-20240429130228-bc9d8c12dd20
 ## explicit; go 1.21
 github.com/sapcc/gophercloud-sapcc/clients
 github.com/sapcc/gophercloud-sapcc/resources/v1/projects
