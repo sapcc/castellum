@@ -200,11 +200,11 @@ func applySizeConstraintsSpecInto(res *db.Resource, spec castellum.Resource, max
 				errs.Addf("maximum size must be configured for %s", res.AssetType)
 			}
 		} else {
-			min := uint64(0)
+			minimum := uint64(0)
 			if res.MinimumSize != nil {
-				min = *res.MinimumSize
+				minimum = *res.MinimumSize
 			}
-			if *res.MaximumSize <= min {
+			if *res.MaximumSize <= minimum {
 				errs.Addf("maximum size must be greater than minimum size")
 			}
 			if maxAssetSize != nil && *res.MaximumSize > *maxAssetSize {
