@@ -107,4 +107,10 @@ var SQLMigrations = map[string]string{
 			usage                  TEXT        NOT NULL
 		);
 	`,
+	"022_add_index_to_assets_next_scrape_at.up.sql": `
+		CREATE INDEX ON assets (next_scrape_at);
+	`,
+	"022_add_index_to_assets_next_scrape_at.down.sql": `
+		DROP INDEX assets_next_scrape_at_idx;
+	`,
 }
