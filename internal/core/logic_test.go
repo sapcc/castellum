@@ -28,6 +28,7 @@ import (
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
+	"github.com/sapcc/go-bits/logg"
 )
 
 func TestGetEligibleOperations(t *testing.T) {
@@ -426,6 +427,26 @@ func TestGetEligibleOperations(t *testing.T) {
 		"low=20%, high=80%, crit=95%, step=20%, min=1100, max=900",
 		"size=1000, usage=100",
 		"", "", // Conflict of non-strict constrains should prevent downsizing
+	)
+
+	// a specific test that used to fail in prod: one metric's low threshold
+	// should not cause inaction when another metric goes into critical
+	logg.ShowDebug = true
+	resLogic := ResourceLogic{
+		UsageMetrics:             []castellum.UsageMetric{"cpu", "ram"},
+		LowThresholdPercent:      castellum.UsageValues{"cpu": 25, "ram": 60},
+		HighThresholdPercent:     castellum.UsageValues{"cpu": 0, "ram": 0}, // disabled
+		CriticalThresholdPercent: castellum.UsageValues{"cpu": 60.5, "ram": 90},
+		SizeStepPercent:          20.0,
+		SingleStep:               false,
+	}
+	assetStatus := AssetStatus{
+		Size:  4,
+		Usage: castellum.UsageValues{"cpu": 1.05, "ram": 3.95},
+	}
+	assert.DeepEqual(t, "eligible operations with percentage-step resizing",
+		eligibleOperationsToString(GetEligibleOperations(resLogic, assetStatus)),
+		"critical->5",
 	)
 }
 
