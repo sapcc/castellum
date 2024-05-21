@@ -118,7 +118,7 @@ func (c *Context) processResourceScrape(ctx context.Context, tx *gorp.Transactio
 			continue
 		}
 		logg.Info("removing deleted %s asset from DB: UUID = %s, scope UUID = %s", res.AssetType, dbAsset.UUID, res.ScopeUUID)
-		_, err = tx.Delete(&dbAsset) //nolint:gosec // Delete is not holding onto the pointer after it returns
+		_, err = tx.Delete(&dbAsset)
 		if err != nil {
 			return err
 		}

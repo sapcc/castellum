@@ -152,7 +152,7 @@ func (h handler) GetPendingOperations(w http.ResponseWriter, r *http.Request) {
 
 		// prepare for response body
 		for _, op := range ops {
-			allOps = append(allOps, PendingOperationFromDB(op, assetUUIDs[op.AssetID], &dbResource)) //nolint:gosec // PendingOperationFromDB is not holding onto the pointer after it returns
+			allOps = append(allOps, PendingOperationFromDB(op, assetUUIDs[op.AssetID], &dbResource))
 		}
 	}
 
@@ -212,7 +212,7 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 				continue
 			}
 			if _, exists := core.GetEligibleOperations(core.LogicOfResource(dbResource, info), core.StatusOfAsset(asset))[op.Reason]; exists {
-				relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &dbResource)) //nolint:gosec // FinishedOperationFromDB is not holding onto the pointer after it returns
+				relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &dbResource))
 			}
 		}
 	}
@@ -260,7 +260,7 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 			if !exists || op.FinishedAt.Before(maxFinishedAt) {
 				continue
 			}
-			relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &dbResource)) //nolint:gosec // FinishedOperationFromDB is not holding onto the pointer after it returns
+			relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &dbResource))
 		}
 	}
 

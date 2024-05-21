@@ -119,7 +119,7 @@ func (c *Context) applyProjectSeed(projectUUID string, seed core.ProjectSeed) er
 		} else if seed.ForbidsResource(dbResource.AssetType) {
 			// enforce negative seed
 			logg.Info("enforcing negative %s seed for project %s/%s...", dbResource.AssetType, seed.DomainName, seed.ProjectName)
-			_, err := c.DB.Delete(&dbResource) //nolint:gosec // we drop this pointer before the end of the loop iteration
+			_, err := c.DB.Delete(&dbResource)
 			if err != nil {
 				return err
 			}
