@@ -34,9 +34,9 @@ import (
 
 	"github.com/dlmiddlecote/sqlstats"
 	"github.com/go-gorp/gorp/v3"
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack"
-	"github.com/gophercloud/utils/openstack/clientconfig"
+	"github.com/gophercloud/gophercloud/v2"
+	"github.com/gophercloud/gophercloud/v2/openstack"
+	"github.com/gophercloud/utils/v2/openstack/clientconfig"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
@@ -98,13 +98,15 @@ func main() {
 	dbi := must.Return(db.Init(dbURL))
 	prometheus.MustRegister(sqlstats.NewStatsCollector("castellum", dbi.Db))
 
+	ctx := httpext.ContextWithSIGINT(context.Background(), 10*time.Second)
+
 	// initialize OpenStack connection
 	ao, err := clientconfig.AuthOptions(nil)
 	if err != nil {
 		logg.Fatal("cannot find OpenStack credentials: " + err.Error())
 	}
 	ao.AllowReauth = true
-	providerClient, err := core.NewProviderClient(*ao, gophercloud.EndpointOpts{
+	providerClient, err := core.NewProviderClient(ctx, *ao, gophercloud.EndpointOpts{
 		// note that empty values are acceptable in both fields
 		Region:       os.Getenv("OS_REGION_NAME"),
 		Availability: gophercloud.Availability(os.Getenv("OS_INTERFACE")),
@@ -128,17 +130,17 @@ func main() {
 		if len(os.Args) != 3 {
 			usage()
 		}
-		runAPI(cfg, dbi, team, providerClient, httpListenAddr)
+		runAPI(ctx, cfg, dbi, team, providerClient, httpListenAddr)
 	case "observer":
 		if len(os.Args) != 3 {
 			usage()
 		}
-		runObserver(cfg, dbi, team, providerClient, httpListenAddr)
+		runObserver(ctx, cfg, dbi, team, providerClient, httpListenAddr)
 	case "worker":
 		if len(os.Args) != 3 {
 			usage()
 		}
-		runWorker(dbi, team, httpListenAddr)
+		runWorker(ctx, dbi, team, httpListenAddr)
 	case "test-asset-type":
 		if len(os.Args) != 4 && len(os.Args) != 5 {
 			usage()
@@ -147,7 +149,7 @@ func main() {
 		if len(os.Args) == 5 {
 			configJSON = os.Args[4]
 		}
-		runAssetTypeTestShell(context.Background(), team, db.AssetType(os.Args[3]), configJSON)
+		runAssetTypeTestShell(ctx, team, db.AssetType(os.Args[3]), configJSON)
 	default:
 		usage()
 	}
@@ -156,7 +158,7 @@ func main() {
 ////////////////////////////////////////////////////////////////////////////////
 // task: API
 
-func runAPI(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
+func runAPI(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
 	identityV3, err := providerClient.CloudAdminClient(openstack.NewIdentityV3)
 	if err != nil {
 		logg.Fatal("cannot find Keystone V3 API: " + err.Error())
@@ -202,16 +204,13 @@ func runAPI(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, provid
 		api.StartAuditLogging(rabbitQueueName, rabbitURI)
 	}
 
-	ctx := httpext.ContextWithSIGINT(context.Background(), 10*time.Second)
 	must.Succeed(httpext.ListenAndServeContext(ctx, httpListenAddr, mux))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // task: observer
 
-func runObserver(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
-	ctx := httpext.ContextWithSIGINT(context.Background(), 1*time.Second)
-
+func runObserver(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
 	c := tasks.Context{Config: cfg, DB: dbi, Team: team, ProviderClient: providerClient}
 	c.ApplyDefaults()
 	prometheus.MustRegister(tasks.StateMetricsCollector{Context: c})
@@ -238,9 +237,7 @@ func runObserver(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, p
 ////////////////////////////////////////////////////////////////////////////////
 // task: worker
 
-func runWorker(dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
-	ctx := httpext.ContextWithSIGINT(context.Background(), 1*time.Second)
-
+func runWorker(ctx context.Context, dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
 	c := tasks.Context{DB: dbi, Team: team}
 	c.ApplyDefaults()
 
@@ -298,7 +295,7 @@ PROMPT:
 			res.AssetType = assetType
 			res.ScopeUUID = fields[1]
 			res.ConfigJSON = configJSON
-			err := manager.CheckResourceAllowed(res.AssetType, res.ScopeUUID, res.ConfigJSON, nil)
+			err := manager.CheckResourceAllowed(ctx, res.AssetType, res.ScopeUUID, res.ConfigJSON, nil)
 			if err != nil {
 				logg.Error("CheckResourceAllowed failed: " + err.Error())
 				continue
@@ -378,7 +375,7 @@ PROMPT:
 				logg.Error(err.Error())
 				continue
 			}
-			outcome, err := manager.SetAssetSize(res, fields[2], oldSize, newSize)
+			outcome, err := manager.SetAssetSize(ctx, res, fields[2], oldSize, newSize)
 			logg.Info("outcome: %s", outcome)
 			if err != nil {
 				logg.Error(err.Error())

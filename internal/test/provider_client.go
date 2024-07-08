@@ -20,7 +20,9 @@
 package test
 
 import (
-	"github.com/gophercloud/gophercloud"
+	"context"
+
+	"github.com/gophercloud/gophercloud/v2"
 
 	"github.com/sapcc/castellum/internal/core"
 )
@@ -35,7 +37,7 @@ func (c MockProviderClient) CloudAdminClient(factory core.ServiceClientFactory) 
 	panic("CloudAdminClient is not implemented in MockProviderClient")
 }
 
-func (c MockProviderClient) ProjectScopedClient(scope core.ProjectScope) (*gophercloud.ProviderClient, gophercloud.EndpointOpts, error) {
+func (c MockProviderClient) ProjectScopedClient(_ context.Context, scope core.ProjectScope) (*gophercloud.ProviderClient, gophercloud.EndpointOpts, error) {
 	panic("ProjectScopedClient is not implemented in MockProviderClient")
 }
 
@@ -43,7 +45,7 @@ func (c MockProviderClient) GetAuthResult() gophercloud.AuthResult {
 	panic("GetAuthResult is not implemented in MockProviderClient")
 }
 
-func (c MockProviderClient) GetProject(projectID string) (*core.CachedProject, error) {
+func (c MockProviderClient) GetProject(_ context.Context, projectID string) (*core.CachedProject, error) {
 	result, exists := c.Projects[projectID]
 	if exists {
 		return &result, nil
@@ -51,7 +53,7 @@ func (c MockProviderClient) GetProject(projectID string) (*core.CachedProject, e
 	return nil, nil
 }
 
-func (c MockProviderClient) GetDomain(domainID string) (*core.CachedDomain, error) {
+func (c MockProviderClient) GetDomain(_ context.Context, domainID string) (*core.CachedDomain, error) {
 	result, exists := c.Domains[domainID]
 	if exists {
 		return &result, nil
@@ -59,7 +61,7 @@ func (c MockProviderClient) GetDomain(domainID string) (*core.CachedDomain, erro
 	return nil, nil
 }
 
-func (c MockProviderClient) FindProjectID(projectName, projectDomainName string) (string, error) {
+func (c MockProviderClient) FindProjectID(_ context.Context, projectName, projectDomainName string) (string, error) {
 	domainID := c.findDomainID(projectDomainName)
 	if domainID == "" {
 		return "", nil // no such project

@@ -96,7 +96,7 @@ func (c *Context) processAssetResize(ctx context.Context, tx *gorp.Transaction, 
 
 	// perform the resize operation (we give asset.Size instead of op.OldSize
 	// since this is the most up-to-date asset size that we have)
-	outcome, err := manager.SetAssetSize(res, asset.UUID, asset.Size, op.NewSize)
+	outcome, err := manager.SetAssetSize(ctx, res, asset.UUID, asset.Size, op.NewSize)
 	errorMessage := ""
 	if err != nil {
 		logg.Error("cannot resize %s %s to size %d: %s", string(res.AssetType), asset.UUID, op.NewSize, err.Error())
