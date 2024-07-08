@@ -131,12 +131,12 @@ type AssetManager interface {
 	//
 	// Simple implementations should return nil for empty `configJSON` and
 	// `core.ErrNoConfigurationAllowed` otherwise.
-	CheckResourceAllowed(assetType db.AssetType, scopeUUID string, configJSON string, existingResources map[db.AssetType]struct{}) error
+	CheckResourceAllowed(ctx context.Context, assetType db.AssetType, scopeUUID string, configJSON string, existingResources map[db.AssetType]struct{}) error
 
 	ListAssets(ctx context.Context, res db.Resource) ([]string, error)
 	// The returned Outcome should be either Succeeded, Failed or Errored, but not Cancelled.
 	// The returned error should be nil if and only if the outcome is Succeeded.
-	SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error)
+	SetAssetSize(ctx context.Context, res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error)
 	// previousStatus will be nil when this function is called for the first time
 	// for the given asset.
 	GetAssetStatus(ctx context.Context, res db.Resource, assetUUID string, previousStatus *AssetStatus) (AssetStatus, error)

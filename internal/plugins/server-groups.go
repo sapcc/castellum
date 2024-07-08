@@ -25,23 +25,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/schedulerhints"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/servergroups"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
-	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
-	"github.com/gophercloud/gophercloud/openstack/keymanager/v1/secrets"
-	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/pools"
+	"github.com/gophercloud/gophercloud/v2"
+	"github.com/gophercloud/gophercloud/v2/openstack"
+	"github.com/gophercloud/gophercloud/v2/openstack/compute/v2/flavors"
+	"github.com/gophercloud/gophercloud/v2/openstack/compute/v2/keypairs"
+	"github.com/gophercloud/gophercloud/v2/openstack/compute/v2/servergroups"
+	"github.com/gophercloud/gophercloud/v2/openstack/compute/v2/servers"
+	"github.com/gophercloud/gophercloud/v2/openstack/image/v2/images"
+	"github.com/gophercloud/gophercloud/v2/openstack/keymanager/v1/secrets"
+	"github.com/gophercloud/gophercloud/v2/openstack/loadbalancer/v2/pools"
 	"github.com/sapcc/go-api-declarations/castellum"
-	"github.com/sapcc/go-bits/errext"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
@@ -117,11 +116,11 @@ func (m *assetManagerServerGroups) InfoForAssetType(assetType db.AssetType) *cor
 }
 
 // CheckResourceAllowed implements the core.AssetManager interface.
-func (m *assetManagerServerGroups) CheckResourceAllowed(assetType db.AssetType, scopeUUID, configJSON string, existingResources map[db.AssetType]struct{}) error {
+func (m *assetManagerServerGroups) CheckResourceAllowed(ctx context.Context, assetType db.AssetType, scopeUUID, configJSON string, existingResources map[db.AssetType]struct{}) error {
 	// check that the server group exists and is in the right project
 	groupID := strings.TrimPrefix(string(assetType), "server-group:")
-	group, err := m.getServerGroup(groupID)
-	if errext.IsOfType[gophercloud.ErrDefault404](err) || (err == nil && group.ProjectID != scopeUUID) {
+	group, err := m.getServerGroup(ctx, groupID)
+	if gophercloud.ResponseCodeIs(err, http.StatusNotFound) || (err == nil && group.ProjectID != scopeUUID) {
 		return fmt.Errorf("server group not found in Nova: %s", groupID)
 	}
 	if err != nil {
@@ -140,14 +139,14 @@ func (m *assetManagerServerGroups) ListAssets(_ context.Context, res db.Resource
 }
 
 // GetAssetStatus implements the core.AssetManager interface.
-func (m *assetManagerServerGroups) GetAssetStatus(_ context.Context, res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
+func (m *assetManagerServerGroups) GetAssetStatus(ctx context.Context, res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
 	computeV2, err := m.Provider.CloudAdminClient(openstack.NewComputeV2)
 	if err != nil {
 		return core.AssetStatus{}, err
 	}
 
 	groupID := strings.TrimPrefix(string(res.AssetType), "server-group:")
-	group, err := m.getServerGroup(groupID)
+	group, err := m.getServerGroup(ctx, groupID)
 	if err != nil {
 		return core.AssetStatus{}, fmt.Errorf("cannot GET server group: %w", err)
 	}
@@ -155,7 +154,7 @@ func (m *assetManagerServerGroups) GetAssetStatus(_ context.Context, res db.Reso
 	// check instance status
 	isNewServer := make(map[string]bool)
 	for _, serverID := range group.Members {
-		server, err := servers.Get(computeV2, serverID).Extract()
+		server, err := servers.Get(ctx, computeV2, serverID).Extract()
 		if err != nil {
 			return core.AssetStatus{}, fmt.Errorf("cannot inspect server %s: %w", serverID, err)
 		}
@@ -206,7 +205,7 @@ func (m *assetManagerServerGroups) GetAssetStatus(_ context.Context, res db.Reso
 }
 
 // SetAssetSize implements the core.AssetManager interface.
-func (m *assetManagerServerGroups) SetAssetSize(res db.Resource, assetUUID string, _, newSize uint64) (castellum.OperationOutcome, error) {
+func (m *assetManagerServerGroups) SetAssetSize(ctx context.Context, res db.Resource, assetUUID string, _, newSize uint64) (castellum.OperationOutcome, error) {
 	cfg, err := m.parseAndValidateConfig(res.ConfigJSON)
 	if err != nil {
 		// if validation fails here, we should not have accepted the configuration
@@ -217,7 +216,7 @@ func (m *assetManagerServerGroups) SetAssetSize(res db.Resource, assetUUID strin
 
 	// double-check actual `oldSize` by counting current group members
 	groupID := strings.TrimPrefix(string(res.AssetType), "server-group:")
-	group, err := m.getServerGroup(groupID)
+	group, err := m.getServerGroup(ctx, groupID)
 	if err != nil {
 		return castellum.OperationOutcomeErrored, err
 	}
@@ -225,22 +224,22 @@ func (m *assetManagerServerGroups) SetAssetSize(res db.Resource, assetUUID strin
 
 	// perform server creations/deletions
 	if oldSize > newSize {
-		return m.terminateServers(res, cfg, group, oldSize-newSize)
+		return m.terminateServers(ctx, res, cfg, group, oldSize-newSize)
 	}
 	if newSize > oldSize {
-		return m.createServers(res, cfg, group, newSize-oldSize)
+		return m.createServers(ctx, res, cfg, group, newSize-oldSize)
 	}
 
 	// nothing to do (should be unreachable in practice since we would not get called at all when `oldSize == newSize`)
 	return castellum.OperationOutcomeSucceeded, nil
 }
 
-func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configForServerGroup, group serverGroup, countToDelete uint64) (castellum.OperationOutcome, error) {
+func (m *assetManagerServerGroups) terminateServers(ctx context.Context, res db.Resource, cfg configForServerGroup, group serverGroup, countToDelete uint64) (castellum.OperationOutcome, error) {
 	computeV2, err := m.Provider.CloudAdminClient(openstack.NewComputeV2)
 	if err != nil {
 		return castellum.OperationOutcomeErrored, err
 	}
-	provider, eo, err := m.Provider.ProjectScopedClient(core.ProjectScope{
+	provider, eo, err := m.Provider.ProjectScopedClient(ctx, core.ProjectScope{
 		ID:        res.ScopeUUID,
 		RoleNames: m.LocalRoleNames,
 	})
@@ -255,7 +254,7 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 	// get creation timestamps for all servers in this group
 	var allServers []*servers.Server
 	for _, serverID := range group.Members {
-		server, err := servers.Get(computeV2, serverID).Extract()
+		server, err := servers.Get(ctx, computeV2, serverID).Extract()
 		if err != nil {
 			return castellum.OperationOutcomeErrored, fmt.Errorf("cannot inspect server %s in %s: %w", serverID, res.AssetType, err)
 		}
@@ -285,7 +284,7 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 		server := allServers[idx]
 		logg.Info("deleting server %s from %s", server.ID, res.AssetType)
 		for _, lb := range cfg.LoadbalancerPoolMemberships {
-			err := m.removeServerFromLoadbalancer(server, lb, loadbalancerV2)
+			err := m.removeServerFromLoadbalancer(ctx, server, lb, loadbalancerV2)
 			if err != nil {
 				err = fmt.Errorf("cannot remove server %s in %s from LB pool %s: %w", server.ID, res.AssetType, lb.PoolUUID, err)
 				return castellum.OperationOutcomeErrored, err
@@ -295,7 +294,7 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 			// give some extra time for the server to answer its last outstanding client requests
 			time.Sleep(5 * time.Second)
 		}
-		err := servers.Delete(computeV2, server.ID).ExtractErr()
+		err := servers.Delete(ctx, computeV2, server.ID).ExtractErr()
 		if err != nil {
 			return castellum.OperationOutcomeErrored, fmt.Errorf("cannot delete server %s in %s: %w", server.ID, res.AssetType, err)
 		}
@@ -320,8 +319,8 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 		// check if servers are still there
 		logg.Info("checking on %d servers being deleted...", len(serversInDeletion))
 		for serverID := range serversInDeletion {
-			server, err := servers.Get(computeV2, serverID).Extract()
-			if errext.IsOfType[gophercloud.ErrDefault404](err) {
+			server, err := servers.Get(ctx, computeV2, serverID).Extract()
+			if gophercloud.ResponseCodeIs(err, http.StatusNotFound) {
 				// server has disappeared - stop waiting for it
 				delete(serversInDeletion, serverID)
 				continue
@@ -337,8 +336,8 @@ func (m *assetManagerServerGroups) terminateServers(res db.Resource, cfg configF
 	return castellum.OperationOutcomeSucceeded, nil
 }
 
-func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForServerGroup, group serverGroup, countToCreate uint64) (castellum.OperationOutcome, error) {
-	provider, eo, err := m.Provider.ProjectScopedClient(core.ProjectScope{
+func (m *assetManagerServerGroups) createServers(ctx context.Context, res db.Resource, cfg configForServerGroup, group serverGroup, countToCreate uint64) (castellum.OperationOutcome, error) {
+	provider, eo, err := m.Provider.ProjectScopedClient(ctx, core.ProjectScope{
 		ID:        res.ScopeUUID,
 		RoleNames: m.LocalRoleNames,
 	})
@@ -349,7 +348,7 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 	if err != nil {
 		return castellum.OperationOutcomeErrored, err
 	}
-	imageV2, err := openstack.NewImageServiceV2(provider, eo)
+	imageV2, err := openstack.NewImageV2(provider, eo)
 	if err != nil {
 		return castellum.OperationOutcomeErrored, err
 	}
@@ -362,15 +361,15 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 		return castellum.OperationOutcomeErrored, err
 	}
 
-	resolvedImageID, err := m.resolveImageIntoID(imageV2, cfg.Template.Image.Name)
+	resolvedImageID, err := m.resolveImageIntoID(ctx, imageV2, cfg.Template.Image.Name)
 	if err != nil {
 		return Classify(err)
 	}
-	resolvedFlavorID, err := m.resolveFlavorIntoID(computeV2, cfg.Template.Flavor.Name)
+	resolvedFlavorID, err := m.resolveFlavorIntoID(ctx, computeV2, cfg.Template.Flavor.Name)
 	if err != nil {
 		return Classify(err)
 	}
-	resolvedKeypairName, err := m.pullKeypairFromBarbican(computeV2, keymgrV1, cfg.Template.PublicKey.BarbicanID)
+	resolvedKeypairName, err := m.pullKeypairFromBarbican(ctx, computeV2, keymgrV1, cfg.Template.PublicKey.BarbicanID)
 	if err != nil {
 		return Classify(err)
 	}
@@ -383,6 +382,7 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 	opts := func(name string) (opts servers.CreateOptsBuilder) {
 		opts = servers.CreateOpts{
 			AvailabilityZone: cfg.Template.AvailabilityZone,
+			BlockDevice:      cfg.Template.BlockDeviceMappings,
 			FlavorRef:        resolvedFlavorID,
 			ImageRef:         resolvedImageID,
 			Metadata:         cfg.Template.Metadata,
@@ -395,19 +395,10 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 			CreateOptsBuilder: opts,
 			KeyName:           resolvedKeypairName,
 		}
-		opts = schedulerhints.CreateOptsExt{
-			CreateOptsBuilder: opts,
-			SchedulerHints: schedulerhints.SchedulerHints{
-				Group: group.ID,
-			},
-		}
-		if len(cfg.Template.BlockDeviceMappings) > 0 {
-			opts = bootfromvolume.CreateOptsExt{
-				CreateOptsBuilder: opts,
-				BlockDevice:       cfg.Template.BlockDeviceMappings,
-			}
-		}
 		return opts
+	}
+	schedulerhints := servers.SchedulerHintOpts{
+		Group: group.ID,
 	}
 
 	// create servers
@@ -416,7 +407,7 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 		name := fmt.Sprintf("%s-%s", group.Name, makeNameDisambiguator())
 		logg.Info("creating server %s in %s", name, res.AssetType)
 
-		server, err := servers.Create(computeV2, opts(name)).Extract()
+		server, err := servers.Create(ctx, computeV2, opts(name), schedulerhints).Extract()
 		if err != nil {
 			err = fmt.Errorf("cannot create server %s in %s: %w", name, res.AssetType, err)
 			if strings.Contains(err.Error(), "Quota exceeded for ") {
@@ -445,8 +436,8 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 		// check if servers have progressed
 		logg.Info("checking on %d servers being created...", len(serversInCreation))
 		for serverID := range serversInCreation {
-			server, err := servers.Get(computeV2, serverID).Extract()
-			if errext.IsOfType[gophercloud.ErrDefault404](err) {
+			server, err := servers.Get(ctx, computeV2, serverID).Extract()
+			if gophercloud.ResponseCodeIs(err, http.StatusNotFound) {
 				// server has disappeared - complain, and stop checking for it
 				msgs = append(msgs, fmt.Sprintf("server %s has disappeared before going into ACTIVE", serverID))
 				delete(serversInCreation, serverID)
@@ -466,7 +457,7 @@ func (m *assetManagerServerGroups) createServers(res db.Resource, cfg configForS
 			case "ACTIVE":
 				logg.Info("server %s in %s has entered status ACTIVE", serverID, res.AssetType)
 				for _, lb := range cfg.LoadbalancerPoolMemberships {
-					err := m.addServerToLoadbalancer(server, lb, loadbalancerV2)
+					err := m.addServerToLoadbalancer(ctx, server, lb, loadbalancerV2)
 					if err != nil {
 						msgs = append(msgs, fmt.Sprintf("cannot add server %s to LB pool %s: %s", serverID, lb.PoolUUID, err.Error()))
 					}
@@ -517,7 +508,7 @@ func (m *assetManagerServerGroups) findServerIPForLoadbalancer(server *servers.S
 	return "", errors.New("cannot find IP address for server")
 }
 
-func (m *assetManagerServerGroups) addServerToLoadbalancer(server *servers.Server, cfg configForLBPoolMembership, loadbalancerV2 *gophercloud.ServiceClient) error {
+func (m *assetManagerServerGroups) addServerToLoadbalancer(ctx context.Context, server *servers.Server, cfg configForLBPoolMembership, loadbalancerV2 *gophercloud.ServiceClient) error {
 	serverIP, err := m.findServerIPForLoadbalancer(server, cfg)
 	if err != nil {
 		return err
@@ -532,15 +523,15 @@ func (m *assetManagerServerGroups) addServerToLoadbalancer(server *servers.Serve
 		opts.MonitorAddress = serverIP
 		opts.MonitorPort = &val
 	}
-	_, err = pools.CreateMember(loadbalancerV2, cfg.PoolUUID, opts).Extract()
+	_, err = pools.CreateMember(ctx, loadbalancerV2, cfg.PoolUUID, opts).Extract()
 	return err
 }
 
-func (m *assetManagerServerGroups) removeServerFromLoadbalancer(server *servers.Server, cfg configForLBPoolMembership, loadbalancerV2 *gophercloud.ServiceClient) error {
+func (m *assetManagerServerGroups) removeServerFromLoadbalancer(ctx context.Context, server *servers.Server, cfg configForLBPoolMembership, loadbalancerV2 *gophercloud.ServiceClient) error {
 	listOpts := pools.ListMembersOpts{
 		Name: server.Name,
 	}
-	pager, err := pools.ListMembers(loadbalancerV2, cfg.PoolUUID, listOpts).AllPages()
+	pager, err := pools.ListMembers(loadbalancerV2, cfg.PoolUUID, listOpts).AllPages(ctx)
 	if err != nil {
 		return err
 	}
@@ -549,7 +540,7 @@ func (m *assetManagerServerGroups) removeServerFromLoadbalancer(server *servers.
 		return err
 	}
 	for _, member := range members {
-		err := pools.DeleteMember(loadbalancerV2, cfg.PoolUUID, member.ID).ExtractErr()
+		err := pools.DeleteMember(ctx, loadbalancerV2, cfg.PoolUUID, member.ID).ExtractErr()
 		if err != nil {
 			return err
 		}
@@ -569,8 +560,8 @@ type configForLBPoolMembership struct {
 type configForServerGroup struct {
 	DeleteNewestFirst bool `json:"delete_newest_first"`
 	Template          struct {
-		AvailabilityZone    string                       `json:"availability_zone"`
-		BlockDeviceMappings []bootfromvolume.BlockDevice `json:"block_device_mapping_v2,omitempty"`
+		AvailabilityZone    string                `json:"availability_zone"`
+		BlockDeviceMappings []servers.BlockDevice `json:"block_device_mapping_v2,omitempty"`
 		Flavor              struct {
 			Name string `json:"name"`
 		} `json:"flavor"`
@@ -591,17 +582,24 @@ type configForServerGroup struct {
 	LoadbalancerPoolMemberships []configForLBPoolMembership `json:"loadbalancer_pool_memberships"`
 }
 
-// TODO Go 1.18: change type to slice of actual type, write containsString() with generics instead
-var validBDMSourceTypes = []string{
-	string(bootfromvolume.SourceBlank),
-	string(bootfromvolume.SourceImage),
-	string(bootfromvolume.SourceSnapshot),
-	string(bootfromvolume.SourceVolume),
+var validBDMSourceTypes = []servers.SourceType{
+	servers.SourceBlank,
+	servers.SourceImage,
+	servers.SourceSnapshot,
+	servers.SourceVolume,
 }
 
-var validBDMDestinationTypes = []string{
-	string(bootfromvolume.DestinationLocal),
-	string(bootfromvolume.DestinationVolume),
+var validBDMDestinationTypes = []servers.DestinationType{
+	servers.DestinationLocal,
+	servers.DestinationVolume,
+}
+
+func joinStrings[S ~string](inputs []S, separator string) string {
+	outputs := make([]string, len(inputs))
+	for idx, input := range inputs {
+		outputs[idx] = string(input)
+	}
+	return strings.Join(outputs, separator)
 }
 
 func (m *assetManagerServerGroups) parseAndValidateConfig(configJSON string) (configForServerGroup, error) {
@@ -624,15 +622,15 @@ func (m *assetManagerServerGroups) parseAndValidateConfig(configJSON string) (co
 	for idx, bd := range cfg.Template.BlockDeviceMappings {
 		if bd.SourceType == "" {
 			complain("template.block_device_mapping_v2[%d].source_type is missing", idx)
-		} else if !containsString(validBDMSourceTypes, string(bd.SourceType)) {
+		} else if !slices.Contains(validBDMSourceTypes, bd.SourceType) {
 			complain("value for template.block_device_mapping_v2[%d].source_type must be one of: %q",
-				idx, strings.Join(validBDMSourceTypes, `", "`))
+				idx, joinStrings(validBDMSourceTypes, `", "`))
 		}
 		if bd.DestinationType == "" {
 			// this is acceptable apparently
-		} else if !containsString(validBDMDestinationTypes, string(bd.DestinationType)) {
+		} else if !slices.Contains(validBDMDestinationTypes, bd.DestinationType) {
 			complain("value for template.block_device_mapping_v2[%d].destination_type must be one of: %q",
-				idx, strings.Join(validBDMDestinationTypes, `", "`))
+				idx, joinStrings(validBDMDestinationTypes, `", "`))
 		}
 	}
 	for idx, lb := range cfg.LoadbalancerPoolMemberships {
@@ -681,15 +679,6 @@ func (m *assetManagerServerGroups) parseAndValidateConfig(configJSON string) (co
 	return cfg, nil
 }
 
-func containsString(list []string, val string) bool {
-	for _, elem := range list {
-		if elem == val {
-			return true
-		}
-	}
-	return false
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // gophercloud extensions/helpers
 
@@ -702,7 +691,7 @@ type serverGroup struct {
 	ProjectID string   `json:"project_id"` // not in Gophercloud (TODO)
 }
 
-func (m *assetManagerServerGroups) getServerGroup(id string) (serverGroup, error) {
+func (m *assetManagerServerGroups) getServerGroup(ctx context.Context, id string) (serverGroup, error) {
 	computeV2, err := m.Provider.CloudAdminClient(openstack.NewComputeV2)
 	if err != nil {
 		return serverGroup{}, err
@@ -712,12 +701,12 @@ func (m *assetManagerServerGroups) getServerGroup(id string) (serverGroup, error
 	var data struct {
 		ServerGroup serverGroup `json:"server_group"`
 	}
-	err = servergroups.Get(computeV2, id).ExtractInto(&data)
+	err = servergroups.Get(ctx, computeV2, id).ExtractInto(&data)
 	return data.ServerGroup, err
 }
 
-func (m *assetManagerServerGroups) resolveImageIntoID(imageV2 *gophercloud.ServiceClient, name string) (string, error) {
-	page, err := images.List(imageV2, images.ListOpts{Name: name}).AllPages()
+func (m *assetManagerServerGroups) resolveImageIntoID(ctx context.Context, imageV2 *gophercloud.ServiceClient, name string) (string, error) {
+	page, err := images.List(imageV2, images.ListOpts{Name: name}).AllPages(ctx)
 	if err != nil {
 		return "", fmt.Errorf("cannot get image %q: %w", name, err)
 	}
@@ -734,8 +723,8 @@ func (m *assetManagerServerGroups) resolveImageIntoID(imageV2 *gophercloud.Servi
 	return matchingImages[0].ID, nil
 }
 
-func (m *assetManagerServerGroups) resolveFlavorIntoID(computeV2 *gophercloud.ServiceClient, name string) (string, error) {
-	page, err := flavors.ListDetail(computeV2, flavors.ListOpts{}).AllPages()
+func (m *assetManagerServerGroups) resolveFlavorIntoID(ctx context.Context, computeV2 *gophercloud.ServiceClient, name string) (string, error) {
+	page, err := flavors.ListDetail(computeV2, flavors.ListOpts{}).AllPages(ctx)
 	if err != nil {
 		return "", fmt.Errorf("cannot get flavor %q: %w", name, err)
 	}
@@ -758,15 +747,15 @@ func (m *assetManagerServerGroups) resolveFlavorIntoID(computeV2 *gophercloud.Se
 	return matchingFlavors[0].ID, nil
 }
 
-func (m *assetManagerServerGroups) pullKeypairFromBarbican(computeV2, keymgrV1 *gophercloud.ServiceClient, secretID string) (string, error) {
+func (m *assetManagerServerGroups) pullKeypairFromBarbican(ctx context.Context, computeV2, keymgrV1 *gophercloud.ServiceClient, secretID string) (string, error) {
 	// check if present in Nova already
 	nameInNova := "from-barbican-" + secretID
-	_, err := keypairs.Get(computeV2, nameInNova, nil).Extract()
+	_, err := keypairs.Get(ctx, computeV2, nameInNova, nil).Extract()
 	switch {
 	case err == nil:
 		// keypair exists -> nothing to do
 		return nameInNova, nil
-	case errext.IsOfType[gophercloud.ErrDefault404](err):
+	case gophercloud.ResponseCodeIs(err, http.StatusNotFound):
 		// keypair does not exist -> pull from Barbican below
 		break
 	default:
@@ -775,7 +764,7 @@ func (m *assetManagerServerGroups) pullKeypairFromBarbican(computeV2, keymgrV1 *
 	}
 
 	// keypair does not exist -> pull from Barbican
-	payload, err := secrets.GetPayload(keymgrV1, secretID, nil).Extract()
+	payload, err := secrets.GetPayload(ctx, keymgrV1, secretID, nil).Extract()
 	if err != nil {
 		// This is not guaranteed to be a UserError, but the most common errors are
 		// going to be 401 Forbidden (the secret was created as private and cannot
@@ -783,7 +772,7 @@ func (m *assetManagerServerGroups) pullKeypairFromBarbican(computeV2, keymgrV1 *
 		// the secret was deleted in the meantime).
 		return "", UserError{fmt.Errorf("cannot get public key from Barbican: %w", err)}
 	}
-	_, err = keypairs.Create(computeV2, keypairs.CreateOpts{Name: nameInNova, PublicKey: string(payload)}).Extract()
+	_, err = keypairs.Create(ctx, computeV2, keypairs.CreateOpts{Name: nameInNova, PublicKey: string(payload)}).Extract()
 	if err != nil {
 		return "", fmt.Errorf("cannot upload public key to Nova: %w", err)
 	}

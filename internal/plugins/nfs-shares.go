@@ -22,15 +22,15 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"net/http"
 	"regexp"
 	"time"
 
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack"
-	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares"
+	"github.com/gophercloud/gophercloud/v2"
+	"github.com/gophercloud/gophercloud/v2/openstack"
+	"github.com/gophercloud/gophercloud/v2/openstack/sharedfilesystems/v2/shares"
 	"github.com/prometheus/common/model"
 	"github.com/sapcc/go-api-declarations/castellum"
-	"github.com/sapcc/go-bits/errext"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/promquery"
 
@@ -81,7 +81,7 @@ func (m *assetManagerNFS) InfoForAssetType(assetType db.AssetType) *core.AssetTy
 }
 
 // CheckResourceAllowed implements the core.AssetManager interface.
-func (m *assetManagerNFS) CheckResourceAllowed(assetType db.AssetType, scopeUUID, configJSON string, existingResources map[db.AssetType]struct{}) error {
+func (m *assetManagerNFS) CheckResourceAllowed(ctx context.Context, assetType db.AssetType, scopeUUID, configJSON string, existingResources map[db.AssetType]struct{}) error {
 	if configJSON != "" {
 		return core.ErrNoConfigurationAllowed
 	}
@@ -130,8 +130,8 @@ var (
 )
 
 // SetAssetSize implements the core.AssetManager interface.
-func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error) {
-	err := m.resize(assetUUID, oldSize, newSize /* useReverseOperation = */, false)
+func (m *assetManagerNFS) SetAssetSize(ctx context.Context, res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error) {
+	err := m.resize(ctx, assetUUID, oldSize, newSize /* useReverseOperation = */, false)
 	if err != nil {
 		match := sizeInconsistencyErrorRx.FindStringSubmatch(err.Error())
 		if match != nil {
@@ -145,7 +145,7 @@ func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSiz
 			// cause it to have a different expectation of how big the share is, therefore
 			// rejecting shrink/extend requests because it thinks they go in the wrong
 			// direction. In this case, we try the opposite direction to see if it helps.
-			err2 := m.resize(assetUUID, oldSize, newSize /* useReverseOperation = */, true)
+			err2 := m.resize(ctx, assetUUID, oldSize, newSize /* useReverseOperation = */, true)
 			if err2 == nil {
 				return castellum.OperationOutcomeSucceeded, nil
 			}
@@ -162,14 +162,14 @@ func (m *assetManagerNFS) SetAssetSize(res db.Resource, assetUUID string, oldSiz
 	return castellum.OperationOutcomeSucceeded, nil
 }
 
-func (m *assetManagerNFS) resize(assetUUID string, oldSize, newSize uint64, useReverseOperation bool) error {
+func (m *assetManagerNFS) resize(ctx context.Context, assetUUID string, oldSize, newSize uint64, useReverseOperation bool) error {
 	if newSize > math.MaxInt { // we need to convert `newSize` to int to satisfy the Gophercloud API
 		return fmt.Errorf("newSize out of bounds: %d", newSize)
 	}
 	if (oldSize < newSize && !useReverseOperation) || (oldSize >= newSize && useReverseOperation) {
-		return shares.Extend(m.Manila, assetUUID, shareExtendOpts{NewSize: int(newSize), Force: true}).ExtractErr()
+		return shares.Extend(ctx, m.Manila, assetUUID, shareExtendOpts{NewSize: int(newSize), Force: true}).ExtractErr()
 	}
-	return shares.Shrink(m.Manila, assetUUID, shares.ShrinkOpts{NewSize: int(newSize)}).ExtractErr()
+	return shares.Shrink(ctx, m.Manila, assetUUID, shares.ShrinkOpts{NewSize: int(newSize)}).ExtractErr()
 }
 
 // GetAssetStatus implements the core.AssetManager interface.
@@ -189,8 +189,8 @@ func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, a
 
 	// if there are no metrics for this share, we can check Manila to see if the share was deleted in the meantime
 	if metrics.SizeGiB == nil || metrics.UsedGiB == nil {
-		_, err := shares.Get(m.Manila, assetUUID).Extract()
-		if errext.IsOfType[gophercloud.ErrDefault404](err) {
+		_, err := shares.Get(ctx, m.Manila, assetUUID).Extract()
+		if gophercloud.ResponseCodeIs(err, http.StatusNotFound) {
 			return core.AssetStatus{}, core.AssetNotFoundError{InnerError: fmt.Errorf("share not found in Manila: %w", err)}
 		} else {
 			return core.AssetStatus{}, fmt.Errorf("incomplete metrics for share %q: %#v", assetUUID, metrics)
@@ -206,7 +206,7 @@ func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, a
 	// when size has changed compared to last time, double-check with the Manila
 	// API (this call is expensive, so we only do it when really necessary)
 	if previousStatus == nil || previousStatus.Size != status.Size {
-		share, err := shares.Get(m.Manila, assetUUID).Extract()
+		share, err := shares.Get(ctx, m.Manila, assetUUID).Extract()
 		if err != nil {
 			return core.AssetStatus{}, fmt.Errorf("cannot get status of share %s from Manila API: %w", assetUUID, err)
 		}

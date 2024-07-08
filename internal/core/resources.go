@@ -20,6 +20,7 @@
 package core
 
 import (
+	"context"
 	"sort"
 
 	"github.com/sapcc/go-api-declarations/castellum"
@@ -38,7 +39,7 @@ import (
 //
 // For new resources, a fresh `res` shall be given that shall only be filled
 // with an AssetType and ScopeUUID.
-func ApplyResourceSpecInto(res *db.Resource, spec castellum.Resource, existingResources map[db.AssetType]struct{}, cfg Config, team AssetManagerTeam) (errs errext.ErrorSet) {
+func ApplyResourceSpecInto(ctx context.Context, res *db.Resource, spec castellum.Resource, existingResources map[db.AssetType]struct{}, cfg Config, team AssetManagerTeam) (errs errext.ErrorSet) {
 	manager, info := team.ForAssetType(res.AssetType)
 	if manager == nil {
 		errs.Addf("unsupported asset type")
@@ -50,7 +51,7 @@ func ApplyResourceSpecInto(res *db.Resource, spec castellum.Resource, existingRe
 	} else {
 		res.ConfigJSON = string(*spec.ConfigJSON)
 	}
-	errs.Add(manager.CheckResourceAllowed(res.AssetType, res.ScopeUUID, res.ConfigJSON, existingResources))
+	errs.Add(manager.CheckResourceAllowed(ctx, res.AssetType, res.ScopeUUID, res.ConfigJSON, existingResources))
 
 	if spec.Checked != nil {
 		errs.Addf("resource.checked cannot be set via the API")

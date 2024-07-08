@@ -19,16 +19,17 @@
 package core
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"sync"
 
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack"
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/domains"
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/roles"
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
-	"github.com/sapcc/go-bits/errext"
+	"github.com/gophercloud/gophercloud/v2"
+	"github.com/gophercloud/gophercloud/v2/openstack"
+	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/domains"
+	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/projects"
+	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/roles"
+	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/tokens"
 )
 
 // ProviderClient is an interface for an internal type that wraps
@@ -39,20 +40,20 @@ type ProviderClient interface {
 	// The argument is a function like `openstack.NewIdentityV3`.
 	CloudAdminClient(factory ServiceClientFactory) (*gophercloud.ServiceClient, error)
 	// ProjectScopedClient authenticates into the specified project scope.
-	ProjectScopedClient(scope ProjectScope) (*gophercloud.ProviderClient, gophercloud.EndpointOpts, error)
+	ProjectScopedClient(ctx context.Context, scope ProjectScope) (*gophercloud.ProviderClient, gophercloud.EndpointOpts, error)
 
 	// GetAuthResult has the same semantics as gophercloud.ProviderClient.GetAuthResult.
 	GetAuthResult() gophercloud.AuthResult
 	// GetProject queries the given project ID in Keystone, unless it is already cached.
 	// When the project does not exist, nil is returned instead of an error.
-	GetProject(projectID string) (*CachedProject, error)
+	GetProject(ctx context.Context, projectID string) (*CachedProject, error)
 	// GetDomain queries the given domain ID in Keystone, unless it is already cached.
 	// When the project does not exist, nil is returned instead of an error.
-	GetDomain(domainID string) (*CachedDomain, error)
+	GetDomain(ctx context.Context, domainID string) (*CachedDomain, error)
 
 	// FindProjectID searches for a project with the given name and domain name.
 	// When the project does not exist, "" is returned instead of an error.
-	FindProjectID(projectName, projectDomainName string) (string, error)
+	FindProjectID(ctx context.Context, projectName, projectDomainName string) (string, error)
 }
 
 // providerClientImpl is the implementation for the ProviderClient interface.
@@ -89,8 +90,8 @@ type CachedDomain struct {
 }
 
 // NewProviderClient constructs a new ProviderClient instance.
-func NewProviderClient(ao gophercloud.AuthOptions, eo gophercloud.EndpointOpts) (ProviderClient, error) {
-	pc, err := openstack.AuthenticatedClient(ao)
+func NewProviderClient(ctx context.Context, ao gophercloud.AuthOptions, eo gophercloud.EndpointOpts) (ProviderClient, error) {
+	pc, err := openstack.AuthenticatedClient(ctx, ao)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +101,7 @@ func NewProviderClient(ao gophercloud.AuthOptions, eo gophercloud.EndpointOpts) 
 	if err != nil {
 		return nil, err
 	}
-	page, err := roles.List(identityV3, roles.ListOpts{}).AllPages()
+	page, err := roles.List(identityV3, roles.ListOpts{}).AllPages(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -130,20 +131,20 @@ func (p *providerClientImpl) CloudAdminClient(factory ServiceClientFactory) (*go
 }
 
 // ProjectScopedClient implements the ProviderClient interface.
-func (p *providerClientImpl) ProjectScopedClient(scope ProjectScope) (*gophercloud.ProviderClient, gophercloud.EndpointOpts, error) {
-	return p.projectScopedClientImpl(scope, true)
+func (p *providerClientImpl) ProjectScopedClient(ctx context.Context, scope ProjectScope) (*gophercloud.ProviderClient, gophercloud.EndpointOpts, error) {
+	return p.projectScopedClientImpl(ctx, scope, true)
 }
 
-func (p *providerClientImpl) projectScopedClientImpl(scope ProjectScope, firstPass bool) (*gophercloud.ProviderClient, gophercloud.EndpointOpts, error) {
+func (p *providerClientImpl) projectScopedClientImpl(ctx context.Context, scope ProjectScope, firstPass bool) (*gophercloud.ProviderClient, gophercloud.EndpointOpts, error) {
 	// auth into the target project
 	ao := p.ao
 	ao.Scope = &gophercloud.AuthScope{ProjectID: scope.ID}
-	pc, err := openstack.AuthenticatedClient(ao)
+	pc, err := openstack.AuthenticatedClient(ctx, ao)
 	if err != nil {
 		//NOTE: If we don't have any roles assigned in the project yet, we will get
 		// a 401, even if the provided credentials are correct. This is not a fatal
 		// error, we just need to carry on and assign roles.
-		if errext.IsOfType[gophercloud.ErrDefault401](err) {
+		if gophercloud.ResponseCodeIs(err, http.StatusUnauthorized) {
 			pc = nil
 		} else {
 			return nil, p.eo, fmt.Errorf("cannot authenticate into project %s: %w", scope.ID, err)
@@ -216,14 +217,14 @@ func (p *providerClientImpl) projectScopedClientImpl(scope ProjectScope, firstPa
 			UserID:    user.ID,
 			ProjectID: scope.ID,
 		}
-		err := roles.Assign(identityV3, roleID, opts).ExtractErr()
+		err := roles.Assign(ctx, identityV3, roleID, opts).ExtractErr()
 		if err != nil {
 			return nil, p.eo, fmt.Errorf("could not assign role %s in project %s: %w", roleName, scope.ID, err)
 		}
 	}
 
 	// restart call to reauthenticate and obtain the new role assignments
-	return p.projectScopedClientImpl(scope, false)
+	return p.projectScopedClientImpl(ctx, scope, false)
 }
 
 // GetAuthResult implements the ProviderClient interface.
@@ -232,7 +233,7 @@ func (p *providerClientImpl) GetAuthResult() gophercloud.AuthResult {
 }
 
 // GetProject implements the ProviderClient interface.
-func (p *providerClientImpl) GetProject(projectID string) (*CachedProject, error) {
+func (p *providerClientImpl) GetProject(ctx context.Context, projectID string) (*CachedProject, error) {
 	p.cacheMutex.RLock()
 	result, ok := p.projectCache[projectID]
 	p.cacheMutex.RUnlock()
@@ -244,9 +245,9 @@ func (p *providerClientImpl) GetProject(projectID string) (*CachedProject, error
 	if err != nil {
 		return nil, err
 	}
-	project, err := projects.Get(identityV3, projectID).Extract()
+	project, err := projects.Get(ctx, identityV3, projectID).Extract()
 	if err != nil {
-		if errext.IsOfType[gophercloud.ErrDefault404](err) {
+		if gophercloud.ResponseCodeIs(err, http.StatusNotFound) {
 			p.cacheMutex.Lock()
 			p.projectCache[projectID] = nil
 			p.cacheMutex.Unlock()
@@ -263,7 +264,7 @@ func (p *providerClientImpl) GetProject(projectID string) (*CachedProject, error
 }
 
 // GetDomain implements the ProviderClient interface.
-func (p *providerClientImpl) GetDomain(domainID string) (*CachedDomain, error) {
+func (p *providerClientImpl) GetDomain(ctx context.Context, domainID string) (*CachedDomain, error) {
 	p.cacheMutex.RLock()
 	result, ok := p.domainCache[domainID]
 	p.cacheMutex.RUnlock()
@@ -275,9 +276,9 @@ func (p *providerClientImpl) GetDomain(domainID string) (*CachedDomain, error) {
 	if err != nil {
 		return nil, err
 	}
-	domain, err := domains.Get(identityV3, domainID).Extract()
+	domain, err := domains.Get(ctx, identityV3, domainID).Extract()
 	if err != nil {
-		if errext.IsOfType[gophercloud.ErrDefault404](err) {
+		if gophercloud.ResponseCodeIs(err, http.StatusNotFound) {
 			p.cacheMutex.Lock()
 			p.domainCache[domainID] = nil
 			p.cacheMutex.Unlock()
@@ -294,12 +295,12 @@ func (p *providerClientImpl) GetDomain(domainID string) (*CachedDomain, error) {
 }
 
 // FindProjectID implements the ProviderClient interface.
-func (p *providerClientImpl) FindProjectID(projectName, projectDomainName string) (string, error) {
+func (p *providerClientImpl) FindProjectID(ctx context.Context, projectName, projectDomainName string) (string, error) {
 	identityV3, err := p.CloudAdminClient(openstack.NewIdentityV3)
 	if err != nil {
 		return "", err
 	}
-	domainID, err := p.findDomainID(identityV3, projectDomainName)
+	domainID, err := p.findDomainID(ctx, identityV3, projectDomainName)
 	if err != nil {
 		return "", err
 	}
@@ -307,7 +308,7 @@ func (p *providerClientImpl) FindProjectID(projectName, projectDomainName string
 		return "", nil // no matching domain, hence no matching project
 	}
 
-	allPages, err := projects.List(identityV3, projects.ListOpts{Name: projectName, DomainID: domainID}).AllPages()
+	allPages, err := projects.List(identityV3, projects.ListOpts{Name: projectName, DomainID: domainID}).AllPages(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -325,8 +326,8 @@ func (p *providerClientImpl) FindProjectID(projectName, projectDomainName string
 	}
 }
 
-func (p *providerClientImpl) findDomainID(identityV3 *gophercloud.ServiceClient, domainName string) (string, error) {
-	allPages, err := domains.List(identityV3, domains.ListOpts{Name: domainName}).AllPages()
+func (p *providerClientImpl) findDomainID(ctx context.Context, identityV3 *gophercloud.ServiceClient, domainName string) (string, error) {
+	allPages, err := domains.List(identityV3, domains.ListOpts{Name: domainName}).AllPages(ctx)
 	if err != nil {
 		return "", fmt.Errorf("while listing domains with name %q: %w", domainName, err)
 	}

@@ -53,15 +53,15 @@ func (c *Context) ResourceSeedingJob(registerer prometheus.Registerer) jobloop.J
 		},
 		Interval: 5 * time.Minute,
 		Task: func(ctx context.Context, _ prometheus.Labels) error {
-			return c.applyResourceSeeds()
+			return c.applyResourceSeeds(ctx)
 		},
 	}).Setup(registerer)
 }
 
-func (c *Context) applyResourceSeeds() error {
+func (c *Context) applyResourceSeeds(ctx context.Context) error {
 	var missingProjects []string
 	for _, seed := range c.Config.ProjectSeeds {
-		projectUUID, err := c.ProviderClient.FindProjectID(seed.ProjectName, seed.DomainName)
+		projectUUID, err := c.ProviderClient.FindProjectID(ctx, seed.ProjectName, seed.DomainName)
 		if err != nil {
 			return fmt.Errorf(`cannot find project "%s/%s": %w`, seed.DomainName, seed.ProjectName, err)
 		}
@@ -71,7 +71,7 @@ func (c *Context) applyResourceSeeds() error {
 			continue
 		}
 
-		err = c.applyProjectSeed(projectUUID, seed)
+		err = c.applyProjectSeed(ctx, projectUUID, seed)
 		if err != nil {
 			return fmt.Errorf(`while applying seed for project "%s/%s" (%s): %w`, seed.DomainName, seed.ProjectName, projectUUID, err)
 		}
@@ -86,7 +86,7 @@ func (c *Context) applyResourceSeeds() error {
 	return nil
 }
 
-func (c *Context) applyProjectSeed(projectUUID string, seed core.ProjectSeed) error {
+func (c *Context) applyProjectSeed(ctx context.Context, projectUUID string, seed core.ProjectSeed) error {
 	// list existing resources
 	var dbResources []db.Resource
 	_, err := c.DB.Select(&dbResources,
@@ -105,7 +105,7 @@ func (c *Context) applyProjectSeed(projectUUID string, seed core.ProjectSeed) er
 		if exists {
 			// apply positive seed
 			dbResourceCopy := dbResource
-			errs := core.ApplyResourceSpecInto(&dbResourceCopy, resource, isExistingResource, c.Config, c.Team)
+			errs := core.ApplyResourceSpecInto(ctx, &dbResourceCopy, resource, isExistingResource, c.Config, c.Team)
 			if !errs.IsEmpty() {
 				return fmt.Errorf("cannot apply %s seed: %s", dbResource.AssetType, errs.Join(", "))
 			}
@@ -134,7 +134,7 @@ func (c *Context) applyProjectSeed(projectUUID string, seed core.ProjectSeed) er
 			continue
 		}
 
-		proj, err := c.ProviderClient.GetProject(projectUUID)
+		proj, err := c.ProviderClient.GetProject(ctx, projectUUID)
 		if err != nil {
 			return err
 		}
@@ -144,7 +144,7 @@ func (c *Context) applyProjectSeed(projectUUID string, seed core.ProjectSeed) er
 			AssetType:    assetType,
 			NextScrapeAt: time.Unix(0, 0).UTC(), // give new resources a very early next_scrape_at to prioritize them in the scrape queue
 		}
-		errs := core.ApplyResourceSpecInto(&dbResource, resource, isExistingResource, c.Config, c.Team)
+		errs := core.ApplyResourceSpecInto(ctx, &dbResource, resource, isExistingResource, c.Config, c.Team)
 		if !errs.IsEmpty() {
 			return fmt.Errorf("cannot apply %s seed: %s", dbResource.AssetType, errs.Join(", "))
 		}

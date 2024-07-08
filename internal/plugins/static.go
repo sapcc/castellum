@@ -90,7 +90,7 @@ func (m AssetManagerStatic) InfoForAssetType(assetType db.AssetType) *core.Asset
 }
 
 // CheckResourceAllowed implements the core.AssetManager interface.
-func (m AssetManagerStatic) CheckResourceAllowed(assetType db.AssetType, scopeUUID, configJSON string, existingResources map[db.AssetType]struct{}) error {
+func (m AssetManagerStatic) CheckResourceAllowed(_ context.Context, assetType db.AssetType, scopeUUID, configJSON string, existingResources map[db.AssetType]struct{}) error {
 	if m.ExpectsConfiguration {
 		if configJSON == "" {
 			return core.ErrNoConfigurationProvided
@@ -192,7 +192,7 @@ func clonePointer[T any](in *T) *T {
 }
 
 // SetAssetSize implements the core.AssetManager interface.
-func (m AssetManagerStatic) SetAssetSize(res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error) {
+func (m AssetManagerStatic) SetAssetSize(_ context.Context, res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error) {
 	if res.AssetType != m.AssetType {
 		return castellum.OperationOutcomeErrored, errWrongAssetType
 	}

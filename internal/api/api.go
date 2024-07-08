@@ -19,6 +19,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -154,7 +155,7 @@ func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *go
 	// all project-scoped endpoints require the user to have access to the
 	// selected project
 	if projectScoped {
-		projectExists, err := h.SetTokenToProjectScope(token, projectUUID)
+		projectExists, err := h.SetTokenToProjectScope(r.Context(), token, projectUUID)
 		if respondwith.ErrorText(w, err) || !token.Require(w, "project:access") {
 			return "", nil
 		}
@@ -170,13 +171,13 @@ func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *go
 	return projectUUID, token
 }
 
-func (h handler) SetTokenToProjectScope(token *gopherpolicy.Token, projectUUID string) (projectExists bool, err error) {
+func (h handler) SetTokenToProjectScope(ctx context.Context, token *gopherpolicy.Token, projectUUID string) (projectExists bool, err error) {
 	objectAttrs := map[string]string{
 		"project_id":        projectUUID,
 		"target.project.id": projectUUID,
 	}
 
-	project, err := h.Provider.GetProject(projectUUID)
+	project, err := h.Provider.GetProject(ctx, projectUUID)
 	if err != nil {
 		return false, err
 	}
@@ -185,7 +186,7 @@ func (h handler) SetTokenToProjectScope(token *gopherpolicy.Token, projectUUID s
 		objectAttrs["target.project.name"] = project.Name
 		objectAttrs["target.project.domain.id"] = project.DomainID
 
-		domain, err := h.Provider.GetDomain(project.DomainID)
+		domain, err := h.Provider.GetDomain(ctx, project.DomainID)
 		if err != nil {
 			return false, err
 		}
@@ -225,7 +226,7 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		if createIfMissing {
-			proj, err := h.Provider.GetProject(projectUUID)
+			proj, err := h.Provider.GetProject(r.Context(), projectUUID)
 			if respondwith.ErrorText(w, err) {
 				return nil
 			}
@@ -245,7 +246,7 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 }
 
 func (h handler) rejectIfResourceSeeded(w http.ResponseWriter, r *http.Request, res db.Resource) bool {
-	proj, err := h.Provider.GetProject(res.ScopeUUID)
+	proj, err := h.Provider.GetProject(r.Context(), res.ScopeUUID)
 	if respondwith.ErrorText(w, err) {
 		return true
 	}
@@ -254,7 +255,7 @@ func (h handler) rejectIfResourceSeeded(w http.ResponseWriter, r *http.Request, 
 		return true
 	}
 
-	domain, err := h.Provider.GetDomain(proj.DomainID)
+	domain, err := h.Provider.GetDomain(r.Context(), proj.DomainID)
 	if respondwith.ErrorText(w, err) {
 		return true
 	}

@@ -198,7 +198,7 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	errs := core.ApplyResourceSpecInto(dbResource, input, existingResources, h.Config, h.Team)
+	errs := core.ApplyResourceSpecInto(r.Context(), dbResource, input, existingResources, h.Config, h.Team)
 	if len(errs) > 0 {
 		doAudit(http.StatusUnprocessableEntity)
 		http.Error(w, errs.Join("\n"), http.StatusUnprocessableEntity)

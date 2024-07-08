@@ -97,7 +97,7 @@ func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (
 	allowedResources := make(map[int64]db.Resource)
 	canAccessAnyMatchingProject := false
 	for _, res := range allResources {
-		projectExists, err := h.SetTokenToProjectScope(token, res.ScopeUUID)
+		projectExists, err := h.SetTokenToProjectScope(r.Context(), token, res.ScopeUUID)
 		if respondwith.ErrorText(w, err) {
 			return nil, false
 		}
