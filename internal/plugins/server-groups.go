@@ -181,7 +181,7 @@ func (m *assetManagerServerGroups) GetAssetStatus(ctx context.Context, res db.Re
 	for _, serverID := range group.Members {
 		for metric, queryTemplate := range serverUsageQueries {
 			queryStr := strings.ReplaceAll(queryTemplate, "${ID}", serverID)
-			value, err := m.Prometheus.GetSingleValue(queryStr, nil)
+			value, err := m.Prometheus.GetSingleValue(ctx, queryStr, nil)
 			if promquery.IsErrNoRows(err) && isNewServer[serverID] {
 				// within a few minutes of instance creation, it's not a hard error if
 				// the vrops metric has not showed up in Prometheus yet; we'll just

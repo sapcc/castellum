@@ -19,6 +19,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -38,7 +39,7 @@ var eventSink chan<- cadf.Event
 var showAuditOnStdout = !osext.GetenvBool("CASTELLUM_AUDIT_SILENT")
 
 // StartAuditLogging starts audit logging for the API.
-func StartAuditLogging(rabbitQueueName string, rabbitURI url.URL) {
+func StartAuditLogging(ctx context.Context, rabbitQueueName string, rabbitURI url.URL) {
 	auditEventPublishSuccessCounter.Add(0)
 	auditEventPublishFailedCounter.Add(0)
 
@@ -55,7 +56,7 @@ func StartAuditLogging(rabbitQueueName string, rabbitURI url.URL) {
 		EventSink:           s,
 		OnSuccessfulPublish: onSuccessFunc,
 		OnFailedPublish:     onFailFunc,
-	}.Commit(rabbitURI, rabbitQueueName)
+	}.Commit(ctx, rabbitURI, rabbitQueueName)
 }
 
 var observerUUID = audittools.GenerateUUID()
