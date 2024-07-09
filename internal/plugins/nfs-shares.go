@@ -93,7 +93,7 @@ func (m *assetManagerNFS) CheckResourceAllowed(ctx context.Context, assetType db
 func (m *assetManagerNFS) ListAssets(ctx context.Context, res db.Resource) ([]string, error) {
 	// shares are discovered via Prometheus metrics since that is way faster than
 	// going through the Manila API
-	vector, err := m.Discovery.GetVector(fmt.Sprintf(
+	vector, err := m.Discovery.GetVector(ctx, fmt.Sprintf(
 		`count by (id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error",snapmirror!="1"})`,
 		res.ScopeUUID,
 	))
@@ -106,7 +106,7 @@ func (m *assetManagerNFS) ListAssets(ctx context.Context, res db.Resource) ([]st
 		shareID := string(sample.Metric["id"])
 
 		// evaluate exclusion rules based on Prometheus metrics
-		metrics, err := m.ShareMetrics.Get(manilaShareMetricsKey{
+		metrics, err := m.ShareMetrics.Get(ctx, manilaShareMetricsKey{
 			ProjectUUID: res.ScopeUUID,
 			ShareUUID:   shareID,
 		})
@@ -175,7 +175,7 @@ func (m *assetManagerNFS) resize(ctx context.Context, assetUUID string, oldSize,
 // GetAssetStatus implements the core.AssetManager interface.
 func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
 	// query Prometheus metrics for size and usage
-	metrics, err := m.ShareMetrics.Get(manilaShareMetricsKey{
+	metrics, err := m.ShareMetrics.Get(ctx, manilaShareMetricsKey{
 		ProjectUUID: res.ScopeUUID,
 		ShareUUID:   assetUUID,
 	})

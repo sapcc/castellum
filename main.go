@@ -201,7 +201,7 @@ func runAPI(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team core.Ass
 			User:   url.UserPassword(username, pass),
 			Path:   "/",
 		}
-		api.StartAuditLogging(rabbitQueueName, rabbitURI)
+		api.StartAuditLogging(ctx, rabbitQueueName, rabbitURI)
 	}
 
 	must.Succeed(httpext.ListenAndServeContext(ctx, httpListenAddr, mux))
