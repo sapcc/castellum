@@ -292,7 +292,7 @@ func ParseAge(query url.Values, key, defaultValue string) (time.Duration, error)
 	if match == nil {
 		return 0, fmt.Errorf(`invalid %s: expected a value like "30m", "12h" or "7d"; got %q`, key, spec)
 	}
-	val, err := strconv.ParseUint(match[1], 10, 64)
+	val, err := strconv.ParseInt(match[1], 10, 64)
 	if err != nil {
 		return 0, err
 	}
