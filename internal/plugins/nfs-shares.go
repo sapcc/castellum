@@ -167,9 +167,9 @@ func (m *assetManagerNFS) resize(ctx context.Context, assetUUID string, oldSize,
 		return fmt.Errorf("newSize out of bounds: %d", newSize)
 	}
 	if (oldSize < newSize && !useReverseOperation) || (oldSize >= newSize && useReverseOperation) {
-		return shares.Extend(ctx, m.Manila, assetUUID, shareExtendOpts{NewSize: int(newSize), Force: true}).ExtractErr()
+		return shares.Extend(ctx, m.Manila, assetUUID, shareExtendOpts{NewSize: int(newSize), Force: true}).ExtractErr() //nolint:gosec // we check above if the value is above math.MaxInt
 	}
-	return shares.Shrink(ctx, m.Manila, assetUUID, shares.ShrinkOpts{NewSize: int(newSize)}).ExtractErr()
+	return shares.Shrink(ctx, m.Manila, assetUUID, shares.ShrinkOpts{NewSize: int(newSize)}).ExtractErr() //nolint:gosec // we check above if the value is above math.MaxInt
 }
 
 // GetAssetStatus implements the core.AssetManager interface.
