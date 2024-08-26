@@ -271,6 +271,7 @@ var (
 			Filler: func(entry *manilaShareMetrics, sample *model.Sample) {
 				entry.ExclusionReason = string(sample.Metric["reason"])
 			},
+			ZeroResultsIsNotAnError: true, // the specific setups that warrant exclusion may not exist everywhere
 		},
 		{
 			Query:       manilaSizeBytesQuery,
