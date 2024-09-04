@@ -19,7 +19,7 @@ metrics are expected:
 
 ```
 # shares are discovered using this query (share ID is expected to be stored in the label `id`)
-openstack_manila_shares_size_gauge{project_id="...",status!="error",snapmirror!="1"}
+openstack_manila_shares_size_gauge{project_id="...",status!="error"}
 
 # then, for shares where this query does not yield any results...
 manila_share_exclusion_reasons_for_castellum{share_id="...",project_id="...",reason!=""} == 1
@@ -34,13 +34,7 @@ Discovery of Manila shares also happens via Prometheus because Prometheus querie
 Manila API queries.
 
 If you want Castellum to ignore a Manila share, fill the `manila_share_exclusion_reasons_for_castellum` metric as
-described above, or set the metadata key `snapmirror` to value `1`:
-
-```
-manila metadata $SHARE_ID set snapmirror=1
-```
-
-Usually you want that if your share is a target in a NetApp SnapMirror setup. Resizing is not possible in this case anyway.
+described above.
 
 ### Configuration
 
