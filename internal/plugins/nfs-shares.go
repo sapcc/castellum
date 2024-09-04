@@ -94,7 +94,7 @@ func (m *assetManagerNFS) ListAssets(ctx context.Context, res db.Resource) ([]st
 	// shares are discovered via Prometheus metrics since that is way faster than
 	// going through the Manila API
 	vector, err := m.Discovery.GetVector(ctx, fmt.Sprintf(
-		`count by (id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error",snapmirror!="1"})`,
+		`count by (id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error"})`,
 		res.ScopeUUID,
 	))
 	if err != nil {
