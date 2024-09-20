@@ -5,14 +5,14 @@ go 1.23
 require (
 	github.com/dlmiddlecote/sqlstats v1.0.2
 	github.com/go-gorp/gorp/v3 v3.1.0
-	github.com/gophercloud/gophercloud/v2 v2.1.0
+	github.com/gophercloud/gophercloud/v2 v2.1.1
 	github.com/gophercloud/utils/v2 v2.0.0-20240912080913-c094a6e5b7da
 	github.com/gorilla/mux v1.8.1
-	github.com/prometheus/client_golang v1.20.3
+	github.com/prometheus/client_golang v1.20.4
 	github.com/prometheus/common v0.59.1
 	github.com/rs/cors v1.11.1
 	github.com/sapcc/go-api-declarations v1.12.6
-	github.com/sapcc/go-bits v0.0.0-20240912081530-0967be9f0a6b
+	github.com/sapcc/go-bits v0.0.0-20240919081231-a80ea73a2dce
 	go.uber.org/automaxprocs v1.5.3
 	gopkg.in/yaml.v2 v2.4.0
 )
