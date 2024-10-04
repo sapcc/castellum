@@ -24,7 +24,7 @@ import (
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/regexpext"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/sapcc/castellum/internal/db"
 )
