@@ -28,7 +28,6 @@ githubWorkflow:
   ci:
     enabled: true
     coveralls: true
-    postgres: true
 
 renovate:
   enabled: true
