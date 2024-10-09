@@ -355,6 +355,9 @@ func TestGetEligibleOperations(t *testing.T) {
 		"size=1100, usage=500, smin=1200",
 		"", "", // MaximumSize is already broken, and StrictMinimumSize is trying to get us to break it further
 	)
+
+	//TODO: change the unit tests above to enforce proper precedence between limiting and enforceable constraints
+	//      (paralysis shall only happen when the conflicting constraints are of equal rank, e.g. `smin > smax`)
 }
 
 // Builds a ResourceLogic from a compact string representation like "low=20%, high=80%, step=single, min=200".
