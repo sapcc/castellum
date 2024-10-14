@@ -70,6 +70,8 @@ type Resource struct {
 	// `newSize - absoluteUsage` would be smaller than this, and upsize operations
 	// will be forced when `currentSize - absoluteUsage` is smaller than this.
 	MinimumFreeSize *uint64 `db:"min_free_size"`
+	// When true, upsize operations forced by MinimumFreeSize will be critical actions.
+	MinimumFreeIsCritical bool `db:"min_free_is_critical"`
 
 	// Contains the error message if the last scrape failed, otherwise an empty string.
 	ScrapeErrorMessage string `db:"scrape_error_message"`

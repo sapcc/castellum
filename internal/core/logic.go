@@ -67,9 +67,10 @@ type ResourceLogic struct {
 	SizeStepPercent float64
 	SingleStep      bool
 
-	MinimumSize     *uint64
-	MaximumSize     *uint64
-	MinimumFreeSize *uint64
+	MinimumSize           *uint64
+	MaximumSize           *uint64
+	MinimumFreeSize       *uint64
+	MinimumFreeIsCritical bool
 }
 
 // LogicOfResource converts a Resource into just its ResourceLogic.
@@ -90,6 +91,7 @@ func LogicOfResource(res db.Resource, info AssetTypeInfo) ResourceLogic {
 		MinimumSize:              res.MinimumSize,
 		MaximumSize:              res.MaximumSize,
 		MinimumFreeSize:          res.MinimumFreeSize,
+		MinimumFreeIsCritical:    res.MinimumFreeIsCritical,
 	}
 }
 
@@ -221,16 +223,20 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 	// technically falls in both phase 1 and phase 2
 	var a actions
 	takeActionBecauseEnforceableConstraint := false
-
 	if enforceableMinSize != nil && asset.Size < *enforceableMinSize {
-		// Enforceable minimum size constraints are preferably enforced on the
-		// "high" threshold, but if no "high" threshold is configured, it will
-		// be done on the "critical" threshold instead.
-		enforcer := castellum.OperationReasonHigh
-		for _, metric := range res.UsageMetrics {
-			if res.HighThresholdPercent[metric] == 0 {
-				enforcer = castellum.OperationReasonCritical
-				break
+		var enforcer castellum.OperationReason
+		if res.MinimumFreeIsCritical {
+			enforcer = castellum.OperationReasonCritical
+		} else {
+			// Enforceable minimum size constraints are preferably enforced on the
+			// "high" threshold, but if no "high" threshold is configured, it will
+			// be done on the "critical" threshold instead.
+			enforcer = castellum.OperationReasonHigh
+			for _, metric := range res.UsageMetrics {
+				if res.HighThresholdPercent[metric] == 0 {
+					enforcer = castellum.OperationReasonCritical
+					break
+				}
 			}
 		}
 

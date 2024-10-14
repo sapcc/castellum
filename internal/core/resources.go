@@ -217,6 +217,11 @@ func applySizeConstraintsSpecInto(res *db.Resource, spec castellum.Resource, max
 		if res.MinimumFreeSize != nil && *res.MinimumFreeSize == 0 {
 			res.MinimumFreeSize = nil
 		}
+
+		res.MinimumFreeIsCritical = spec.SizeConstraints.MinimumFreeIsCritical
+		if res.MinimumFreeIsCritical && res.MinimumFreeSize == nil {
+			errs.Addf("threshold for minimum free space must be configured")
+		}
 	}
 
 	return

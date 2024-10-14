@@ -48,7 +48,8 @@ type SizeSteps struct {
 
 // SizeConstraints appears in type Resource.
 type SizeConstraints struct {
-	Minimum     *uint64 `json:"minimum,omitempty" yaml:"minimum,omitempty"`
-	Maximum     *uint64 `json:"maximum,omitempty" yaml:"maximum,omitempty"`
-	MinimumFree *uint64 `json:"minimum_free,omitempty" yaml:"minimum_free,omitempty"`
+	Minimum               *uint64 `json:"minimum,omitempty" yaml:"minimum,omitempty"`
+	Maximum               *uint64 `json:"maximum,omitempty" yaml:"maximum,omitempty"`
+	MinimumFree           *uint64 `json:"minimum_free,omitempty" yaml:"minimum_free,omitempty"`
+	MinimumFreeIsCritical bool    `json:"minimum_free_is_critical,omitempty" yaml:"minimum_free_is_critical,omitempty"`
 }

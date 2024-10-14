@@ -79,6 +79,7 @@ The following fields may be returned:
 | `resources.$type.low_threshold.delay_seconds`<br>`resources.$type.high_threshold.delay_seconds` | integer | How long usage must cross the threshold before the operation is confirmed. Critical operations don't have a delay; they are always confirmed immediately. |
 | `resources.$type.size_constraints.minimum`<br>`resources.$type.size_constraints.maximum` | integer | If set, resize operations will only be scheduled when the target size fits into these constraints. |
 | `resources.$type.size_constraints.minimum_free` | integer | If set, downsize operations will be inhibited and upsize operations will be scheduled to ensure that `size - absoluteUsage` is always `>=` this value. |
+| `resources.$type.size_constraints.minimum_free_is_critical` | boolean | When true, upsize operations forced by violating the minimum free space constraint will be confirmed without delay. |
 | `resources.$type.size_steps.percent` | float | Step size for percentage-step resizing. [See below](#stepping-strategies) for details. |
 | `resources.$type.size_steps.single` | boolean | When true, use single-step resizing. [See below](#stepping-strategies) for details. |
 
