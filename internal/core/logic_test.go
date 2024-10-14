@@ -228,9 +228,9 @@ func TestGetEligibleOperations(t *testing.T) {
 		"critical->1100", // restricted by StrictMaximumSize
 	)
 	check(
-		"low=20%, high=80%, crit=95%, step=20%, min=900",
+		"low=20%, high=80%, crit=95%, step=20%, max=900",
 		"size=1000, usage=500",
-		"", "", // MaximumSize does not force upsizes (only StrictMaximumSize does)
+		"", "", // MaximumSize does not force downsizes (only StrictMaximumSize does)
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
