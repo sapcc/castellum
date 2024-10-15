@@ -121,17 +121,6 @@ func GetEligibleOperations(res ResourceLogic, asset AssetStatus) map[castellum.O
 func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.OperationReason) *uint64 {
 	// phase 1: generate global constraints
 	//
-	//NOTE: We only add MinimumSize as a constraint for downsizing. For upsizing,
-	// it's okay if the target is below MinimumSize. It just means we're inching
-	// closer *towards* the happy area. (And vice versa for MaximumSize.)
-	c := emptyConstraints()
-	if reason == castellum.OperationReasonLow && res.MinimumSize != nil {
-		c.forbidBelow(*res.MinimumSize)
-	}
-	if reason != castellum.OperationReasonLow && res.MaximumSize != nil {
-		c.forbidAbove(*res.MaximumSize)
-	}
-
 	// We have a bunch of constraints that can cause action if they are crossed:
 	//- On the Asset, StrictMinimumSize and StrictMaximumSize values describe
 	//  technical constraints that the raw usage numbers cannot represent.
@@ -140,10 +129,24 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 	//
 	// Because the logic for all of these is identical, we start out by merging
 	// them (strongest constraint wins).
+	// Priority 0: StrictMinimumSize, StrictMaximumSize
+	// Priority 1: MinimumFreeSize
+	// Priority 2: MinimumSize, MaximumSize
+	c := emptyConstraints()
+
+	enforceableMaxSize := asset.StrictMaximumSize
+	if reason != castellum.OperationReasonLow && enforceableMaxSize != nil {
+		c.forbidAbove(*enforceableMaxSize)
+	}
+
 	enforceableMinSize := asset.StrictMinimumSize
 	if res.MinimumFreeSize != nil {
 		for _, metric := range res.UsageMetrics {
 			minSize := *res.MinimumFreeSize + uint64(math.Ceil(asset.Usage[metric]))
+			// Only apply MinimumFreeSize constraint if there is no conflict with strict constraints
+			if enforceableMaxSize != nil && *enforceableMaxSize < minSize {
+				continue
+			}
 			if enforceableMinSize == nil || *enforceableMinSize < minSize {
 				enforceableMinSize = &minSize
 			}
@@ -153,9 +156,18 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 		c.forbidBelow(*enforceableMinSize)
 	}
 
-	enforceableMaxSize := asset.StrictMaximumSize
-	if reason != castellum.OperationReasonLow && enforceableMaxSize != nil {
-		c.forbidAbove(*enforceableMaxSize)
+	//NOTE: We only add MinimumSize as a constraint for downsizing. For upsizing,
+	// it's okay if the target is below MinimumSize. It just means we're inching
+	// closer *towards* the happy area. (And vice versa for MaximumSize.)
+	if reason == castellum.OperationReasonLow && res.MinimumSize != nil {
+		if enforceableMaxSize == nil || *res.MinimumSize < *enforceableMaxSize {
+			c.forbidBelow(*res.MinimumSize)
+		}
+	}
+	if reason != castellum.OperationReasonLow && res.MaximumSize != nil {
+		if enforceableMinSize == nil || *enforceableMinSize < *res.MaximumSize {
+			c.forbidAbove(*res.MaximumSize)
+		}
 	}
 
 	// do not allow downsize operations to cross above the high/critical thresholds
