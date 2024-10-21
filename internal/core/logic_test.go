@@ -260,6 +260,50 @@ func TestGetEligibleOperations(t *testing.T) {
 		"high->1200", "high->1100", // forced by MinimumFreeSize
 	)
 
+	// Critical MinimumFreeSize constraint
+	// If MinimumFreeSize is marked as critical, forced upsizes should be critical actions.
+	// Other behaviour should not be affected regardless whether the flag is set or not.
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, min_free=600, min_free_is_critical=true",
+		"size=1000, usage=100",
+		"low->800", "low->700", // not restricted by critical MinimumFreeSize
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, min_free=600, min_free_is_critical=false",
+		"size=1000, usage=100",
+		"low->800", "low->700", // not restricted by non-critical MinimumFreeSize
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, min_free=800, min_free_is_critical=false",
+		"size=1000, usage=100",
+		"low->900", "low->900", // restricted by non-critical MinimumFreeSize
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, min_free=800, min_free_is_critical=true",
+		"size=1000, usage=100",
+		"low->900", "low->900", // restricted by critical MinimumFreeSize
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, min_free=800, min_free_is_critical=false",
+		"size=1000, usage=200",
+		"", "", // overridden by non-critical MinimumFreeSize
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, min_free=800, min_free_is_critical=true",
+		"size=1000, usage=200",
+		"", "", // overridden by critical MinimumFreeSize
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, min_free=600, min_free_is_critical=false",
+		"size=1000, usage=500",
+		"high->1200", "high->1100", // forced by non-critical MinimumFreeSize
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, min_free=600, min_free_is_critical=true",
+		"size=1000, usage=500",
+		"critical->1200", "critical->1100", // forced by critical MinimumFreeSize
+	)
+
 	// test behavior around zero size and/or zero usage without constraints
 	check(
 		"low=20%, high=80%, crit=95%, step=20%",
@@ -383,6 +427,8 @@ func mustParseResourceLogic(t *testing.T, input string) (result ResourceLogic) {
 			result.MaximumSize = mustParsePointerToUint64(t, parts[1])
 		case "min_free":
 			result.MinimumFreeSize = mustParsePointerToUint64(t, parts[1])
+		case "min_free_is_critical":
+			result.MinimumFreeIsCritical = mustParseBool(t, parts[1])
 		default:
 			panic("unknown field in ResourceLogic string: " + parts[0])
 		}
@@ -422,6 +468,15 @@ func eligibleOperationsToString(m map[castellum.OperationReason]uint64) string {
 		fields = append(fields, fmt.Sprintf("%s->%d", k, m[k]))
 	}
 	return strings.Join(fields, ", ")
+}
+
+func mustParseBool(t *testing.T, input string) bool {
+	t.Helper()
+	val, err := strconv.ParseBool(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return val
 }
 
 func mustParseFloat(t *testing.T, input string) float64 {
