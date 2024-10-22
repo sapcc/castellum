@@ -333,31 +333,66 @@ func TestGetEligibleOperations(t *testing.T) {
 
 	// test conflicts between constraints
 	//
-	// Entirely conflicting constraints (max < min) shall paralyze Castellum and
-	// suppress all actions.
-	check(
-		"low=20%, high=80%, crit=95%, step=200%, min=1000",
-		"size=1000, usage=500, smax=900",
-		"", "", // MinimumSize is upheld, but StrictMaximumSize is trying to get us to break it
-	)
-	check(
-		"low=20%, high=80%, crit=95%, step=200%, min=1000",
-		"size=900, usage=500, smax=800",
-		"", "", // MinimumSize is already broken, and StrictMaximumSize is trying to get us to break it further
-	)
-	check(
-		"low=20%, high=80%, crit=95%, step=200%, max=1000",
-		"size=1000, usage=500, smin=1100",
-		"", "", // MaximumSize is upheld, but StrictMinimumSize is trying to get us to break it
-	)
-	check(
-		"low=20%, high=80%, crit=95%, step=200%, max=1000",
-		"size=1100, usage=500, smin=1200",
-		"", "", // MaximumSize is already broken, and StrictMinimumSize is trying to get us to break it further
-	)
+	// Entirely conflicting constraints of equal priority shall paralyze Castellum and
+	// suppress all actions. Otherwise, the stronger constraint should be enforced.
+	// Priority 0: StrictMinimumSize, StrictMaximumSize
+	// Priority 1: MinimumFreeSize, MinimumSize, MaximumSize
 
-	//TODO: change the unit tests above to enforce proper precedence between limiting and enforceable constraints
-	//      (paralysis shall only happen when the conflicting constraints are of equal rank, e.g. `smin > smax`)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, max=900",
+		"size=1000, usage=500, smin=1100",
+		"high->1200", "high->1100", // StrictMinimumSize takes precedence over maximum constraint
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, min=900",
+		"size=1000, usage=100, smin=950",
+		"low->950", "low->950", // StrictMinimumSize takes precedence over minimum constraint
+	)
+	check(
+		"low=10%, high=80%, crit=95%, step=20%, min_free=550",
+		"size=1000, usage=500, smin=1100",
+		"high->1200", "high->1100", // StrictMinimumSize takes precedence over minimum free constraint
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, min_free=200",
+		"size=1000, usage=900, smax=1050",
+		"high->1050", "high->1050", // StrictMaximumSize takes precedence over minimum free constraint
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, min_free=200",
+		"size=1000, usage=800, smax=900",
+		"low->900", "low->900", // StrictMaximumSize enforces downsizing over minimum free constraint
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, min=1100",
+		"size=1000, usage=500, smax=900",
+		"low->800", "low->900", // StrictMaximumSize takes precedence over minimum constraint
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, max=1100",
+		"size=1000, usage=990, smax=1050",
+		"critical->1050", "critical->1050", // StrictMaximumSize takes precedence over maximum constraint
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, max=1050, min_free=600",
+		"size=1000, usage=500",
+		"high->1050", "high->1050", // Upsizing due to MinimumFreeSize should not exceed maximum constraint
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%",
+		"size=1000, usage=500, smin=1100, smax=900",
+		"", "", // Conflict of strict constrains should result in no action
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, min=1100, max=900",
+		"size=1000, usage=990",
+		"", "", // Conflict of non-strict constrains should prevent upsizing
+	)
+	check(
+		"low=20%, high=80%, crit=95%, step=20%, min=1100, max=900",
+		"size=1000, usage=100",
+		"", "", // Conflict of non-strict constrains should prevent downsizing
+	)
 }
 
 // Builds a ResourceLogic from a compact string representation like "low=20%, high=80%, step=single, min=200".
