@@ -113,4 +113,12 @@ var SQLMigrations = map[string]string{
 	"022_add_index_to_assets_next_scrape_at.down.sql": `
 		DROP INDEX assets_next_scrape_at_idx;
 	`,
+	"023_add_resource_min_free_is_critical_flag.down.sql": `
+		ALTER TABLE resources
+			DROP COLUMN min_free_is_critical;
+	`,
+	"023_add_resource_min_free_is_critical_flag.up.sql": `
+		ALTER TABLE resources
+			ADD COLUMN min_free_is_critical BOOLEAN DEFAULT FALSE;
+	`,
 }

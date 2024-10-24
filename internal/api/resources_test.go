@@ -336,9 +336,10 @@ func TestPutResource(baseT *testing.T) {
 				"percent": 15,
 			},
 			"size_constraints": assert.JSONObject{
-				"minimum":      0, // gets normalized into NULL
-				"maximum":      42000,
-				"minimum_free": 0, // gets normalized into NULL
+				"minimum":                  0, // gets normalized into NULL
+				"maximum":                  42000,
+				"minimum_free":             200,
+				"minimum_free_is_critical": true,
 			},
 		}
 		assert.HTTPRequest{
@@ -350,7 +351,7 @@ func TestPutResource(baseT *testing.T) {
 
 		// expect the resource to have been updated
 		tr.DBChanges().AssertEqualf(`
-			UPDATE resources SET low_threshold_percent = '{"singular":0}', low_delay_seconds = 0, high_threshold_percent = '{"singular":0}', high_delay_seconds = 0, critical_threshold_percent = '{"singular":98}', size_step_percent = 15, max_size = 42000, single_step = FALSE WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+			UPDATE resources SET low_threshold_percent = '{"singular":0}', low_delay_seconds = 0, high_threshold_percent = '{"singular":0}', high_delay_seconds = 0, critical_threshold_percent = '{"singular":98}', size_step_percent = 15, max_size = 42000, min_free_size = 200, single_step = FALSE, min_free_is_critical = TRUE WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 		`)
 	})
 }
@@ -559,6 +560,15 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 				"size_steps":         assert.JSONObject{"percent": 10},
 			},
 			"cannot create qux resource because there is a foo resource",
+		)
+
+		expectErrors("foo",
+			assert.JSONObject{
+				"critical_threshold": assert.JSONObject{"usage_percent": 95},
+				"size_steps":         assert.JSONObject{"percent": 10},
+				"size_constraints":   assert.JSONObject{"minimum": 20, "maximum": 30, "minimum_free_is_critical": true},
+			},
+			"threshold for minimum free space must be configured",
 		)
 
 		// none of this should have touched the DB

@@ -76,11 +76,12 @@ func (h handler) ResourceFromDB(res db.Resource) (castellum.Resource, error) {
 			UsagePercent: res.CriticalThresholdPercent,
 		}
 	}
-	if res.MinimumSize != nil || res.MaximumSize != nil || res.MinimumFreeSize != nil {
+	if res.MinimumSize != nil || res.MaximumSize != nil || res.MinimumFreeSize != nil || res.MinimumFreeIsCritical {
 		result.SizeConstraints = &castellum.SizeConstraints{
-			Minimum:     res.MinimumSize,
-			Maximum:     res.MaximumSize,
-			MinimumFree: res.MinimumFreeSize,
+			Minimum:               res.MinimumSize,
+			Maximum:               res.MaximumSize,
+			MinimumFree:           res.MinimumFreeSize,
+			MinimumFreeIsCritical: res.MinimumFreeIsCritical,
 		}
 	}
 	return result, nil
