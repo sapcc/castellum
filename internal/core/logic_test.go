@@ -264,14 +264,14 @@ func TestGetEligibleOperations(t *testing.T) {
 	// If MinimumFreeSize is marked as critical, forced upsizes should be critical actions.
 	// Other behaviour should not be affected regardless whether the flag is set or not.
 	check(
-		"low=20%, high=80%, crit=95%, step=20%, min_free=600, min_free_is_critical=true",
+		"low=20%, high=80%, crit=95%, step=20%, min_free=300, min_free_is_critical=true",
 		"size=1000, usage=100",
-		"low->800", "low->700", // not restricted by critical MinimumFreeSize
+		"low->800", "low->499", // not restricted by critical MinimumFreeSize
 	)
 	check(
-		"low=20%, high=80%, crit=95%, step=20%, min_free=600, min_free_is_critical=false",
+		"low=20%, high=80%, crit=95%, step=20%, min_free=300, min_free_is_critical=false",
 		"size=1000, usage=100",
-		"low->800", "low->700", // not restricted by non-critical MinimumFreeSize
+		"low->800", "low->499", // not restricted by non-critical MinimumFreeSize
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min_free=800, min_free_is_critical=false",
