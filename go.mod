@@ -5,11 +5,11 @@ go 1.23
 require (
 	github.com/dlmiddlecote/sqlstats v1.0.2
 	github.com/go-gorp/gorp/v3 v3.1.0
-	github.com/gophercloud/gophercloud/v2 v2.1.1
-	github.com/gophercloud/utils/v2 v2.0.0-20241008104625-7cbb8fd76bb7
+	github.com/gophercloud/gophercloud/v2 v2.2.0
+	github.com/gophercloud/utils/v2 v2.0.0-20241021065553-b46d0737ee98
 	github.com/gorilla/mux v1.8.1
 	github.com/prometheus/client_golang v1.20.5
-	github.com/prometheus/common v0.60.0
+	github.com/prometheus/common v0.60.1
 	github.com/rs/cors v1.11.1
 	github.com/sapcc/go-api-declarations v1.12.8
 	github.com/sapcc/go-bits v0.0.0-20241017174154-c7f8644a3ec1
