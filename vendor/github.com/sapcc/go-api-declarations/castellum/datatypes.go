@@ -48,6 +48,8 @@ const (
 	OperationOutcomeErrored OperationOutcome = "errored"
 	// OperationOutcomeCancelled indicates that a resize operation was cancelled. This happens when usage falls back into normal
 	OperationOutcomeCancelled OperationOutcome = "cancelled"
+	// OperationOutcomeErrorResolved indicates that an errored operation has been resolved manually.
+	OperationOutcomeErrorResolved OperationOutcome = "error-resolved"
 )
 
 // OperationState is an enumeration type for all possible states of an operation.
