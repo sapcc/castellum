@@ -124,23 +124,11 @@ func RequireJSON(w http.ResponseWriter, r *http.Request, data any) bool {
 	return true
 }
 
-func respondWithForbidden(w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusForbidden)
-	w.Write([]byte("403 Forbidden")) //nolint:errcheck
-}
-
-func respondWithNotFound(w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusNotFound)
-	w.Write([]byte("404 Not found")) //nolint:errcheck
-}
-
 func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *gopherpolicy.Token) {
 	// for endpoints requiring the `project_id` variable, check that it's not empty
 	projectUUID, projectScoped := mux.Vars(r)["project_id"]
 	if projectScoped && projectUUID == "" {
-		respondWithNotFound(w)
+		http.NotFound(w, r)
 		return "", nil
 	}
 	// other endpoints might have a project ID in the `project` query argument instead
@@ -163,7 +151,7 @@ func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *go
 		// only report 404 after having checked access rules, otherwise we might leak
 		// information about which projects exist to unauthorized users
 		if !projectExists {
-			respondWithNotFound(w)
+			http.NotFound(w, r)
 			return "", nil
 		}
 	}
@@ -205,13 +193,13 @@ func (h handler) SetTokenToProjectScope(ctx context.Context, token *gopherpolicy
 func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUID string, token *gopherpolicy.Token, createIfMissing bool) *db.Resource {
 	assetType := db.AssetType(mux.Vars(r)["asset_type"])
 	if assetType == "" {
-		respondWithNotFound(w)
+		http.NotFound(w, r)
 		return nil
 	}
 	manager, _ := h.Team.ForAssetType(assetType)
 	if manager == nil {
 		// only report resources when we have an asset manager configured
-		respondWithNotFound(w)
+		http.NotFound(w, r)
 		return nil
 	}
 
@@ -236,7 +224,7 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 				AssetType:  assetType,
 			}
 		}
-		respondWithNotFound(w)
+		http.NotFound(w, r)
 		return nil
 	}
 	if respondwith.ErrorText(w, err) {
