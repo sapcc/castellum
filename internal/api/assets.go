@@ -28,6 +28,7 @@ import (
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/respondwith"
+	"github.com/sapcc/go-bits/sqlext"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -214,6 +215,16 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	respondwith.JSON(w, http.StatusOK, asset)
 }
 
+var (
+	checkLastFinishedOperationQuery = sqlext.SimplifyWhitespace(`
+		SELECT a.id, fo.reason, fo.outcome
+		FROM assets a
+		LEFT JOIN finished_operations fo ON a.id = fo.asset_id
+		WHERE a.resource_id = $1 AND a.uuid = $2
+		ORDER BY fo.finished_at DESC LIMIT 1
+	`)
+)
+
 func (h handler) PostAssetErrorResolved(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/assets/:type/:uuid/error-resolved")
 
@@ -229,20 +240,13 @@ func (h handler) PostAssetErrorResolved(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var queryResult struct {
-		AssetID          int64                      `db:"id"`
-		OperationReason  castellum.OperationReason  `db:"reason"`
-		OperationOutcome castellum.OperationOutcome `db:"outcome"`
-	}
-
-	err := h.DB.SelectOne(&queryResult,
-		`SELECT a.id, fo.reason, fo.outcome
-		 FROM assets a
-		 LEFT JOIN finished_operations fo ON a.id = fo.asset_id
-		 WHERE a.resource_id = $1 AND a.uuid = $2
-		 ORDER BY fo.finished_at DESC LIMIT 1`,
-		dbResource.ID, mux.Vars(r)["asset_uuid"])
-
+	var (
+		assetID     int64
+		lastReason  castellum.OperationReason
+		lastOutcome castellum.OperationOutcome
+	)
+	err := h.DB.QueryRow(checkLastFinishedOperationQuery, dbResource.ID, mux.Vars(r)["asset_uuid"]).
+		Scan(&assetID, &lastReason, &lastOutcome)
 	if errors.Is(err, sql.ErrNoRows) {
 		http.NotFound(w, r)
 		return
@@ -250,7 +254,7 @@ func (h handler) PostAssetErrorResolved(w http.ResponseWriter, r *http.Request) 
 	if respondwith.ErrorText(w, err) {
 		return
 	}
-	if queryResult.OperationOutcome != castellum.OperationOutcomeErrored {
+	if lastOutcome != castellum.OperationOutcomeErrored {
 		http.Error(w, "last operation of the asset is not in an errored state and cannot be resolved.", http.StatusConflict)
 		return
 	}
@@ -258,8 +262,8 @@ func (h handler) PostAssetErrorResolved(w http.ResponseWriter, r *http.Request) 
 	now := h.TimeNow()
 	userUUID := token.UserUUID()
 	err = h.DB.Insert(&db.FinishedOperation{
-		AssetID:            queryResult.AssetID,
-		Reason:             queryResult.OperationReason,
+		AssetID:            assetID,
+		Reason:             lastReason,
 		Outcome:            castellum.OperationOutcomeErrorResolved,
 		CreatedAt:          now,
 		ConfirmedAt:        &now,
