@@ -171,7 +171,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		`SELECT * FROM assets WHERE resource_id = $1 AND uuid = $2`,
 		dbResource.ID, mux.Vars(r)["asset_uuid"])
 	if errors.Is(err, sql.ErrNoRows) {
-		respondWithNotFound(w)
+		http.NotFound(w, r)
 		return
 	}
 	if respondwith.ErrorText(w, err) {

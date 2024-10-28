@@ -49,7 +49,7 @@ func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (
 	assetTypeStr, exists := mux.Vars(r)["asset_type"]
 	if exists {
 		if assetTypeStr == "" {
-			respondWithNotFound(w)
+			http.NotFound(w, r)
 			return nil, false
 		}
 	} else {
@@ -59,7 +59,7 @@ func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (
 		manager, _ := h.Team.ForAssetType(db.AssetType(assetTypeStr))
 		if manager == nil {
 			// only report resources when we have an asset manager configured
-			respondWithNotFound(w)
+			http.NotFound(w, r)
 			return nil, false
 		}
 	}
@@ -113,10 +113,10 @@ func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (
 	// if there are no allowed resources, generate 4xx response
 	if len(allowedResources) == 0 {
 		if canAccessAnyMatchingProject {
-			respondWithForbidden(w)
+			http.Error(w, "Forbidden", http.StatusForbidden)
 		} else {
 			// do not leak information about project/resource existence to unauthorized users
-			respondWithNotFound(w)
+			http.NotFound(w, r)
 		}
 		return nil, false
 	}
