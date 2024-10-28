@@ -15,6 +15,9 @@ INSERT INTO assets (id, resource_id, uuid, size, expected_size, scrape_error_mes
 -- insert a bogus asset in an unknown asset type; we should not be able to list this in the API
 INSERT INTO assets (id, resource_id, uuid, size, expected_size, scrape_error_message, usage, critical_usages, next_scrape_at, min_size, max_size) VALUES (4, 4, 'bogusasset', 100, NULL, '', '{"singular":50}', '', UNIX(314), NULL, NULL);
 
+-- insert a dummy operation that should not be listed
+INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, greenlit_by_user_uuid, finished_at, error_message, usage) VALUES (1, 'critical', 'error-resolved', 0, 0, UNIX(21), UNIX(22), UNIX(22), 'user3', UNIX(23), '', '{"singular":0}');
+-- insert some operations that we can list
 INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, greenlit_by_user_uuid, finished_at, error_message, usage) VALUES (1, 'low', 'cancelled', 1000, 900, UNIX(31), NULL, NULL, NULL, UNIX(32), '', '{"singular":200}');
 INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, greenlit_by_user_uuid, finished_at, error_message, usage) VALUES (1, 'high', 'succeeded', 1023, 1024, UNIX(41), UNIX(42), UNIX(43), 'user2', UNIX(44), '', '{"singular":818.4}');
 INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, greenlit_by_user_uuid, finished_at, error_message, usage) VALUES (1, 'critical', 'errored', 1024, 1025, UNIX(51), UNIX(52), UNIX(52), NULL, UNIX(53), 'datacenter is on fire', '{"singular":983.04}');

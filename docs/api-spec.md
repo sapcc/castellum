@@ -18,6 +18,7 @@ This document uses the terminology defined in the [README.md](../README.md#termi
 * [DELETE /v1/projects/:id/resources/:type](#delete-v1projectsidresourcestype)
 * [GET /v1/projects/:id/assets/:type](#get-v1projectsidassetstype)
 * [GET /v1/projects/:id/assets/:type/:id](#get-v1projectsidassetstypeid)
+* [POST /v1/projects/:id/assets/:type/:id/error-resolved](#post-v1projectsidassetstypeiderror-resolved)
 * [GET /v1/projects/:id/resources/:type/operations/pending](#get-v1projectsidresourcestypeoperationspending)
 * [GET /v1/projects/:id/resources/:type/operations/recently-failed](#get-v1projectsidresourcestypeoperationsrecently-failed)
 * [GET /v1/projects/:id/resources/:type/operations/recently-succeeded](#get-v1projectsidresourcestypeoperationsrecently-succeeded)
@@ -297,6 +298,13 @@ The following fields may be returned for each operation, both below `pending_ope
 | `.greenlit.by_user` | string | The UUID of the user that greenlit this operation. For operations in states `created` or `confirmed`, this field is not shown. For operations not subject to operator approval, this field is not shown. |
 
 The previous table contains a lot of rules like "this field is not shown for operations in state X". When this is confusing to you, have a look at the state machine diagram in [README.md](../README.md#terminology). The reason why many fields are optional is that they only have values when the respective state was entered in the operation's lifecycle.
+
+## POST /v1/projects/:id/assets/:type/:id/error-resolved
+
+This endpoint allows manually marking the latest errored operation of a specified asset as resolved. This will remove the "resize errored" alert associated with the asset which otherwise only disappears if a later operation on the same asset succeeds.
+Returns `404` if the project or asset is not found.
+Returns `409` if the last operation of the asset is not `errored`.
+Otherwise returns `200`.
 
 ## GET /v1/projects/:id/resources/:type/operations/pending
 ## GET /v1/projects/:id/resources/:type/operations/recently-failed

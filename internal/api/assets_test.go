@@ -25,6 +25,7 @@ import (
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
+	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/mock"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -224,6 +225,61 @@ func TestGetAsset(baseT *testing.T) {
 				"stale":         false,
 				"usage_percent": 0,
 			},
+		}.Check(t.T, hh)
+	})
+}
+
+func TestPostAssetErrorResolved(baseT *testing.T) {
+	t := test.T{T: baseT}
+	clock := mock.NewClock()
+	clock.StepBy(time.Hour)
+	withHandler(t, core.Config{}, clock.Now, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
+		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
+		tr0.Ignore()
+
+		// endpoint requires cluster access
+		mv.Enforcer.Forbid("cluster:access")
+		assert.HTTPRequest{
+			Method:       "POST",
+			Path:         "/v1/projects/project1/assets/foo/fooasset1/error-resolved",
+			ExpectStatus: http.StatusForbidden,
+		}.Check(t.T, hh)
+		mv.Enforcer.Allow("cluster:access")
+
+		// expect error for unknown project
+		assert.HTTPRequest{
+			Method:       "POST",
+			Path:         "/v1/projects/project1/assets/projectdoesnotexist/fooasset1/error-resolved",
+			ExpectStatus: http.StatusNotFound,
+		}.Check(t.T, hh)
+
+		// expect error for unknown asset
+		assert.HTTPRequest{
+			Method:       "POST",
+			Path:         "/v1/projects/project1/assets/foo/assetdoesnotexist/error-resolved",
+			ExpectStatus: http.StatusNotFound,
+		}.Check(t.T, hh)
+
+		tr.DBChanges().AssertEmpty()
+
+		// happy path
+		req := assert.HTTPRequest{
+			Method:       "POST",
+			Path:         "/v1/projects/project1/assets/foo/fooasset1/error-resolved",
+			ExpectStatus: http.StatusOK,
+		}
+		req.Check(t.T, hh)
+
+		tr.DBChanges().AssertEqualf(`
+			INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, finished_at, greenlit_by_user_uuid, usage) VALUES (1, 'critical', 'error-resolved', 0, 0, %[1]d, %[1]d, %[1]d, %[1]d, '', 'null');
+		`,
+			h.TimeNow().Unix())
+
+		// expect conflict for asset where the last operation is not "errored"
+		assert.HTTPRequest{
+			Method:       "POST",
+			Path:         "/v1/projects/project1/assets/foo/fooasset1/error-resolved",
+			ExpectStatus: http.StatusConflict,
 		}.Check(t.T, hh)
 	})
 }

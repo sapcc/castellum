@@ -197,7 +197,9 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	if wantsFinishedOps {
 		var dbFinishedOps []db.FinishedOperation
 		_, err = h.DB.Select(&dbFinishedOps,
-			`SELECT * FROM finished_operations WHERE asset_id = $1 ORDER BY finished_at`,
+			`SELECT * FROM finished_operations 
+			 WHERE asset_id = $1 AND outcome != 'error-resolved'
+			 ORDER BY finished_at`,
 			dbAsset.ID)
 		if respondwith.ErrorText(w, err) {
 			return
@@ -210,4 +212,65 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondwith.JSON(w, http.StatusOK, asset)
+}
+
+func (h handler) PostAssetErrorResolved(w http.ResponseWriter, r *http.Request) {
+	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/assets/:type/:uuid/error-resolved")
+
+	projectUUID, token := h.CheckToken(w, r)
+	if token == nil {
+		return
+	}
+	if !token.Require(w, "cluster:access") {
+		return
+	}
+	dbResource := h.LoadResource(w, r, projectUUID, token, false)
+	if dbResource == nil {
+		return
+	}
+
+	var queryResult struct {
+		AssetID          int64                      `db:"id"`
+		OperationReason  castellum.OperationReason  `db:"reason"`
+		OperationOutcome castellum.OperationOutcome `db:"outcome"`
+	}
+
+	err := h.DB.SelectOne(&queryResult,
+		`SELECT a.id, fo.reason, fo.outcome
+		 FROM assets a
+		 LEFT JOIN finished_operations fo ON a.id = fo.asset_id
+		 WHERE a.resource_id = $1 AND a.uuid = $2
+		 ORDER BY fo.finished_at DESC LIMIT 1`,
+		dbResource.ID, mux.Vars(r)["asset_uuid"])
+
+	if errors.Is(err, sql.ErrNoRows) {
+		http.NotFound(w, r)
+		return
+	}
+	if respondwith.ErrorText(w, err) {
+		return
+	}
+	if queryResult.OperationOutcome != castellum.OperationOutcomeErrored {
+		http.Error(w, "last operation of the asset is not in an errored state and cannot be resolved.", http.StatusConflict)
+		return
+	}
+
+	now := h.TimeNow()
+	userUUID := token.UserUUID()
+	err = h.DB.Insert(&db.FinishedOperation{
+		AssetID:            queryResult.AssetID,
+		Reason:             queryResult.OperationReason,
+		Outcome:            castellum.OperationOutcomeErrorResolved,
+		CreatedAt:          now,
+		ConfirmedAt:        &now,
+		GreenlitAt:         &now,
+		FinishedAt:         now,
+		GreenlitByUserUUID: &userUUID,
+	})
+
+	if respondwith.ErrorText(w, err) {
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

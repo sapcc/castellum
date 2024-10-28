@@ -79,6 +79,9 @@ func (h *handler) AddTo(router *mux.Router) {
 	router.Methods("GET").
 		Path(`/v1/projects/{project_id}/assets/{asset_type}/{asset_uuid}`).
 		HandlerFunc(h.GetAsset)
+	router.Methods("POST").
+		Path(`/v1/projects/{project_id}/assets/{asset_type}/{asset_uuid}/error-resolved`).
+		HandlerFunc(h.PostAssetErrorResolved)
 
 	router.Methods("GET").
 		Path(`/v1/projects/{project_id}/resources/{asset_type}/operations/pending`).
