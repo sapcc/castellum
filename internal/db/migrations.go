@@ -121,4 +121,10 @@ var SQLMigrations = map[string]string{
 		ALTER TABLE resources
 			ADD COLUMN min_free_is_critical BOOLEAN DEFAULT FALSE;
 	`,
+	"024_add_error-resolved_to_op_outcome.up.sql": `
+		ALTER TYPE op_outcome ADD VALUE 'error-resolved';
+	`,
+	"024_add_error-resolved_to_op_outcome.down.sql": `
+		ALTER TYPE op_outcome REMOVE VALUE 'error-resolved';
+	`,
 }
