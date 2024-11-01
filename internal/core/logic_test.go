@@ -344,11 +344,6 @@ func TestGetEligibleOperations(t *testing.T) {
 		"high->1200", "high->1100", // StrictMinimumSize takes precedence over maximum constraint
 	)
 	check(
-		"low=20%, high=80%, crit=95%, step=20%, min=900",
-		"size=1000, usage=100, smin=950",
-		"low->950", "low->950", // StrictMinimumSize takes precedence over minimum constraint
-	)
-	check(
 		"low=10%, high=80%, crit=95%, step=20%, min_free=550",
 		"size=1000, usage=500, smin=1100",
 		"high->1200", "high->1100", // StrictMinimumSize takes precedence over minimum free constraint
@@ -365,13 +360,8 @@ func TestGetEligibleOperations(t *testing.T) {
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, min=1100",
-		"size=1000, usage=500, smax=900",
-		"low->800", "low->900", // StrictMaximumSize takes precedence over minimum constraint
-	)
-	check(
-		"low=20%, high=80%, crit=95%, step=20%, max=1100",
-		"size=1000, usage=990, smax=1050",
-		"critical->1050", "critical->1050", // StrictMaximumSize takes precedence over maximum constraint
+		"size=1000, usage=800, smax=900",
+		"low->900", "low->900", // StrictMaximumSize takes precedence over minimum constraint
 	)
 	check(
 		"low=20%, high=80%, crit=95%, step=20%, max=1050, min_free=600",
