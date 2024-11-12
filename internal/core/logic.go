@@ -197,10 +197,18 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 
 	// do not allow upsize operations to cross below the low threshold
 	if reason != castellum.OperationReasonLow {
+		var lowSize uint64
 		for _, metric := range res.UsageMetrics {
-			if res.LowThresholdPercent[metric] != 0 {
-				lowSize := uint64(math.Floor(100*asset.Usage[metric]/res.LowThresholdPercent[metric])) - 1
-
+			if res.LowThresholdPercent[metric] == 0 {
+				continue
+			}
+			metricLowSize := uint64(math.Floor(100*asset.Usage[metric]/res.LowThresholdPercent[metric])) - 1
+			if lowSize == 0 || metricLowSize < lowSize {
+				lowSize = metricLowSize
+			}
+		}
+		if lowSize > 0 {
+			for _, metric := range res.UsageMetrics {
 				// BUT ensure that this threshold does not prevent us from taking action
 				// at all (if in doubt, the high or critical threshold is more important
 				// than the low threshold; it's better to have an asset slightly too large
@@ -222,11 +230,8 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 						lowSize = *enforceableMinSize
 					}
 				}
-
-				if lowSize > 0 {
-					c.forbidAbove(lowSize)
-				}
 			}
+			c.forbidAbove(lowSize)
 		}
 	}
 
