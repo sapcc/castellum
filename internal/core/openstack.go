@@ -30,6 +30,7 @@ import (
 	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/projects"
 	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/roles"
 	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/tokens"
+	"github.com/sapcc/go-bits/gophercloudext"
 )
 
 // ProviderClient is an interface for an internal type that wraps
@@ -59,7 +60,6 @@ type ProviderClient interface {
 // providerClientImpl is the implementation for the ProviderClient interface.
 type providerClientImpl struct {
 	pc            *gophercloud.ProviderClient
-	ao            gophercloud.AuthOptions
 	eo            gophercloud.EndpointOpts
 	roleIDForName map[string]string
 	projectCache  map[string]*CachedProject // key = UUID, nil value = project does not exist
@@ -90,8 +90,8 @@ type CachedDomain struct {
 }
 
 // NewProviderClient constructs a new ProviderClient instance.
-func NewProviderClient(ctx context.Context, ao gophercloud.AuthOptions, eo gophercloud.EndpointOpts) (ProviderClient, error) {
-	pc, err := openstack.AuthenticatedClient(ctx, ao)
+func NewProviderClient(ctx context.Context) (ProviderClient, error) {
+	pc, eo, err := gophercloudext.NewProviderClient(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,6 @@ func NewProviderClient(ctx context.Context, ao gophercloud.AuthOptions, eo gophe
 
 	return &providerClientImpl{
 		pc:            pc,
-		ao:            ao,
 		eo:            eo,
 		roleIDForName: roleIDForName,
 		projectCache:  make(map[string]*CachedProject),
@@ -137,9 +136,11 @@ func (p *providerClientImpl) ProjectScopedClient(ctx context.Context, scope Proj
 
 func (p *providerClientImpl) projectScopedClientImpl(ctx context.Context, scope ProjectScope, firstPass bool) (*gophercloud.ProviderClient, gophercloud.EndpointOpts, error) {
 	// auth into the target project
-	ao := p.ao
-	ao.Scope = &gophercloud.AuthScope{ProjectID: scope.ID}
-	pc, err := openstack.AuthenticatedClient(ctx, ao)
+	pc, eo, err := gophercloudext.NewProviderClient(ctx, &gophercloudext.ClientOpts{
+		CustomizeAuthOptions: func(ao *gophercloud.AuthOptions) {
+			ao.Scope = &gophercloud.AuthScope{ProjectID: scope.ID}
+		},
+	})
 	if err != nil {
 		//NOTE: If we don't have any roles assigned in the project yet, we will get
 		// a 401, even if the provided credentials are correct. This is not a fatal
@@ -147,7 +148,7 @@ func (p *providerClientImpl) projectScopedClientImpl(ctx context.Context, scope 
 		if gophercloud.ResponseCodeIs(err, http.StatusUnauthorized) {
 			pc = nil
 		} else {
-			return nil, p.eo, fmt.Errorf("cannot authenticate into project %s: %w", scope.ID, err)
+			return nil, eo, fmt.Errorf("cannot authenticate into project %s: %w", scope.ID, err)
 		}
 	}
 
@@ -164,20 +165,20 @@ func (p *providerClientImpl) projectScopedClientImpl(ctx context.Context, scope 
 		// our cloud-admin-scope AuthResult for that
 		result, ok = p.pc.GetAuthResult().(tokens.CreateResult)
 		if !ok {
-			return nil, p.eo, fmt.Errorf("unknown type for AuthResult: %T", p.pc.GetAuthResult())
+			return nil, eo, fmt.Errorf("unknown type for AuthResult: %T", p.pc.GetAuthResult())
 		}
 	} else {
 		if len(scope.RoleNames) == 0 {
 			// no checks to perform
-			return pc, p.eo, nil
+			return pc, eo, nil
 		}
 		result, ok = pc.GetAuthResult().(tokens.CreateResult)
 		if !ok {
-			return nil, p.eo, fmt.Errorf("unknown type for AuthResult: %T", p.pc.GetAuthResult())
+			return nil, eo, fmt.Errorf("unknown type for AuthResult: %T", p.pc.GetAuthResult())
 		}
 		assignedRoles, err = result.ExtractRoles()
 		if err != nil {
-			return nil, p.eo, fmt.Errorf("cannot get role assignments for project scope: %w", err)
+			return nil, eo, fmt.Errorf("cannot get role assignments for project scope: %w", err)
 		}
 	}
 
@@ -191,27 +192,27 @@ func (p *providerClientImpl) projectScopedClientImpl(ctx context.Context, scope 
 	}
 	if len(isRequestedRole) == 0 {
 		// all required roles are assigned
-		return pc, p.eo, nil
+		return pc, eo, nil
 	}
 
 	// not all roles present -> try at most once to assign missing roles
 	// (this check prevents an infinite loop in case of unforeseen problems)
 	if !firstPass {
-		return nil, p.eo, fmt.Errorf("some roles in project %s are still missing despite successful assignment: %v",
+		return nil, eo, fmt.Errorf("some roles in project %s are still missing despite successful assignment: %v",
 			scope.ID, isRequestedRole)
 	}
 	user, err := result.ExtractUser()
 	if err != nil {
-		return nil, p.eo, fmt.Errorf("cannot get own user ID: %w", err)
+		return nil, eo, fmt.Errorf("cannot get own user ID: %w", err)
 	}
 	identityV3, err := p.CloudAdminClient(openstack.NewIdentityV3)
 	if err != nil {
-		return nil, p.eo, err
+		return nil, eo, err
 	}
 	for roleName := range isRequestedRole {
 		roleID := p.roleIDForName[roleName]
 		if roleID == "" {
-			return nil, p.eo, fmt.Errorf("no such role: %s", roleName)
+			return nil, eo, fmt.Errorf("no such role: %s", roleName)
 		}
 		opts := roles.AssignOpts{
 			UserID:    user.ID,
@@ -219,7 +220,7 @@ func (p *providerClientImpl) projectScopedClientImpl(ctx context.Context, scope 
 		}
 		err := roles.Assign(ctx, identityV3, roleID, opts).ExtractErr()
 		if err != nil {
-			return nil, p.eo, fmt.Errorf("could not assign role %s in project %s: %w", roleName, scope.ID, err)
+			return nil, eo, fmt.Errorf("could not assign role %s in project %s: %w", roleName, scope.ID, err)
 		}
 	}
 

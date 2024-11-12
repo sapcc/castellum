@@ -34,9 +34,7 @@ import (
 
 	"github.com/dlmiddlecote/sqlstats"
 	"github.com/go-gorp/gorp/v3"
-	"github.com/gophercloud/gophercloud/v2"
 	"github.com/gophercloud/gophercloud/v2/openstack"
-	"github.com/gophercloud/utils/v2/openstack/clientconfig"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
@@ -98,22 +96,9 @@ func main() {
 	dbi := must.Return(db.Init(dbURL))
 	prometheus.MustRegister(sqlstats.NewStatsCollector("castellum", dbi.Db))
 
-	ctx := httpext.ContextWithSIGINT(context.Background(), 10*time.Second)
-
 	// initialize OpenStack connection
-	ao, err := clientconfig.AuthOptions(nil)
-	if err != nil {
-		logg.Fatal("cannot find OpenStack credentials: " + err.Error())
-	}
-	ao.AllowReauth = true
-	providerClient, err := core.NewProviderClient(ctx, *ao, gophercloud.EndpointOpts{
-		// note that empty values are acceptable in both fields
-		Region:       os.Getenv("OS_REGION_NAME"),
-		Availability: gophercloud.Availability(os.Getenv("OS_INTERFACE")),
-	})
-	if err != nil {
-		logg.Fatal("cannot connect to OpenStack: " + err.Error())
-	}
+	ctx := httpext.ContextWithSIGINT(context.Background(), 10*time.Second)
+	providerClient := must.Return(core.NewProviderClient(ctx))
 
 	// get max asset sizes
 	cfg := must.Return(core.LoadConfig(configPath))
@@ -167,7 +152,7 @@ func runAPI(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team core.Ass
 		IdentityV3: identityV3,
 		Cacher:     gopherpolicy.InMemoryCacher(),
 	}
-	must.Succeed(tv.LoadPolicyFile(osext.MustGetenv("CASTELLUM_OSLO_POLICY_PATH")))
+	must.Succeed(tv.LoadPolicyFile(osext.MustGetenv("CASTELLUM_OSLO_POLICY_PATH"), nil))
 
 	// wrap the main API handler in several layers of middleware
 	corsMiddleware := cors.New(cors.Options{

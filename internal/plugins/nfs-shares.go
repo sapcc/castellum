@@ -210,7 +210,7 @@ func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, a
 		if err != nil {
 			return core.AssetStatus{}, fmt.Errorf("cannot get status of share %s from Manila API: %w", assetUUID, err)
 		}
-		if share.Size < 0 || uint64(share.Size) != status.Size { //nolint:gosec // we cannot store exabytes and negative check is done
+		if share.Size < 0 || uint64(share.Size) != status.Size {
 			return core.AssetStatus{}, fmt.Errorf(
 				"inconsistent size reports for share %s: Prometheus says %d GiB, Manila says %d GiB",
 				assetUUID, status.Size, share.Size)
