@@ -19,92 +19,15 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
-	"net/http"
-	"net/url"
-	"time"
 
 	"github.com/sapcc/go-api-declarations/cadf"
 	"github.com/sapcc/go-api-declarations/castellum"
-	"github.com/sapcc/go-bits/audittools"
-	"github.com/sapcc/go-bits/gopherpolicy"
-	"github.com/sapcc/go-bits/logg"
-	"github.com/sapcc/go-bits/osext"
 )
-
-// eventSink is a channel that receives audit events.
-var eventSink chan<- cadf.Event
-
-var showAuditOnStdout = !osext.GetenvBool("CASTELLUM_AUDIT_SILENT")
-
-// StartAuditLogging starts audit logging for the API.
-func StartAuditLogging(ctx context.Context, rabbitQueueName string, rabbitURI url.URL) {
-	auditEventPublishSuccessCounter.Add(0)
-	auditEventPublishFailedCounter.Add(0)
-
-	onSuccessFunc := func() {
-		auditEventPublishSuccessCounter.Inc()
-	}
-	onFailFunc := func() {
-		auditEventPublishFailedCounter.Inc()
-	}
-	s := make(chan cadf.Event, 20)
-	eventSink = s
-
-	go audittools.AuditTrail{
-		EventSink:           s,
-		OnSuccessfulPublish: onSuccessFunc,
-		OnFailedPublish:     onFailFunc,
-	}.Commit(ctx, rabbitURI, rabbitQueueName)
-}
-
-var observerUUID = audittools.GenerateUUID()
-
-// logAndPublishEvent logs the audit event to stdout and publishes it to a RabbitMQ server.
-func logAndPublishEvent(eventTime time.Time, req *http.Request, token *gopherpolicy.Token, reasonCode int, target audittools.TargetRenderer) {
-	action := cadf.UpdateAction
-	if v, ok := target.(scalingEventTarget); ok {
-		action = cadf.Action(string(v.action) + "/" + v.resourceType)
-	}
-	p := audittools.EventParameters{
-		Time:       eventTime,
-		Request:    req,
-		User:       token,
-		ReasonCode: reasonCode,
-		Action:     action,
-		Observer: struct {
-			TypeURI string
-			Name    string
-			ID      string
-		}{
-			TypeURI: "service/autoscaling",
-			Name:    "castellum",
-			ID:      observerUUID,
-		},
-		Target: target,
-	}
-	event := audittools.NewEvent(p)
-
-	if showAuditOnStdout {
-		msg, err := json.Marshal(event)
-		if err != nil {
-			logg.Error("could not marshal audit event: %s", err.Error())
-		} else {
-			logg.Other("AUDIT", string(msg))
-		}
-	}
-
-	if eventSink != nil {
-		eventSink <- event
-	}
-}
 
 // EventParams contains parameters for creating an audit event.
 type scalingEventTarget struct {
-	action            cadf.Action
 	projectID         string
-	resourceType      string
 	attachmentContent targetAttachmentContent // only used for enable/update action events
 }
 

@@ -24,9 +24,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -40,6 +38,7 @@ import (
 	"github.com/rs/cors"
 	"github.com/sapcc/go-api-declarations/bininfo"
 	"github.com/sapcc/go-api-declarations/castellum"
+	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpapi"
@@ -154,6 +153,19 @@ func runAPI(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team core.Ass
 	}
 	must.Succeed(tv.LoadPolicyFile(osext.MustGetenv("CASTELLUM_OSLO_POLICY_PATH"), nil))
 
+	// connect to Hermes RabbitMQ if requested
+	auditor := audittools.NewNullAuditor()
+	if os.Getenv("CASTELLUM_RABBITMQ_QUEUE_NAME") != "" {
+		auditor = must.Return(audittools.NewAuditor(ctx, audittools.AuditorOpts{
+			EnvPrefix: "CASTELLUM_RABBITMQ",
+			Observer: audittools.Observer{
+				TypeURI: "service/autoscaling",
+				Name:    bininfo.Component(),
+				ID:      audittools.GenerateUUID(),
+			},
+		}))
+	}
+
 	// wrap the main API handler in several layers of middleware
 	corsMiddleware := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
@@ -161,7 +173,7 @@ func runAPI(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team core.Ass
 		AllowedHeaders: []string{"Content-Type", "User-Agent", "X-Auth-Token"},
 	})
 	handler := httpapi.Compose(
-		api.NewHandler(cfg, dbi, team, &tv, providerClient),
+		api.NewHandler(cfg, dbi, team, &tv, providerClient, auditor),
 		httpapi.HealthCheckAPI{SkipRequestLog: true},
 		httpapi.WithGlobalMiddleware(corsMiddleware.Handler),
 		pprofapi.API{IsAuthorized: pprofapi.IsRequestFromLocalhost},
@@ -169,25 +181,6 @@ func runAPI(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team core.Ass
 	mux := http.NewServeMux()
 	mux.Handle("/", handler)
 	mux.Handle("/metrics", promhttp.Handler())
-
-	// Start audit logging.
-	rabbitQueueName := os.Getenv("CASTELLUM_RABBITMQ_QUEUE_NAME")
-	if rabbitQueueName != "" {
-		username := osext.GetenvOrDefault("CASTELLUM_RABBITMQ_USERNAME", "guest")
-		pass := osext.GetenvOrDefault("CASTELLUM_RABBITMQ_PASSWORD", "guest")
-		hostname := osext.GetenvOrDefault("CASTELLUM_RABBITMQ_HOSTNAME", "localhost")
-		port, err := strconv.Atoi(osext.GetenvOrDefault("CASTELLUM_RABBITMQ_PORT", "5672"))
-		if err != nil {
-			logg.Fatal("invalid value for CASTELLUM_RABBITMQ_PORT: " + err.Error())
-		}
-		rabbitURI := url.URL{
-			Scheme: "amqp",
-			Host:   net.JoinHostPort(hostname, strconv.Itoa(port)),
-			User:   url.UserPassword(username, pass),
-			Path:   "/",
-		}
-		api.StartAuditLogging(ctx, rabbitQueueName, rabbitURI)
-	}
 
 	must.Succeed(httpext.ListenAndServeContext(ctx, httpListenAddr, mux))
 }

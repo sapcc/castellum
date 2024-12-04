@@ -26,6 +26,7 @@ import (
 
 	"github.com/sapcc/go-api-declarations/cadf"
 	"github.com/sapcc/go-api-declarations/castellum"
+	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/respondwith"
 	"github.com/sapcc/go-bits/sqlext"
@@ -171,15 +172,19 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	if dbResource.ID == 0 {
 		action = cadf.EnableAction
 	}
-	// this allows to reuse the logAndPublishEvent() with same parameters except reasonCode
+	// this allows to reuse h.Auditor.Record() with same parameters except reasonCode
 	doAudit := func(statusCode int) {
-		logAndPublishEvent(requestTime, r, token, statusCode,
-			scalingEventTarget{
-				action:            action,
+		h.Auditor.Record(audittools.EventParameters{
+			Time:       requestTime,
+			Request:    r,
+			User:       token,
+			ReasonCode: statusCode,
+			Action:     cadf.Action(string(action) + "/" + string(dbResource.AssetType)),
+			Target: scalingEventTarget{
 				projectID:         projectUUID,
-				resourceType:      string(dbResource.AssetType),
 				attachmentContent: targetAttachmentContent{resource: input},
-			})
+			},
+		})
 	}
 
 	existingResources := make(map[db.AssetType]struct{})
@@ -239,14 +244,18 @@ func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// this allows to reuse the logAndPublishEvent() with same parameters except reasonCode
+	// this allows to reuse h.Auditor.Record() with same parameters except reasonCode
 	doAudit := func(statusCode int) {
-		logAndPublishEvent(requestTime, r, token, statusCode,
-			scalingEventTarget{
-				action:       cadf.DisableAction,
-				projectID:    projectUUID,
-				resourceType: string(dbResource.AssetType),
-			})
+		h.Auditor.Record(audittools.EventParameters{
+			Time:       requestTime,
+			Request:    r,
+			User:       token,
+			ReasonCode: statusCode,
+			Action:     cadf.Action("disable/" + string(dbResource.AssetType)),
+			Target: scalingEventTarget{
+				projectID: projectUUID,
+			},
+		})
 	}
 
 	_, err := h.DB.Exec(`DELETE FROM resources WHERE id = $1`, dbResource.ID)

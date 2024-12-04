@@ -32,6 +32,7 @@ import (
 
 	"github.com/go-gorp/gorp/v3"
 	"github.com/gorilla/mux"
+	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/logg"
@@ -47,14 +48,15 @@ type handler struct {
 	Team      core.AssetManagerTeam
 	Validator gopherpolicy.Validator
 	Provider  core.ProviderClient
+	Auditor   audittools.Auditor
 
 	// dependency injection slots (filled with doubles in tests)
 	TimeNow func() time.Time
 }
 
 // NewAPI constructs the main httpapi.API for this package.
-func NewHandler(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClient) httpapi.API {
-	return &handler{Config: cfg, DB: dbi, Team: team, Validator: validator, Provider: provider, TimeNow: time.Now}
+func NewHandler(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClient, auditor audittools.Auditor) httpapi.API {
+	return &handler{Config: cfg, DB: dbi, Team: team, Validator: validator, Provider: provider, Auditor: auditor, TimeNow: time.Now}
 }
 
 // AddTo implements the httpapi.API interface.

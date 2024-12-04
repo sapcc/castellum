@@ -25,6 +25,7 @@ import (
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
+	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/mock"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -34,7 +35,7 @@ import (
 
 func TestGetPendingOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, mv,
 			"/v1/projects/%s/resources/%s/operations/pending")
 
@@ -126,7 +127,7 @@ func withEitherFailedOrErroredOperation(action func(castellum.OperationOutcome))
 func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withEitherFailedOrErroredOperation(func(failedOperationOutcome castellum.OperationOutcome) {
-		withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
+		withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 			testCommonEndpointBehavior(t, hh, mv,
 				"/v1/projects/%s/resources/%s/operations/recently-failed")
 
@@ -248,7 +249,7 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 	clock.StepBy(time.Hour)
 
 	withEitherFailedOrErroredOperation(func(failedOperationOutcome castellum.OperationOutcome) {
-		withHandler(t, core.Config{}, clock.Now, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
+		withHandler(t, core.Config{}, clock.Now, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 			testCommonEndpointBehavior(t, hh, mv,
 				"/v1/projects/%s/resources/%s/operations/recently-succeeded")
 
