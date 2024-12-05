@@ -25,6 +25,7 @@ import (
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
+	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/mock"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -34,7 +35,7 @@ import (
 
 func TestGetResourceScrapeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with cluster access
 		mv.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
@@ -75,7 +76,7 @@ func TestGetResourceScrapeErrors(baseT *testing.T) {
 
 func TestGetAssetScrapeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with cluster access
 		mv.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
@@ -108,7 +109,7 @@ func TestGetAssetScrapeErrors(baseT *testing.T) {
 
 func TestGetAssetResizeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with cluster access
 		mv.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{

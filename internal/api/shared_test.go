@@ -26,6 +26,7 @@ import (
 	"github.com/go-gorp/gorp/v3"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
+	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/mock"
 
@@ -35,7 +36,7 @@ import (
 	"github.com/sapcc/castellum/internal/test"
 )
 
-func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action func(*handler, http.Handler, *mock.Validator[*mock.Enforcer], []db.Resource, []db.Asset)) {
+func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action func(*handler, http.Handler, *mock.Validator[*mock.Enforcer], *audittools.MockAuditor, []db.Resource, []db.Asset)) {
 	baseline := "fixtures/start-data.sql"
 	t.WithDB(&baseline, func(dbi *gorp.DbMap) {
 		team := core.AssetManagerTeam{
@@ -54,6 +55,7 @@ func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action fun
 				"project3": {Name: "Third Project", DomainID: "domain1"},
 			},
 		}
+		auditor := audittools.NewMockAuditor()
 
 		var resources []db.Resource
 		_, err := dbi.Select(&resources, `SELECT * FROM resources ORDER BY ID`)
@@ -66,9 +68,9 @@ func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action fun
 		if timeNow == nil {
 			timeNow = time.Now
 		}
-		h := &handler{Config: cfg, DB: dbi, Team: team, Validator: mv, Provider: mpc, TimeNow: timeNow}
+		h := &handler{Config: cfg, DB: dbi, Team: team, Validator: mv, Auditor: auditor, Provider: mpc, TimeNow: timeNow}
 		hh := httpapi.Compose(h, httpapi.WithoutLogging())
-		action(h, hh, mv, resources, assets)
+		action(h, hh, mv, auditor, resources, assets)
 	})
 }
 

@@ -25,6 +25,7 @@ import (
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
+	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/mock"
 
@@ -35,7 +36,7 @@ import (
 
 func TestGetAssets(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, mv,
 			"/v1/projects/%s/assets/%s")
 
@@ -72,7 +73,7 @@ func TestGetAssets(baseT *testing.T) {
 
 func TestGetAsset(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, mv,
 			"/v1/projects/%s/assets/%s/fooasset1")
 
@@ -233,7 +234,7 @@ func TestPostAssetErrorResolved(baseT *testing.T) {
 	t := test.T{T: baseT}
 	clock := mock.NewClock()
 	clock.StepBy(time.Hour)
-	withHandler(t, core.Config{}, clock.Now, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, clock.Now, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
 		tr0.Ignore()
 
