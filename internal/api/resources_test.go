@@ -19,11 +19,13 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/sapcc/go-api-declarations/cadf"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/audittools"
@@ -190,7 +192,7 @@ func TestPutResource(baseT *testing.T) {
 	clock := mock.NewClock()
 	clock.StepBy(time.Hour)
 
-	withHandler(t, core.Config{}, clock.Now, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, clock.Now, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], ma *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
 		tr0.Ignore()
 
@@ -272,6 +274,7 @@ func TestPutResource(baseT *testing.T) {
 		tr.DBChanges().AssertEmpty()
 
 		// happy path
+		ma.IgnoreEventsUntilNow()
 		assert.HTTPRequest{
 			Method:       "PUT",
 			Path:         "/v1/projects/project1/resources/foo",
@@ -283,6 +286,22 @@ func TestPutResource(baseT *testing.T) {
 		tr.DBChanges().AssertEqualf(`
 			UPDATE resources SET low_delay_seconds = 1800, high_delay_seconds = 900, size_step_percent = 0, single_step = TRUE WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 		`)
+		ma.ExpectEvents(t.T, cadf.Event{
+			Action:      "update/foo",
+			Outcome:     "success",
+			Reason:      cadf.Reason{ReasonType: "HTTP", ReasonCode: "202"},
+			RequestPath: "/v1/projects/project1/resources/foo",
+			Target: cadf.Resource{
+				TypeURI:   "data/security/project",
+				ID:        "project1",
+				ProjectID: "project1",
+				Attachments: []cadf.Attachment{{
+					Name:    "payload",
+					TypeURI: "mime:application/json",
+					Content: toJSONVia[castellum.Resource](newFooResourceJSON1),
+				}},
+			},
+		})
 
 		// test disabling low and high thresholds, and enabling critical threshold
 		newFooResourceJSON2 := assert.JSONObject{
@@ -355,6 +374,26 @@ func TestPutResource(baseT *testing.T) {
 			UPDATE resources SET low_threshold_percent = '{"singular":0}', low_delay_seconds = 0, high_threshold_percent = '{"singular":0}', high_delay_seconds = 0, critical_threshold_percent = '{"singular":98}', size_step_percent = 15, max_size = 42000, min_free_size = 200, single_step = FALSE, min_free_is_critical = TRUE WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 		`)
 	})
+}
+
+func toJSONVia[T any](in any) string {
+	// This is mostly the same as `must.Return(json.Marshal(in))`, but deserializes into
+	// T in an intermediate step to render the JSON with the correct field order.
+	// Used for audit event matches.
+	buf, err := json.Marshal(in)
+	if err != nil {
+		panic(err.Error())
+	}
+	var intermediate T
+	err = json.Unmarshal(buf, &intermediate)
+	if err != nil {
+		panic(err.Error())
+	}
+	buf, err = json.Marshal(intermediate)
+	if err != nil {
+		panic(err.Error())
+	}
+	return string(buf)
 }
 
 func TestMaxAssetSizeFor(t *testing.T) {
@@ -579,7 +618,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 
 func TestDeleteResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], ma *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
 		tr0.Ignore()
 
@@ -633,6 +672,7 @@ func TestDeleteResource(baseT *testing.T) {
 		tr.DBChanges().AssertEmpty()
 
 		// happy path
+		ma.IgnoreEventsUntilNow()
 		assert.HTTPRequest{
 			Method:       "DELETE",
 			Path:         "/v1/projects/project1/resources/foo",
@@ -649,6 +689,17 @@ func TestDeleteResource(baseT *testing.T) {
 			DELETE FROM finished_operations WHERE asset_id = 1 AND reason = 'low' AND outcome = 'cancelled' AND old_size = 1000 AND new_size = 900 AND created_at = 31 AND confirmed_at = NULL AND greenlit_at = NULL AND finished_at = 32 AND greenlit_by_user_uuid = NULL AND error_message = '' AND errored_attempts = 0 AND usage = '{"singular":200}';
 			DELETE FROM resources WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 		`)
+		ma.ExpectEvents(t.T, cadf.Event{
+			Action:      "disable/foo",
+			Outcome:     "success",
+			Reason:      cadf.Reason{ReasonType: "HTTP", ReasonCode: "204"},
+			RequestPath: "/v1/projects/project1/resources/foo",
+			Target: cadf.Resource{
+				TypeURI:   "data/security/project",
+				ID:        "project1",
+				ProjectID: "project1",
+			},
+		})
 	})
 }
 
