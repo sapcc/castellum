@@ -174,15 +174,15 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	}
 	// this allows to reuse h.Auditor.Record() with same parameters except reasonCode
 	doAudit := func(statusCode int) {
-		h.Auditor.Record(audittools.EventParameters{
+		h.Auditor.Record(audittools.Event{
 			Time:       requestTime,
 			Request:    r,
 			User:       token,
 			ReasonCode: statusCode,
 			Action:     cadf.Action(string(action) + "/" + string(dbResource.AssetType)),
 			Target: scalingEventTarget{
-				projectID:         projectUUID,
-				attachmentContent: targetAttachmentContent{resource: input},
+				projectID: projectUUID,
+				resource:  &input,
 			},
 		})
 	}
@@ -246,7 +246,7 @@ func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
 
 	// this allows to reuse h.Auditor.Record() with same parameters except reasonCode
 	doAudit := func(statusCode int) {
-		h.Auditor.Record(audittools.EventParameters{
+		h.Auditor.Record(audittools.Event{
 			Time:       requestTime,
 			Request:    r,
 			User:       token,

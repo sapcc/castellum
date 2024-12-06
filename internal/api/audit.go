@@ -19,46 +19,26 @@
 package api
 
 import (
-	"encoding/json"
-
 	"github.com/sapcc/go-api-declarations/cadf"
 	"github.com/sapcc/go-api-declarations/castellum"
+	"github.com/sapcc/go-bits/must"
 )
 
 // EventParams contains parameters for creating an audit event.
 type scalingEventTarget struct {
-	projectID         string
-	attachmentContent targetAttachmentContent // only used for enable/update action events
+	projectID string
+	resource  *castellum.Resource // only used for enable/update action events
 }
 
 func (t scalingEventTarget) Render() cadf.Resource {
-	return cadf.Resource{
+	result := cadf.Resource{
 		TypeURI:   "data/security/project",
 		ID:        t.projectID,
 		ProjectID: t.projectID,
-		Attachments: []cadf.Attachment{{
-			Name:    "payload",
-			TypeURI: "mime:application/json",
-			Content: t.attachmentContent,
-		}},
 	}
-}
-
-type targetAttachmentContent struct {
-	resource castellum.Resource
-}
-
-// MarshalJSON implements the json.Marshaler interface.
-func (a targetAttachmentContent) MarshalJSON() ([]byte, error) {
-	// copy resource data into a struct that does not have a custom MarshalJSON
-	data := a.resource
-
-	// Hermes does not accept a JSON object at target.attachments[].content, so
-	// we need to wrap the marshaled JSON into a JSON string
-	bytes, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
+	if t.resource != nil {
+		attachment := must.Return(cadf.NewJSONAttachment("payload", *t.resource))
+		result.Attachments = append(result.Attachments, attachment)
 	}
-
-	return json.Marshal(string(bytes))
+	return result
 }
