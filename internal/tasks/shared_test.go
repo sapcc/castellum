@@ -20,6 +20,7 @@ package tasks
 
 import (
 	"context"
+	"testing"
 	"time"
 
 	"github.com/go-gorp/gorp/v3"
@@ -30,6 +31,10 @@ import (
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
 )
+
+func TestMain(m *testing.M) {
+	test.WithTestDatabase(m, func() int { return m.Run() })
+}
 
 func withContext(t test.T, cfg core.Config, action func(context.Context, *Context, *plugins.AssetManagerStatic, *mock.Clock, *prometheus.Registry)) {
 	t.WithDB(nil, func(dbi *gorp.DbMap) {

@@ -21,6 +21,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"testing"
 	"time"
 
 	"github.com/go-gorp/gorp/v3"
@@ -35,6 +36,10 @@ import (
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
 )
+
+func TestMain(m *testing.M) {
+	test.WithTestDatabase(m, func() int { return m.Run() })
+}
 
 func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action func(*handler, http.Handler, *mock.Validator[*mock.Enforcer], *audittools.MockAuditor, []db.Resource, []db.Asset)) {
 	baseline := "fixtures/start-data.sql"
