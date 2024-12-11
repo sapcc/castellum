@@ -73,6 +73,7 @@ func WithTestDB(m *testing.M, action func() int) int {
 	// create DB on first use
 	hasPostgresDB := must.Return(checkPathExists(filepath.Join(rootPath, ".testdb/datadir/PG_VERSION")))
 	if !hasPostgresDB {
+		logg.Info("PATH = %s", os.Getenv("PATH"))
 		for _, dirName := range []string{".testdb/datadir", ".testdb/run"} {
 			must.Succeed(os.MkdirAll(filepath.Join(rootPath, dirName), 0777)) // subject to umask
 		}
