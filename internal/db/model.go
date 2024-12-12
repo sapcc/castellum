@@ -19,8 +19,7 @@
 package db
 
 import (
-	"fmt"
-	"net/url"
+	"database/sql"
 	"strings"
 	"time"
 
@@ -264,18 +263,15 @@ func (o FinishedOperation) State() castellum.OperationState {
 	return castellum.OperationState(o.Outcome)
 }
 
-// Init connects to the database and initializes the schema and model types.
-func Init(dbURL *url.URL) (*gorp.DbMap, error) {
-	cfg := easypg.Configuration{
-		PostgresURL: dbURL,
-		Migrations:  SQLMigrations,
+// Configuration returns the easypg.Configuration object that func main() needs to initialize the DB connection.
+func Configuration() easypg.Configuration {
+	return easypg.Configuration{
+		Migrations: SQLMigrations,
 	}
+}
 
-	dbConn, err := easypg.Connect(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("cannot connect to database: %w", err)
-	}
-
+// InitORM wraps a database connection into a gorp.DbMap instance.
+func InitORM(dbConn *sql.DB) *gorp.DbMap {
 	// ensure that this process does not starve other Castellum processes for DB connections
 	dbConn.SetMaxOpenConns(16)
 
@@ -284,5 +280,5 @@ func Init(dbURL *url.URL) (*gorp.DbMap, error) {
 	gorpDB.AddTableWithName(Asset{}, "assets").SetKeys(true, "id")
 	gorpDB.AddTableWithName(PendingOperation{}, "pending_operations").SetKeys(true, "id")
 	gorpDB.AddTableWithName(FinishedOperation{}, "finished_operations")
-	return gorpDB, nil
+	return gorpDB
 }
