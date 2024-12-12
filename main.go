@@ -84,16 +84,18 @@ func main() {
 	wrap.SetOverrideUserAgent(bininfo.Component(), bininfo.VersionOr("rolling"))
 
 	// initialize DB connection
+	dbName := osext.GetenvOrDefault("CASTELLUM_DB_NAME", "castellum")
 	dbURL := must.Return(easypg.URLFrom(easypg.URLParts{
 		HostName:          osext.GetenvOrDefault("CASTELLUM_DB_HOSTNAME", "localhost"),
 		Port:              osext.GetenvOrDefault("CASTELLUM_DB_PORT", "5432"),
 		UserName:          osext.GetenvOrDefault("CASTELLUM_DB_USERNAME", "postgres"),
 		Password:          os.Getenv("CASTELLUM_DB_PASSWORD"),
 		ConnectionOptions: os.Getenv("CASTELLUM_DB_CONNECTION_OPTIONS"),
-		DatabaseName:      osext.GetenvOrDefault("CASTELLUM_DB_NAME", "castellum"),
+		DatabaseName:      dbName,
 	}))
-	dbi := must.Return(db.Init(dbURL))
-	prometheus.MustRegister(sqlstats.NewStatsCollector("castellum", dbi.Db))
+	dbConn := must.Return(easypg.Connect(dbURL, db.Configuration()))
+	prometheus.MustRegister(sqlstats.NewStatsCollector(dbName, dbConn))
+	dbi := db.InitORM(dbConn)
 
 	// initialize OpenStack connection
 	ctx := httpext.ContextWithSIGINT(context.Background(), 10*time.Second)
