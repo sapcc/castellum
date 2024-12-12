@@ -21,12 +21,14 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"testing"
 	"time"
 
 	"github.com/go-gorp/gorp/v3"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/audittools"
+	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/mock"
 
@@ -35,6 +37,10 @@ import (
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
 )
+
+func TestMain(m *testing.M) {
+	easypg.WithTestDB(m, func() int { return m.Run() })
+}
 
 func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action func(*handler, http.Handler, *mock.Validator[*mock.Enforcer], *audittools.MockAuditor, []db.Resource, []db.Asset)) {
 	baseline := "fixtures/start-data.sql"

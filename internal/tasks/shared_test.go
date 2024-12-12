@@ -20,16 +20,22 @@ package tasks
 
 import (
 	"context"
+	"testing"
 	"time"
 
 	"github.com/go-gorp/gorp/v3"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/mock"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
 )
+
+func TestMain(m *testing.M) {
+	easypg.WithTestDB(m, func() int { return m.Run() })
+}
 
 func withContext(t test.T, cfg core.Config, action func(context.Context, *Context, *plugins.AssetManagerStatic, *mock.Clock, *prometheus.Registry)) {
 	t.WithDB(nil, func(dbi *gorp.DbMap) {

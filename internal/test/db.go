@@ -20,7 +20,6 @@ package test
 
 import (
 	"encoding/json"
-	"net/url"
 
 	"github.com/go-gorp/gorp/v3"
 	"github.com/sapcc/go-bits/easypg"
@@ -31,29 +30,17 @@ import (
 // WithDB prepares a DB reference for this test, or fails the test if the DB
 // is not ready.
 func (t T) WithDB(fixtureFile *string, action func(dbi *gorp.DbMap)) {
-	postgresURLStr := "postgres://postgres:postgres@localhost:54321/castellum?sslmode=disable"
-	dbURL, err := url.Parse(postgresURLStr)
-	if err != nil {
-		t.Fatalf("malformed database URL %q: %s", postgresURLStr, err.Error())
+	opts := []easypg.TestSetupOption{
+		easypg.ClearTables("resources", "assets", "pending_operations", "finished_operations"),
+		easypg.ResetPrimaryKeys("resources", "assets", "pending_operations"),
 	}
-
-	dbi, err := db.Init(dbURL)
-	if err != nil {
-		t.Error(err)
-		t.Log("Try prepending ./testing/with-postgres-db.sh to your command.")
-		t.FailNow()
-	}
-
-	// reset the DB contents and populate with initial resources if requested
-	easypg.ClearTables(t.T, dbi.Db, "resources", "assets", "pending_operations", "finished_operations")
 	if fixtureFile != nil {
-		easypg.ExecSQLFile(t.T, dbi.Db, *fixtureFile)
+		opts = append(opts, easypg.LoadSQLFile(*fixtureFile))
 	}
-	easypg.ResetPrimaryKeys(t.T, dbi.Db, "resources", "assets", "pending_operations")
 
-	action(dbi)
-
-	t.Must(dbi.Db.Close())
+	dbConn := easypg.ConnectForTest(t.T, db.Configuration(), opts...)
+	action(db.InitORM(dbConn))
+	t.Must(dbConn.Close())
 }
 
 // MustUpdate aborts the test if dbi.Update(row) throws an error.
