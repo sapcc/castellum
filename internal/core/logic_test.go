@@ -497,6 +497,8 @@ func mustParseAssetStatus(t *testing.T, input string) (result AssetStatus) {
 			result.StrictMinimumSize = mustParsePointerToUint64(t, parts[1])
 		case "smax":
 			result.StrictMaximumSize = mustParsePointerToUint64(t, parts[1])
+		default:
+			panic("unknown field in AssetStatus string: " + parts[0])
 		}
 	}
 	return result
