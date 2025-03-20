@@ -134,8 +134,8 @@ type Asset struct {
 	// by contrast, are actively enforced: Sizes beyond these boundaries will
 	// result in a resize operation to move back into the boundary (hence the
 	// qualifier "strict").
-	StrictMinimumSize *uint64 `db:"min_size"`
-	StrictMaximumSize *uint64 `db:"max_size"`
+	StrictMinimumSize *uint64 `db:"strict_min_size"`
+	StrictMaximumSize *uint64 `db:"strict_max_size"`
 
 	// This flag is set by a Castellum worker after a resize operation to indicate
 	// that the .Size attribute is outdated. The value is the new_size of the
