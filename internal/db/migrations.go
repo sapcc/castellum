@@ -127,4 +127,12 @@ var SQLMigrations = map[string]string{
 	"024_add_error-resolved_to_op_outcome.down.sql": `
 		ALTER TYPE op_outcome REMOVE VALUE 'error-resolved';
 	`,
+	"025_clarify_asset_column_names.up.sql": `
+		ALTER TABLE assets RENAME min_size TO strict_min_size;
+		ALTER TABLE assets RENAME max_size TO strict_max_size;
+	`,
+	"025_clarify_asset_column_names.down.sql": `
+		ALTER TABLE assets RENAME strict_min_size TO min_size;
+		ALTER TABLE assets RENAME strict_max_size TO max_size;
+	`,
 }

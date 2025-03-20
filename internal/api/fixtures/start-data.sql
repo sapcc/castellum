@@ -9,11 +9,11 @@ INSERT INTO resources (id, scope_uuid, asset_type, low_threshold_percent, low_de
 INSERT INTO resources (id, scope_uuid, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_size, max_size, min_free_size, single_step, domain_uuid, scrape_error_message, config_json, next_scrape_at) VALUES (4, 'project1', 'unknown', '{"singular":20}', 3600, '{"singular":80}', 1800, '{"singular":95}', 20, NULL, NULL, NULL, FALSE, 'domain1', '', '', UNIX(1804));
 
 -- insert some assets in 'project1' that we can list
-INSERT INTO assets (id, resource_id, uuid, size, expected_size, scrape_error_message, usage, critical_usages, next_scrape_at, min_size, max_size) VALUES (1, 1, 'fooasset1', 1024, 1200, '', '{"singular":512}', '', UNIX(311), NULL, NULL);
-INSERT INTO assets (id, resource_id, uuid, size, expected_size, scrape_error_message, usage, critical_usages, next_scrape_at, min_size, max_size) VALUES (2, 1, 'fooasset2', 512, NULL, 'unexpected uptime', '{"singular":409.6}', '', UNIX(312), 256, 1024);
-INSERT INTO assets (id, resource_id, uuid, size, expected_size, scrape_error_message, usage, critical_usages, next_scrape_at, min_size, max_size) VALUES (3, 2, 'barasset1', 2000, NULL, '', '{"first":200,"second":222}', '', UNIX(313), NULL, NULL);
+INSERT INTO assets (id, resource_id, uuid, size, expected_size, scrape_error_message, usage, critical_usages, next_scrape_at, strict_min_size, strict_max_size) VALUES (1, 1, 'fooasset1', 1024, 1200, '', '{"singular":512}', '', UNIX(311), NULL, NULL);
+INSERT INTO assets (id, resource_id, uuid, size, expected_size, scrape_error_message, usage, critical_usages, next_scrape_at, strict_min_size, strict_max_size) VALUES (2, 1, 'fooasset2', 512, NULL, 'unexpected uptime', '{"singular":409.6}', '', UNIX(312), 256, 1024);
+INSERT INTO assets (id, resource_id, uuid, size, expected_size, scrape_error_message, usage, critical_usages, next_scrape_at, strict_min_size, strict_max_size) VALUES (3, 2, 'barasset1', 2000, NULL, '', '{"first":200,"second":222}', '', UNIX(313), NULL, NULL);
 -- insert a bogus asset in an unknown asset type; we should not be able to list this in the API
-INSERT INTO assets (id, resource_id, uuid, size, expected_size, scrape_error_message, usage, critical_usages, next_scrape_at, min_size, max_size) VALUES (4, 4, 'bogusasset', 100, NULL, '', '{"singular":50}', '', UNIX(314), NULL, NULL);
+INSERT INTO assets (id, resource_id, uuid, size, expected_size, scrape_error_message, usage, critical_usages, next_scrape_at, strict_min_size, strict_max_size) VALUES (4, 4, 'bogusasset', 100, NULL, '', '{"singular":50}', '', UNIX(314), NULL, NULL);
 
 -- insert a dummy operation that should not be listed
 INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, greenlit_by_user_uuid, finished_at, error_message, usage) VALUES (1, 'critical', 'error-resolved', 0, 0, UNIX(21), UNIX(22), UNIX(22), 'user3', UNIX(23), '', '{"singular":0}');
