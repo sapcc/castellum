@@ -432,7 +432,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 		tr0.Ignore()
 
 		expectErrors := func(assetType string, body assert.JSONObject, errors ...string) {
-			t.T.Helper()
+			t.Helper()
 			assert.HTTPRequest{
 				Method:       "PUT",
 				Path:         "/v1/projects/project1/resources/" + assetType,
