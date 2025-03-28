@@ -10,8 +10,8 @@ require (
 	github.com/prometheus/client_golang v1.21.1
 	github.com/prometheus/common v0.63.0
 	github.com/rs/cors v1.11.1
-	github.com/sapcc/go-api-declarations v1.14.1
-	github.com/sapcc/go-bits v0.0.0-20250320011137-5ec7b29ab444
+	github.com/sapcc/go-api-declarations v1.14.2
+	github.com/sapcc/go-bits v0.0.0-20250327084830-778195481ca6
 	go.uber.org/automaxprocs v1.6.0
 	gopkg.in/yaml.v2 v2.4.0
 )
@@ -19,7 +19,7 @@ require (
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/databus23/goslo.policy v0.0.0-20210929125152-81bf2876dbdb // indirect
+	github.com/databus23/goslo.policy v0.0.0-20250326134918-4afc2c56a903 // indirect
 	github.com/gofrs/uuid/v5 v5.3.1 // indirect
 	github.com/golang-migrate/migrate/v4 v4.18.2 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
