@@ -176,7 +176,12 @@ func runAPI(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team core.Ass
 	})
 	handler := httpapi.Compose(
 		api.NewHandler(cfg, dbi, team, &tv, providerClient, auditor),
-		httpapi.HealthCheckAPI{SkipRequestLog: true},
+		httpapi.HealthCheckAPI{
+			SkipRequestLog: true,
+			Check: func() error {
+				return dbi.Db.PingContext(ctx)
+			},
+		},
 		httpapi.WithGlobalMiddleware(corsMiddleware.Handler),
 		pprofapi.API{IsAuthorized: pprofapi.IsRequestFromLocalhost},
 	)
@@ -205,7 +210,12 @@ func runObserver(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team cor
 
 	// use main goroutine to emit Prometheus metrics
 	handler := httpapi.Compose(
-		httpapi.HealthCheckAPI{SkipRequestLog: true},
+		httpapi.HealthCheckAPI{
+			SkipRequestLog: true,
+			Check: func() error {
+				return dbi.Db.PingContext(ctx)
+			},
+		},
 		pprofapi.API{IsAuthorized: pprofapi.IsRequestFromLocalhost},
 	)
 	mux := http.NewServeMux()
@@ -228,7 +238,12 @@ func runWorker(ctx context.Context, dbi *gorp.DbMap, team core.AssetManagerTeam,
 
 	// use main goroutine to emit Prometheus metrics
 	handler := httpapi.Compose(
-		httpapi.HealthCheckAPI{SkipRequestLog: true},
+		httpapi.HealthCheckAPI{
+			SkipRequestLog: true,
+			Check: func() error {
+				return dbi.Db.PingContext(ctx)
+			},
+		},
 		pprofapi.API{IsAuthorized: pprofapi.IsRequestFromLocalhost},
 	)
 	mux := http.NewServeMux()
