@@ -53,6 +53,7 @@ func (m *assetManagerNFS) PluginTypeID() string { return "nfs-shares" }
 
 // Init implements the core.AssetManager interface.
 func (m *assetManagerNFS) Init(provider core.ProviderClient) (err error) {
+	gophercloud.ServiceTypeAliases["shared-file-system"] = []string{"sharev2"}
 	m.Manila, err = provider.CloudAdminClient(openstack.NewSharedFileSystemV2)
 	if err != nil {
 		return err
