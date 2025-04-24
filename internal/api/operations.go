@@ -211,7 +211,7 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 			if !exists {
 				continue
 			}
-			if _, exists := core.GetEligibleOperations(core.LogicOfResource(dbResource, info), core.StatusOfAsset(asset))[op.Reason]; exists {
+			if _, exists := core.GetEligibleOperations(core.LogicOfResource(dbResource, info), core.StatusOfAsset(asset, h.Config, dbResource))[op.Reason]; exists {
 				relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &dbResource))
 			}
 		}

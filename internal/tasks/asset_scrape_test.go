@@ -672,3 +672,53 @@ func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 	})
 }
+
+func TestMaxAssetSizeRules(baseT *testing.T) {
+	t := test.T{T: baseT}
+	withContext(t, core.Config{MaxAssetSizeRules: []core.MaxAssetSizeRule{{AssetTypeRx: "foo", ScopeUUID: "project1", Value: 800}}}, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
+		scrapeJob := c.AssetScrapingJob(registry)
+		t.Must(c.DB.Insert(&db.Resource{
+			ScopeUUID:                "project1",
+			AssetType:                "foo",
+			LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
+			LowDelaySeconds:          3600,
+			HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 80},
+			HighDelaySeconds:         3600,
+			CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 95},
+			SizeStepPercent:          20,
+		}))
+		asset := db.Asset{
+			ResourceID:   1,
+			UUID:         "asset1",
+			Size:         1000,
+			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
+			NextScrapeAt: c.TimeNow(),
+			ExpectedSize: nil,
+		}
+		t.Must(c.DB.Insert(&asset))
+
+		amStatic.Assets = map[string]map[string]plugins.StaticAsset{
+			"project1": {
+				"asset1": {Size: 1000, Usage: 510},
+			},
+		}
+
+		clock.StepBy(10 * time.Minute)
+		t.Must(scrapeJob.ProcessOne(ctx))
+
+		asset.NextScrapeAt = c.TimeNow().Add(5 * time.Minute)
+		asset.Usage = castellum.UsageValues{castellum.SingularUsageMetric: 510}
+		t.ExpectAssets(c.DB, asset)
+
+		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+			ID:        1,
+			AssetID:   1,
+			Reason:    castellum.OperationReasonLow,
+			OldSize:   1000,
+			NewSize:   800,
+			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 510},
+			CreatedAt: c.TimeNow(),
+		})
+		t.ExpectFinishedOperations(c.DB /*, nothing */)
+	})
+}

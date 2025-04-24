@@ -46,12 +46,16 @@ type AssetStatus struct {
 // a low-level logic function. Low-level functions explicitly take only the
 // AssetStatus to avoid accidental dependencies on non-logic attributes
 // like timestamps, UUIDs or error message strings.
-func StatusOfAsset(asset db.Asset) AssetStatus {
+func StatusOfAsset(asset db.Asset, cfg Config, res db.Resource) AssetStatus {
+	strictMaximumSize := asset.StrictMaximumSize
+	if val := cfg.MaxAssetSizeFor(res.AssetType, res.ScopeUUID); val != nil && (strictMaximumSize == nil || *val < *strictMaximumSize) {
+		strictMaximumSize = val
+	}
 	return AssetStatus{
 		Size:              asset.Size,
 		Usage:             asset.Usage,
 		StrictMinimumSize: asset.StrictMinimumSize,
-		StrictMaximumSize: asset.StrictMaximumSize,
+		StrictMaximumSize: strictMaximumSize,
 	}
 }
 
