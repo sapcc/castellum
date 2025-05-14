@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 SAP SE
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Asset manager: `nfs-shares`
 
 The asset manager `nfs-shares` provides asset types for resizing NFS shares

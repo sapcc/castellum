@@ -1,3 +1,7 @@
+-- SPDX-FileCopyrightText: 2025 SAP SE
+--
+-- SPDX-License-Identifier: Apache-2.0
+
 CREATE OR REPLACE FUNCTION unix(i integer) RETURNS timestamp AS $$ SELECT TO_TIMESTAMP(i) AT TIME ZONE 'Etc/UTC' $$ LANGUAGE SQL;
 
 -- insert some resources in 'project1' that we can actually list -- both have a different set of thresholds activated to exercise different code paths

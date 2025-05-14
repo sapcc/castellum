@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 SAP SE
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Castellum
 
 [![CI](https://github.com/sapcc/castellum/actions/workflows/ci.yaml/badge.svg)](https://github.com/sapcc/castellum/actions/workflows/ci.yaml)

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 SAP SE
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Castellum API specification
 
 Castellum's API looks like a conventional OpenStack REST API.

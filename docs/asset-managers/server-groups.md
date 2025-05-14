@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 SAP SE
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Asset manager: `server-groups`
 
 The asset manager `server-groups` provides one asset type of the form `server-group:$UUID` for each
