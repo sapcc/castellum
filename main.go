@@ -67,20 +67,6 @@ func main() {
 	wrap.SetInsecureSkipVerify(osext.GetenvBool("CASTELLUM_INSECURE")) // for debugging with mitmproxy etc. (DO NOT SET IN PRODUCTION)
 	wrap.SetOverrideUserAgent(bininfo.Component(), bininfo.VersionOr("rolling"))
 
-	// initialize DB connection
-	dbName := osext.GetenvOrDefault("CASTELLUM_DB_NAME", "castellum")
-	dbURL := must.Return(easypg.URLFrom(easypg.URLParts{
-		HostName:          osext.GetenvOrDefault("CASTELLUM_DB_HOSTNAME", "localhost"),
-		Port:              osext.GetenvOrDefault("CASTELLUM_DB_PORT", "5432"),
-		UserName:          osext.GetenvOrDefault("CASTELLUM_DB_USERNAME", "postgres"),
-		Password:          os.Getenv("CASTELLUM_DB_PASSWORD"),
-		ConnectionOptions: os.Getenv("CASTELLUM_DB_CONNECTION_OPTIONS"),
-		DatabaseName:      dbName,
-	}))
-	dbConn := must.Return(easypg.Connect(dbURL, db.Configuration()))
-	prometheus.MustRegister(sqlstats.NewStatsCollector(dbName, dbConn))
-	dbi := db.InitORM(dbConn)
-
 	// initialize OpenStack connection
 	ctx := httpext.ContextWithSIGINT(context.Background(), 10*time.Second)
 	providerClient := must.Return(core.NewProviderClient(ctx))
@@ -100,17 +86,17 @@ func main() {
 		if len(os.Args) != 3 {
 			usage()
 		}
-		runAPI(ctx, cfg, dbi, team, providerClient, httpListenAddr)
+		runAPI(ctx, cfg, initDB(), team, providerClient, httpListenAddr)
 	case "observer":
 		if len(os.Args) != 3 {
 			usage()
 		}
-		runObserver(ctx, cfg, dbi, team, providerClient, httpListenAddr)
+		runObserver(ctx, cfg, initDB(), team, providerClient, httpListenAddr)
 	case "worker":
 		if len(os.Args) != 3 {
 			usage()
 		}
-		runWorker(ctx, dbi, team, httpListenAddr)
+		runWorker(ctx, initDB(), team, httpListenAddr)
 	case "test-asset-type":
 		if len(os.Args) != 4 && len(os.Args) != 5 {
 			usage()
@@ -174,6 +160,23 @@ func runAPI(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team core.Ass
 	mux.Handle("/metrics", promhttp.Handler())
 
 	must.Succeed(httpext.ListenAndServeContext(ctx, httpListenAddr, mux))
+}
+
+// This initialization phase is split into a separate method because we only
+// need it for some subcommands.
+func initDB() *gorp.DbMap {
+	dbName := osext.GetenvOrDefault("CASTELLUM_DB_NAME", "castellum")
+	dbURL := must.Return(easypg.URLFrom(easypg.URLParts{
+		HostName:          osext.GetenvOrDefault("CASTELLUM_DB_HOSTNAME", "localhost"),
+		Port:              osext.GetenvOrDefault("CASTELLUM_DB_PORT", "5432"),
+		UserName:          osext.GetenvOrDefault("CASTELLUM_DB_USERNAME", "postgres"),
+		Password:          os.Getenv("CASTELLUM_DB_PASSWORD"),
+		ConnectionOptions: os.Getenv("CASTELLUM_DB_CONNECTION_OPTIONS"),
+		DatabaseName:      dbName,
+	}))
+	dbConn := must.Return(easypg.Connect(dbURL, db.Configuration()))
+	prometheus.MustRegister(sqlstats.NewStatsCollector(dbName, dbConn))
+	return db.InitORM(dbConn)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
