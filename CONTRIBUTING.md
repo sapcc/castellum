@@ -16,11 +16,10 @@ to work on Castellum's codebase. This document assumes that you did that already
 Run the full test suite with:
 
 ```sh
-$ ./testing/with-postgres-db.sh make check
+$ make check
 ```
 
-This will produce a coverage report at `build/cover.html`. If you don't need
-that, substitute `check` for `quick-check` to get slightly better performance.
+This will produce a coverage report at `build/cover.html`.
 
 ### Asset manager plugins
 
