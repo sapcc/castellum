@@ -46,6 +46,7 @@ github.com/gophercloud/gophercloud/v2/openstack/keymanager/v1/secrets
 github.com/gophercloud/gophercloud/v2/openstack/loadbalancer/v2/monitors
 github.com/gophercloud/gophercloud/v2/openstack/loadbalancer/v2/pools
 github.com/gophercloud/gophercloud/v2/openstack/sharedfilesystems/v2/shares
+github.com/gophercloud/gophercloud/v2/openstack/sharedfilesystems/v2/sharetypes
 github.com/gophercloud/gophercloud/v2/openstack/utils
 github.com/gophercloud/gophercloud/v2/pagination
 # github.com/gorilla/mux v1.8.1
