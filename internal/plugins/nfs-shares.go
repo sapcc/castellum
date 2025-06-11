@@ -16,6 +16,7 @@ import (
 	"github.com/gophercloud/gophercloud/v2/openstack"
 	"github.com/gophercloud/gophercloud/v2/openstack/sharedfilesystems/v2/shares"
 	"github.com/gophercloud/gophercloud/v2/openstack/sharedfilesystems/v2/sharetypes"
+	. "github.com/majewsky/gg/option"
 	"github.com/prometheus/common/model"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/logg"
@@ -26,22 +27,22 @@ import (
 )
 
 type assetTypeNFS struct {
-	AllShares   bool
-	NFSType     string
-	ShareTypeID string
+	AllShares     bool
+	ShareTypeName string
+	ShareTypeID   string
 }
 
-func (m *assetManagerNFS) parseAssetType(assetType db.AssetType) *assetTypeNFS {
+func (m *assetManagerNFS) parseAssetType(assetType db.AssetType) Option[assetTypeNFS] {
 	if assetType == "nfs-shares" {
-		return &assetTypeNFS{AllShares: true}
+		return Some(assetTypeNFS{AllShares: true})
 	}
 
 	if nfsType, ok := strings.CutPrefix(string(assetType), "nfs-shares-type:"); ok {
 		if shareTypeID, ok := m.shareTypeNameToID[nfsType]; ok {
-			return &assetTypeNFS{AllShares: false, NFSType: nfsType, ShareTypeID: shareTypeID}
+			return Some(assetTypeNFS{AllShares: false, ShareTypeName: nfsType, ShareTypeID: shareTypeID})
 		}
 	}
-	return nil
+	return None[assetTypeNFS]()
 }
 
 func (m *assetManagerNFS) getShareTypeInfo() error {
@@ -100,7 +101,7 @@ func (m *assetManagerNFS) Init(provider core.ProviderClient) (err error) {
 
 // InfoForAssetType implements the core.AssetManager interface.
 func (m *assetManagerNFS) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
-	if m.parseAssetType(assetType) != nil {
+	if m.parseAssetType(assetType).IsSome() {
 		return &core.AssetTypeInfo{
 			AssetType:    assetType,
 			UsageMetrics: []castellum.UsageMetric{castellum.SingularUsageMetric},
@@ -115,10 +116,13 @@ func (m *assetManagerNFS) CheckResourceAllowed(ctx context.Context, assetType db
 		return core.ErrNoConfigurationAllowed
 	}
 
-	parsed := m.parseAssetType(assetType)
+	parsed, ok := m.parseAssetType(assetType).Unpack()
+	if !ok {
+		return fmt.Errorf("could not parse asset type %s", assetType)
+	}
 	for otherAssetType := range existingResources {
-		parsedOther := m.parseAssetType(otherAssetType)
-		if parsedOther != nil && (parsed.AllShares != parsedOther.AllShares) {
+		parsedOther, ok := m.parseAssetType(otherAssetType).Unpack()
+		if ok && parsed.AllShares != parsedOther.AllShares {
 			return fmt.Errorf("cannot create a %q resource because of possible contradiction with existing %q resource",
 				string(assetType), string(otherAssetType))
 		}
@@ -131,8 +135,8 @@ func (m *assetManagerNFS) CheckResourceAllowed(ctx context.Context, assetType db
 func (m *assetManagerNFS) ListAssets(ctx context.Context, res db.Resource) ([]string, error) {
 	// shares are discovered via Prometheus metrics since that is way faster than
 	// going through the Manila API
-	assetType := m.parseAssetType(res.AssetType)
-	if assetType == nil {
+	assetType, ok := m.parseAssetType(res.AssetType).Unpack()
+	if !ok {
 		return nil, fmt.Errorf("could not parse asset type %s", res.AssetType)
 	}
 	var promQuery string
