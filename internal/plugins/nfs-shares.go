@@ -9,11 +9,14 @@ import (
 	"math"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gophercloud/gophercloud/v2"
 	"github.com/gophercloud/gophercloud/v2/openstack"
 	"github.com/gophercloud/gophercloud/v2/openstack/sharedfilesystems/v2/shares"
+	"github.com/gophercloud/gophercloud/v2/openstack/sharedfilesystems/v2/sharetypes"
+	. "github.com/majewsky/gg/option"
 	"github.com/prometheus/common/model"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/logg"
@@ -23,10 +26,47 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
+type assetTypeNFS struct {
+	AllShares     bool
+	ShareTypeName string
+	ShareTypeID   string
+}
+
+func (m *assetManagerNFS) parseAssetType(assetType db.AssetType) Option[assetTypeNFS] {
+	if assetType == "nfs-shares" {
+		return Some(assetTypeNFS{AllShares: true})
+	}
+
+	if nfsType, ok := strings.CutPrefix(string(assetType), "nfs-shares-type:"); ok {
+		if shareTypeID, ok := m.shareTypeNameToID[nfsType]; ok {
+			return Some(assetTypeNFS{AllShares: false, ShareTypeName: nfsType, ShareTypeID: shareTypeID})
+		}
+	}
+	return None[assetTypeNFS]()
+}
+
+func (m *assetManagerNFS) getShareTypeInfo() error {
+	pages, err := sharetypes.List(m.Manila, nil).AllPages(context.TODO())
+	if err != nil {
+		return err
+	}
+	allShareTypes, err := sharetypes.ExtractShareTypes(pages)
+	if err != nil {
+		return err
+	}
+	m.shareTypeNameToID = make(map[string]string)
+	for _, sharetype := range allShareTypes {
+		m.shareTypeNameToID[sharetype.Name] = sharetype.ID
+	}
+	return nil
+}
+
 type assetManagerNFS struct {
 	Manila       *gophercloud.ServiceClient
 	Discovery    promquery.Client
 	ShareMetrics *promquery.BulkQueryCache[manilaShareMetricsKey, manilaShareMetrics]
+
+	shareTypeNameToID map[string]string
 }
 
 func init() {
@@ -44,6 +84,10 @@ func (m *assetManagerNFS) Init(provider core.ProviderClient) (err error) {
 		return err
 	}
 	m.Manila.Microversion = "2.64" // for "force" field on .Extend(), requires Manila at least on Xena
+	err = m.getShareTypeInfo()
+	if err != nil {
+		return fmt.Errorf("while fetching share types from manila API: %w", err)
+	}
 
 	promClient, err := promquery.ConfigFromEnv("CASTELLUM_NFS_PROMETHEUS").Connect()
 	if err != nil {
@@ -57,7 +101,7 @@ func (m *assetManagerNFS) Init(provider core.ProviderClient) (err error) {
 
 // InfoForAssetType implements the core.AssetManager interface.
 func (m *assetManagerNFS) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
-	if assetType == "nfs-shares" {
+	if m.parseAssetType(assetType).IsSome() {
 		return &core.AssetTypeInfo{
 			AssetType:    assetType,
 			UsageMetrics: []castellum.UsageMetric{castellum.SingularUsageMetric},
@@ -72,6 +116,18 @@ func (m *assetManagerNFS) CheckResourceAllowed(ctx context.Context, assetType db
 		return core.ErrNoConfigurationAllowed
 	}
 
+	parsed, ok := m.parseAssetType(assetType).Unpack()
+	if !ok {
+		return fmt.Errorf("could not parse asset type %s", assetType)
+	}
+	for otherAssetType := range existingResources {
+		parsedOther, ok := m.parseAssetType(otherAssetType).Unpack()
+		if ok && parsed.AllShares != parsedOther.AllShares {
+			return fmt.Errorf("cannot create a %q resource because of possible contradiction with existing %q resource",
+				string(assetType), string(otherAssetType))
+		}
+	}
+
 	return nil
 }
 
@@ -79,10 +135,23 @@ func (m *assetManagerNFS) CheckResourceAllowed(ctx context.Context, assetType db
 func (m *assetManagerNFS) ListAssets(ctx context.Context, res db.Resource) ([]string, error) {
 	// shares are discovered via Prometheus metrics since that is way faster than
 	// going through the Manila API
-	vector, err := m.Discovery.GetVector(ctx, fmt.Sprintf(
-		`count by (id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error"})`,
-		res.ScopeUUID,
-	))
+	assetType, ok := m.parseAssetType(res.AssetType).Unpack()
+	if !ok {
+		return nil, fmt.Errorf("could not parse asset type %s", res.AssetType)
+	}
+	var promQuery string
+	if assetType.AllShares {
+		promQuery = fmt.Sprintf(
+			`count by (id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error"})`,
+			res.ScopeUUID,
+		)
+	} else {
+		promQuery = fmt.Sprintf(
+			`count by (id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error",share_type_id="%s"})`,
+			res.ScopeUUID, assetType.ShareTypeID,
+		)
+	}
+	vector, err := m.Discovery.GetVector(ctx, promQuery)
 	if err != nil {
 		return nil, fmt.Errorf("while discovering shares for project %s in Prometheus: %w", res.ScopeUUID, err)
 	}
