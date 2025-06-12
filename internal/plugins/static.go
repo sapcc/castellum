@@ -55,7 +55,7 @@ type AssetManagerStatic struct {
 func (m AssetManagerStatic) PluginTypeID() string { return "static" }
 
 // Init implements the core.AssetManager interface.
-func (m AssetManagerStatic) Init(provider core.ProviderClient) (err error) {
+func (m AssetManagerStatic) Init(ctx context.Context, provider core.ProviderClient) (err error) {
 	return nil // unused
 }
 

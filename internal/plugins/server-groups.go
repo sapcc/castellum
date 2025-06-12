@@ -70,7 +70,7 @@ func init() {
 func (m *assetManagerServerGroups) PluginTypeID() string { return "server-groups" }
 
 // Init implements the core.AssetManager interface.
-func (m *assetManagerServerGroups) Init(provider core.ProviderClient) (err error) {
+func (m *assetManagerServerGroups) Init(ctx context.Context, provider core.ProviderClient) (err error) {
 	m.Provider = provider
 
 	m.Prometheus, err = promquery.ConfigFromEnv("CASTELLUM_SERVERGROUPS_PROMETHEUS").Connect()
