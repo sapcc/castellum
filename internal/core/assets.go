@@ -102,7 +102,7 @@ type AssetManager interface {
 	//
 	// The supplied ProviderClient should be stored inside the AssetManager
 	// instance for later usage and/or used to query OpenStack capabilities.
-	Init(provider ProviderClient) error
+	Init(ctx context.Context, provider ProviderClient) error
 
 	// If this asset type is supported by this asset manager, return information
 	// about it. Otherwise return nil.
@@ -140,14 +140,14 @@ type AssetManagerTeam []AssetManager
 // CreateAssetManagers prepares a set of AssetManager instances for a single run
 // of Castellum. The first argument is the list of IDs of all factories that
 // shall be used to create asset managers.
-func CreateAssetManagers(pluginTypeIDs []string, provider ProviderClient) (AssetManagerTeam, error) {
+func CreateAssetManagers(ctx context.Context, pluginTypeIDs []string, provider ProviderClient) (AssetManagerTeam, error) {
 	team := make(AssetManagerTeam, len(pluginTypeIDs))
 	for idx, pluginTypeID := range pluginTypeIDs {
 		manager := AssetManagerRegistry.Instantiate(pluginTypeID)
 		if manager == nil {
 			return nil, fmt.Errorf("unknown asset manager: %q", pluginTypeID)
 		}
-		err := manager.Init(provider)
+		err := manager.Init(ctx, provider)
 		if err != nil {
 			return nil, fmt.Errorf("cannot initialize asset manager %q: %s", pluginTypeID, err.Error())
 		}

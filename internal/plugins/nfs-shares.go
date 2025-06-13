@@ -45,8 +45,8 @@ func (m *assetManagerNFS) parseAssetType(assetType db.AssetType) Option[assetTyp
 	return None[assetTypeNFS]()
 }
 
-func (m *assetManagerNFS) getShareTypeInfo() error {
-	pages, err := sharetypes.List(m.Manila, nil).AllPages(context.TODO())
+func (m *assetManagerNFS) getShareTypeInfo(ctx context.Context) error {
+	pages, err := sharetypes.List(m.Manila, nil).AllPages(ctx)
 	if err != nil {
 		return err
 	}
@@ -77,14 +77,14 @@ func init() {
 func (m *assetManagerNFS) PluginTypeID() string { return "nfs-shares" }
 
 // Init implements the core.AssetManager interface.
-func (m *assetManagerNFS) Init(provider core.ProviderClient) (err error) {
+func (m *assetManagerNFS) Init(ctx context.Context, provider core.ProviderClient) (err error) {
 	gophercloud.ServiceTypeAliases["shared-file-system"] = []string{"sharev2"}
 	m.Manila, err = provider.CloudAdminClient(openstack.NewSharedFileSystemV2)
 	if err != nil {
 		return err
 	}
 	m.Manila.Microversion = "2.64" // for "force" field on .Extend(), requires Manila at least on Xena
-	err = m.getShareTypeInfo()
+	err = m.getShareTypeInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("while fetching share types from manila API: %w", err)
 	}
