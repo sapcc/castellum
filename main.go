@@ -76,6 +76,7 @@ func main() {
 
 	// initialize asset managers
 	team := must.Return(core.CreateAssetManagers(
+		ctx,
 		strings.Split(osext.MustGetenv("CASTELLUM_ASSET_MANAGERS"), ","),
 		providerClient,
 	))
