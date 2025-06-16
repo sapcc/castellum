@@ -438,7 +438,7 @@ func TestGetEligibleOperations(t *testing.T) {
 func mustParseResourceLogic(t *testing.T, input string) (result ResourceLogic) {
 	t.Helper()
 	result.UsageMetrics = []castellum.UsageMetric{castellum.SingularUsageMetric}
-	for _, assignment := range strings.Split(input, ",") {
+	for assignment := range strings.SplitSeq(input, ",") {
 		assignment = strings.TrimSpace(assignment)
 		parts := strings.SplitN(assignment, "=", 2)
 		switch parts[0] {
@@ -469,7 +469,7 @@ func mustParseResourceLogic(t *testing.T, input string) (result ResourceLogic) {
 // Builds an AssetStatus from a compact string representation like "size=1000, usage=500, smin=1100".
 func mustParseAssetStatus(t *testing.T, input string) (result AssetStatus) {
 	t.Helper()
-	for _, assignment := range strings.Split(input, ",") {
+	for assignment := range strings.SplitSeq(input, ",") {
 		assignment = strings.TrimSpace(assignment)
 		parts := strings.SplitN(assignment, "=", 2)
 		switch parts[0] {
