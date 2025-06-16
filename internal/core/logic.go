@@ -6,7 +6,7 @@ package core
 import (
 	"fmt"
 	"math"
-	"sort"
+	"slices"
 
 	"github.com/sapcc/go-api-declarations/castellum"
 
@@ -433,13 +433,7 @@ func (as *actions) AddAction(a action, c constraints) {
 		return
 	}
 
-	val := a.Desired
-	if val < c.Min {
-		val = c.Min
-	}
-	if val > c.Max {
-		val = c.Max
-	}
+	val := min(max(a.Desired, c.Min), c.Max)
 	*as = append(*as, val)
 }
 
@@ -447,7 +441,7 @@ func (as actions) Min() *uint64 {
 	if len(as) == 0 {
 		return nil
 	}
-	sort.Slice(as, func(i, j int) bool { return as[i] < as[j] })
+	slices.Sort(as)
 	val := as[0]
 	return &val
 }
@@ -456,7 +450,7 @@ func (as actions) Max() *uint64 {
 	if len(as) == 0 {
 		return nil
 	}
-	sort.Slice(as, func(i, j int) bool { return as[i] < as[j] })
+	slices.Sort(as)
 	val := as[len(as)-1]
 	return &val
 }
