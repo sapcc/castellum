@@ -134,7 +134,7 @@ func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *go
 	// selected project
 	if projectScoped {
 		projectExists, err := h.SetTokenToProjectScope(r.Context(), token, projectUUID)
-		if respondwith.ErrorText(w, err) || !token.Require(w, "project:access") {
+		if respondwith.ObfuscatedErrorText(w, err) || !token.Require(w, "project:access") {
 			return "", nil
 		}
 
@@ -205,7 +205,7 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 	if errors.Is(err, sql.ErrNoRows) {
 		if createIfMissing {
 			proj, err := h.Provider.GetProject(r.Context(), projectUUID)
-			if respondwith.ErrorText(w, err) {
+			if respondwith.ObfuscatedErrorText(w, err) {
 				return nil
 			}
 			return &db.Resource{
@@ -217,7 +217,7 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 		http.NotFound(w, r)
 		return nil
 	}
-	if respondwith.ErrorText(w, err) {
+	if respondwith.ObfuscatedErrorText(w, err) {
 		return nil
 	}
 	return &res
@@ -225,7 +225,7 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 
 func (h handler) rejectIfResourceSeeded(w http.ResponseWriter, r *http.Request, res db.Resource) bool {
 	proj, err := h.Provider.GetProject(r.Context(), res.ScopeUUID)
-	if respondwith.ErrorText(w, err) {
+	if respondwith.ObfuscatedErrorText(w, err) {
 		return true
 	}
 	if proj == nil {
@@ -234,7 +234,7 @@ func (h handler) rejectIfResourceSeeded(w http.ResponseWriter, r *http.Request, 
 	}
 
 	domain, err := h.Provider.GetDomain(r.Context(), proj.DomainID)
-	if respondwith.ErrorText(w, err) {
+	if respondwith.ObfuscatedErrorText(w, err) {
 		return true
 	}
 	if domain == nil {
