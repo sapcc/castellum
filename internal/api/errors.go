@@ -26,7 +26,7 @@ func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request)
 	var dbResources []db.Resource
 	_, err := h.DB.Select(&dbResources,
 		`SELECT * FROM resources WHERE scrape_error_message != '' ORDER BY id`)
-	if respondwith.ErrorText(w, err) {
+	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
 
@@ -67,7 +67,7 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 	var dbResources []db.Resource
 	_, err := h.DB.Select(&dbResources,
 		`SELECT * FROM resources ORDER BY id`)
-	if respondwith.ErrorText(w, err) {
+	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
 
@@ -79,7 +79,7 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 			 WHERE scrape_error_message != '' AND resource_id = $1
 			 ORDER BY id
 			`, res.ID)
-		if respondwith.ErrorText(w, err) {
+		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
 
@@ -121,7 +121,7 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 	var dbResources []db.Resource
 	_, err := h.DB.Select(&dbResources,
 		`SELECT * FROM resources ORDER BY id`)
-	if respondwith.ErrorText(w, err) {
+	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
 
@@ -140,7 +140,7 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 			)
 			SELECT * FROM latest_finished_operations WHERE outcome = 'errored'
 		`, res.ID)
-		if respondwith.ErrorText(w, err) {
+		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
 
@@ -152,7 +152,7 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 
 		// find asset UUIDs
 		assetUUIDs, err := h.getAssetUUIDMap(res)
-		if respondwith.ErrorText(w, err) {
+		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
 

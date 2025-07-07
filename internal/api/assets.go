@@ -125,7 +125,7 @@ func (h handler) GetAssets(w http.ResponseWriter, r *http.Request) {
 	var dbAssets []db.Asset
 	_, err := h.DB.Select(&dbAssets,
 		`SELECT * FROM assets WHERE resource_id = $1 ORDER BY uuid`, dbResource.ID)
-	if respondwith.ErrorText(w, err) {
+	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
 
@@ -160,7 +160,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if respondwith.ErrorText(w, err) {
+	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
 	asset := AssetFromDB(dbAsset)
@@ -172,7 +172,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		asset.PendingOperation = nil
-	case respondwith.ErrorText(w, err):
+	case respondwith.ObfuscatedErrorText(w, err):
 		return
 	default:
 		op := PendingOperationFromDB(dbPendingOp, "", nil)
@@ -187,7 +187,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 			 WHERE asset_id = $1 AND outcome != 'error-resolved'
 			 ORDER BY finished_at`,
 			dbAsset.ID)
-		if respondwith.ErrorText(w, err) {
+		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
 		finishedOps := make([]castellum.StandaloneOperation, len(dbFinishedOps))
@@ -236,7 +236,7 @@ func (h handler) PostAssetErrorResolved(w http.ResponseWriter, r *http.Request) 
 		http.NotFound(w, r)
 		return
 	}
-	if respondwith.ErrorText(w, err) {
+	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
 	if lastOutcome != castellum.OperationOutcomeErrored {
@@ -257,7 +257,7 @@ func (h handler) PostAssetErrorResolved(w http.ResponseWriter, r *http.Request) 
 		GreenlitByUserUUID: &userUUID,
 	})
 
-	if respondwith.ErrorText(w, err) {
+	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
 

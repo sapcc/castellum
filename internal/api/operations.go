@@ -74,7 +74,7 @@ func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (
 	queryStr := `SELECT * FROM resources WHERE ` + strings.Join(sqlConditions, " AND ")
 	var allResources []db.Resource
 	_, err := h.DB.Select(&allResources, queryStr, sqlBindValues...)
-	if respondwith.ErrorText(w, err) {
+	if respondwith.ObfuscatedErrorText(w, err) {
 		return nil, false
 	}
 
@@ -83,7 +83,7 @@ func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (
 	canAccessAnyMatchingProject := false
 	for _, res := range allResources {
 		projectExists, err := h.SetTokenToProjectScope(r.Context(), token, res.ScopeUUID)
-		if respondwith.ErrorText(w, err) {
+		if respondwith.ObfuscatedErrorText(w, err) {
 			return nil, false
 		}
 		if !projectExists || !token.Check("project:access") {
@@ -125,13 +125,13 @@ func (h handler) GetPendingOperations(w http.ResponseWriter, r *http.Request) {
 				JOIN assets a ON a.id = o.asset_id
 			 WHERE a.resource_id = $1
 		`, dbResource.ID)
-		if respondwith.ErrorText(w, err) {
+		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
 
 		// find asset UUIDs
 		assetUUIDs, err := h.getAssetUUIDMap(dbResource)
-		if respondwith.ErrorText(w, err) {
+		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
 
@@ -180,7 +180,7 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 			Outcomes:     []castellum.OperationOutcome{castellum.OperationOutcomeFailed, castellum.OperationOutcomeErrored},
 			OverriddenBy: `TRUE`,
 		}.Execute()
-		if respondwith.ErrorText(w, err) {
+		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
 
@@ -188,7 +188,7 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 		var assets []db.Asset
 		_, err = h.DB.Select(&assets,
 			`SELECT * FROM assets WHERE resource_id = $1 ORDER BY uuid`, dbResource.ID)
-		if respondwith.ErrorText(w, err) {
+		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
 		for _, asset := range assets {
@@ -229,7 +229,7 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 			Outcomes:     []castellum.OperationOutcome{castellum.OperationOutcomeSucceeded},
 			OverriddenBy: fmt.Sprintf(`outcome != '%s'`, castellum.OperationOutcomeCancelled),
 		}.Execute()
-		if respondwith.ErrorText(w, err) {
+		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
 
@@ -237,7 +237,7 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 		var assets []db.Asset
 		_, err = h.DB.Select(&assets,
 			`SELECT * FROM assets WHERE resource_id = $1 ORDER BY uuid`, dbResource.ID)
-		if respondwith.ErrorText(w, err) {
+		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
 		for _, asset := range assets {

@@ -86,7 +86,7 @@ func (h handler) GetProject(w http.ResponseWriter, r *http.Request) {
 	var dbResources []db.Resource
 	_, err := h.DB.Select(&dbResources,
 		`SELECT * FROM resources WHERE scope_uuid = $1 ORDER BY asset_type`, projectUUID)
-	if respondwith.ErrorText(w, err) {
+	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
 
@@ -103,7 +103,7 @@ func (h handler) GetProject(w http.ResponseWriter, r *http.Request) {
 		}
 		if token.Check(res.AssetType.PolicyRuleForRead()) {
 			result.Resources[res.AssetType], err = h.ResourceFromDB(res)
-			if respondwith.ErrorText(w, err) {
+			if respondwith.ObfuscatedErrorText(w, err) {
 				return
 			}
 		}
@@ -124,7 +124,7 @@ func (h handler) GetResource(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resource, err := h.ResourceFromDB(*dbResource)
-	if respondwith.ErrorText(w, err) {
+	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
 	respondwith.JSON(w, http.StatusOK, resource)
@@ -184,7 +184,7 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 			return err
 		},
 	)
-	if respondwith.ErrorText(w, err) {
+	if respondwith.ObfuscatedErrorText(w, err) {
 		doAudit(http.StatusInternalServerError)
 		return
 	}
@@ -202,7 +202,7 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	} else {
 		_, err = h.DB.Update(dbResource)
 	}
-	if respondwith.ErrorText(w, err) {
+	if respondwith.ObfuscatedErrorText(w, err) {
 		doAudit(http.StatusInternalServerError)
 		return
 	}
@@ -244,7 +244,7 @@ func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err := h.DB.Exec(`DELETE FROM resources WHERE id = $1`, dbResource.ID)
-	if respondwith.ErrorText(w, err) {
+	if respondwith.ObfuscatedErrorText(w, err) {
 		doAudit(http.StatusInternalServerError)
 		return
 	}
