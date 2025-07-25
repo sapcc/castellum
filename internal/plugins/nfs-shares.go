@@ -29,7 +29,7 @@ import (
 type assetTypeNFS struct {
 	AllShares     bool
 	ShareTypeName string
-	ShareTypeID   string
+	shareGroupID  string
 }
 
 func (m *assetManagerNFS) parseAssetType(assetType db.AssetType) Option[assetTypeNFS] {
@@ -39,7 +39,7 @@ func (m *assetManagerNFS) parseAssetType(assetType db.AssetType) Option[assetTyp
 
 	if nfsGroup, ok := strings.CutPrefix(string(assetType), "nfs-shares-group:"); ok {
 		if shareGroupID, ok := m.shareTypeNameToID[nfsGroup]; ok {
-			return Some(assetTypeNFS{AllShares: false, ShareTypeName: nfsGroup, shareGroupID: shareTypeID})
+			return Some(assetTypeNFS{AllShares: false, ShareTypeName: nfsGroup, shareGroupID: shareGroupID})
 		}
 	}
 	return None[assetTypeNFS]()
@@ -148,7 +148,7 @@ func (m *assetManagerNFS) ListAssets(ctx context.Context, res db.Resource) ([]st
 	} else {
 		promQuery = fmt.Sprintf(
 			`count by (id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error",share_type_id="%s"})`,
-			res.ScopeUUID, assetType.ShareTypeID,
+			res.ScopeUUID, assetType.shareGroupID,
 		)
 	}
 	vector, err := m.Discovery.GetVector(ctx, promQuery)
