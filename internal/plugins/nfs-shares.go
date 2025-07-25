@@ -37,9 +37,9 @@ func (m *assetManagerNFS) parseAssetType(assetType db.AssetType) Option[assetTyp
 		return Some(assetTypeNFS{AllShares: true})
 	}
 
-	if nfsType, ok := strings.CutPrefix(string(assetType), "nfs-shares-group:"); ok {
-		if shareTypeID, ok := m.shareTypeNameToID[nfsType]; ok {
-			return Some(assetTypeNFS{AllShares: false, ShareTypeName: nfsType, ShareTypeID: shareTypeID})
+	if nfsGroup, ok := strings.CutPrefix(string(assetType), "nfs-shares-group:"); ok {
+		if shareGroupID, ok := m.shareTypeNameToID[nfsGroup]; ok {
+			return Some(assetTypeNFS{AllShares: false, ShareTypeName: nfsGroup, shareGroupID: shareTypeID})
 		}
 	}
 	return None[assetTypeNFS]()
