@@ -140,6 +140,7 @@ func (m *assetManagerNFS) CheckResourceAllowed(ctx context.Context, assetType db
 		for _, access := range projectsWithAccess {
 			if scopeUUID == access.ProjectID {
 				isAllowed = true
+				break
 			}
 		}
 		if !isAllowed {
