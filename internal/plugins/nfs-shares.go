@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -28,18 +29,22 @@ import (
 
 type assetTypeNFS struct {
 	AllShares     bool
+	IsPublic      bool
 	ShareTypeName string
 	ShareTypeID   string
 }
 
 func (m *assetManagerNFS) parseAssetType(assetType db.AssetType) Option[assetTypeNFS] {
 	if assetType == "nfs-shares" {
-		return Some(assetTypeNFS{AllShares: true})
+		return Some(assetTypeNFS{AllShares: true, IsPublic: true})
 	}
 
 	if nfsType, ok := strings.CutPrefix(string(assetType), "nfs-shares-type:"); ok {
 		if shareTypeID, ok := m.shareTypeNameToID[nfsType]; ok {
-			return Some(assetTypeNFS{AllShares: false, ShareTypeName: nfsType, ShareTypeID: shareTypeID})
+			return Some(assetTypeNFS{AllShares: false, IsPublic: true, ShareTypeName: nfsType, ShareTypeID: shareTypeID})
+		}
+		if shareTypeID, ok := m.privateShareTypeNameToID[nfsType]; ok {
+			return Some(assetTypeNFS{AllShares: false, IsPublic: false, ShareTypeName: nfsType, ShareTypeID: shareTypeID})
 		}
 	}
 	return None[assetTypeNFS]()
@@ -50,13 +55,18 @@ func (m *assetManagerNFS) getShareTypeInfo(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	allShareTypes, err := sharetypes.ExtractShareTypes(pages)
+	allShareTypes, err := ExtractShareTypes(pages)
 	if err != nil {
 		return err
 	}
 	m.shareTypeNameToID = make(map[string]string)
+	m.privateShareTypeNameToID = make(map[string]string)
 	for _, sharetype := range allShareTypes {
-		m.shareTypeNameToID[sharetype.Name] = sharetype.ID
+		if sharetype.IsPublic {
+			m.shareTypeNameToID[sharetype.Name] = sharetype.ID
+		} else {
+			m.privateShareTypeNameToID[sharetype.Name] = sharetype.ID
+		}
 	}
 	return nil
 }
@@ -66,7 +76,8 @@ type assetManagerNFS struct {
 	Discovery    promquery.Client
 	ShareMetrics *promquery.BulkQueryCache[manilaShareMetricsKey, manilaShareMetrics]
 
-	shareTypeNameToID map[string]string
+	shareTypeNameToID        map[string]string
+	privateShareTypeNameToID map[string]string
 }
 
 func init() {
@@ -120,6 +131,18 @@ func (m *assetManagerNFS) CheckResourceAllowed(ctx context.Context, assetType db
 	if !ok {
 		return fmt.Errorf("could not parse asset type %s", assetType)
 	}
+
+	if !parsed.IsPublic {
+		projectsWithAccess, err := sharetypes.ShowAccess(ctx, m.Manila, parsed.ShareTypeID).Extract()
+		if err != nil {
+			return err
+		}
+		isAllowed := slices.ContainsFunc(projectsWithAccess, func(a sharetypes.ShareTypeAccess) bool { return a.ProjectID == scopeUUID })
+		if !isAllowed {
+			return fmt.Errorf("project: %s does not have access to the asset type %s", scopeUUID, parsed.ShareTypeName)
+		}
+	}
+
 	for otherAssetType := range existingResources {
 		parsedOther, ok := m.parseAssetType(otherAssetType).Unpack()
 		if ok && parsed.AllShares != parsedOther.AllShares {
