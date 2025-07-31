@@ -136,13 +136,7 @@ func (m *assetManagerNFS) CheckResourceAllowed(ctx context.Context, assetType db
 		if err != nil {
 			return err
 		}
-		isAllowed := false
-		for _, access := range projectsWithAccess {
-			if scopeUUID == access.ProjectID {
-				isAllowed = true
-				break
-			}
-		}
+		isAllowed := slices.ContainsFunc(projectsWithAccess, func(a sharetypes.ShareTypeAccess) bool { return a.ProjectID == scopeUUID })
 		if !isAllowed {
 			return fmt.Errorf("project: %s does not have access to the asset type %s", scopeUUID, parsed.ShareTypeName)
 		}
