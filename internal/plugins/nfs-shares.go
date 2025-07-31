@@ -46,7 +46,7 @@ func (m *assetManagerNFS) parseAssetType(assetType db.AssetType) Option[assetTyp
 }
 
 func (m *assetManagerNFS) getShareTypeInfo(ctx context.Context) error {
-	pages, err := sharetypes.List(m.Manila, nil).AllPages(ctx)
+	pages, err := sharetypes.List(m.Manila, sharetypes.ListOpts{IsPublic: "All"}).AllPages(ctx)
 	if err != nil {
 		return err
 	}
