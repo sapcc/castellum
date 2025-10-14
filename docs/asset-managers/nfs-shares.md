@@ -42,6 +42,10 @@ Manila API queries.
 If you want Castellum to ignore a Manila share, fill the `manila_share_exclusion_reasons_for_castellum` metric as
 described above.
 
+If any of the aforementioned metric families do not contain any entries, Castellum will assume that this is because of a problem with metric scraping.
+Castellum will then rather throw errors instead of silently proceeding on the assumption that there are no shares.
+For the exclusion-reasons metric family specifically, it may be necessary to add dummy metrics when there are legitimately no excluded shares.
+
 ### Configuration
 
 | Variable | Default | Explanation |
