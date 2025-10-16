@@ -314,7 +314,8 @@ func (opts shareExtendOpts) ToShareExtendMap() (map[string]any, error) {
 // type declarations and configuration for promquery.BulkQueryCache
 
 const (
-	manilaExclusionReasonsQuery = `max by (project_id, share_id, reason) (manila_share_exclusion_reasons_for_castellum{reason!=""} == 1)`
+	// TODO: remove the "or dummy" part once https://github.com/sapcc/helm-charts/pull/9928 is deployed to all regions
+	manilaExclusionReasonsQuery = `max by (project_id, share_id, reason) (manila_share_exclusion_reasons_for_castellum{reason!=""} == 1 or manila_share_exclusion_reasons_for_castellum{share_id="dummy"} == 1)`
 
 	manilaSizeBytesQuery    = `max by (project_id, share_id) (manila_share_size_bytes_for_castellum        {volume_type!="dp",volume_state!="offline"})`
 	manilaUsedBytesQuery    = `max by (project_id, share_id) (manila_share_used_bytes_for_castellum        {volume_type!="dp",volume_state!="offline"})`
