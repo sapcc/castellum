@@ -117,7 +117,7 @@ github.com/rs/cors/internal
 github.com/sapcc/go-api-declarations/bininfo
 github.com/sapcc/go-api-declarations/cadf
 github.com/sapcc/go-api-declarations/castellum
-# github.com/sapcc/go-bits v0.0.0-20251009112313-51a4d641ae65
+# github.com/sapcc/go-bits v0.0.0-20251016112301-bea1654200bb
 ## explicit; go 1.24.0
 github.com/sapcc/go-bits/assert
 github.com/sapcc/go-bits/audittools
