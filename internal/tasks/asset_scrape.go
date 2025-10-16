@@ -6,6 +6,7 @@ package tasks
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/sapcc/go-bits/errext"
 	"github.com/sapcc/go-bits/jobloop"
 	"github.com/sapcc/go-bits/logg"
+	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
 	"github.com/sapcc/go-bits/sqlext"
 
@@ -145,8 +147,8 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 				core.Identifier(metric, "[%s]"), usage, core.GetUsagePercent(status.Size, usage),
 			))
 		}
-		logg.Info("observed %s %s at size = %d, %s",
-			res.AssetType, asset.UUID, status.Size, strings.Join(valueLogStrings, ", "),
+		logg.Info("observed %s %s at size = %d, %s, resource config = %s",
+			res.AssetType, asset.UUID, status.Size, strings.Join(valueLogStrings, ", "), must.Return(json.Marshal(core.LogicOfResource(res, info))),
 		)
 	}
 
