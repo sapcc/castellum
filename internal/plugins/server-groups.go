@@ -138,16 +138,22 @@ func (m *assetManagerServerGroups) GetAssetStatus(ctx context.Context, res db.Re
 
 	// check instance status
 	isNewServer := make(map[string]bool)
+	var serversToIgnore []string
 	for _, serverID := range group.Members {
 		server, err := servers.Get(ctx, computeV2, serverID).Extract()
 		if err != nil {
 			return core.AssetStatus{}, fmt.Errorf("cannot inspect server %s: %w", serverID, err)
 		}
-		// if any instance is not in a running state, that's a huge red flag and we
-		// should not attempt any autoscaling until all servers are back into a
-		// running state
-		if server.Status == "ERROR" || server.Status == "SHUTOFF" {
+		// if any instance is not in error state, that's a huge red flag and we
+		// should not attempt any autoscaling
+		if server.Status == "ERROR" {
 			return core.AssetStatus{}, fmt.Errorf("server %s is in status %s", serverID, server.Status)
+		}
+		// if an instance is in shutoff state, we handle this server as being non-existent.
+		// That means, if a customer shuts down a server, the group will still scale as if
+		// this server did not exist at all.
+		if server.Status == "SHUTOFF" {
+			serversToIgnore = append(serversToIgnore, serverID)
 		}
 		// for new servers, we will be more lenient wrt metric availability
 		if time.Since(server.Created) < 10*time.Minute {
@@ -164,6 +170,9 @@ func (m *assetManagerServerGroups) GetAssetStatus(ctx context.Context, res db.Re
 		result.Usage[metric] = 0
 	}
 	for _, serverID := range group.Members {
+		if slices.Contains(serversToIgnore, serverID) {
+			continue
+		}
 		for metric, queryTemplate := range serverUsageQueries {
 			queryStr := strings.ReplaceAll(queryTemplate, "${ID}", serverID)
 			value, err := m.Prometheus.GetSingleValue(ctx, queryStr, nil)
@@ -472,7 +481,7 @@ func makeNameDisambiguator() string {
 }
 
 func (m *assetManagerServerGroups) findServerIPForLoadbalancer(server *servers.Server, _ configForLBPoolMembership) (string, error) {
-	//TODO: We should probably check that the IP address is from a subnet that
+	// TODO: We should probably check that the IP address is from a subnet that
 	// the LB can actually reach. For now, I'll just assume that the user will
 	// only configure one private network on the auto-created instances, which
 	// means that there is no question which IP to choose.
