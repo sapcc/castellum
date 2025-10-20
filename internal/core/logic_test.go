@@ -85,7 +85,7 @@ func TestGetEligibleOperations(t *testing.T) {
 		// between steps, to validate that a new step size is calculated each time,
 		// same as if multiple steps had been taken in successive operations.
 		//
-		//NOTE: This testcase used to require a target size of 1420, but that was wrong.
+		// NOTE: This testcase used to require a target size of 1420, but that was wrong.
 		// A size of 1420 would lead to 95% usage (or rather, 95.07%) which is still
 		// above the critical threshold.
 		"critical->1434",
@@ -213,6 +213,12 @@ func TestGetEligibleOperations(t *testing.T) {
 		"critical->1100", // restricted by StrictMaximumSize
 	)
 	check(
+		"crit=95%, step=20%, max=1000",
+		"size=1000, usage=1000, smin=1000",
+		"",
+		"", // 100% max size
+	)
+	check(
 		"low=20%, high=80%, crit=95%, step=20%, max=900",
 		"size=1000, usage=500",
 		"", "", // MaximumSize does not force downsizes (only StrictMaximumSize does)
@@ -307,8 +313,8 @@ func TestGetEligibleOperations(t *testing.T) {
 		// Zero size and usage occurs e.g. in the project-quota asset manager, when the project
 		// in question has no quota at all. We expect Castellum to:
 		//
-		//- leave assets with 0 size and 0 usage alone (and not crash on divide-by-zero while doing so)
-		//- never resize assets with non-zero size and 0 usage to zero size
+		// - leave assets with 0 size and 0 usage alone (and not crash on divide-by-zero while doing so)
+		// - never resize assets with non-zero size and 0 usage to zero size
 		"size=0, usage=0",
 		"", "",
 	)

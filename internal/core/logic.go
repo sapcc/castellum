@@ -109,9 +109,9 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 	// phase 1: generate global constraints
 	//
 	// We have a bunch of constraints that can cause action if they are crossed:
-	//- On the Asset, StrictMinimumSize and StrictMaximumSize values describe
+	// - On the Asset, StrictMinimumSize and StrictMaximumSize values describe
 	//  technical constraints that the raw usage numbers cannot represent.
-	//- On the Resource, MinimumFreeSize is enforceable, whereas MinimumSize
+	// - On the Resource, MinimumFreeSize is enforceable, whereas MinimumSize
 	//  and MaximumSize just inhibit action.
 	//
 	// Because the logic for all of these is identical, we start out by merging
@@ -142,7 +142,7 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 		c.forbidBelow(*enforceableMinSize)
 	}
 
-	//NOTE: We only add MinimumSize as a constraint for downsizing. For upsizing,
+	// NOTE: We only add MinimumSize as a constraint for downsizing. For upsizing,
 	// it's okay if the target is below MinimumSize. It just means we're inching
 	// closer *towards* the happy area. (And vice versa for MaximumSize.)
 	if reason == castellum.OperationReasonLow && res.MinimumSize != nil {
@@ -151,7 +151,7 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 		}
 	}
 	if reason != castellum.OperationReasonLow && res.MaximumSize != nil {
-		if asset.StrictMinimumSize == nil || *asset.StrictMinimumSize < *res.MaximumSize {
+		if asset.StrictMinimumSize == nil || *asset.StrictMinimumSize <= *res.MaximumSize {
 			c.forbidAbove(*res.MaximumSize)
 		}
 	}
