@@ -44,18 +44,18 @@ func GetMultiUsagePercent(size uint64, usage castellum.UsageValues) castellum.Us
 // order to avoid accidental dependencies on things like timing information,
 // UUIDs or error message strings.
 type ResourceLogic struct {
-	UsageMetrics             []castellum.UsageMetric
-	LowThresholdPercent      castellum.UsageValues
-	HighThresholdPercent     castellum.UsageValues
-	CriticalThresholdPercent castellum.UsageValues
+	UsageMetrics             []castellum.UsageMetric `json:"metr,omitempty"`
+	LowThresholdPercent      castellum.UsageValues   `json:"low,omitempty"`
+	HighThresholdPercent     castellum.UsageValues   `json:"high,omitempty"`
+	CriticalThresholdPercent castellum.UsageValues   `json:"crit,omitempty"`
 
-	SizeStepPercent float64
-	SingleStep      bool
+	SizeStepPercent float64 `json:"step,omitempty"`
+	SingleStep      bool    `json:"sstep,omitempty"`
 
-	MinimumSize           *uint64
-	MaximumSize           *uint64
-	MinimumFreeSize       *uint64
-	MinimumFreeIsCritical bool
+	MinimumSize           *uint64 `json:"min,omitempty"`
+	MaximumSize           *uint64 `json:"max,omitempty"`
+	MinimumFreeSize       *uint64 `json:"minf,omitempty"`
+	MinimumFreeIsCritical bool    `json:"minfc,omitempty"`
 }
 
 // LogicOfResource converts a Resource into just its ResourceLogic.
