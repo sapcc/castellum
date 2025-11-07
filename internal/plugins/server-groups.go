@@ -79,7 +79,7 @@ func (m *assetManagerServerGroups) Init(ctx context.Context, provider core.Provi
 	}
 
 	localRoleNamesStr := osext.MustGetenv("CASTELLUM_SERVERGROUPS_LOCAL_ROLES")
-	for _, roleName := range strings.Split(localRoleNamesStr, ",") {
+	for roleName := range strings.SplitSeq(localRoleNamesStr, ",") {
 		roleName = strings.TrimSpace(roleName)
 		if roleName != "" {
 			m.LocalRoleNames = append(m.LocalRoleNames, roleName)
