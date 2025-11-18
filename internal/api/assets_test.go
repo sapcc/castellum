@@ -1,13 +1,14 @@
 // SPDX-FileCopyrightText: 2019 SAP SE or an SAP affiliate company
 // SPDX-License-Identifier: Apache-2.0
 
-package api
+package api_test
 
 import (
 	"net/http"
 	"testing"
 	"time"
 
+	"github.com/go-gorp/gorp/v3"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/audittools"
@@ -21,7 +22,7 @@ import (
 
 func TestGetAssets(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(hh http.Handler, _ *gorp.DbMap, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, mv,
 			"/v1/projects/%s/assets/%s")
 
@@ -58,7 +59,7 @@ func TestGetAssets(baseT *testing.T) {
 
 func TestGetAsset(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(hh http.Handler, dbm *gorp.DbMap, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, mv,
 			"/v1/projects/%s/assets/%s/fooasset1")
 
@@ -94,7 +95,7 @@ func TestGetAsset(baseT *testing.T) {
 			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 768},
 			CreatedAt: time.Unix(21, 0).UTC(),
 		}
-		t.Must(h.DB.Insert(&pendingOp))
+		t.Must(dbm.Insert(&pendingOp))
 		pendingOpJSON := assert.JSONObject{
 			"state":    "created",
 			"reason":   "high",
@@ -110,25 +111,25 @@ func TestGetAsset(baseT *testing.T) {
 
 		// check rendering of a pending operation in state "confirmed"
 		pendingOp.ConfirmedAt = p2time(time.Unix(22, 0).UTC())
-		t.MustUpdate(h.DB, &pendingOp)
+		t.MustUpdate(dbm, &pendingOp)
 		pendingOpJSON["state"] = "confirmed"
 		pendingOpJSON["confirmed"] = assert.JSONObject{"at": 22}
 		req.Check(t.T, hh)
 
 		// check rendering of a pending operation in state "greenlit"
 		pendingOp.GreenlitAt = p2time(time.Unix(23, 0).UTC())
-		t.MustUpdate(h.DB, &pendingOp)
+		t.MustUpdate(dbm, &pendingOp)
 		pendingOpJSON["state"] = "greenlit"
 		pendingOpJSON["greenlit"] = assert.JSONObject{"at": 23}
 		req.Check(t.T, hh)
 
 		pendingOp.GreenlitByUserUUID = p2string("user1")
-		t.MustUpdate(h.DB, &pendingOp)
+		t.MustUpdate(dbm, &pendingOp)
 		pendingOpJSON["greenlit"] = assert.JSONObject{"at": 23, "by_user": "user1"}
 		req.Check(t.T, hh)
 
 		// check rendering of a scraping error
-		t.MustExec(h.DB, `UPDATE assets SET scrape_error_message = $1 WHERE id = 1`, "filer is on fire")
+		t.MustExec(dbm, `UPDATE assets SET scrape_error_message = $1 WHERE id = 1`, "filer is on fire")
 		response["checked"] = assert.JSONObject{
 			"error": "filer is on fire",
 		}
@@ -194,7 +195,7 @@ func TestGetAsset(baseT *testing.T) {
 		req.Check(t.T, hh)
 
 		// check rendering of an asset that has never had a successful scrape
-		t.Must(h.DB.Insert(&db.Asset{
+		t.Must(dbm.Insert(&db.Asset{
 			ResourceID:         1,
 			UUID:               "fooasset3",
 			ScrapeErrorMessage: "filer has stranger anxiety",
@@ -219,8 +220,8 @@ func TestPostAssetErrorResolved(baseT *testing.T) {
 	t := test.T{T: baseT}
 	clock := mock.NewClock()
 	clock.StepBy(time.Hour)
-	withHandler(t, core.Config{}, clock.Now, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
-		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
+	withHandler(t, core.Config{}, clock.Now, func(hh http.Handler, dbm *gorp.DbMap, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+		tr, tr0 := easypg.NewTracker(t.T, dbm.Db)
 		tr0.Ignore()
 
 		// endpoint requires cluster access
@@ -259,7 +260,7 @@ func TestPostAssetErrorResolved(baseT *testing.T) {
 		tr.DBChanges().AssertEqualf(`
 			INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, finished_at, greenlit_by_user_uuid, usage) VALUES (1, 'critical', 'error-resolved', 0, 0, %[1]d, %[1]d, %[1]d, %[1]d, '', 'null');
 		`,
-			h.TimeNow().Unix())
+			clock.Now().Unix())
 
 		// expect conflict for asset where the last operation is not "errored"
 		assert.HTTPRequest{

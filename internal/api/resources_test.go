@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2019 SAP SE or an SAP affiliate company
 // SPDX-License-Identifier: Apache-2.0
 
-package api
+package api_test
 
 import (
 	"encoding/json"
@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-gorp/gorp/v3"
 	"github.com/sapcc/go-api-declarations/cadf"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
@@ -65,7 +66,7 @@ var (
 
 func TestGetProject(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(hh http.Handler, _ *gorp.DbMap, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with project access
 		mv.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
@@ -116,7 +117,7 @@ func TestGetProject(baseT *testing.T) {
 
 func TestGetResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(_ *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(hh http.Handler, _ *gorp.DbMap, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with project access
 		mv.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
@@ -177,8 +178,8 @@ func TestPutResource(baseT *testing.T) {
 	clock := mock.NewClock()
 	clock.StepBy(time.Hour)
 
-	withHandler(t, core.Config{}, clock.Now, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], ma *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
-		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
+	withHandler(t, core.Config{}, clock.Now, func(hh http.Handler, dbm *gorp.DbMap, team core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], ma *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+		tr, tr0 := easypg.NewTracker(t.T, dbm.Db)
 		tr0.Ignore()
 
 		// mostly like `initialFooResourceJSON`, but with some delays changed and
@@ -244,7 +245,7 @@ func TestPutResource(baseT *testing.T) {
 		mv.Enforcer.Allow("project:edit:foo")
 
 		// expect error when CheckResourceAllowed fails
-		m, _ := h.Team.ForAssetType("foo")
+		m, _ := team.ForAssetType("foo")
 		m.(*plugins.AssetManagerStatic).CheckResourceAllowedFails = true
 		assert.HTTPRequest{
 			Method:       "PUT",
@@ -412,8 +413,8 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 	}
 
 	t := test.T{T: baseT}
-	withHandler(t, cfg, nil, func(h *handler, hh http.Handler, _ *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
-		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
+	withHandler(t, cfg, nil, func(hh http.Handler, dbm *gorp.DbMap, _ core.AssetManagerTeam, _ *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+		tr, tr0 := easypg.NewTracker(t.T, dbm.Db)
 		tr0.Ignore()
 
 		expectErrors := func(assetType string, body assert.JSONObject, errors ...string) {
@@ -603,8 +604,8 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 
 func TestDeleteResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], ma *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
-		tr, tr0 := easypg.NewTracker(t.T, h.DB.Db)
+	withHandler(t, core.Config{}, nil, func(hh http.Handler, dbm *gorp.DbMap, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], ma *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+		tr, tr0 := easypg.NewTracker(t.T, dbm.Db)
 		tr0.Ignore()
 
 		// endpoint requires a token with project access
@@ -717,7 +718,7 @@ func TestSeedBlocksResourceUpdates(baseT *testing.T) {
 	clock := mock.NewClock()
 	clock.StepBy(time.Hour)
 
-	withHandler(t, cfg, clock.Now, func(_ *handler, hh http.Handler, _ *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, cfg, clock.Now, func(hh http.Handler, _ *gorp.DbMap, _ core.AssetManagerTeam, _ *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		// cannot PUT an existing resource defined by the seed
 		assert.HTTPRequest{
 			Method:       "PUT",

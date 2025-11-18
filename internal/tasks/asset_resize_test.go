@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2019 SAP SE or an SAP affiliate company
 // SPDX-License-Identifier: Apache-2.0
 
-package tasks
+package tasks_test
 
 import (
 	"context"
@@ -19,10 +19,11 @@ import (
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
+	"github.com/sapcc/castellum/internal/tasks"
 	"github.com/sapcc/castellum/internal/test"
 )
 
-func setupAssetResizeTest(t test.T, c *Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry, assetCount int) jobloop.Job {
+func setupAssetResizeTest(t test.T, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry, assetCount int) jobloop.Job {
 	// create a resource and assets to test with
 	t.Must(c.DB.Insert(&db.Resource{
 		ScopeUUID: "project1",
@@ -53,7 +54,7 @@ func setupAssetResizeTest(t test.T, c *Context, amStatic *plugins.AssetManagerSt
 
 func TestSuccessfulResize(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withContext(t, core.Config{}, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
+	withContext(t, core.Config{}, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
 		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
 		// add a greenlit PendingOperation
@@ -113,7 +114,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 
 func TestFailingResize(tBase *testing.T) {
 	t := test.T{T: tBase}
-	withContext(t, core.Config{}, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
+	withContext(t, core.Config{}, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
 		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
 		// add a greenlit PendingOperation
@@ -163,7 +164,7 @@ func TestFailingResize(tBase *testing.T) {
 
 func TestErroringResize(tBase *testing.T) {
 	t := test.T{T: tBase}
-	withContext(t, core.Config{}, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
+	withContext(t, core.Config{}, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
 		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
 		// add a greenlit PendingOperation that will error in SetAssetSize()
@@ -181,13 +182,13 @@ func TestErroringResize(tBase *testing.T) {
 		t.Must(c.DB.Insert(&pendingOp))
 
 		// when the outcome of the resize is "errored", we can retry several times
-		for range maxRetries {
+		for range tasks.MaxRetries {
 			clock.StepBy(10 * time.Minute)
 			t.Must(resizeJob.ProcessOne(ctx))
 
 			pendingOp.ID++
 			pendingOp.ErroredAttempts++
-			pendingOp.RetryAt = p2time(c.TimeNow().Add(retryInterval))
+			pendingOp.RetryAt = p2time(c.TimeNow().Add(tasks.RetryInterval))
 			t.ExpectPendingOperations(c.DB, pendingOp)
 			t.ExpectFinishedOperations(c.DB /*, nothing */)
 		}
@@ -217,7 +218,7 @@ func TestErroringResize(tBase *testing.T) {
 			FinishedAt:      c.TimeNow(),
 			Outcome:         castellum.OperationOutcomeErrored,
 			ErrorMessage:    "cannot set size smaller than current usage",
-			ErroredAttempts: maxRetries,
+			ErroredAttempts: tasks.MaxRetries,
 		})
 
 		// check that asset does not have an ExpectedSize

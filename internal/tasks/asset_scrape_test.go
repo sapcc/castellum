@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2019 SAP SE or an SAP affiliate company
 // SPDX-License-Identifier: Apache-2.0
 
-package tasks
+package tasks_test
 
 import (
 	"context"
@@ -19,11 +19,12 @@ import (
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
+	"github.com/sapcc/castellum/internal/tasks"
 	"github.com/sapcc/castellum/internal/test"
 )
 
-func runAssetScrapeTest(t test.T, action func(context.Context, *Context, func(plugins.StaticAsset), *mock.Clock, jobloop.Job)) {
-	withContext(t, core.Config{}, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
+func runAssetScrapeTest(t test.T, action func(context.Context, *tasks.Context, func(plugins.StaticAsset), *mock.Clock, jobloop.Job)) {
+	withContext(t, core.Config{}, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
 		scrapeJob := c.AssetScrapingJob(registry)
 
 		// asset scrape without any resources just does nothing
@@ -72,7 +73,7 @@ func runAssetScrapeTest(t test.T, action func(context.Context, *Context, func(pl
 
 func TestNoOperationWhenNoThreshold(baseT *testing.T) {
 	t := test.T{T: baseT}
-	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *tasks.Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		// when no threshold is crossed, no operation gets created
 		clock.StepBy(10 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
@@ -83,7 +84,7 @@ func TestNoOperationWhenNoThreshold(baseT *testing.T) {
 
 func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
-	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *tasks.Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		// set a maximum size that does not contradict the following operations
 		// (down below, there's a separate test for when the maximum size actually
 		// inhibits upsizing)
@@ -138,7 +139,7 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 
 func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 	t := test.T{T: baseT}
-	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *tasks.Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		// when the "High" threshold gets crossed, a "High" operation gets created in
 		// state "created"
 		clock.StepBy(10 * time.Minute)
@@ -177,7 +178,7 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 
 func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
-	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *tasks.Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		// set a minimum size that does not contradict the following operations
 		// (down below, there's a separate test for when the minimum size actually
 		// inhibits upsizing)
@@ -232,7 +233,7 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 
 func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 	t := test.T{T: baseT}
-	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *tasks.Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		// when the "Low" threshold gets crossed, a "Low" operation gets created in
 		// state "created"
 		clock.StepBy(10 * time.Minute)
@@ -271,7 +272,7 @@ func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 
 func TestCriticalUpsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
-	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *tasks.Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		// when the "Critical" threshold gets crossed, a "Critical" operation gets
 		// created and immediately confirmed/greenlit
 		clock.StepBy(10 * time.Minute)
@@ -296,7 +297,7 @@ func TestCriticalUpsizeTowardsGreenlight(baseT *testing.T) {
 
 func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 	t := test.T{T: baseT}
-	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *tasks.Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		// when the "High" threshold gets crossed, a "High" operation gets created in
 		// state "created"
 		clock.StepBy(10 * time.Minute)
@@ -347,7 +348,7 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 
 func TestAssetScrapeOrdering(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withContext(t, core.Config{}, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
+	withContext(t, core.Config{}, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
 		scrapeJob := c.AssetScrapingJob(registry)
 		// create a resource and multiple assets to test with
 		t.Must(c.DB.Insert(&db.Resource{
@@ -435,7 +436,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 
 func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 	t := test.T{T: baseT}
-	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *tasks.Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		// make asset look like it just completed a resize operation
 		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, c.TimeNow())
 		setAsset(plugins.StaticAsset{
@@ -496,7 +497,7 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
 	// in parallel with Castellum's resize operation, so we observe a new size
 	// that's different from the expected size.
 	t := test.T{T: baseT}
-	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *tasks.Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		// make asset look like it just completed a resize operation
 		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, c.TimeNow())
 		setAsset(plugins.StaticAsset{
@@ -524,7 +525,7 @@ func TestAssetScrapesGivesUpWaitingForResize(baseT *testing.T) {
 	// an hour, Castellum should give up waiting on the resize to complete and
 	// resume normal operation.
 	t := test.T{T: baseT}
-	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *tasks.Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		// make asset look like it just completed a resize operation
 		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, c.TimeNow())
 		setAsset(plugins.StaticAsset{
@@ -569,7 +570,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 	// but the asset's next_scrape_at timestamp is still updated to ensure that
 	// the main loop progresses to the next asset.
 	t := test.T{T: baseT}
-	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *tasks.Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		setAsset(plugins.StaticAsset{
 			Size:                 1000,
 			Usage:                600,
@@ -627,7 +628,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 
 func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 	t := test.T{T: baseT}
-	runAssetScrapeTest(t, func(ctx context.Context, c *Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
+	runAssetScrapeTest(t, func(ctx context.Context, c *tasks.Context, setAsset func(plugins.StaticAsset), clock *mock.Clock, scrapeJob jobloop.Job) {
 		// create a "High" operation
 		clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 900})
@@ -660,7 +661,7 @@ func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 
 func TestMaxAssetSizeRules(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withContext(t, core.Config{MaxAssetSizeRules: []core.MaxAssetSizeRule{{AssetTypeRx: "foo", ScopeUUID: "project1", Value: 800}}}, func(ctx context.Context, c *Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
+	withContext(t, core.Config{MaxAssetSizeRules: []core.MaxAssetSizeRule{{AssetTypeRx: "foo", ScopeUUID: "project1", Value: 800}}}, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
 		scrapeJob := c.AssetScrapingJob(registry)
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",

@@ -146,7 +146,7 @@ func runAPI(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team core.Ass
 		AllowedHeaders: []string{"Content-Type", "User-Agent", "X-Auth-Token"},
 	})
 	handler := httpapi.Compose(
-		api.NewHandler(cfg, dbi, team, &tv, providerClient, auditor),
+		api.NewHandler(cfg, dbi, team, &tv, providerClient, auditor, time.Now),
 		httpapi.HealthCheckAPI{
 			SkipRequestLog: true,
 			Check: func() error {

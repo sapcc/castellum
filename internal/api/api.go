@@ -40,8 +40,8 @@ type handler struct {
 }
 
 // NewAPI constructs the main httpapi.API for this package.
-func NewHandler(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClient, auditor audittools.Auditor) httpapi.API {
-	return &handler{Config: cfg, DB: dbi, Team: team, Validator: validator, Provider: provider, Auditor: auditor, TimeNow: time.Now}
+func NewHandler(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClient, auditor audittools.Auditor, timeNow func() time.Time) httpapi.API {
+	return &handler{Config: cfg, DB: dbi, Team: team, Validator: validator, Provider: provider, Auditor: auditor, TimeNow: timeNow}
 }
 
 // AddTo implements the httpapi.API interface.

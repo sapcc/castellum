@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2019 SAP SE or an SAP affiliate company
 // SPDX-License-Identifier: Apache-2.0
 
-package tasks
+package tasks_test
 
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/plugins"
+	"github.com/sapcc/castellum/internal/tasks"
 	"github.com/sapcc/castellum/internal/test"
 )
 
@@ -22,7 +23,7 @@ func TestMain(m *testing.M) {
 	easypg.WithTestDB(m, func() int { return m.Run() })
 }
 
-func withContext(t test.T, cfg core.Config, action func(context.Context, *Context, *plugins.AssetManagerStatic, *mock.Clock, *prometheus.Registry)) {
+func withContext(t test.T, cfg core.Config, action func(context.Context, *tasks.Context, *plugins.AssetManagerStatic, *mock.Clock, *prometheus.Registry)) {
 	t.WithDB(nil, func(dbi *gorp.DbMap) {
 		amStatic := &plugins.AssetManagerStatic{AssetType: "foo"}
 		// clock starts at an easily recognizable value
@@ -41,7 +42,7 @@ func withContext(t test.T, cfg core.Config, action func(context.Context, *Contex
 			},
 		}
 
-		action(context.Background(), &Context{
+		action(context.Background(), &tasks.Context{
 			Config:         cfg,
 			DB:             dbi,
 			Team:           core.AssetManagerTeam{amStatic},

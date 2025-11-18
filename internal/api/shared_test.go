@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2019 SAP SE or an SAP affiliate company
 // SPDX-License-Identifier: Apache-2.0
 
-package api
+package api_test
 
 import (
 	"fmt"
@@ -17,6 +17,7 @@ import (
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/mock"
 
+	"github.com/sapcc/castellum/internal/api"
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
@@ -27,7 +28,7 @@ func TestMain(m *testing.M) {
 	easypg.WithTestDB(m, func() int { return m.Run() })
 }
 
-func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action func(*handler, http.Handler, *mock.Validator[*mock.Enforcer], *audittools.MockAuditor, []db.Resource, []db.Asset)) {
+func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action func(http.Handler, *gorp.DbMap, core.AssetManagerTeam, *mock.Validator[*mock.Enforcer], *audittools.MockAuditor, []db.Resource, []db.Asset)) {
 	baseline := "fixtures/start-data.sql"
 	t.WithDB(&baseline, func(dbi *gorp.DbMap) {
 		team := core.AssetManagerTeam{
@@ -59,9 +60,8 @@ func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action fun
 		if timeNow == nil {
 			timeNow = time.Now
 		}
-		h := &handler{Config: cfg, DB: dbi, Team: team, Validator: mv, Auditor: auditor, Provider: mpc, TimeNow: timeNow}
-		hh := httpapi.Compose(h, httpapi.WithoutLogging())
-		action(h, hh, mv, auditor, resources, assets)
+		hh := httpapi.Compose(api.NewHandler(cfg, dbi, team, mv, mpc, auditor, timeNow), httpapi.WithoutLogging())
+		action(hh, dbi, team, mv, auditor, resources, assets)
 	})
 }
 

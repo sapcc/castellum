@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 SAP SE or an SAP affiliate company
 // SPDX-License-Identifier: Apache-2.0
 
-package tasks
+package tasks_test
 
 import (
 	"context"
@@ -19,6 +19,7 @@ import (
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
+	"github.com/sapcc/castellum/internal/tasks"
 	"github.com/sapcc/castellum/internal/test"
 )
 
@@ -75,7 +76,7 @@ const resourceSeedingConfigGood = `{
 func TestResourceSeedingSuccess(baseT *testing.T) {
 	t := test.T{T: baseT}
 	cfg := configFromJSON(t, resourceSeedingConfigGood)
-	withContext(t, cfg, func(ctx context.Context, c *Context, _ *plugins.AssetManagerStatic, _ *mock.Clock, registry *prometheus.Registry) {
+	withContext(t, cfg, func(ctx context.Context, c *tasks.Context, _ *plugins.AssetManagerStatic, _ *mock.Clock, registry *prometheus.Registry) {
 		job := c.ResourceSeedingJob(registry)
 
 		// create a resource in a project that is not seeded - this will be ignored by the seeding job
@@ -147,7 +148,7 @@ const resourceSeedingConfigBadResource = `{
 func TestResourceSeedingBadResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	cfg := configFromJSON(t, resourceSeedingConfigBadResource)
-	withContext(t, cfg, func(ctx context.Context, c *Context, _ *plugins.AssetManagerStatic, _ *mock.Clock, registry *prometheus.Registry) {
+	withContext(t, cfg, func(ctx context.Context, c *tasks.Context, _ *plugins.AssetManagerStatic, _ *mock.Clock, registry *prometheus.Registry) {
 		job := c.ResourceSeedingJob(registry)
 
 		err := job.ProcessOne(ctx)
@@ -176,18 +177,18 @@ func removeCommentsFromJSON(jsonStr string) string {
 
 func TestRemoveCommentsFromJSON(t *testing.T) {
 	jsonStr := `{
-    "name": "test", // This is an inline comment
-    // This is a single line comment
-    "value": 42, // Another inline comment
-    /* This is a multiline
-      comment that spans
-      multiple lines */
-    "enabled": true, // Final inline comment
-    // Another single line comment
-    "config": {
-      "debug": false /* inline multiline comment */
-    }
-  }`
+		"name": "test", // This is an inline comment
+		// This is a single line comment
+		"value": 42, // Another inline comment
+		/* This is a multiline
+			comment that spans
+			multiple lines */
+		"enabled": true, // Final inline comment
+		// Another single line comment
+		"config": {
+			"debug": false /* inline multiline comment */
+		}
+	}`
 
 	expected := jsonmatch.Object{
 		"name":    "test",

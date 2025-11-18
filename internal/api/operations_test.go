@@ -1,13 +1,14 @@
 // SPDX-FileCopyrightText: 2019 SAP SE or an SAP affiliate company
 // SPDX-License-Identifier: Apache-2.0
 
-package api
+package api_test
 
 import (
 	"net/http"
 	"testing"
 	"time"
 
+	"github.com/go-gorp/gorp/v3"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/audittools"
@@ -20,7 +21,7 @@ import (
 
 func TestGetPendingOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(hh http.Handler, dbm *gorp.DbMap, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, mv,
 			"/v1/projects/%s/resources/%s/operations/pending")
 
@@ -44,7 +45,7 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 768},
 			CreatedAt: time.Unix(21, 0).UTC(),
 		}
-		t.Must(h.DB.Insert(&pendingOp))
+		t.Must(dbm.Insert(&pendingOp))
 		pendingOpJSON := assert.JSONObject{
 			"project_id": "project1",
 			"asset_type": "foo",
@@ -65,20 +66,20 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 
 		// check rendering of a pending operation in state "confirmed"
 		pendingOp.ConfirmedAt = p2time(time.Unix(22, 0).UTC())
-		t.MustUpdate(h.DB, &pendingOp)
+		t.MustUpdate(dbm, &pendingOp)
 		pendingOpJSON["state"] = "confirmed"
 		pendingOpJSON["confirmed"] = assert.JSONObject{"at": 22}
 		req.Check(t.T, hh)
 
 		// check rendering of a pending operation in state "greenlit"
 		pendingOp.GreenlitAt = p2time(time.Unix(23, 0).UTC())
-		t.MustUpdate(h.DB, &pendingOp)
+		t.MustUpdate(dbm, &pendingOp)
 		pendingOpJSON["state"] = "greenlit"
 		pendingOpJSON["greenlit"] = assert.JSONObject{"at": 23}
 		req.Check(t.T, hh)
 
 		pendingOp.GreenlitByUserUUID = p2string("user1")
-		t.MustUpdate(h.DB, &pendingOp)
+		t.MustUpdate(dbm, &pendingOp)
 		pendingOpJSON["greenlit"] = assert.JSONObject{"at": 23, "by_user": "user1"}
 		req.Check(t.T, hh)
 
@@ -112,11 +113,11 @@ func withEitherFailedOrErroredOperation(action func(castellum.OperationOutcome))
 func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withEitherFailedOrErroredOperation(func(failedOperationOutcome castellum.OperationOutcome) {
-		withHandler(t, core.Config{}, nil, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+		withHandler(t, core.Config{}, nil, func(hh http.Handler, dbm *gorp.DbMap, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 			testCommonEndpointBehavior(t, hh, mv,
 				"/v1/projects/%s/resources/%s/operations/recently-failed")
 
-			t.MustExec(h.DB, `UPDATE finished_operations SET outcome = $1 WHERE outcome = $2`,
+			t.MustExec(dbm, `UPDATE finished_operations SET outcome = $1 WHERE outcome = $2`,
 				failedOperationOutcome, castellum.OperationOutcomeErrored,
 			)
 
@@ -134,8 +135,8 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 
 			// to make the recently-failed operation appear, move fooasset1 back to
 			// critical usage levels
-			t.MustExec(h.DB, `UPDATE resources SET critical_threshold_percent = 95 WHERE id = 1`)
-			t.MustExec(h.DB, `UPDATE assets SET usage = $1 WHERE id = $2`,
+			t.MustExec(dbm, `UPDATE resources SET critical_threshold_percent = 95 WHERE id = 1`)
+			t.MustExec(dbm, `UPDATE assets SET usage = $1 WHERE id = $2`,
 				castellum.UsageValues{castellum.SingularUsageMetric: 0.97 * 1024},
 				1,
 			)
@@ -171,7 +172,7 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 
 			// operation should NOT disappear when there is a pending operation that has
 			// not yet finished
-			t.Must(h.DB.Insert(&db.PendingOperation{
+			t.Must(dbm.Insert(&db.PendingOperation{
 				AssetID:   1,
 				Reason:    castellum.OperationReasonHigh,
 				OldSize:   1024,
@@ -188,7 +189,7 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 
 			// operation should disappear when there is a non-failed operation that
 			// finished after the failed one
-			t.Must(h.DB.Insert(&db.FinishedOperation{
+			t.Must(dbm.Insert(&db.FinishedOperation{
 				AssetID:     1,
 				Reason:      castellum.OperationReasonHigh,
 				Outcome:     castellum.OperationOutcomeSucceeded,
@@ -234,11 +235,11 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 	clock.StepBy(time.Hour)
 
 	withEitherFailedOrErroredOperation(func(failedOperationOutcome castellum.OperationOutcome) {
-		withHandler(t, core.Config{}, clock.Now, func(h *handler, hh http.Handler, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+		withHandler(t, core.Config{}, clock.Now, func(hh http.Handler, dbm *gorp.DbMap, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 			testCommonEndpointBehavior(t, hh, mv,
 				"/v1/projects/%s/resources/%s/operations/recently-succeeded")
 
-			t.MustExec(h.DB, `UPDATE finished_operations SET outcome = $1 WHERE outcome = $2`,
+			t.MustExec(dbm, `UPDATE finished_operations SET outcome = $1 WHERE outcome = $2`,
 				failedOperationOutcome, castellum.OperationOutcomeErrored,
 			)
 
@@ -254,7 +255,7 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 			}.Check(t.T, hh)
 
 			// make the failed operation a cancelled one to surface the succeeded operation
-			t.MustExec(h.DB, `UPDATE finished_operations SET outcome = $1 WHERE outcome = $2`,
+			t.MustExec(dbm, `UPDATE finished_operations SET outcome = $1 WHERE outcome = $2`,
 				castellum.OperationOutcomeCancelled, failedOperationOutcome,
 			)
 			expectedOps = []assert.JSONObject{{
@@ -289,7 +290,7 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 
 			// operation should NOT disappear when there is a pending operation that has
 			// not yet finished
-			t.Must(h.DB.Insert(&db.PendingOperation{
+			t.Must(dbm.Insert(&db.PendingOperation{
 				AssetID:   1,
 				Reason:    castellum.OperationReasonHigh,
 				OldSize:   1024,
