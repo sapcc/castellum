@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-gorp/gorp/v3"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/audittools"
@@ -28,41 +27,41 @@ func TestMain(m *testing.M) {
 	easypg.WithTestDB(m, func() int { return m.Run() })
 }
 
-func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action func(http.Handler, *gorp.DbMap, core.AssetManagerTeam, *mock.Validator[*mock.Enforcer], *audittools.MockAuditor, []db.Resource, []db.Asset)) {
-	baseline := "fixtures/start-data.sql"
-	t.WithDB(&baseline, func(dbi *gorp.DbMap) {
-		team := core.AssetManagerTeam{
-			&plugins.AssetManagerStatic{AssetType: "foo"},
-			&plugins.AssetManagerStatic{AssetType: "bar", UsageMetrics: []castellum.UsageMetric{"first", "second"}, ExpectsConfiguration: true},
-			&plugins.AssetManagerStatic{AssetType: "qux", ConflictsWithAssetType: "foo"},
-		}
-		mv := mock.NewValidator(mock.NewEnforcer(), nil)
-		mpc := test.MockProviderClient{
-			Domains: map[string]core.CachedDomain{
-				"domain1": {Name: "First Domain"},
-			},
-			Projects: map[string]core.CachedProject{
-				"project1": {Name: "First Project", DomainID: "domain1"},
-				"project2": {Name: "Second Project", DomainID: "domain1"},
-				"project3": {Name: "Third Project", DomainID: "domain1"},
-			},
-		}
-		auditor := audittools.NewMockAuditor()
+func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action func(test.Setup, http.Handler, core.AssetManagerTeam, *mock.Validator[*mock.Enforcer], *audittools.MockAuditor, []db.Resource, []db.Asset)) {
+	s := test.NewSetup(t.T,
+		test.WithDBFixtureFile("fixtures/start-data.sql"),
+	)
+	team := core.AssetManagerTeam{
+		&plugins.AssetManagerStatic{AssetType: "foo"},
+		&plugins.AssetManagerStatic{AssetType: "bar", UsageMetrics: []castellum.UsageMetric{"first", "second"}, ExpectsConfiguration: true},
+		&plugins.AssetManagerStatic{AssetType: "qux", ConflictsWithAssetType: "foo"},
+	}
+	mv := mock.NewValidator(mock.NewEnforcer(), nil)
+	mpc := test.MockProviderClient{
+		Domains: map[string]core.CachedDomain{
+			"domain1": {Name: "First Domain"},
+		},
+		Projects: map[string]core.CachedProject{
+			"project1": {Name: "First Project", DomainID: "domain1"},
+			"project2": {Name: "Second Project", DomainID: "domain1"},
+			"project3": {Name: "Third Project", DomainID: "domain1"},
+		},
+	}
+	auditor := audittools.NewMockAuditor()
 
-		var resources []db.Resource
-		_, err := dbi.Select(&resources, `SELECT * FROM resources ORDER BY ID`)
-		t.Must(err)
+	var resources []db.Resource
+	_, err := s.DB.Select(&resources, `SELECT * FROM resources ORDER BY ID`)
+	t.Must(err)
 
-		var assets []db.Asset
-		_, err = dbi.Select(&assets, `SELECT * FROM assets ORDER BY ID`)
-		t.Must(err)
+	var assets []db.Asset
+	_, err = s.DB.Select(&assets, `SELECT * FROM assets ORDER BY ID`)
+	t.Must(err)
 
-		if timeNow == nil {
-			timeNow = time.Now
-		}
-		hh := httpapi.Compose(api.NewHandler(cfg, dbi, team, mv, mpc, auditor, timeNow), httpapi.WithoutLogging())
-		action(hh, dbi, team, mv, auditor, resources, assets)
-	})
+	if timeNow == nil {
+		timeNow = time.Now
+	}
+	hh := httpapi.Compose(api.NewHandler(cfg, s.DB, team, mv, mpc, auditor, timeNow), httpapi.WithoutLogging())
+	action(s, hh, team, mv, auditor, resources, assets)
 }
 
 func testCommonEndpointBehavior(t test.T, hh http.Handler, validator *mock.Validator[*mock.Enforcer], pathPattern string) {

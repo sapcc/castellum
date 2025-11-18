@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-gorp/gorp/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/mock"
@@ -24,33 +23,32 @@ func TestMain(m *testing.M) {
 }
 
 func withContext(t test.T, cfg core.Config, action func(context.Context, *tasks.Context, *plugins.AssetManagerStatic, *mock.Clock, *prometheus.Registry)) {
-	t.WithDB(nil, func(dbi *gorp.DbMap) {
-		amStatic := &plugins.AssetManagerStatic{AssetType: "foo"}
-		// clock starts at an easily recognizable value
-		clock := mock.NewClock()
-		clock.StepBy(99990 * time.Second)
-		registry := prometheus.NewPedanticRegistry()
+	s := test.NewSetup(t.T)
+	amStatic := &plugins.AssetManagerStatic{AssetType: "foo"}
+	// clock starts at an easily recognizable value
+	clock := mock.NewClock()
+	clock.StepBy(99990 * time.Second)
+	registry := prometheus.NewPedanticRegistry()
 
-		mpc := test.MockProviderClient{
-			Domains: map[string]core.CachedDomain{
-				"domain1": {Name: "First Domain"},
-			},
-			Projects: map[string]core.CachedProject{
-				"project1": {Name: "First Project", DomainID: "domain1"},
-				"project2": {Name: "Second Project", DomainID: "domain1"},
-				"project3": {Name: "Third Project", DomainID: "domain1"},
-			},
-		}
+	mpc := test.MockProviderClient{
+		Domains: map[string]core.CachedDomain{
+			"domain1": {Name: "First Domain"},
+		},
+		Projects: map[string]core.CachedProject{
+			"project1": {Name: "First Project", DomainID: "domain1"},
+			"project2": {Name: "Second Project", DomainID: "domain1"},
+			"project3": {Name: "Third Project", DomainID: "domain1"},
+		},
+	}
 
-		action(context.Background(), &tasks.Context{
-			Config:         cfg,
-			DB:             dbi,
-			Team:           core.AssetManagerTeam{amStatic},
-			ProviderClient: mpc,
-			TimeNow:        clock.Now,
-			AddJitter:      noJitter,
-		}, amStatic, clock, registry)
-	})
+	action(context.Background(), &tasks.Context{
+		Config:         cfg,
+		DB:             s.DB,
+		Team:           core.AssetManagerTeam{amStatic},
+		ProviderClient: mpc,
+		TimeNow:        clock.Now,
+		AddJitter:      noJitter,
+	}, amStatic, clock, registry)
 }
 
 func noJitter(d time.Duration) time.Duration {

@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-gorp/gorp/v3"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/audittools"
@@ -21,7 +20,7 @@ import (
 
 func TestGetResourceScrapeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(hh http.Handler, dbm *gorp.DbMap, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with cluster access
 		mv.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
@@ -62,7 +61,7 @@ func TestGetResourceScrapeErrors(baseT *testing.T) {
 
 func TestGetAssetScrapeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(hh http.Handler, _ *gorp.DbMap, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(_ test.Setup, hh http.Handler, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with cluster access
 		mv.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
@@ -95,7 +94,7 @@ func TestGetAssetScrapeErrors(baseT *testing.T) {
 
 func TestGetAssetResizeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(hh http.Handler, dbm *gorp.DbMap, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, nil, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with cluster access
 		mv.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
@@ -131,7 +130,7 @@ func TestGetAssetResizeErrors(baseT *testing.T) {
 
 		// add a new operation on the same asset that results with outcome
 		// "succeeded" and check that we get an empty list
-		t.Must(dbm.Insert(&db.FinishedOperation{
+		t.Must(s.DB.Insert(&db.FinishedOperation{
 			AssetID:     1,
 			Reason:      castellum.OperationReasonCritical,
 			Outcome:     castellum.OperationOutcomeSucceeded,
