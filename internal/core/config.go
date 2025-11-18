@@ -4,20 +4,20 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/regexpext"
-	"gopkg.in/yaml.v2"
 
 	"github.com/sapcc/castellum/internal/db"
 )
 
 // Config contains everything that we found in the configuration file.
 type Config struct {
-	MaxAssetSizeRules []MaxAssetSizeRule `yaml:"max_asset_sizes"`
-	ProjectSeeds      []ProjectSeed      `yaml:"project_seeds"`
+	MaxAssetSizeRules []MaxAssetSizeRule `json:"max_asset_sizes"`
+	ProjectSeeds      []ProjectSeed      `json:"project_seeds"`
 }
 
 // LoadConfig loads the configuration file from the given path.
@@ -28,7 +28,7 @@ func LoadConfig(configPath string) (Config, error) {
 	}
 
 	var cfg Config
-	err = yaml.UnmarshalStrict(buf, &cfg)
+	err = json.Unmarshal(buf, &cfg)
 	if err != nil {
 		return Config{}, fmt.Errorf("could not parse %s: %w", configPath, err)
 	}
@@ -38,9 +38,9 @@ func LoadConfig(configPath string) (Config, error) {
 
 // MaxAssetSizeRule appears in type Config.
 type MaxAssetSizeRule struct {
-	AssetTypeRx regexpext.BoundedRegexp `yaml:"asset_type"`
-	ScopeUUID   string                  `yaml:"scope_uuid"` // leave empty to have the rule apply to all scopes
-	Value       uint64                  `yaml:"value"`
+	AssetTypeRx regexpext.BoundedRegexp `json:"asset_type"`
+	ScopeUUID   string                  `json:"scope_uuid"` // leave empty to have the rule apply to all scopes
+	Value       uint64                  `json:"value"`
 }
 
 // MaxAssetSizeFor computes the highest permissible max_size value for this
@@ -58,10 +58,10 @@ func (c Config) MaxAssetSizeFor(assetType db.AssetType, scopeUUID string) (resul
 
 // ProjectSeed appears in type Seed.
 type ProjectSeed struct {
-	ProjectName             string                              `yaml:"project_name"`
-	DomainName              string                              `yaml:"domain_name"`
-	Resources               map[db.AssetType]castellum.Resource `yaml:"resources"`
-	DisabledResourceRegexps []regexpext.BoundedRegexp           `yaml:"disabled_resources"`
+	ProjectName             string                              `json:"project_name"`
+	DomainName              string                              `json:"domain_name"`
+	Resources               map[db.AssetType]castellum.Resource `json:"resources"`
+	DisabledResourceRegexps []regexpext.BoundedRegexp           `json:"disabled_resources"`
 }
 
 // IsSeededResource returns true if the config contains a seed for this
