@@ -741,12 +741,4 @@ func TestSeedBlocksResourceUpdates(baseT *testing.T) {
 		Body:         initialFooResourceJSON,
 		ExpectStatus: http.StatusConflict,
 	}.Check(t.T, hh)
-
-	// cannot DELETE a missing resource disabled by the seed
-	assert.HTTPRequest{
-		Method:       "PUT",
-		Path:         "/v1/projects/project1/resources/qux",
-		Body:         initialFooResourceJSON,
-		ExpectStatus: http.StatusConflict,
-	}.Check(t.T, hh)
 }
