@@ -23,11 +23,6 @@ func commonSetupOptionsForWorkerTest() test.SetupOption {
 	)
 }
 
-func withContext(_ test.Setup, action func()) {
-	// TODO: remove this in the next commit (not done yet to avoid huge whitespace changes in the current commit)
-	action()
-}
-
 // Take pointer to time.Time expression.
 func p2time(t time.Time) *time.Time {
 	return &t

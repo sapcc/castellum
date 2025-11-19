@@ -24,52 +24,50 @@ func runAssetScrapeTest(t test.T, action func(context.Context, test.Setup, func(
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForWorkerTest(),
 	)
-	withContext(s, func() {
-		scrapeJob := s.TaskContext.AssetScrapingJob(s.Registry)
+	scrapeJob := s.TaskContext.AssetScrapingJob(s.Registry)
 
-		// asset scrape without any resources just does nothing
-		err := scrapeJob.ProcessOne(ctx)
-		if !errors.Is(err, sql.ErrNoRows) {
-			t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
-		}
-		_, dbDump := easypg.NewTracker(t.T, s.DB.Db)
-		dbDump.AssertEmpty()
+	// asset scrape without any resources just does nothing
+	err := scrapeJob.ProcessOne(ctx)
+	if !errors.Is(err, sql.ErrNoRows) {
+		t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
+	}
+	_, dbDump := easypg.NewTracker(t.T, s.DB.Db)
+	dbDump.AssertEmpty()
 
-		// create a resource and asset to test with
-		t.Must(s.DB.Insert(&db.Resource{
-			ScopeUUID:                "project1",
-			AssetType:                "foo",
-			LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
-			LowDelaySeconds:          3600,
-			HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 80},
-			HighDelaySeconds:         3600,
-			CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 95},
-			SizeStepPercent:          20,
-			SingleStep:               false,
-		}))
-		t.Must(s.DB.Insert(&db.Asset{
-			ResourceID:   1,
-			UUID:         "asset1",
-			Size:         1000,
-			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
-			NextScrapeAt: s.Clock.Now(),
-			NeverScraped: true,
-			ExpectedSize: nil,
-		}))
+	// create a resource and asset to test with
+	t.Must(s.DB.Insert(&db.Resource{
+		ScopeUUID:                "project1",
+		AssetType:                "foo",
+		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
+		LowDelaySeconds:          3600,
+		HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 80},
+		HighDelaySeconds:         3600,
+		CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 95},
+		SizeStepPercent:          20,
+		SingleStep:               false,
+	}))
+	t.Must(s.DB.Insert(&db.Asset{
+		ResourceID:   1,
+		UUID:         "asset1",
+		Size:         1000,
+		Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
+		NextScrapeAt: s.Clock.Now(),
+		NeverScraped: true,
+		ExpectedSize: nil,
+	}))
 
-		// setup asset with configurable size
-		amStatic := s.ManagerForAssetType("foo")
-		amStatic.Assets = map[string]map[string]plugins.StaticAsset{
-			"project1": {
-				"asset1": {Size: 1000, Usage: 500},
-			},
-		}
-		setAsset := func(a plugins.StaticAsset) {
-			amStatic.Assets["project1"]["asset1"] = a
-		}
+	// setup asset with configurable size
+	amStatic := s.ManagerForAssetType("foo")
+	amStatic.Assets = map[string]map[string]plugins.StaticAsset{
+		"project1": {
+			"asset1": {Size: 1000, Usage: 500},
+		},
+	}
+	setAsset := func(a plugins.StaticAsset) {
+		amStatic.Assets["project1"]["asset1"] = a
+	}
 
-		action(ctx, s, setAsset, scrapeJob)
-	})
+	action(ctx, s, setAsset, scrapeJob)
 }
 
 func TestNoOperationWhenNoThreshold(baseT *testing.T) {
@@ -353,91 +351,89 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForWorkerTest(),
 	)
-	withContext(s, func() {
-		scrapeJob := s.TaskContext.AssetScrapingJob(s.Registry)
-		// create a resource and multiple assets to test with
-		t.Must(s.DB.Insert(&db.Resource{
-			ScopeUUID:                "project1",
-			AssetType:                "foo",
-			LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
-			LowDelaySeconds:          3600,
-			HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 80},
-			HighDelaySeconds:         3600,
-			CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 95},
-			SizeStepPercent:          20,
-		}))
-		assets := []db.Asset{
-			{
-				ResourceID:   1,
-				UUID:         "asset1",
-				Size:         1000,
-				Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
-				NextScrapeAt: s.Clock.Now(),
-				ExpectedSize: nil,
-			},
-			{
-				ResourceID:   1,
-				UUID:         "asset2",
-				Size:         1000,
-				Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
-				NextScrapeAt: s.Clock.Now(),
-				ExpectedSize: nil,
-			},
-			{
-				ResourceID:   1,
-				UUID:         "asset3",
-				Size:         1000,
-				Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
-				NextScrapeAt: s.Clock.Now(),
-				ExpectedSize: nil,
-			},
-		}
-		t.Must(s.DB.Insert(&assets[0]))
-		t.Must(s.DB.Insert(&assets[1]))
-		t.Must(s.DB.Insert(&assets[2]))
+	scrapeJob := s.TaskContext.AssetScrapingJob(s.Registry)
+	// create a resource and multiple assets to test with
+	t.Must(s.DB.Insert(&db.Resource{
+		ScopeUUID:                "project1",
+		AssetType:                "foo",
+		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
+		LowDelaySeconds:          3600,
+		HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 80},
+		HighDelaySeconds:         3600,
+		CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 95},
+		SizeStepPercent:          20,
+	}))
+	assets := []db.Asset{
+		{
+			ResourceID:   1,
+			UUID:         "asset1",
+			Size:         1000,
+			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
+			NextScrapeAt: s.Clock.Now(),
+			ExpectedSize: nil,
+		},
+		{
+			ResourceID:   1,
+			UUID:         "asset2",
+			Size:         1000,
+			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
+			NextScrapeAt: s.Clock.Now(),
+			ExpectedSize: nil,
+		},
+		{
+			ResourceID:   1,
+			UUID:         "asset3",
+			Size:         1000,
+			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
+			NextScrapeAt: s.Clock.Now(),
+			ExpectedSize: nil,
+		},
+	}
+	t.Must(s.DB.Insert(&assets[0]))
+	t.Must(s.DB.Insert(&assets[1]))
+	t.Must(s.DB.Insert(&assets[2]))
 
-		amStatic := s.ManagerForAssetType("foo")
-		amStatic.Assets = map[string]map[string]plugins.StaticAsset{
-			"project1": {
-				"asset1": {Size: 1000, Usage: 510},
-				"asset2": {Size: 1000, Usage: 520},
-				"asset3": {Size: 1000, Usage: 530},
-			},
-		}
+	amStatic := s.ManagerForAssetType("foo")
+	amStatic.Assets = map[string]map[string]plugins.StaticAsset{
+		"project1": {
+			"asset1": {Size: 1000, Usage: 510},
+			"asset2": {Size: 1000, Usage: 520},
+			"asset3": {Size: 1000, Usage: 530},
+		},
+	}
 
-		// this should scrape each asset once, in order
-		s.Clock.StepBy(10 * time.Minute)
-		t.Must(scrapeJob.ProcessOne(ctx))
-		s.Clock.StepBy(time.Minute)
-		t.Must(scrapeJob.ProcessOne(ctx))
-		s.Clock.StepBy(time.Minute)
-		t.Must(scrapeJob.ProcessOne(ctx))
+	// this should scrape each asset once, in order
+	s.Clock.StepBy(10 * time.Minute)
+	t.Must(scrapeJob.ProcessOne(ctx))
+	s.Clock.StepBy(time.Minute)
+	t.Must(scrapeJob.ProcessOne(ctx))
+	s.Clock.StepBy(time.Minute)
+	t.Must(scrapeJob.ProcessOne(ctx))
 
-		// so the asset table should look like this now
-		assets[0].NextScrapeAt = s.Clock.Now().Add(3 * time.Minute)
-		assets[1].NextScrapeAt = s.Clock.Now().Add(4 * time.Minute)
-		assets[2].NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
-		assets[0].Usage = castellum.UsageValues{castellum.SingularUsageMetric: 510}
-		assets[1].Usage = castellum.UsageValues{castellum.SingularUsageMetric: 520}
-		assets[2].Usage = castellum.UsageValues{castellum.SingularUsageMetric: 530}
-		t.ExpectAssets(s.DB, assets...)
+	// so the asset table should look like this now
+	assets[0].NextScrapeAt = s.Clock.Now().Add(3 * time.Minute)
+	assets[1].NextScrapeAt = s.Clock.Now().Add(4 * time.Minute)
+	assets[2].NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
+	assets[0].Usage = castellum.UsageValues{castellum.SingularUsageMetric: 510}
+	assets[1].Usage = castellum.UsageValues{castellum.SingularUsageMetric: 520}
+	assets[2].Usage = castellum.UsageValues{castellum.SingularUsageMetric: 530}
+	t.ExpectAssets(s.DB, assets...)
 
-		// next scrape should work identically
-		s.Clock.StepBy(10 * time.Minute)
-		t.Must(scrapeJob.ProcessOne(ctx))
-		s.Clock.StepBy(time.Minute)
-		t.Must(scrapeJob.ProcessOne(ctx))
-		s.Clock.StepBy(time.Minute)
-		t.Must(scrapeJob.ProcessOne(ctx))
-		assets[0].NextScrapeAt = s.Clock.Now().Add(3 * time.Minute)
-		assets[1].NextScrapeAt = s.Clock.Now().Add(4 * time.Minute)
-		assets[2].NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
-		t.ExpectAssets(s.DB, assets...)
+	// next scrape should work identically
+	s.Clock.StepBy(10 * time.Minute)
+	t.Must(scrapeJob.ProcessOne(ctx))
+	s.Clock.StepBy(time.Minute)
+	t.Must(scrapeJob.ProcessOne(ctx))
+	s.Clock.StepBy(time.Minute)
+	t.Must(scrapeJob.ProcessOne(ctx))
+	assets[0].NextScrapeAt = s.Clock.Now().Add(3 * time.Minute)
+	assets[1].NextScrapeAt = s.Clock.Now().Add(4 * time.Minute)
+	assets[2].NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
+	t.ExpectAssets(s.DB, assets...)
 
-		// and all of this should not have created any operations
-		t.ExpectPendingOperations(s.DB /*, nothing */)
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
-	})
+	// and all of this should not have created any operations
+	t.ExpectPendingOperations(s.DB /*, nothing */)
+	t.ExpectFinishedOperations(s.DB /*, nothing */)
 }
 
 func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
@@ -676,51 +672,49 @@ func TestMaxAssetSizeRules(baseT *testing.T) {
 			]
 		}`),
 	)
-	withContext(s, func() {
-		scrapeJob := s.TaskContext.AssetScrapingJob(s.Registry)
-		t.Must(s.DB.Insert(&db.Resource{
-			ScopeUUID:                "project1",
-			AssetType:                "foo",
-			LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
-			LowDelaySeconds:          3600,
-			HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 80},
-			HighDelaySeconds:         3600,
-			CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 95},
-			SizeStepPercent:          20,
-		}))
-		asset := db.Asset{
-			ResourceID:   1,
-			UUID:         "asset1",
-			Size:         1000,
-			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
-			NextScrapeAt: s.Clock.Now(),
-			ExpectedSize: nil,
-		}
-		t.Must(s.DB.Insert(&asset))
+	scrapeJob := s.TaskContext.AssetScrapingJob(s.Registry)
+	t.Must(s.DB.Insert(&db.Resource{
+		ScopeUUID:                "project1",
+		AssetType:                "foo",
+		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
+		LowDelaySeconds:          3600,
+		HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 80},
+		HighDelaySeconds:         3600,
+		CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 95},
+		SizeStepPercent:          20,
+	}))
+	asset := db.Asset{
+		ResourceID:   1,
+		UUID:         "asset1",
+		Size:         1000,
+		Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
+		NextScrapeAt: s.Clock.Now(),
+		ExpectedSize: nil,
+	}
+	t.Must(s.DB.Insert(&asset))
 
-		amStatic := s.ManagerForAssetType("foo")
-		amStatic.Assets = map[string]map[string]plugins.StaticAsset{
-			"project1": {
-				"asset1": {Size: 1000, Usage: 510},
-			},
-		}
+	amStatic := s.ManagerForAssetType("foo")
+	amStatic.Assets = map[string]map[string]plugins.StaticAsset{
+		"project1": {
+			"asset1": {Size: 1000, Usage: 510},
+		},
+	}
 
-		s.Clock.StepBy(10 * time.Minute)
-		t.Must(scrapeJob.ProcessOne(ctx))
+	s.Clock.StepBy(10 * time.Minute)
+	t.Must(scrapeJob.ProcessOne(ctx))
 
-		asset.NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
-		asset.Usage = castellum.UsageValues{castellum.SingularUsageMetric: 510}
-		t.ExpectAssets(s.DB, asset)
+	asset.NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
+	asset.Usage = castellum.UsageValues{castellum.SingularUsageMetric: 510}
+	t.ExpectAssets(s.DB, asset)
 
-		t.ExpectPendingOperations(s.DB, db.PendingOperation{
-			ID:        1,
-			AssetID:   1,
-			Reason:    castellum.OperationReasonLow,
-			OldSize:   1000,
-			NewSize:   800,
-			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 510},
-			CreatedAt: s.Clock.Now(),
-		})
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
+	t.ExpectPendingOperations(s.DB, db.PendingOperation{
+		ID:        1,
+		AssetID:   1,
+		Reason:    castellum.OperationReasonLow,
+		OldSize:   1000,
+		NewSize:   800,
+		Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 510},
+		CreatedAt: s.Clock.Now(),
 	})
+	t.ExpectFinishedOperations(s.DB /*, nothing */)
 }
