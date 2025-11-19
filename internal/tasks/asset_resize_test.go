@@ -21,7 +21,9 @@ import (
 	"github.com/sapcc/castellum/internal/test"
 )
 
-func setupAssetResizeTest(t test.T, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry, assetCount int) jobloop.Job {
+func setupAssetResizeTest(t test.T, c *tasks.Context, s test.Setup, registry *prometheus.Registry, assetCount int) jobloop.Job {
+	amStatic := s.ManagerForAssetType("foo")
+
 	// create a resource and assets to test with
 	t.Must(c.DB.Insert(&db.Resource{
 		ScopeUUID: "project1",
@@ -52,9 +54,11 @@ func setupAssetResizeTest(t test.T, c *tasks.Context, amStatic *plugins.AssetMan
 
 func TestSuccessfulResize(baseT *testing.T) {
 	t := test.T{T: baseT}
-	s := test.NewSetup(t.T)
-	withContext(s, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
-		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
+	s := test.NewSetup(t.T,
+		commonSetupOptionsForWorkerTest(),
+	)
+	withContext(s, func(ctx context.Context, c *tasks.Context, registry *prometheus.Registry) {
+		resizeJob := setupAssetResizeTest(t, c, s, registry, 1)
 
 		// add a greenlit PendingOperation
 		s.Clock.StepBy(5 * time.Minute)
@@ -113,9 +117,11 @@ func TestSuccessfulResize(baseT *testing.T) {
 
 func TestFailingResize(tBase *testing.T) {
 	t := test.T{T: tBase}
-	s := test.NewSetup(t.T)
-	withContext(s, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
-		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
+	s := test.NewSetup(t.T,
+		commonSetupOptionsForWorkerTest(),
+	)
+	withContext(s, func(ctx context.Context, c *tasks.Context, registry *prometheus.Registry) {
+		resizeJob := setupAssetResizeTest(t, c, s, registry, 1)
 
 		// add a greenlit PendingOperation
 		s.Clock.StepBy(10 * time.Minute)
@@ -131,6 +137,7 @@ func TestFailingResize(tBase *testing.T) {
 		}
 		t.Must(c.DB.Insert(&pendingOp))
 
+		amStatic := s.ManagerForAssetType("foo")
 		amStatic.SetAssetSizeFails = true
 		t.Must(resizeJob.ProcessOne(ctx))
 
@@ -164,9 +171,11 @@ func TestFailingResize(tBase *testing.T) {
 
 func TestErroringResize(tBase *testing.T) {
 	t := test.T{T: tBase}
-	s := test.NewSetup(t.T)
-	withContext(s, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
-		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
+	s := test.NewSetup(t.T,
+		commonSetupOptionsForWorkerTest(),
+	)
+	withContext(s, func(ctx context.Context, c *tasks.Context, registry *prometheus.Registry) {
+		resizeJob := setupAssetResizeTest(t, c, s, registry, 1)
 
 		// add a greenlit PendingOperation that will error in SetAssetSize()
 		s.Clock.StepBy(10 * time.Minute)

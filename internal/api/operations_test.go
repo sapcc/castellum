@@ -11,7 +11,6 @@ import (
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 
-	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/test"
 )
@@ -19,9 +18,9 @@ import (
 func TestGetPendingOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	s := test.NewSetup(t.T,
-		test.WithDBFixtureFile("fixtures/start-data.sql"),
+		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, s,
 			"/v1/projects/%s/resources/%s/operations/pending")
 
@@ -114,9 +113,9 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withEitherFailedOrErroredOperation(func(failedOperationOutcome castellum.OperationOutcome) {
 		s := test.NewSetup(t.T,
-			test.WithDBFixtureFile("fixtures/start-data.sql"),
+			commonSetupOptionsForAPITest(),
 		)
-		withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+		withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
 			testCommonEndpointBehavior(t, hh, s,
 				"/v1/projects/%s/resources/%s/operations/recently-failed")
 
@@ -237,9 +236,9 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 
 	withEitherFailedOrErroredOperation(func(failedOperationOutcome castellum.OperationOutcome) {
 		s := test.NewSetup(t.T,
-			test.WithDBFixtureFile("fixtures/start-data.sql"),
+			commonSetupOptionsForAPITest(),
 		)
-		withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+		withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
 			testCommonEndpointBehavior(t, hh, s,
 				"/v1/projects/%s/resources/%s/operations/recently-succeeded")
 

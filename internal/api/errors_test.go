@@ -11,7 +11,6 @@ import (
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 
-	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/test"
 )
@@ -19,9 +18,9 @@ import (
 func TestGetResourceScrapeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
 	s := test.NewSetup(t.T,
-		test.WithDBFixtureFile("fixtures/start-data.sql"),
+		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with cluster access
 		s.Validator.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
@@ -63,9 +62,9 @@ func TestGetResourceScrapeErrors(baseT *testing.T) {
 func TestGetAssetScrapeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
 	s := test.NewSetup(t.T,
-		test.WithDBFixtureFile("fixtures/start-data.sql"),
+		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with cluster access
 		s.Validator.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
@@ -99,9 +98,9 @@ func TestGetAssetScrapeErrors(baseT *testing.T) {
 func TestGetAssetResizeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
 	s := test.NewSetup(t.T,
-		test.WithDBFixtureFile("fixtures/start-data.sql"),
+		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with cluster access
 		s.Validator.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{

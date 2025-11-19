@@ -12,7 +12,6 @@ import (
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
 
-	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/test"
 )
@@ -20,9 +19,9 @@ import (
 func TestGetAssets(baseT *testing.T) {
 	t := test.T{T: baseT}
 	s := test.NewSetup(t.T,
-		test.WithDBFixtureFile("fixtures/start-data.sql"),
+		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, s,
 			"/v1/projects/%s/assets/%s")
 
@@ -60,9 +59,9 @@ func TestGetAssets(baseT *testing.T) {
 func TestGetAsset(baseT *testing.T) {
 	t := test.T{T: baseT}
 	s := test.NewSetup(t.T,
-		test.WithDBFixtureFile("fixtures/start-data.sql"),
+		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, s,
 			"/v1/projects/%s/assets/%s/fooasset1")
 
@@ -222,9 +221,9 @@ func TestGetAsset(baseT *testing.T) {
 func TestPostAssetErrorResolved(baseT *testing.T) {
 	t := test.T{T: baseT}
 	s := test.NewSetup(t.T,
-		test.WithDBFixtureFile("fixtures/start-data.sql"),
+		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 

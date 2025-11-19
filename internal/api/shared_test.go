@@ -14,7 +14,6 @@ import (
 	"github.com/sapcc/go-bits/httpapi"
 
 	"github.com/sapcc/castellum/internal/api"
-	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
@@ -24,13 +23,18 @@ func TestMain(m *testing.M) {
 	easypg.WithTestDB(m, func() int { return m.Run() })
 }
 
-func withHandler(t test.T, s test.Setup, action func(http.Handler, core.AssetManagerTeam, []db.Resource, []db.Asset)) {
-	team := core.AssetManagerTeam{
-		&plugins.AssetManagerStatic{AssetType: "foo"},
-		&plugins.AssetManagerStatic{AssetType: "bar", UsageMetrics: []castellum.UsageMetric{"first", "second"}, ExpectsConfiguration: true},
-		&plugins.AssetManagerStatic{AssetType: "qux", ConflictsWithAssetType: "foo"},
-	}
+func commonSetupOptionsForAPITest() test.SetupOption {
+	return test.WithSeveral(
+		test.WithDBFixtureFile("fixtures/start-data.sql"),
+		test.WithAssetManagers(
+			&plugins.AssetManagerStatic{AssetType: "foo"},
+			&plugins.AssetManagerStatic{AssetType: "bar", UsageMetrics: []castellum.UsageMetric{"first", "second"}, ExpectsConfiguration: true},
+			&plugins.AssetManagerStatic{AssetType: "qux", ConflictsWithAssetType: "foo"},
+		),
+	)
+}
 
+func withHandler(t test.T, s test.Setup, action func(http.Handler, []db.Resource, []db.Asset)) {
 	var resources []db.Resource
 	_, err := s.DB.Select(&resources, `SELECT * FROM resources ORDER BY ID`)
 	t.Must(err)
@@ -40,10 +44,10 @@ func withHandler(t test.T, s test.Setup, action func(http.Handler, core.AssetMan
 	t.Must(err)
 
 	hh := httpapi.Compose(
-		api.NewHandler(s.Config, s.DB, team, s.Validator, s.ProviderClient, s.Auditor, s.Clock.Now),
+		api.NewHandler(s.Config, s.DB, s.Team, s.Validator, s.ProviderClient, s.Auditor, s.Clock.Now),
 		httpapi.WithoutLogging(),
 	)
-	action(hh, team, resources, assets)
+	action(hh, resources, assets)
 }
 
 func testCommonEndpointBehavior(t test.T, hh http.Handler, s test.Setup, pathPattern string) {

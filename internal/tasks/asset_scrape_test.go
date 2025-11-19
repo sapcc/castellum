@@ -22,8 +22,10 @@ import (
 )
 
 func runAssetScrapeTest(t test.T, action func(context.Context, test.Setup, *tasks.Context, func(plugins.StaticAsset), jobloop.Job)) {
-	s := test.NewSetup(t.T)
-	withContext(s, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
+	s := test.NewSetup(t.T,
+		commonSetupOptionsForWorkerTest(),
+	)
+	withContext(s, func(ctx context.Context, c *tasks.Context, registry *prometheus.Registry) {
 		scrapeJob := c.AssetScrapingJob(registry)
 
 		// asset scrape without any resources just does nothing
@@ -57,6 +59,7 @@ func runAssetScrapeTest(t test.T, action func(context.Context, test.Setup, *task
 		}))
 
 		// setup asset with configurable size
+		amStatic := s.ManagerForAssetType("foo")
 		amStatic.Assets = map[string]map[string]plugins.StaticAsset{
 			"project1": {
 				"asset1": {Size: 1000, Usage: 500},
@@ -347,8 +350,10 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 
 func TestAssetScrapeOrdering(baseT *testing.T) {
 	t := test.T{T: baseT}
-	s := test.NewSetup(t.T)
-	withContext(s, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
+	s := test.NewSetup(t.T,
+		commonSetupOptionsForWorkerTest(),
+	)
+	withContext(s, func(ctx context.Context, c *tasks.Context, registry *prometheus.Registry) {
 		scrapeJob := c.AssetScrapingJob(registry)
 		// create a resource and multiple assets to test with
 		t.Must(c.DB.Insert(&db.Resource{
@@ -391,6 +396,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 		t.Must(c.DB.Insert(&assets[1]))
 		t.Must(c.DB.Insert(&assets[2]))
 
+		amStatic := s.ManagerForAssetType("foo")
 		amStatic.Assets = map[string]map[string]plugins.StaticAsset{
 			"project1": {
 				"asset1": {Size: 1000, Usage: 510},
@@ -662,13 +668,14 @@ func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 func TestMaxAssetSizeRules(baseT *testing.T) {
 	t := test.T{T: baseT}
 	s := test.NewSetup(t.T,
+		commonSetupOptionsForWorkerTest(),
 		test.WithConfig(`{
 			"max_asset_sizes": [
 				{ "asset_type": "foo", "scope_uuid": "project1", "value": 800 }
 			]
 		}`),
 	)
-	withContext(s, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
+	withContext(s, func(ctx context.Context, c *tasks.Context, registry *prometheus.Registry) {
 		scrapeJob := c.AssetScrapingJob(registry)
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",
@@ -690,6 +697,7 @@ func TestMaxAssetSizeRules(baseT *testing.T) {
 		}
 		t.Must(c.DB.Insert(&asset))
 
+		amStatic := s.ManagerForAssetType("foo")
 		amStatic.Assets = map[string]map[string]plugins.StaticAsset{
 			"project1": {
 				"asset1": {Size: 1000, Usage: 510},

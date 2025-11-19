@@ -22,8 +22,10 @@ import (
 
 func TestResourceScraping(baseT *testing.T) {
 	t := test.T{T: baseT}
-	s := test.NewSetup(t.T)
-	withContext(s, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
+	s := test.NewSetup(t.T,
+		commonSetupOptionsForWorkerTest(),
+	)
+	withContext(s, func(ctx context.Context, c *tasks.Context, registry *prometheus.Registry) {
 		job := c.ResourceScrapingJob(registry)
 
 		// ScrapeNextResource() without any resources just does nothing
@@ -55,6 +57,7 @@ func TestResourceScraping(baseT *testing.T) {
 		}))
 
 		// create some mock assets that ScrapeNextResource() can find
+		amStatic := s.ManagerForAssetType("foo")
 		amStatic.Assets = map[string]map[string]plugins.StaticAsset{
 			"project1": {
 				"asset1": {Size: 1000, Usage: 400},

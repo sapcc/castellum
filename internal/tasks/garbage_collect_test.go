@@ -12,15 +12,16 @@ import (
 	"github.com/sapcc/go-api-declarations/castellum"
 
 	"github.com/sapcc/castellum/internal/db"
-	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/tasks"
 	"github.com/sapcc/castellum/internal/test"
 )
 
 func TestCollectGarbage(baseT *testing.T) {
 	t := test.T{T: baseT}
-	s := test.NewSetup(t.T)
-	withContext(s, func(_ context.Context, c *tasks.Context, _ *plugins.AssetManagerStatic, _ *prometheus.Registry) {
+	s := test.NewSetup(t.T,
+		commonSetupOptionsForWorkerTest(),
+	)
+	withContext(s, func(_ context.Context, c *tasks.Context, _ *prometheus.Registry) {
 		fakeNow := time.Unix(0, 0).UTC()
 
 		// setup some minimal scaffolding (we can only insert finished_operations

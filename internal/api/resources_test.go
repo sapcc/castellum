@@ -16,7 +16,6 @@ import (
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
-	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
 )
 
@@ -62,9 +61,9 @@ var (
 func TestGetProject(baseT *testing.T) {
 	t := test.T{T: baseT}
 	s := test.NewSetup(t.T,
-		test.WithDBFixtureFile("fixtures/start-data.sql"),
+		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with project access
 		s.Validator.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
@@ -116,9 +115,9 @@ func TestGetProject(baseT *testing.T) {
 func TestGetResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	s := test.NewSetup(t.T,
-		test.WithDBFixtureFile("fixtures/start-data.sql"),
+		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with project access
 		s.Validator.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
@@ -177,9 +176,9 @@ func TestGetResource(baseT *testing.T) {
 func TestPutResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	s := test.NewSetup(t.T,
-		test.WithDBFixtureFile("fixtures/start-data.sql"),
+		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, team core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 
@@ -246,8 +245,8 @@ func TestPutResource(baseT *testing.T) {
 		s.Validator.Enforcer.Allow("project:edit:foo")
 
 		// expect error when CheckResourceAllowed fails
-		m, _ := team.ForAssetType("foo")
-		m.(*plugins.AssetManagerStatic).CheckResourceAllowedFails = true
+		mgr := s.ManagerForAssetType("foo")
+		mgr.CheckResourceAllowedFails = true
 		assert.HTTPRequest{
 			Method:       "PUT",
 			Path:         "/v1/projects/project1/resources/foo",
@@ -255,7 +254,7 @@ func TestPutResource(baseT *testing.T) {
 			ExpectStatus: http.StatusUnprocessableEntity,
 			ExpectBody:   assert.StringData("CheckResourceAllowed failing as requested\n"),
 		}.Check(t.T, hh)
-		m.(*plugins.AssetManagerStatic).CheckResourceAllowedFails = false
+		mgr.CheckResourceAllowedFails = false
 
 		// since all tests above were error cases, expect the DB to be unchanged
 		tr.DBChanges().AssertEmpty()
@@ -409,14 +408,14 @@ func TestMaxAssetSizeFor(t *testing.T) {
 func TestPutResourceValidationErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
 	s := test.NewSetup(t.T,
-		test.WithDBFixtureFile("fixtures/start-data.sql"),
+		commonSetupOptionsForAPITest(),
 		test.WithConfig(`{
 			"max_asset_sizes": [
 				{ "asset_type": "foo", "value": 30 }
 			]
 		}`),
 	)
-	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 
@@ -608,9 +607,9 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 func TestDeleteResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	s := test.NewSetup(t.T,
-		test.WithDBFixtureFile("fixtures/start-data.sql"),
+		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 
@@ -698,7 +697,7 @@ func TestDeleteResource(baseT *testing.T) {
 func TestSeedBlocksResourceUpdates(baseT *testing.T) {
 	t := test.T{T: baseT}
 	s := test.NewSetup(t.T,
-		test.WithDBFixtureFile("fixtures/start-data.sql"),
+		commonSetupOptionsForAPITest(),
 		// this seed matches what we have in fixtures/start-data.sql
 		test.WithConfig(`{
 			"project_seeds": [
@@ -718,7 +717,7 @@ func TestSeedBlocksResourceUpdates(baseT *testing.T) {
 		}`),
 	)
 
-	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
 		// cannot PUT an existing resource defined by the seed
 		assert.HTTPRequest{
 			Method:       "PUT",

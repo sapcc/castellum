@@ -5,6 +5,7 @@ package test
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -18,15 +19,24 @@ import (
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
+	"github.com/sapcc/castellum/internal/plugins"
 )
 
 type setupParams struct {
+	AssetManagers []core.AssetManager
 	ConfigJSON    string
 	DBFixtureFile string
 }
 
 // SetupOption is an option that can be given to NewSetup().
 type SetupOption func(*setupParams)
+
+// WithAssetManagers is a SetupOption that adds asset managers to the team.
+func WithAssetManagers(managers ...core.AssetManager) SetupOption {
+	return func(params *setupParams) {
+		params.AssetManagers = append(params.AssetManagers, managers...)
+	}
+}
 
 // WithConfig is a SetupOption that initializes core.Config by unmarshaling the provided JSON payload.
 func WithConfig(configJSON string) SetupOption {
@@ -42,6 +52,15 @@ func WithDBFixtureFile(path string) SetupOption {
 	}
 }
 
+// WithSeveral combines several SetupOption instances into a single object.
+func WithSeveral(opts ...SetupOption) SetupOption {
+	return func(params *setupParams) {
+		for _, opt := range opts {
+			opt(params)
+		}
+	}
+}
+
 // Setup contains all the pieces that are needed for most tests.
 type Setup struct {
 	// for all types of integration tests
@@ -49,6 +68,7 @@ type Setup struct {
 	Config         core.Config
 	DB             *gorp.DbMap
 	ProviderClient MockProviderClient
+	Team           core.AssetManagerTeam
 
 	// for API tests only
 	Auditor   *audittools.MockAuditor
@@ -79,6 +99,7 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 				"project3": {Name: "Third Project", DomainID: "domain1"},
 			},
 		},
+		Team:      core.AssetManagerTeam(params.AssetManagers),
 		Auditor:   audittools.NewMockAuditor(),
 		Validator: mock.NewValidator(mock.NewEnforcer(), nil),
 	}
@@ -110,4 +131,18 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 	})
 
 	return s
+}
+
+// ManagerForAssetType return the mock asset manager for the given asset type,
+// or panics if no such asset manager exists.
+func (s Setup) ManagerForAssetType(assetType db.AssetType) *plugins.AssetManagerStatic {
+	mgrGeneric, _ := s.Team.ForAssetType(assetType)
+	if mgrGeneric == nil {
+		panic(fmt.Sprintf("no manager for asset type %q", assetType))
+	}
+	mgrStatic, ok := mgrGeneric.(*plugins.AssetManagerStatic)
+	if !ok {
+		panic(fmt.Sprintf("manager for asset type %q has wrong type %T", assetType, mgrGeneric))
+	}
+	return mgrStatic
 }
