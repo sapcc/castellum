@@ -11,10 +11,7 @@ import (
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
-	"github.com/sapcc/go-bits/httpapi"
 
-	"github.com/sapcc/castellum/internal/api"
-	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
 )
@@ -34,20 +31,9 @@ func commonSetupOptionsForAPITest() test.SetupOption {
 	)
 }
 
-func withHandler(t test.T, s test.Setup, action func(http.Handler, []db.Resource, []db.Asset)) {
-	var resources []db.Resource
-	_, err := s.DB.Select(&resources, `SELECT * FROM resources ORDER BY ID`)
-	t.Must(err)
-
-	var assets []db.Asset
-	_, err = s.DB.Select(&assets, `SELECT * FROM assets ORDER BY ID`)
-	t.Must(err)
-
-	hh := httpapi.Compose(
-		api.NewHandler(s.Config, s.DB, s.Team, s.Validator, s.ProviderClient, s.Auditor, s.Clock.Now),
-		httpapi.WithoutLogging(),
-	)
-	action(hh, resources, assets)
+func withHandler(action func()) {
+	// TODO: remove this in the next commit (not done yet to avoid huge whitespace changes in the current commit)
+	action()
 }
 
 func testCommonEndpointBehavior(t test.T, hh http.Handler, s test.Setup, pathPattern string) {

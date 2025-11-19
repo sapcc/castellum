@@ -20,7 +20,9 @@ func TestGetPendingOperationsForResource(baseT *testing.T) {
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
+	hh := s.Handler
+
+	withHandler(func() {
 		testCommonEndpointBehavior(t, hh, s,
 			"/v1/projects/%s/resources/%s/operations/pending")
 
@@ -115,7 +117,9 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 		s := test.NewSetup(t.T,
 			commonSetupOptionsForAPITest(),
 		)
-		withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
+		hh := s.Handler
+
+		withHandler(func() {
 			testCommonEndpointBehavior(t, hh, s,
 				"/v1/projects/%s/resources/%s/operations/recently-failed")
 
@@ -238,7 +242,9 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 		s := test.NewSetup(t.T,
 			commonSetupOptionsForAPITest(),
 		)
-		withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
+		hh := s.Handler
+
+		withHandler(func() {
 			testCommonEndpointBehavior(t, hh, s,
 				"/v1/projects/%s/resources/%s/operations/recently-succeeded")
 

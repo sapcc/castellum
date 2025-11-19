@@ -21,7 +21,9 @@ func TestGetAssets(baseT *testing.T) {
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
+	hh := s.Handler
+
+	withHandler(func() {
 		testCommonEndpointBehavior(t, hh, s,
 			"/v1/projects/%s/assets/%s")
 
@@ -61,7 +63,9 @@ func TestGetAsset(baseT *testing.T) {
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
+	hh := s.Handler
+
+	withHandler(func() {
 		testCommonEndpointBehavior(t, hh, s,
 			"/v1/projects/%s/assets/%s/fooasset1")
 
@@ -223,7 +227,9 @@ func TestPostAssetErrorResolved(baseT *testing.T) {
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
+	hh := s.Handler
+
+	withHandler(func() {
 		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 

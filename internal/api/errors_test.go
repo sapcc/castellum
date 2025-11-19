@@ -20,7 +20,9 @@ func TestGetResourceScrapeErrors(baseT *testing.T) {
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
+	hh := s.Handler
+
+	withHandler(func() {
 		// endpoint requires a token with cluster access
 		s.Validator.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
@@ -64,7 +66,9 @@ func TestGetAssetScrapeErrors(baseT *testing.T) {
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
+	hh := s.Handler
+
+	withHandler(func() {
 		// endpoint requires a token with cluster access
 		s.Validator.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
@@ -100,7 +104,9 @@ func TestGetAssetResizeErrors(baseT *testing.T) {
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
+	hh := s.Handler
+
+	withHandler(func() {
 		// endpoint requires a token with cluster access
 		s.Validator.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{

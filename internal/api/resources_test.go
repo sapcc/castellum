@@ -63,7 +63,9 @@ func TestGetProject(baseT *testing.T) {
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
+	hh := s.Handler
+
+	withHandler(func() {
 		// endpoint requires a token with project access
 		s.Validator.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
@@ -117,7 +119,9 @@ func TestGetResource(baseT *testing.T) {
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
+	hh := s.Handler
+
+	withHandler(func() {
 		// endpoint requires a token with project access
 		s.Validator.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
@@ -178,7 +182,9 @@ func TestPutResource(baseT *testing.T) {
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
+	hh := s.Handler
+
+	withHandler(func() {
 		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 
@@ -415,7 +421,9 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 			]
 		}`),
 	)
-	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
+	hh := s.Handler
+
+	withHandler(func() {
 		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 
@@ -609,7 +617,9 @@ func TestDeleteResource(baseT *testing.T) {
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForAPITest(),
 	)
-	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
+	hh := s.Handler
+
+	withHandler(func() {
 		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 
@@ -716,8 +726,9 @@ func TestSeedBlocksResourceUpdates(baseT *testing.T) {
 			]
 		}`),
 	)
+	hh := s.Handler
 
-	withHandler(t, s, func(hh http.Handler, _ []db.Resource, _ []db.Asset) {
+	withHandler(func() {
 		// cannot PUT an existing resource defined by the seed
 		assert.HTTPRequest{
 			Method:       "PUT",

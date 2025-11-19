@@ -6,6 +6,7 @@ package test
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -13,11 +14,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/easypg"
+	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/mock"
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
 
+	"github.com/sapcc/castellum/internal/api"
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
@@ -74,6 +77,7 @@ type Setup struct {
 
 	// for API tests only
 	Auditor   *audittools.MockAuditor
+	Handler   http.Handler
 	Validator *mock.Validator[*mock.Enforcer]
 
 	// for worker tests only
@@ -105,10 +109,12 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 				"project3": {Name: "Third Project", DomainID: "domain1"},
 			},
 		},
-		Team:      core.AssetManagerTeam(params.AssetManagers),
-		Auditor:   audittools.NewMockAuditor(),
-		Validator: mock.NewValidator(mock.NewEnforcer(), nil),
-		Registry:  prometheus.NewPedanticRegistry(),
+		Team:        core.AssetManagerTeam(params.AssetManagers),
+		Auditor:     audittools.NewMockAuditor(),
+		Handler:     nil, // see below
+		Validator:   mock.NewValidator(mock.NewEnforcer(), nil),
+		Registry:    prometheus.NewPedanticRegistry(),
+		TaskContext: nil, // see below
 	}
 
 	// initialize config if requested
@@ -136,6 +142,12 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 	t.Cleanup(func() {
 		_ = dbConn.Close()
 	})
+
+	// initialize HTTP handler for API tests
+	s.Handler = httpapi.Compose(
+		api.NewHandler(s.Config, s.DB, s.Team, s.Validator, s.ProviderClient, s.Auditor, s.Clock.Now),
+		httpapi.WithoutLogging(),
+	)
 
 	// initialize context for worker tests
 	noJitter := func(d time.Duration) time.Duration {
