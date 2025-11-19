@@ -13,7 +13,6 @@ import (
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
-	"github.com/sapcc/go-bits/regexpext"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -62,7 +61,10 @@ var (
 
 func TestGetProject(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	s := test.NewSetup(t.T,
+		test.WithDBFixtureFile("fixtures/start-data.sql"),
+	)
+	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with project access
 		s.Validator.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
@@ -113,7 +115,10 @@ func TestGetProject(baseT *testing.T) {
 
 func TestGetResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	s := test.NewSetup(t.T,
+		test.WithDBFixtureFile("fixtures/start-data.sql"),
+	)
+	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with project access
 		s.Validator.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
@@ -171,8 +176,10 @@ func TestGetResource(baseT *testing.T) {
 
 func TestPutResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-
-	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, team core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	s := test.NewSetup(t.T,
+		test.WithDBFixtureFile("fixtures/start-data.sql"),
+	)
+	withHandler(t, s, func(hh http.Handler, team core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 
@@ -400,14 +407,16 @@ func TestMaxAssetSizeFor(t *testing.T) {
 }
 
 func TestPutResourceValidationErrors(baseT *testing.T) {
-	var cfg = core.Config{
-		MaxAssetSizeRules: []core.MaxAssetSizeRule{
-			{AssetTypeRx: "foo", Value: 30},
-		},
-	}
-
 	t := test.T{T: baseT}
-	withHandler(t, cfg, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	s := test.NewSetup(t.T,
+		test.WithDBFixtureFile("fixtures/start-data.sql"),
+		test.WithConfig(`{
+			"max_asset_sizes": [
+				{ "asset_type": "foo", "value": 30 }
+			]
+		}`),
+	)
+	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 
@@ -598,7 +607,10 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 
 func TestDeleteResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	s := test.NewSetup(t.T,
+		test.WithDBFixtureFile("fixtures/start-data.sql"),
+	)
+	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 
@@ -684,33 +696,29 @@ func TestDeleteResource(baseT *testing.T) {
 }
 
 func TestSeedBlocksResourceUpdates(baseT *testing.T) {
-	// this seed matches what we have in fixtures/start-data.sql
-	cfg := core.Config{
-		ProjectSeeds: []core.ProjectSeed{{
-			ProjectName: "First Project",
-			DomainName:  "First Domain",
-			Resources: map[db.AssetType]castellum.Resource{
-				"foo": {
-					LowThreshold: &castellum.Threshold{
-						UsagePercent: castellum.UsageValues{castellum.SingularUsageMetric: 20},
-						DelaySeconds: 3600,
-					},
-					HighThreshold: &castellum.Threshold{
-						UsagePercent: castellum.UsageValues{castellum.SingularUsageMetric: 80},
-						DelaySeconds: 1800,
-					},
-					SizeSteps: castellum.SizeSteps{
-						Percent: 20,
-					},
-				},
-			},
-			DisabledResourceRegexps: []regexpext.BoundedRegexp{"qux"},
-		}},
-	}
-
 	t := test.T{T: baseT}
+	s := test.NewSetup(t.T,
+		test.WithDBFixtureFile("fixtures/start-data.sql"),
+		// this seed matches what we have in fixtures/start-data.sql
+		test.WithConfig(`{
+			"project_seeds": [
+				{
+					"project_name": "First Project",
+					"domain_name":  "First Domain",
+					"disabled_resources": [ "qux" ],
+					"resources": {
+						"foo": {
+							"low_threshold":  { "usage_percent": 20, "delay_seconds": 3600 },
+							"high_threshold": { "usage_percent": 80, "delay_seconds": 1800 },
+							"size_steps":     { "percent": 20 }
+						}
+					}
+				}
+			]
+		}`),
+	)
 
-	withHandler(t, cfg, func(_ test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		// cannot PUT an existing resource defined by the seed
 		assert.HTTPRequest{
 			Method:       "PUT",

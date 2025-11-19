@@ -15,7 +15,6 @@ import (
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/jobloop"
 
-	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/tasks"
@@ -23,7 +22,8 @@ import (
 )
 
 func runAssetScrapeTest(t test.T, action func(context.Context, test.Setup, *tasks.Context, func(plugins.StaticAsset), jobloop.Job)) {
-	withContext(t, core.Config{}, func(ctx context.Context, s test.Setup, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
+	s := test.NewSetup(t.T)
+	withContext(s, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
 		scrapeJob := c.AssetScrapingJob(registry)
 
 		// asset scrape without any resources just does nothing
@@ -347,7 +347,8 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 
 func TestAssetScrapeOrdering(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withContext(t, core.Config{}, func(ctx context.Context, s test.Setup, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
+	s := test.NewSetup(t.T)
+	withContext(s, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
 		scrapeJob := c.AssetScrapingJob(registry)
 		// create a resource and multiple assets to test with
 		t.Must(c.DB.Insert(&db.Resource{
@@ -660,7 +661,14 @@ func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 
 func TestMaxAssetSizeRules(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withContext(t, core.Config{MaxAssetSizeRules: []core.MaxAssetSizeRule{{AssetTypeRx: "foo", ScopeUUID: "project1", Value: 800}}}, func(ctx context.Context, s test.Setup, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
+	s := test.NewSetup(t.T,
+		test.WithConfig(`{
+			"max_asset_sizes": [
+				{ "asset_type": "foo", "scope_uuid": "project1", "value": 800 }
+			]
+		}`),
+	)
+	withContext(s, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
 		scrapeJob := c.AssetScrapingJob(registry)
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",

@@ -7,7 +7,7 @@ require (
 	github.com/go-gorp/gorp/v3 v3.1.0
 	github.com/gophercloud/gophercloud/v2 v2.8.0
 	github.com/gorilla/mux v1.8.1
-	github.com/majewsky/gg v1.3.0
+	github.com/majewsky/gg v1.4.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/common v0.67.2
 	github.com/rs/cors v1.11.1

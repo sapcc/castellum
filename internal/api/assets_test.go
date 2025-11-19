@@ -19,7 +19,10 @@ import (
 
 func TestGetAssets(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	s := test.NewSetup(t.T,
+		test.WithDBFixtureFile("fixtures/start-data.sql"),
+	)
+	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, s,
 			"/v1/projects/%s/assets/%s")
 
@@ -56,7 +59,10 @@ func TestGetAssets(baseT *testing.T) {
 
 func TestGetAsset(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	s := test.NewSetup(t.T,
+		test.WithDBFixtureFile("fixtures/start-data.sql"),
+	)
+	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, s,
 			"/v1/projects/%s/assets/%s/fooasset1")
 
@@ -215,7 +221,10 @@ func TestGetAsset(baseT *testing.T) {
 
 func TestPostAssetErrorResolved(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	s := test.NewSetup(t.T,
+		test.WithDBFixtureFile("fixtures/start-data.sql"),
+	)
+	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 

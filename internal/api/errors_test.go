@@ -18,7 +18,10 @@ import (
 
 func TestGetResourceScrapeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	s := test.NewSetup(t.T,
+		test.WithDBFixtureFile("fixtures/start-data.sql"),
+	)
+	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with cluster access
 		s.Validator.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
@@ -59,7 +62,10 @@ func TestGetResourceScrapeErrors(baseT *testing.T) {
 
 func TestGetAssetScrapeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	s := test.NewSetup(t.T,
+		test.WithDBFixtureFile("fixtures/start-data.sql"),
+	)
+	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with cluster access
 		s.Validator.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
@@ -92,7 +98,10 @@ func TestGetAssetScrapeErrors(baseT *testing.T) {
 
 func TestGetAssetResizeErrors(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	s := test.NewSetup(t.T,
+		test.WithDBFixtureFile("fixtures/start-data.sql"),
+	)
+	withHandler(t, s, func(hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with cluster access
 		s.Validator.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{

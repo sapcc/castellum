@@ -5,27 +5,18 @@ package tasks_test
 
 import (
 	"context"
-	"encoding/json"
-	"regexp"
 	"testing"
 
-	"github.com/majewsky/gg/jsonmatch"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
 
-	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/tasks"
 	"github.com/sapcc/castellum/internal/test"
 )
-
-func configFromJSON(t test.T, buf string) (cfg core.Config) {
-	t.Must(json.Unmarshal([]byte(removeCommentsFromJSON(buf)), &cfg))
-	return
-}
 
 const resourceSeedingConfigGood = `{
 	"project_seeds": [
@@ -74,8 +65,10 @@ const resourceSeedingConfigGood = `{
 
 func TestResourceSeedingSuccess(baseT *testing.T) {
 	t := test.T{T: baseT}
-	cfg := configFromJSON(t, resourceSeedingConfigGood)
-	withContext(t, cfg, func(ctx context.Context, s test.Setup, c *tasks.Context, _ *plugins.AssetManagerStatic, registry *prometheus.Registry) {
+	s := test.NewSetup(t.T,
+		test.WithConfig(resourceSeedingConfigGood),
+	)
+	withContext(s, func(ctx context.Context, c *tasks.Context, _ *plugins.AssetManagerStatic, registry *prometheus.Registry) {
 		job := c.ResourceSeedingJob(registry)
 
 		// create a resource in a project that is not seeded - this will be ignored by the seeding job
@@ -146,8 +139,10 @@ const resourceSeedingConfigBadResource = `{
 
 func TestResourceSeedingBadResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	cfg := configFromJSON(t, resourceSeedingConfigBadResource)
-	withContext(t, cfg, func(ctx context.Context, s test.Setup, c *tasks.Context, _ *plugins.AssetManagerStatic, registry *prometheus.Registry) {
+	s := test.NewSetup(t.T,
+		test.WithConfig(resourceSeedingConfigBadResource),
+	)
+	withContext(s, func(ctx context.Context, c *tasks.Context, _ *plugins.AssetManagerStatic, registry *prometheus.Registry) {
 		job := c.ResourceSeedingJob(registry)
 
 		err := job.ProcessOne(ctx)
@@ -158,53 +153,4 @@ func TestResourceSeedingBadResource(baseT *testing.T) {
 				`while applying seed for project "First Domain/First Project" (project1): cannot apply foo seed: delay for high threshold is missing`)
 		}
 	})
-}
-
-// removeCommentsFromJSON removes C-style comments from JSON literals.
-// It is intended only for use with JSON literals that appear in test code.
-// Its implementation is very simple and not intended for use with untrusted inputs.
-func removeCommentsFromJSON(jsonStr string) string {
-	singleLineCommentRegex := regexp.MustCompile(`//[^\n]*`)
-	multiLineCommentRegex := regexp.MustCompile(`(?s)/\*.*?\*/`)
-	emptyLineRegex := regexp.MustCompile(`\n\s*\n`)
-
-	result := singleLineCommentRegex.ReplaceAllString(jsonStr, "")
-	result = multiLineCommentRegex.ReplaceAllString(result, "")
-	result = emptyLineRegex.ReplaceAllString(result, "\n")
-	return result
-}
-
-func TestRemoveCommentsFromJSON(t *testing.T) {
-	jsonStr := `{
-		"name": "test", // This is an inline comment
-		// This is a single line comment
-		"value": 42, // Another inline comment
-		/* This is a multiline
-			comment that spans
-			multiple lines */
-		"enabled": true, // Final inline comment
-		// Another single line comment
-		"config": {
-			"debug": false /* inline multiline comment */
-		}
-	}`
-
-	expected := jsonmatch.Object{
-		"name":    "test",
-		"value":   42,
-		"enabled": true,
-		"config": jsonmatch.Object{
-			"debug": false,
-		},
-	}
-
-	result := removeCommentsFromJSON(jsonStr)
-
-	for _, diff := range expected.DiffAgainst([]byte(result)) {
-		if diff.Pointer == "" {
-			t.Errorf("%s: expected %s, but got %s", diff.Kind, diff.ExpectedJSON, diff.ActualJSON)
-		} else {
-			t.Errorf("%s at %s: expected %s, but got %s", diff.Kind, diff.Pointer, diff.ExpectedJSON, diff.ActualJSON)
-		}
-	}
 }

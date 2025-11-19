@@ -14,7 +14,6 @@ import (
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/easypg"
 
-	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/tasks"
@@ -23,7 +22,8 @@ import (
 
 func TestResourceScraping(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withContext(t, core.Config{}, func(ctx context.Context, s test.Setup, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
+	s := test.NewSetup(t.T)
+	withContext(s, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
 		job := c.ResourceScrapingJob(registry)
 
 		// ScrapeNextResource() without any resources just does nothing

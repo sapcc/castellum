@@ -24,10 +24,7 @@ func TestMain(m *testing.M) {
 	easypg.WithTestDB(m, func() int { return m.Run() })
 }
 
-func withHandler(t test.T, cfg core.Config, action func(test.Setup, http.Handler, core.AssetManagerTeam, []db.Resource, []db.Asset)) {
-	s := test.NewSetup(t.T,
-		test.WithDBFixtureFile("fixtures/start-data.sql"),
-	)
+func withHandler(t test.T, s test.Setup, action func(http.Handler, core.AssetManagerTeam, []db.Resource, []db.Asset)) {
 	team := core.AssetManagerTeam{
 		&plugins.AssetManagerStatic{AssetType: "foo"},
 		&plugins.AssetManagerStatic{AssetType: "bar", UsageMetrics: []castellum.UsageMetric{"first", "second"}, ExpectsConfiguration: true},
@@ -43,10 +40,10 @@ func withHandler(t test.T, cfg core.Config, action func(test.Setup, http.Handler
 	t.Must(err)
 
 	hh := httpapi.Compose(
-		api.NewHandler(cfg, s.DB, team, s.Validator, s.ProviderClient, s.Auditor, s.Clock.Now),
+		api.NewHandler(s.Config, s.DB, team, s.Validator, s.ProviderClient, s.Auditor, s.Clock.Now),
 		httpapi.WithoutLogging(),
 	)
-	action(s, hh, team, resources, assets)
+	action(hh, team, resources, assets)
 }
 
 func testCommonEndpointBehavior(t test.T, hh http.Handler, s test.Setup, pathPattern string) {

@@ -15,7 +15,6 @@ import (
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/jobloop"
 
-	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/tasks"
@@ -53,7 +52,8 @@ func setupAssetResizeTest(t test.T, c *tasks.Context, amStatic *plugins.AssetMan
 
 func TestSuccessfulResize(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withContext(t, core.Config{}, func(ctx context.Context, s test.Setup, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
+	s := test.NewSetup(t.T)
+	withContext(s, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
 		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
 		// add a greenlit PendingOperation
@@ -113,7 +113,8 @@ func TestSuccessfulResize(baseT *testing.T) {
 
 func TestFailingResize(tBase *testing.T) {
 	t := test.T{T: tBase}
-	withContext(t, core.Config{}, func(ctx context.Context, s test.Setup, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
+	s := test.NewSetup(t.T)
+	withContext(s, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
 		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
 		// add a greenlit PendingOperation
@@ -163,7 +164,8 @@ func TestFailingResize(tBase *testing.T) {
 
 func TestErroringResize(tBase *testing.T) {
 	t := test.T{T: tBase}
-	withContext(t, core.Config{}, func(ctx context.Context, s test.Setup, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
+	s := test.NewSetup(t.T)
+	withContext(s, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
 		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
 		// add a greenlit PendingOperation that will error in SetAssetSize()

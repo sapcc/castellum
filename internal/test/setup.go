@@ -4,6 +4,7 @@
 package test
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/mock"
+	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -19,11 +21,19 @@ import (
 )
 
 type setupParams struct {
+	ConfigJSON    string
 	DBFixtureFile string
 }
 
 // SetupOption is an option that can be given to NewSetup().
 type SetupOption func(*setupParams)
+
+// WithConfig is a SetupOption that initializes core.Config by unmarshaling the provided JSON payload.
+func WithConfig(configJSON string) SetupOption {
+	return func(params *setupParams) {
+		params.ConfigJSON = configJSON
+	}
+}
 
 // WithDBFixtureFile is a SetupOption that initializes the DB by executing the given SQL file.
 func WithDBFixtureFile(path string) SetupOption {
@@ -36,6 +46,7 @@ func WithDBFixtureFile(path string) SetupOption {
 type Setup struct {
 	// for all types of integration tests
 	Clock          *mock.Clock
+	Config         core.Config
 	DB             *gorp.DbMap
 	ProviderClient MockProviderClient
 
@@ -55,8 +66,9 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 
 	// initialize all parts of Setup that can be written as a single expression
 	s := Setup{
-		Clock: nil, // see below
-		DB:    nil, // see below
+		Clock:  nil,           // see below
+		Config: core.Config{}, // see below
+		DB:     nil,           // see below
 		ProviderClient: MockProviderClient{
 			Domains: map[string]core.CachedDomain{
 				"domain1": {Name: "First Domain"},
@@ -69,6 +81,12 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 		},
 		Auditor:   audittools.NewMockAuditor(),
 		Validator: mock.NewValidator(mock.NewEnforcer(), nil),
+	}
+
+	// initialize config if requested
+	if params.ConfigJSON != "" {
+		buf := []byte(removeCommentsFromJSON(params.ConfigJSON))
+		must.SucceedT(t, json.Unmarshal(buf, &s.Config))
 	}
 
 	// initialize clock: some timestamps in internal/api/fixtures/start-data.sql

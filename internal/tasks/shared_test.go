@@ -21,13 +21,12 @@ func TestMain(m *testing.M) {
 	easypg.WithTestDB(m, func() int { return m.Run() })
 }
 
-func withContext(t test.T, cfg core.Config, action func(context.Context, test.Setup, *tasks.Context, *plugins.AssetManagerStatic, *prometheus.Registry)) {
-	s := test.NewSetup(t.T)
+func withContext(s test.Setup, action func(context.Context, *tasks.Context, *plugins.AssetManagerStatic, *prometheus.Registry)) {
 	amStatic := &plugins.AssetManagerStatic{AssetType: "foo"}
 	registry := prometheus.NewPedanticRegistry()
 
-	action(context.Background(), s, &tasks.Context{
-		Config:         cfg,
+	action(context.Background(), &tasks.Context{
+		Config:         s.Config,
 		DB:             s.DB,
 		Team:           core.AssetManagerTeam{amStatic},
 		ProviderClient: s.ProviderClient,
