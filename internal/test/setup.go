@@ -7,10 +7,13 @@ import (
 	"testing"
 
 	"github.com/go-gorp/gorp/v3"
+	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/logg"
+	"github.com/sapcc/go-bits/mock"
 	"github.com/sapcc/go-bits/osext"
 
+	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 )
 
@@ -30,7 +33,13 @@ func WithDBFixtureFile(path string) SetupOption {
 
 // Setup contains all the pieces that are needed for most tests.
 type Setup struct {
-	DB *gorp.DbMap
+	// for all types of integration tests
+	DB             *gorp.DbMap
+	ProviderClient MockProviderClient
+
+	// for API tests only
+	Auditor   *audittools.MockAuditor
+	Validator *mock.Validator[*mock.Enforcer]
 }
 
 // NewSetup prepares most or all pieces of Keppel for a test.
@@ -42,7 +51,22 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 		option(&params)
 	}
 
-	var s Setup
+	// initialize all parts of Setup that can be written as a single expression
+	s := Setup{
+		DB: nil, // see below
+		ProviderClient: MockProviderClient{
+			Domains: map[string]core.CachedDomain{
+				"domain1": {Name: "First Domain"},
+			},
+			Projects: map[string]core.CachedProject{
+				"project1": {Name: "First Project", DomainID: "domain1"},
+				"project2": {Name: "Second Project", DomainID: "domain1"},
+				"project3": {Name: "Third Project", DomainID: "domain1"},
+			},
+		},
+		Auditor:   audittools.NewMockAuditor(),
+		Validator: mock.NewValidator(mock.NewEnforcer(), nil),
+	}
 
 	// initialize DB
 	dbOpts := []easypg.TestSetupOption{

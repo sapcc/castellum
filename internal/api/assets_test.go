@@ -10,7 +10,6 @@ import (
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
-	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/mock"
 
@@ -21,8 +20,8 @@ import (
 
 func TestGetAssets(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(_ test.Setup, hh http.Handler, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
-		testCommonEndpointBehavior(t, hh, mv,
+	withHandler(t, core.Config{}, nil, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+		testCommonEndpointBehavior(t, hh, s,
 			"/v1/projects/%s/assets/%s")
 
 		expectedAssets := []assert.JSONObject{
@@ -46,7 +45,7 @@ func TestGetAssets(baseT *testing.T) {
 		}
 
 		// happy path
-		mv.Enforcer.Forbid("project:edit:foo") // this should not be an issue
+		s.Validator.Enforcer.Forbid("project:edit:foo") // this should not be an issue
 		assert.HTTPRequest{
 			Method:       "GET",
 			Path:         "/v1/projects/project1/assets/foo",
@@ -58,8 +57,8 @@ func TestGetAssets(baseT *testing.T) {
 
 func TestGetAsset(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
-		testCommonEndpointBehavior(t, hh, mv,
+	withHandler(t, core.Config{}, nil, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+		testCommonEndpointBehavior(t, hh, s,
 			"/v1/projects/%s/assets/%s/fooasset1")
 
 		// expect error for unknown asset
@@ -70,7 +69,7 @@ func TestGetAsset(baseT *testing.T) {
 		}.Check(t.T, hh)
 
 		// happy path: just an asset without any operations
-		mv.Enforcer.Forbid("project:edit:foo") // this should not be an issue
+		s.Validator.Enforcer.Forbid("project:edit:foo") // this should not be an issue
 		response := assert.JSONObject{
 			"id":            "fooasset1",
 			"size":          1024,
@@ -219,18 +218,18 @@ func TestPostAssetErrorResolved(baseT *testing.T) {
 	t := test.T{T: baseT}
 	clock := mock.NewClock()
 	clock.StepBy(time.Hour)
-	withHandler(t, core.Config{}, clock.Now, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, clock.Now, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 
 		// endpoint requires cluster access
-		mv.Enforcer.Forbid("cluster:access")
+		s.Validator.Enforcer.Forbid("cluster:access")
 		assert.HTTPRequest{
 			Method:       "POST",
 			Path:         "/v1/projects/project1/assets/foo/fooasset1/error-resolved",
 			ExpectStatus: http.StatusForbidden,
 		}.Check(t.T, hh)
-		mv.Enforcer.Allow("cluster:access")
+		s.Validator.Enforcer.Allow("cluster:access")
 
 		// expect error for unknown project
 		assert.HTTPRequest{

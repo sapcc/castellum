@@ -10,7 +10,6 @@ import (
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
-	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/mock"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -20,12 +19,12 @@ import (
 
 func TestGetPendingOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
-		testCommonEndpointBehavior(t, hh, mv,
+	withHandler(t, core.Config{}, nil, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+		testCommonEndpointBehavior(t, hh, s,
 			"/v1/projects/%s/resources/%s/operations/pending")
 
 		// start-data.sql contains no pending operations
-		mv.Enforcer.Forbid("project:edit:foo") // this should not be an issue
+		s.Validator.Enforcer.Forbid("project:edit:foo") // this should not be an issue
 		response := []assert.JSONObject{}
 		req := assert.HTTPRequest{
 			Method:       "GET",
@@ -112,8 +111,8 @@ func withEitherFailedOrErroredOperation(action func(castellum.OperationOutcome))
 func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withEitherFailedOrErroredOperation(func(failedOperationOutcome castellum.OperationOutcome) {
-		withHandler(t, core.Config{}, nil, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
-			testCommonEndpointBehavior(t, hh, mv,
+		withHandler(t, core.Config{}, nil, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+			testCommonEndpointBehavior(t, hh, s,
 				"/v1/projects/%s/resources/%s/operations/recently-failed")
 
 			t.MustExec(s.DB, `UPDATE finished_operations SET outcome = $1 WHERE outcome = $2`,
@@ -124,7 +123,7 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 			// it will not be shown because fooasset1 does not have critical usage levels
 			// anymore
 			expectedOps := []assert.JSONObject{}
-			mv.Enforcer.Forbid("project:edit:foo") // this should not be an issue
+			s.Validator.Enforcer.Forbid("project:edit:foo") // this should not be an issue
 			assert.HTTPRequest{
 				Method:       "GET",
 				Path:         "/v1/projects/project1/resources/foo/operations/recently-failed",
@@ -234,8 +233,8 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 	clock.StepBy(time.Hour)
 
 	withEitherFailedOrErroredOperation(func(failedOperationOutcome castellum.OperationOutcome) {
-		withHandler(t, core.Config{}, clock.Now, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, mv *mock.Validator[*mock.Enforcer], _ *audittools.MockAuditor, _ []db.Resource, _ []db.Asset) {
-			testCommonEndpointBehavior(t, hh, mv,
+		withHandler(t, core.Config{}, clock.Now, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+			testCommonEndpointBehavior(t, hh, s,
 				"/v1/projects/%s/resources/%s/operations/recently-succeeded")
 
 			t.MustExec(s.DB, `UPDATE finished_operations SET outcome = $1 WHERE outcome = $2`,
@@ -245,7 +244,7 @@ func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 			// start-data.sql has a succeeded operation, but also a failed/errored one on the same
 			// asset after that, so we should not see anything yet
 			expectedOps := []assert.JSONObject{}
-			mv.Enforcer.Forbid("project:edit:foo") // this should not be an issue
+			s.Validator.Enforcer.Forbid("project:edit:foo") // this should not be an issue
 			assert.HTTPRequest{
 				Method:       "GET",
 				Path:         "/v1/projects/project1/resources/foo/operations/recently-succeeded",

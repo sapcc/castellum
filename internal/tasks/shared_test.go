@@ -30,22 +30,11 @@ func withContext(t test.T, cfg core.Config, action func(context.Context, *tasks.
 	clock.StepBy(99990 * time.Second)
 	registry := prometheus.NewPedanticRegistry()
 
-	mpc := test.MockProviderClient{
-		Domains: map[string]core.CachedDomain{
-			"domain1": {Name: "First Domain"},
-		},
-		Projects: map[string]core.CachedProject{
-			"project1": {Name: "First Project", DomainID: "domain1"},
-			"project2": {Name: "Second Project", DomainID: "domain1"},
-			"project3": {Name: "Third Project", DomainID: "domain1"},
-		},
-	}
-
 	action(context.Background(), &tasks.Context{
 		Config:         cfg,
 		DB:             s.DB,
 		Team:           core.AssetManagerTeam{amStatic},
-		ProviderClient: mpc,
+		ProviderClient: s.ProviderClient,
 		TimeNow:        clock.Now,
 		AddJitter:      noJitter,
 	}, amStatic, clock, registry)
