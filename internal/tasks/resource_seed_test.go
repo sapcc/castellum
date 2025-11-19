@@ -7,7 +7,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
@@ -68,8 +67,8 @@ func TestResourceSeedingSuccess(baseT *testing.T) {
 		commonSetupOptionsForWorkerTest(),
 		test.WithConfig(resourceSeedingConfigGood),
 	)
-	withContext(s, func(ctx context.Context, c *tasks.Context, registry *prometheus.Registry) {
-		job := c.ResourceSeedingJob(registry)
+	withContext(s, func(ctx context.Context, c *tasks.Context) {
+		job := c.ResourceSeedingJob(s.Registry)
 
 		// create a resource in a project that is not seeded - this will be ignored by the seeding job
 		t.Must(c.DB.Insert(&db.Resource{
@@ -143,8 +142,8 @@ func TestResourceSeedingBadResource(baseT *testing.T) {
 		commonSetupOptionsForWorkerTest(),
 		test.WithConfig(resourceSeedingConfigBadResource),
 	)
-	withContext(s, func(ctx context.Context, c *tasks.Context, registry *prometheus.Registry) {
-		job := c.ResourceSeedingJob(registry)
+	withContext(s, func(ctx context.Context, c *tasks.Context) {
+		job := c.ResourceSeedingJob(s.Registry)
 
 		err := job.ProcessOne(ctx)
 		if err == nil {

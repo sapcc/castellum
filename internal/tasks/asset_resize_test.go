@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/jobloop"
 
@@ -21,7 +20,7 @@ import (
 	"github.com/sapcc/castellum/internal/test"
 )
 
-func setupAssetResizeTest(t test.T, c *tasks.Context, s test.Setup, registry *prometheus.Registry, assetCount int) jobloop.Job {
+func setupAssetResizeTest(t test.T, c *tasks.Context, s test.Setup, assetCount int) jobloop.Job {
 	amStatic := s.ManagerForAssetType("foo")
 
 	// create a resource and assets to test with
@@ -49,7 +48,7 @@ func setupAssetResizeTest(t test.T, c *tasks.Context, s test.Setup, registry *pr
 		}
 	}
 
-	return c.AssetResizingJob(registry)
+	return c.AssetResizingJob(s.Registry)
 }
 
 func TestSuccessfulResize(baseT *testing.T) {
@@ -57,8 +56,8 @@ func TestSuccessfulResize(baseT *testing.T) {
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForWorkerTest(),
 	)
-	withContext(s, func(ctx context.Context, c *tasks.Context, registry *prometheus.Registry) {
-		resizeJob := setupAssetResizeTest(t, c, s, registry, 1)
+	withContext(s, func(ctx context.Context, c *tasks.Context) {
+		resizeJob := setupAssetResizeTest(t, c, s, 1)
 
 		// add a greenlit PendingOperation
 		s.Clock.StepBy(5 * time.Minute)
@@ -120,8 +119,8 @@ func TestFailingResize(tBase *testing.T) {
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForWorkerTest(),
 	)
-	withContext(s, func(ctx context.Context, c *tasks.Context, registry *prometheus.Registry) {
-		resizeJob := setupAssetResizeTest(t, c, s, registry, 1)
+	withContext(s, func(ctx context.Context, c *tasks.Context) {
+		resizeJob := setupAssetResizeTest(t, c, s, 1)
 
 		// add a greenlit PendingOperation
 		s.Clock.StepBy(10 * time.Minute)
@@ -174,8 +173,8 @@ func TestErroringResize(tBase *testing.T) {
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForWorkerTest(),
 	)
-	withContext(s, func(ctx context.Context, c *tasks.Context, registry *prometheus.Registry) {
-		resizeJob := setupAssetResizeTest(t, c, s, registry, 1)
+	withContext(s, func(ctx context.Context, c *tasks.Context) {
+		resizeJob := setupAssetResizeTest(t, c, s, 1)
 
 		// add a greenlit PendingOperation that will error in SetAssetSize()
 		s.Clock.StepBy(10 * time.Minute)

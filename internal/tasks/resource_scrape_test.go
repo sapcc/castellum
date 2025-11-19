@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/easypg"
 
@@ -25,8 +24,8 @@ func TestResourceScraping(baseT *testing.T) {
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForWorkerTest(),
 	)
-	withContext(s, func(ctx context.Context, c *tasks.Context, registry *prometheus.Registry) {
-		job := c.ResourceScrapingJob(registry)
+	withContext(s, func(ctx context.Context, c *tasks.Context) {
+		job := c.ResourceScrapingJob(s.Registry)
 
 		// ScrapeNextResource() without any resources just does nothing
 		err := job.ProcessOne(ctx)

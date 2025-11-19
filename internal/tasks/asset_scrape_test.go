@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/jobloop"
@@ -25,8 +24,8 @@ func runAssetScrapeTest(t test.T, action func(context.Context, test.Setup, *task
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForWorkerTest(),
 	)
-	withContext(s, func(ctx context.Context, c *tasks.Context, registry *prometheus.Registry) {
-		scrapeJob := c.AssetScrapingJob(registry)
+	withContext(s, func(ctx context.Context, c *tasks.Context) {
+		scrapeJob := c.AssetScrapingJob(s.Registry)
 
 		// asset scrape without any resources just does nothing
 		err := scrapeJob.ProcessOne(ctx)
@@ -353,8 +352,8 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForWorkerTest(),
 	)
-	withContext(s, func(ctx context.Context, c *tasks.Context, registry *prometheus.Registry) {
-		scrapeJob := c.AssetScrapingJob(registry)
+	withContext(s, func(ctx context.Context, c *tasks.Context) {
+		scrapeJob := c.AssetScrapingJob(s.Registry)
 		// create a resource and multiple assets to test with
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",
@@ -675,8 +674,8 @@ func TestMaxAssetSizeRules(baseT *testing.T) {
 			]
 		}`),
 	)
-	withContext(s, func(ctx context.Context, c *tasks.Context, registry *prometheus.Registry) {
-		scrapeJob := c.AssetScrapingJob(registry)
+	withContext(s, func(ctx context.Context, c *tasks.Context) {
+		scrapeJob := c.AssetScrapingJob(s.Registry)
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",
 			AssetType:                "foo",

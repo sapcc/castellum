@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-gorp/gorp/v3"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/logg"
@@ -73,6 +74,9 @@ type Setup struct {
 	// for API tests only
 	Auditor   *audittools.MockAuditor
 	Validator *mock.Validator[*mock.Enforcer]
+
+	// for worker tests only
+	Registry *prometheus.Registry
 }
 
 // NewSetup prepares most or all pieces of Keppel for a test.
@@ -102,6 +106,7 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 		Team:      core.AssetManagerTeam(params.AssetManagers),
 		Auditor:   audittools.NewMockAuditor(),
 		Validator: mock.NewValidator(mock.NewEnforcer(), nil),
+		Registry:  prometheus.NewPedanticRegistry(),
 	}
 
 	// initialize config if requested

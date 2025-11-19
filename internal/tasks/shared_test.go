@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-bits/easypg"
 
 	"github.com/sapcc/castellum/internal/plugins"
@@ -26,9 +25,7 @@ func commonSetupOptionsForWorkerTest() test.SetupOption {
 	)
 }
 
-func withContext(s test.Setup, action func(context.Context, *tasks.Context, *prometheus.Registry)) {
-	registry := prometheus.NewPedanticRegistry()
-
+func withContext(s test.Setup, action func(context.Context, *tasks.Context)) {
 	action(context.Background(), &tasks.Context{
 		Config:         s.Config,
 		DB:             s.DB,
@@ -36,7 +33,7 @@ func withContext(s test.Setup, action func(context.Context, *tasks.Context, *pro
 		ProviderClient: s.ProviderClient,
 		TimeNow:        s.Clock.Now,
 		AddJitter:      noJitter,
-	}, registry)
+	})
 }
 
 func noJitter(d time.Duration) time.Duration {
