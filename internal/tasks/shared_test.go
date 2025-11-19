@@ -4,14 +4,12 @@
 package tasks_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/sapcc/go-bits/easypg"
 
 	"github.com/sapcc/castellum/internal/plugins"
-	"github.com/sapcc/castellum/internal/tasks"
 	"github.com/sapcc/castellum/internal/test"
 )
 
@@ -25,20 +23,9 @@ func commonSetupOptionsForWorkerTest() test.SetupOption {
 	)
 }
 
-func withContext(s test.Setup, action func(context.Context, *tasks.Context)) {
-	action(context.Background(), &tasks.Context{
-		Config:         s.Config,
-		DB:             s.DB,
-		Team:           s.Team,
-		ProviderClient: s.ProviderClient,
-		TimeNow:        s.Clock.Now,
-		AddJitter:      noJitter,
-	})
-}
-
-func noJitter(d time.Duration) time.Duration {
-	// Tests should be deterministic, so we do not add random jitter here.
-	return d
+func withContext(_ test.Setup, action func()) {
+	// TODO: remove this in the next commit (not done yet to avoid huge whitespace changes in the current commit)
+	action()
 }
 
 // Take pointer to time.Time expression.

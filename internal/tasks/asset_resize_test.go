@@ -4,7 +4,6 @@
 package tasks_test
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -20,7 +19,7 @@ import (
 	"github.com/sapcc/castellum/internal/test"
 )
 
-func setupAssetResizeTest(t test.T, c *tasks.Context, s test.Setup, assetCount int) jobloop.Job {
+func setupAssetResizeTest(t test.T, s test.Setup, assetCount int) jobloop.Job {
 	amStatic := s.ManagerForAssetType("foo")
 
 	// create a resource and assets to test with
@@ -48,16 +47,17 @@ func setupAssetResizeTest(t test.T, c *tasks.Context, s test.Setup, assetCount i
 		}
 	}
 
-	return c.AssetResizingJob(s.Registry)
+	return s.TaskContext.AssetResizingJob(s.Registry)
 }
 
 func TestSuccessfulResize(baseT *testing.T) {
 	t := test.T{T: baseT}
+	ctx := t.Context()
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForWorkerTest(),
 	)
-	withContext(s, func(ctx context.Context, c *tasks.Context) {
-		resizeJob := setupAssetResizeTest(t, c, s, 1)
+	withContext(s, func() {
+		resizeJob := setupAssetResizeTest(t, s, 1)
 
 		// add a greenlit PendingOperation
 		s.Clock.StepBy(5 * time.Minute)
@@ -116,11 +116,12 @@ func TestSuccessfulResize(baseT *testing.T) {
 
 func TestFailingResize(tBase *testing.T) {
 	t := test.T{T: tBase}
+	ctx := t.Context()
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForWorkerTest(),
 	)
-	withContext(s, func(ctx context.Context, c *tasks.Context) {
-		resizeJob := setupAssetResizeTest(t, c, s, 1)
+	withContext(s, func() {
+		resizeJob := setupAssetResizeTest(t, s, 1)
 
 		// add a greenlit PendingOperation
 		s.Clock.StepBy(10 * time.Minute)
@@ -170,11 +171,12 @@ func TestFailingResize(tBase *testing.T) {
 
 func TestErroringResize(tBase *testing.T) {
 	t := test.T{T: tBase}
+	ctx := t.Context()
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForWorkerTest(),
 	)
-	withContext(s, func(ctx context.Context, c *tasks.Context) {
-		resizeJob := setupAssetResizeTest(t, c, s, 1)
+	withContext(s, func() {
+		resizeJob := setupAssetResizeTest(t, s, 1)
 
 		// add a greenlit PendingOperation that will error in SetAssetSize()
 		s.Clock.StepBy(10 * time.Minute)

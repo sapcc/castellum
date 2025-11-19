@@ -4,7 +4,6 @@
 package tasks_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/sapcc/go-api-declarations/castellum"
@@ -12,7 +11,6 @@ import (
 	"github.com/sapcc/go-bits/easypg"
 
 	"github.com/sapcc/castellum/internal/db"
-	"github.com/sapcc/castellum/internal/tasks"
 	"github.com/sapcc/castellum/internal/test"
 )
 
@@ -63,12 +61,13 @@ const resourceSeedingConfigGood = `{
 
 func TestResourceSeedingSuccess(baseT *testing.T) {
 	t := test.T{T: baseT}
+	ctx := t.Context()
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForWorkerTest(),
 		test.WithConfig(resourceSeedingConfigGood),
 	)
-	withContext(s, func(ctx context.Context, c *tasks.Context) {
-		job := c.ResourceSeedingJob(s.Registry)
+	withContext(s, func() {
+		job := s.TaskContext.ResourceSeedingJob(s.Registry)
 
 		// create a resource in a project that is not seeded - this will be ignored by the seeding job
 		t.Must(s.DB.Insert(&db.Resource{
@@ -138,12 +137,13 @@ const resourceSeedingConfigBadResource = `{
 
 func TestResourceSeedingBadResource(baseT *testing.T) {
 	t := test.T{T: baseT}
+	ctx := t.Context()
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForWorkerTest(),
 		test.WithConfig(resourceSeedingConfigBadResource),
 	)
-	withContext(s, func(ctx context.Context, c *tasks.Context) {
-		job := c.ResourceSeedingJob(s.Registry)
+	withContext(s, func() {
+		job := s.TaskContext.ResourceSeedingJob(s.Registry)
 
 		err := job.ProcessOne(ctx)
 		if err == nil {

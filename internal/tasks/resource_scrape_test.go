@@ -4,7 +4,6 @@
 package tasks_test
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"testing"
@@ -15,17 +14,17 @@ import (
 
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
-	"github.com/sapcc/castellum/internal/tasks"
 	"github.com/sapcc/castellum/internal/test"
 )
 
 func TestResourceScraping(baseT *testing.T) {
 	t := test.T{T: baseT}
+	ctx := t.Context()
 	s := test.NewSetup(t.T,
 		commonSetupOptionsForWorkerTest(),
 	)
-	withContext(s, func(ctx context.Context, c *tasks.Context) {
-		job := c.ResourceScrapingJob(s.Registry)
+	withContext(s, func() {
+		job := s.TaskContext.ResourceScrapingJob(s.Registry)
 
 		// ScrapeNextResource() without any resources just does nothing
 		err := job.ProcessOne(ctx)

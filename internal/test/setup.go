@@ -21,6 +21,7 @@ import (
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
+	"github.com/sapcc/castellum/internal/tasks"
 )
 
 type setupParams struct {
@@ -76,7 +77,8 @@ type Setup struct {
 	Validator *mock.Validator[*mock.Enforcer]
 
 	// for worker tests only
-	Registry *prometheus.Registry
+	Registry    *prometheus.Registry
+	TaskContext *tasks.Context
 }
 
 // NewSetup prepares most or all pieces of Keppel for a test.
@@ -134,6 +136,20 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 	t.Cleanup(func() {
 		_ = dbConn.Close()
 	})
+
+	// initialize context for worker tests
+	noJitter := func(d time.Duration) time.Duration {
+		// Tests should be deterministic, so we do not add random jitter here.
+		return d
+	}
+	s.TaskContext = &tasks.Context{
+		Config:         s.Config,
+		DB:             s.DB,
+		Team:           s.Team,
+		ProviderClient: s.ProviderClient,
+		TimeNow:        s.Clock.Now,
+		AddJitter:      noJitter,
+	}
 
 	return s
 }
