@@ -11,7 +11,6 @@ import (
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
-	"github.com/sapcc/go-bits/mock"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -20,7 +19,7 @@ import (
 
 func TestGetAssets(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, s,
 			"/v1/projects/%s/assets/%s")
 
@@ -57,7 +56,7 @@ func TestGetAssets(baseT *testing.T) {
 
 func TestGetAsset(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, s,
 			"/v1/projects/%s/assets/%s/fooasset1")
 
@@ -216,9 +215,7 @@ func TestGetAsset(baseT *testing.T) {
 
 func TestPostAssetErrorResolved(baseT *testing.T) {
 	t := test.T{T: baseT}
-	clock := mock.NewClock()
-	clock.StepBy(time.Hour)
-	withHandler(t, core.Config{}, clock.Now, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 
@@ -258,7 +255,7 @@ func TestPostAssetErrorResolved(baseT *testing.T) {
 		tr.DBChanges().AssertEqualf(`
 			INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, finished_at, greenlit_by_user_uuid, usage) VALUES (1, 'critical', 'error-resolved', 0, 0, %[1]d, %[1]d, %[1]d, %[1]d, '', 'null');
 		`,
-			clock.Now().Unix())
+			s.Clock.Now().Unix())
 
 		// expect conflict for asset where the last operation is not "errored"
 		assert.HTTPRequest{

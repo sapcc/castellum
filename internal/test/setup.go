@@ -5,6 +5,7 @@ package test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/go-gorp/gorp/v3"
 	"github.com/sapcc/go-bits/audittools"
@@ -34,6 +35,7 @@ func WithDBFixtureFile(path string) SetupOption {
 // Setup contains all the pieces that are needed for most tests.
 type Setup struct {
 	// for all types of integration tests
+	Clock          *mock.Clock
 	DB             *gorp.DbMap
 	ProviderClient MockProviderClient
 
@@ -53,7 +55,8 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 
 	// initialize all parts of Setup that can be written as a single expression
 	s := Setup{
-		DB: nil, // see below
+		Clock: nil, // see below
+		DB:    nil, // see below
 		ProviderClient: MockProviderClient{
 			Domains: map[string]core.CachedDomain{
 				"domain1": {Name: "First Domain"},
@@ -67,6 +70,12 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 		Auditor:   audittools.NewMockAuditor(),
 		Validator: mock.NewValidator(mock.NewEnforcer(), nil),
 	}
+
+	// initialize clock: some timestamps in internal/api/fixtures/start-data.sql
+	// are after time.Unix(0, 0) and must be in the past for the tests to work,
+	// so we need to step this clock forward a little bit
+	s.Clock = mock.NewClock()
+	s.Clock.StepBy(time.Hour)
 
 	// initialize DB
 	dbOpts := []easypg.TestSetupOption{

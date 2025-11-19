@@ -10,7 +10,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-bits/easypg"
-	"github.com/sapcc/go-bits/mock"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/plugins"
@@ -22,22 +21,19 @@ func TestMain(m *testing.M) {
 	easypg.WithTestDB(m, func() int { return m.Run() })
 }
 
-func withContext(t test.T, cfg core.Config, action func(context.Context, *tasks.Context, *plugins.AssetManagerStatic, *mock.Clock, *prometheus.Registry)) {
+func withContext(t test.T, cfg core.Config, action func(context.Context, test.Setup, *tasks.Context, *plugins.AssetManagerStatic, *prometheus.Registry)) {
 	s := test.NewSetup(t.T)
 	amStatic := &plugins.AssetManagerStatic{AssetType: "foo"}
-	// clock starts at an easily recognizable value
-	clock := mock.NewClock()
-	clock.StepBy(99990 * time.Second)
 	registry := prometheus.NewPedanticRegistry()
 
-	action(context.Background(), &tasks.Context{
+	action(context.Background(), s, &tasks.Context{
 		Config:         cfg,
 		DB:             s.DB,
 		Team:           core.AssetManagerTeam{amStatic},
 		ProviderClient: s.ProviderClient,
-		TimeNow:        clock.Now,
+		TimeNow:        s.Clock.Now,
 		AddJitter:      noJitter,
-	}, amStatic, clock, registry)
+	}, amStatic, registry)
 }
 
 func noJitter(d time.Duration) time.Duration {

@@ -8,13 +8,11 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/sapcc/go-api-declarations/cadf"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
-	"github.com/sapcc/go-bits/mock"
 	"github.com/sapcc/go-bits/regexpext"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -64,7 +62,7 @@ var (
 
 func TestGetProject(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with project access
 		s.Validator.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
@@ -115,7 +113,7 @@ func TestGetProject(baseT *testing.T) {
 
 func TestGetResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		// endpoint requires a token with project access
 		s.Validator.Enforcer.Forbid("project:access")
 		assert.HTTPRequest{
@@ -173,10 +171,8 @@ func TestGetResource(baseT *testing.T) {
 
 func TestPutResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	clock := mock.NewClock()
-	clock.StepBy(time.Hour)
 
-	withHandler(t, core.Config{}, clock.Now, func(s test.Setup, hh http.Handler, team core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, team core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 
@@ -411,7 +407,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 	}
 
 	t := test.T{T: baseT}
-	withHandler(t, cfg, nil, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, cfg, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 
@@ -602,7 +598,7 @@ func TestPutResourceValidationErrors(baseT *testing.T) {
 
 func TestDeleteResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 
@@ -713,10 +709,8 @@ func TestSeedBlocksResourceUpdates(baseT *testing.T) {
 	}
 
 	t := test.T{T: baseT}
-	clock := mock.NewClock()
-	clock.StepBy(time.Hour)
 
-	withHandler(t, cfg, clock.Now, func(_ test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, cfg, func(_ test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		// cannot PUT an existing resource defined by the seed
 		assert.HTTPRequest{
 			Method:       "PUT",

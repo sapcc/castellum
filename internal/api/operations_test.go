@@ -10,7 +10,6 @@ import (
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
-	"github.com/sapcc/go-bits/mock"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -19,7 +18,7 @@ import (
 
 func TestGetPendingOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withHandler(t, core.Config{}, nil, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+	withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 		testCommonEndpointBehavior(t, hh, s,
 			"/v1/projects/%s/resources/%s/operations/pending")
 
@@ -111,7 +110,7 @@ func withEitherFailedOrErroredOperation(action func(castellum.OperationOutcome))
 func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	withEitherFailedOrErroredOperation(func(failedOperationOutcome castellum.OperationOutcome) {
-		withHandler(t, core.Config{}, nil, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+		withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 			testCommonEndpointBehavior(t, hh, s,
 				"/v1/projects/%s/resources/%s/operations/recently-failed")
 
@@ -229,11 +228,9 @@ func TestGetRecentlyFailedOperationsForResource(baseT *testing.T) {
 
 func TestGetRecentlySucceededOperationsForResource(baseT *testing.T) {
 	t := test.T{T: baseT}
-	clock := mock.NewClock()
-	clock.StepBy(time.Hour)
 
 	withEitherFailedOrErroredOperation(func(failedOperationOutcome castellum.OperationOutcome) {
-		withHandler(t, core.Config{}, clock.Now, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
+		withHandler(t, core.Config{}, func(s test.Setup, hh http.Handler, _ core.AssetManagerTeam, _ []db.Resource, _ []db.Asset) {
 			testCommonEndpointBehavior(t, hh, s,
 				"/v1/projects/%s/resources/%s/operations/recently-succeeded")
 

@@ -13,7 +13,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/easypg"
-	"github.com/sapcc/go-bits/mock"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -24,7 +23,7 @@ import (
 
 func TestResourceScraping(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withContext(t, core.Config{}, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
+	withContext(t, core.Config{}, func(ctx context.Context, s test.Setup, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
 		job := c.ResourceScrapingJob(registry)
 
 		// ScrapeNextResource() without any resources just does nothing
@@ -43,7 +42,7 @@ func TestResourceScraping(baseT *testing.T) {
 			LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 0},
 			HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 0},
 			CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 0},
-			NextScrapeAt:             c.TimeNow(),
+			NextScrapeAt:             s.Clock.Now(),
 		}))
 		t.Must(c.DB.Insert(&db.Resource{
 			ScopeUUID:                "project3",
@@ -52,7 +51,7 @@ func TestResourceScraping(baseT *testing.T) {
 			LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 0},
 			HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 0},
 			CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 0},
-			NextScrapeAt:             c.TimeNow(),
+			NextScrapeAt:             s.Clock.Now(),
 		}))
 
 		// create some mock assets that ScrapeNextResource() can find
@@ -69,49 +68,49 @@ func TestResourceScraping(baseT *testing.T) {
 		tr.DBChanges().Ignore()
 
 		// first ScrapeNextResource() should scrape project1/foo
-		clock.StepBy(time.Hour)
+		s.Clock.StepBy(time.Hour)
 		t.Must(job.ProcessOne(ctx))
 		tr.DBChanges().AssertEqualf(`
 				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (1, 1, 'asset1', 0, '{"singular":0}', %[1]d, TRUE);
 				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (2, 1, 'asset2', 0, '{"singular":0}', %[1]d, TRUE);
 				UPDATE resources SET next_scrape_at = %[2]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 			`,
-			c.TimeNow().Unix(),
-			c.TimeNow().Add(30*time.Minute).Unix(),
+			s.Clock.Now().Unix(),
+			s.Clock.Now().Add(30*time.Minute).Unix(),
 		)
 
 		// first ScrapeNextResource() should scrape project3/foo
-		clock.StepBy(time.Hour)
+		s.Clock.StepBy(time.Hour)
 		t.Must(job.ProcessOne(ctx))
 		tr.DBChanges().AssertEqualf(`
 				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (3, 2, 'asset5', 0, '{"singular":0}', %[1]d, TRUE);
 				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (4, 2, 'asset6', 0, '{"singular":0}', %[1]d, TRUE);
 				UPDATE resources SET next_scrape_at = %[2]d WHERE id = 2 AND scope_uuid = 'project3' AND asset_type = 'foo';
 			`,
-			c.TimeNow().Unix(),
-			c.TimeNow().Add(30*time.Minute).Unix(),
+			s.Clock.Now().Unix(),
+			s.Clock.Now().Add(30*time.Minute).Unix(),
 		)
 
 		// next ScrapeNextResource() should scrape project1/foo again because its
 		// next_scrape_at timestamp is the smallest; there should be no changes except for
 		// resources.next_scrape_at
-		clock.StepBy(time.Hour)
+		s.Clock.StepBy(time.Hour)
 		t.Must(job.ProcessOne(ctx))
 		tr.DBChanges().AssertEqualf(`
 				UPDATE resources SET next_scrape_at = %d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 			`,
-			c.TimeNow().Add(30*time.Minute).Unix(),
+			s.Clock.Now().Add(30*time.Minute).Unix(),
 		)
 
 		// simulate deletion of an asset
 		delete(amStatic.Assets["project3"], "asset6")
-		clock.StepBy(time.Hour)
+		s.Clock.StepBy(time.Hour)
 		t.Must(job.ProcessOne(ctx))
 		tr.DBChanges().AssertEqualf(`
 				DELETE FROM assets WHERE id = 4 AND resource_id = 2 AND uuid = 'asset6';
 				UPDATE resources SET next_scrape_at = %d WHERE id = 2 AND scope_uuid = 'project3' AND asset_type = 'foo';
 			`,
-			c.TimeNow().Add(30*time.Minute).Unix(),
+			s.Clock.Now().Add(30*time.Minute).Unix(),
 		)
 
 		// simulate addition of a new asset
@@ -121,8 +120,8 @@ func TestResourceScraping(baseT *testing.T) {
 				INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (5, 1, 'asset7', 0, '{"singular":0}', %[1]d, TRUE);
 				UPDATE resources SET next_scrape_at = %[2]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
 			`,
-			c.TimeNow().Unix(),
-			c.TimeNow().Add(30*time.Minute).Unix(),
+			s.Clock.Now().Unix(),
+			s.Clock.Now().Add(30*time.Minute).Unix(),
 		)
 
 		// check behavior on a resource without assets
@@ -130,14 +129,14 @@ func TestResourceScraping(baseT *testing.T) {
 			ScopeUUID:    "project2",
 			DomainUUID:   "domain1",
 			AssetType:    "foo",
-			NextScrapeAt: c.TimeNow(),
+			NextScrapeAt: s.Clock.Now(),
 		}))
 		amStatic.Assets["project2"] = nil
 		t.Must(job.ProcessOne(ctx))
 		tr.DBChanges().AssertEqualf(`
 				INSERT INTO resources (id, scope_uuid, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, domain_uuid, next_scrape_at) VALUES (3, 'project2', 'foo', '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":0}', 0, 'domain1', %d);
 			`,
-			c.TimeNow().Add(30*time.Minute).Unix(),
+			s.Clock.Now().Add(30*time.Minute).Unix(),
 		)
 	})
 }

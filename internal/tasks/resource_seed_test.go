@@ -14,7 +14,6 @@ import (
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
-	"github.com/sapcc/go-bits/mock"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -76,7 +75,7 @@ const resourceSeedingConfigGood = `{
 func TestResourceSeedingSuccess(baseT *testing.T) {
 	t := test.T{T: baseT}
 	cfg := configFromJSON(t, resourceSeedingConfigGood)
-	withContext(t, cfg, func(ctx context.Context, c *tasks.Context, _ *plugins.AssetManagerStatic, _ *mock.Clock, registry *prometheus.Registry) {
+	withContext(t, cfg, func(ctx context.Context, s test.Setup, c *tasks.Context, _ *plugins.AssetManagerStatic, registry *prometheus.Registry) {
 		job := c.ResourceSeedingJob(registry)
 
 		// create a resource in a project that is not seeded - this will be ignored by the seeding job
@@ -148,7 +147,7 @@ const resourceSeedingConfigBadResource = `{
 func TestResourceSeedingBadResource(baseT *testing.T) {
 	t := test.T{T: baseT}
 	cfg := configFromJSON(t, resourceSeedingConfigBadResource)
-	withContext(t, cfg, func(ctx context.Context, c *tasks.Context, _ *plugins.AssetManagerStatic, _ *mock.Clock, registry *prometheus.Registry) {
+	withContext(t, cfg, func(ctx context.Context, s test.Setup, c *tasks.Context, _ *plugins.AssetManagerStatic, registry *prometheus.Registry) {
 		job := c.ResourceSeedingJob(registry)
 
 		err := job.ProcessOne(ctx)

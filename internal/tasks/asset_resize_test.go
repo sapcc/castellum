@@ -14,7 +14,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/jobloop"
-	"github.com/sapcc/go-bits/mock"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -54,20 +53,20 @@ func setupAssetResizeTest(t test.T, c *tasks.Context, amStatic *plugins.AssetMan
 
 func TestSuccessfulResize(baseT *testing.T) {
 	t := test.T{T: baseT}
-	withContext(t, core.Config{}, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
+	withContext(t, core.Config{}, func(ctx context.Context, s test.Setup, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
 		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
 		// add a greenlit PendingOperation
-		clock.StepBy(5 * time.Minute)
+		s.Clock.StepBy(5 * time.Minute)
 		pendingOp := db.PendingOperation{
 			AssetID:     1,
 			Reason:      castellum.OperationReasonHigh,
 			OldSize:     1000,
 			NewSize:     1200,
 			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 500},
-			CreatedAt:   c.TimeNow().Add(-5 * time.Minute),
-			ConfirmedAt: p2time(c.TimeNow()),
-			GreenlitAt:  p2time(c.TimeNow().Add(5 * time.Minute)),
+			CreatedAt:   s.Clock.Now().Add(-5 * time.Minute),
+			ConfirmedAt: p2time(s.Clock.Now()),
+			GreenlitAt:  p2time(s.Clock.Now().Add(5 * time.Minute)),
 		}
 		t.Must(c.DB.Insert(&pendingOp))
 
@@ -81,7 +80,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
 		// go into the future and check that the operation gets executed
-		clock.StepBy(10 * time.Minute)
+		s.Clock.StepBy(10 * time.Minute)
 		err = resizeJob.ProcessOne(ctx)
 		t.Must(err)
 		t.ExpectPendingOperations(c.DB /*, nothing */)
@@ -91,10 +90,10 @@ func TestSuccessfulResize(baseT *testing.T) {
 			OldSize:     1000,
 			NewSize:     1200,
 			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 500},
-			CreatedAt:   c.TimeNow().Add(-15 * time.Minute),
-			ConfirmedAt: p2time(c.TimeNow().Add(-10 * time.Minute)),
-			GreenlitAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
-			FinishedAt:  c.TimeNow(),
+			CreatedAt:   s.Clock.Now().Add(-15 * time.Minute),
+			ConfirmedAt: p2time(s.Clock.Now().Add(-10 * time.Minute)),
+			GreenlitAt:  p2time(s.Clock.Now().Add(-5 * time.Minute)),
+			FinishedAt:  s.Clock.Now(),
 			Outcome:     castellum.OperationOutcomeSucceeded,
 		})
 
@@ -107,27 +106,27 @@ func TestSuccessfulResize(baseT *testing.T) {
 			Size:         1000,
 			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			ExpectedSize: p2uint64(1200),
-			ResizedAt:    p2time(c.TimeNow()),
+			ResizedAt:    p2time(s.Clock.Now()),
 		})
 	})
 }
 
 func TestFailingResize(tBase *testing.T) {
 	t := test.T{T: tBase}
-	withContext(t, core.Config{}, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
+	withContext(t, core.Config{}, func(ctx context.Context, s test.Setup, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
 		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
 		// add a greenlit PendingOperation
-		clock.StepBy(10 * time.Minute)
+		s.Clock.StepBy(10 * time.Minute)
 		pendingOp := db.PendingOperation{
 			AssetID:     1,
 			Reason:      castellum.OperationReasonLow,
 			OldSize:     1000,
 			NewSize:     600,
 			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 500},
-			CreatedAt:   c.TimeNow().Add(-10 * time.Minute),
-			ConfirmedAt: p2time(c.TimeNow().Add(-5 * time.Minute)),
-			GreenlitAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
+			CreatedAt:   s.Clock.Now().Add(-10 * time.Minute),
+			ConfirmedAt: p2time(s.Clock.Now().Add(-5 * time.Minute)),
+			GreenlitAt:  p2time(s.Clock.Now().Add(-5 * time.Minute)),
 		}
 		t.Must(c.DB.Insert(&pendingOp))
 
@@ -142,10 +141,10 @@ func TestFailingResize(tBase *testing.T) {
 			OldSize:      1000,
 			NewSize:      600,
 			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
-			CreatedAt:    c.TimeNow().Add(-10 * time.Minute),
-			ConfirmedAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
-			GreenlitAt:   p2time(c.TimeNow().Add(-5 * time.Minute)),
-			FinishedAt:   c.TimeNow(),
+			CreatedAt:    s.Clock.Now().Add(-10 * time.Minute),
+			ConfirmedAt:  p2time(s.Clock.Now().Add(-5 * time.Minute)),
+			GreenlitAt:   p2time(s.Clock.Now().Add(-5 * time.Minute)),
+			FinishedAt:   s.Clock.Now(),
 			Outcome:      castellum.OperationOutcomeFailed,
 			ErrorMessage: "SetAssetSize failing as requested",
 		})
@@ -164,31 +163,31 @@ func TestFailingResize(tBase *testing.T) {
 
 func TestErroringResize(tBase *testing.T) {
 	t := test.T{T: tBase}
-	withContext(t, core.Config{}, func(ctx context.Context, c *tasks.Context, amStatic *plugins.AssetManagerStatic, clock *mock.Clock, registry *prometheus.Registry) {
+	withContext(t, core.Config{}, func(ctx context.Context, s test.Setup, c *tasks.Context, amStatic *plugins.AssetManagerStatic, registry *prometheus.Registry) {
 		resizeJob := setupAssetResizeTest(t, c, amStatic, registry, 1)
 
 		// add a greenlit PendingOperation that will error in SetAssetSize()
-		clock.StepBy(10 * time.Minute)
+		s.Clock.StepBy(10 * time.Minute)
 		pendingOp := db.PendingOperation{
 			AssetID:     1,
 			Reason:      castellum.OperationReasonLow,
 			OldSize:     1000,
 			NewSize:     400, // will error because `new_size < usage` (usage = 500, see above)
 			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 500},
-			CreatedAt:   c.TimeNow().Add(-10 * time.Minute),
-			ConfirmedAt: p2time(c.TimeNow().Add(-5 * time.Minute)),
-			GreenlitAt:  p2time(c.TimeNow().Add(-5 * time.Minute)),
+			CreatedAt:   s.Clock.Now().Add(-10 * time.Minute),
+			ConfirmedAt: p2time(s.Clock.Now().Add(-5 * time.Minute)),
+			GreenlitAt:  p2time(s.Clock.Now().Add(-5 * time.Minute)),
 		}
 		t.Must(c.DB.Insert(&pendingOp))
 
 		// when the outcome of the resize is "errored", we can retry several times
 		for range tasks.MaxRetries {
-			clock.StepBy(10 * time.Minute)
+			s.Clock.StepBy(10 * time.Minute)
 			t.Must(resizeJob.ProcessOne(ctx))
 
 			pendingOp.ID++
 			pendingOp.ErroredAttempts++
-			pendingOp.RetryAt = p2time(c.TimeNow().Add(tasks.RetryInterval))
+			pendingOp.RetryAt = p2time(s.Clock.Now().Add(tasks.RetryInterval))
 			t.ExpectPendingOperations(c.DB, pendingOp)
 			t.ExpectFinishedOperations(c.DB /*, nothing */)
 		}
@@ -203,7 +202,7 @@ func TestErroringResize(tBase *testing.T) {
 		t.ExpectFinishedOperations(c.DB /*, nothing */)
 
 		// check that resizing errors as expected once the retry budget is exceeded
-		clock.StepBy(10 * time.Minute)
+		s.Clock.StepBy(10 * time.Minute)
 		t.Must(resizeJob.ProcessOne(ctx))
 		t.ExpectPendingOperations(c.DB /*, nothing */)
 		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
@@ -215,7 +214,7 @@ func TestErroringResize(tBase *testing.T) {
 			CreatedAt:       pendingOp.CreatedAt,
 			ConfirmedAt:     pendingOp.ConfirmedAt,
 			GreenlitAt:      pendingOp.GreenlitAt,
-			FinishedAt:      c.TimeNow(),
+			FinishedAt:      s.Clock.Now(),
 			Outcome:         castellum.OperationOutcomeErrored,
 			ErrorMessage:    "cannot set size smaller than current usage",
 			ErroredAttempts: tasks.MaxRetries,

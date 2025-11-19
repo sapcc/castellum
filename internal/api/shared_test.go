@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
@@ -25,7 +24,7 @@ func TestMain(m *testing.M) {
 	easypg.WithTestDB(m, func() int { return m.Run() })
 }
 
-func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action func(test.Setup, http.Handler, core.AssetManagerTeam, []db.Resource, []db.Asset)) {
+func withHandler(t test.T, cfg core.Config, action func(test.Setup, http.Handler, core.AssetManagerTeam, []db.Resource, []db.Asset)) {
 	s := test.NewSetup(t.T,
 		test.WithDBFixtureFile("fixtures/start-data.sql"),
 	)
@@ -43,11 +42,8 @@ func withHandler(t test.T, cfg core.Config, timeNow func() time.Time, action fun
 	_, err = s.DB.Select(&assets, `SELECT * FROM assets ORDER BY ID`)
 	t.Must(err)
 
-	if timeNow == nil {
-		timeNow = time.Now
-	}
 	hh := httpapi.Compose(
-		api.NewHandler(cfg, s.DB, team, s.Validator, s.ProviderClient, s.Auditor, timeNow),
+		api.NewHandler(cfg, s.DB, team, s.Validator, s.ProviderClient, s.Auditor, s.Clock.Now),
 		httpapi.WithoutLogging(),
 	)
 	action(s, hh, team, resources, assets)
