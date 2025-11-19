@@ -71,7 +71,7 @@ func TestResourceSeedingSuccess(baseT *testing.T) {
 		job := c.ResourceSeedingJob(s.Registry)
 
 		// create a resource in a project that is not seeded - this will be ignored by the seeding job
-		t.Must(c.DB.Insert(&db.Resource{
+		t.Must(s.DB.Insert(&db.Resource{
 			ScopeUUID:           "project3",
 			DomainUUID:          "domain1",
 			AssetType:           "foo",
@@ -81,7 +81,7 @@ func TestResourceSeedingSuccess(baseT *testing.T) {
 		}))
 
 		// create a resource that has a negative seed - the seeding job will delete it
-		t.Must(c.DB.Insert(&db.Resource{
+		t.Must(s.DB.Insert(&db.Resource{
 			ScopeUUID:           "project2",
 			DomainUUID:          "domain1",
 			AssetType:           "foo",
@@ -90,7 +90,7 @@ func TestResourceSeedingSuccess(baseT *testing.T) {
 			SingleStep:          true,
 		}))
 
-		tr, tr0 := easypg.NewTracker(t.T, c.DB.Db)
+		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.Ignore()
 
 		// test that seeding job applies the seeds (except for the one project that the MockProviderClient reports as nonexistent)
@@ -105,7 +105,7 @@ func TestResourceSeedingSuccess(baseT *testing.T) {
 		tr.DBChanges().AssertEmpty()
 
 		// perturb one of the seeded resources
-		t.MustExec(c.DB, `UPDATE resources SET high_threshold_percent = $1, high_delay_seconds = $2 WHERE scope_uuid = $3`,
+		t.MustExec(s.DB, `UPDATE resources SET high_threshold_percent = $1, high_delay_seconds = $2 WHERE scope_uuid = $3`,
 			castellum.UsageValues{castellum.SingularUsageMetric: 80}, 7200, "project1")
 
 		// test that the next seeding run resets these changes

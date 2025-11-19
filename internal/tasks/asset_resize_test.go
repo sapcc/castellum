@@ -24,7 +24,7 @@ func setupAssetResizeTest(t test.T, c *tasks.Context, s test.Setup, assetCount i
 	amStatic := s.ManagerForAssetType("foo")
 
 	// create a resource and assets to test with
-	t.Must(c.DB.Insert(&db.Resource{
+	t.Must(s.DB.Insert(&db.Resource{
 		ScopeUUID: "project1",
 		AssetType: "foo",
 	}))
@@ -34,7 +34,7 @@ func setupAssetResizeTest(t test.T, c *tasks.Context, s test.Setup, assetCount i
 
 	for idx := 1; idx <= assetCount; idx++ {
 		uuid := fmt.Sprintf("asset%d", idx)
-		t.Must(c.DB.Insert(&db.Asset{
+		t.Must(s.DB.Insert(&db.Asset{
 			ResourceID:   1,
 			UUID:         uuid,
 			Size:         1000,
@@ -71,7 +71,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 			ConfirmedAt: p2time(s.Clock.Now()),
 			GreenlitAt:  p2time(s.Clock.Now().Add(5 * time.Minute)),
 		}
-		t.Must(c.DB.Insert(&pendingOp))
+		t.Must(s.DB.Insert(&pendingOp))
 
 		// ExecuteOne(AssetResizeJob{}) should do nothing right now because that operation is
 		// only greenlit in the future, but not right now
@@ -79,15 +79,15 @@ func TestSuccessfulResize(baseT *testing.T) {
 		if !errors.Is(err, sql.ErrNoRows) {
 			t.Fatalf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
-		t.ExpectPendingOperations(c.DB, pendingOp)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectPendingOperations(s.DB, pendingOp)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 
 		// go into the future and check that the operation gets executed
 		s.Clock.StepBy(10 * time.Minute)
 		err = resizeJob.ProcessOne(ctx)
 		t.Must(err)
-		t.ExpectPendingOperations(c.DB /*, nothing */)
-		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
+		t.ExpectPendingOperations(s.DB /*, nothing */)
+		t.ExpectFinishedOperations(s.DB, db.FinishedOperation{
 			AssetID:     1,
 			Reason:      castellum.OperationReasonHigh,
 			OldSize:     1000,
@@ -102,7 +102,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 
 		// expect asset to report an expected size, but still show the old size
 		// (until the next asset scrape)
-		t.ExpectAssets(c.DB, db.Asset{
+		t.ExpectAssets(s.DB, db.Asset{
 			ID:           1,
 			ResourceID:   1,
 			UUID:         "asset1",
@@ -134,15 +134,15 @@ func TestFailingResize(tBase *testing.T) {
 			ConfirmedAt: p2time(s.Clock.Now().Add(-5 * time.Minute)),
 			GreenlitAt:  p2time(s.Clock.Now().Add(-5 * time.Minute)),
 		}
-		t.Must(c.DB.Insert(&pendingOp))
+		t.Must(s.DB.Insert(&pendingOp))
 
 		amStatic := s.ManagerForAssetType("foo")
 		amStatic.SetAssetSizeFails = true
 		t.Must(resizeJob.ProcessOne(ctx))
 
 		// check that resizing fails as expected
-		t.ExpectPendingOperations(c.DB /*, nothing */)
-		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
+		t.ExpectPendingOperations(s.DB /*, nothing */)
+		t.ExpectFinishedOperations(s.DB, db.FinishedOperation{
 			AssetID:      1,
 			Reason:       castellum.OperationReasonLow,
 			OldSize:      1000,
@@ -157,7 +157,7 @@ func TestFailingResize(tBase *testing.T) {
 		})
 
 		// check that asset does not have an ExpectedSize
-		t.ExpectAssets(c.DB, db.Asset{
+		t.ExpectAssets(s.DB, db.Asset{
 			ID:           1,
 			ResourceID:   1,
 			UUID:         "asset1",
@@ -188,7 +188,7 @@ func TestErroringResize(tBase *testing.T) {
 			ConfirmedAt: p2time(s.Clock.Now().Add(-5 * time.Minute)),
 			GreenlitAt:  p2time(s.Clock.Now().Add(-5 * time.Minute)),
 		}
-		t.Must(c.DB.Insert(&pendingOp))
+		t.Must(s.DB.Insert(&pendingOp))
 
 		// when the outcome of the resize is "errored", we can retry several times
 		for range tasks.MaxRetries {
@@ -198,8 +198,8 @@ func TestErroringResize(tBase *testing.T) {
 			pendingOp.ID++
 			pendingOp.ErroredAttempts++
 			pendingOp.RetryAt = p2time(s.Clock.Now().Add(tasks.RetryInterval))
-			t.ExpectPendingOperations(c.DB, pendingOp)
-			t.ExpectFinishedOperations(c.DB /*, nothing */)
+			t.ExpectPendingOperations(s.DB, pendingOp)
+			t.ExpectFinishedOperations(s.DB /*, nothing */)
 		}
 
 		// ExecuteOne(AssetResizeJob{}) should do nothing right now because, although the
@@ -208,14 +208,14 @@ func TestErroringResize(tBase *testing.T) {
 		if !errors.Is(err, sql.ErrNoRows) {
 			t.Fatalf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
-		t.ExpectPendingOperations(c.DB, pendingOp)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectPendingOperations(s.DB, pendingOp)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 
 		// check that resizing errors as expected once the retry budget is exceeded
 		s.Clock.StepBy(10 * time.Minute)
 		t.Must(resizeJob.ProcessOne(ctx))
-		t.ExpectPendingOperations(c.DB /*, nothing */)
-		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
+		t.ExpectPendingOperations(s.DB /*, nothing */)
+		t.ExpectFinishedOperations(s.DB, db.FinishedOperation{
 			AssetID:         1,
 			Reason:          castellum.OperationReasonLow,
 			OldSize:         1000,
@@ -231,7 +231,7 @@ func TestErroringResize(tBase *testing.T) {
 		})
 
 		// check that asset does not have an ExpectedSize
-		t.ExpectAssets(c.DB, db.Asset{
+		t.ExpectAssets(s.DB, db.Asset{
 			ID:           1,
 			ResourceID:   1,
 			UUID:         "asset1",

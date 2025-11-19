@@ -25,15 +25,15 @@ func TestCollectGarbage(baseT *testing.T) {
 
 		// setup some minimal scaffolding (we can only insert finished_operations
 		// with valid asset IDs into the DB)
-		t.Must(c.DB.Insert(&db.Resource{
+		t.Must(s.DB.Insert(&db.Resource{
 			ScopeUUID: "project1",
 			AssetType: "foo",
 		}))
-		t.Must(c.DB.Insert(&db.Asset{
+		t.Must(s.DB.Insert(&db.Asset{
 			ResourceID: 1,
 			UUID:       "asset1",
 		}))
-		t.Must(c.DB.Insert(&db.Asset{
+		t.Must(s.DB.Insert(&db.Asset{
 			ResourceID: 1,
 			UUID:       "asset2",
 		}))
@@ -73,11 +73,11 @@ func TestCollectGarbage(baseT *testing.T) {
 			},
 		}
 		for _, op := range ops {
-			t.Must(c.DB.Insert(&op))
+			t.Must(s.DB.Insert(&op))
 		}
 
-		t.ExpectFinishedOperations(c.DB, ops...)
-		t.Must(tasks.CollectGarbage(c.DB, fakeNow.Add(-15*time.Minute)))
-		t.ExpectFinishedOperations(c.DB, ops[2])
+		t.ExpectFinishedOperations(s.DB, ops...)
+		t.Must(tasks.CollectGarbage(s.DB, fakeNow.Add(-15*time.Minute)))
+		t.ExpectFinishedOperations(s.DB, ops[2])
 	})
 }

@@ -32,11 +32,11 @@ func TestResourceScraping(baseT *testing.T) {
 		if !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
-		tr, tr0 := easypg.NewTracker(t.T, c.DB.Db)
+		tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
 		tr0.AssertEmpty()
 
 		// create some project resources for testing
-		t.Must(c.DB.Insert(&db.Resource{
+		t.Must(s.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",
 			DomainUUID:               "domain1",
 			AssetType:                "foo",
@@ -45,7 +45,7 @@ func TestResourceScraping(baseT *testing.T) {
 			CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 0},
 			NextScrapeAt:             s.Clock.Now(),
 		}))
-		t.Must(c.DB.Insert(&db.Resource{
+		t.Must(s.DB.Insert(&db.Resource{
 			ScopeUUID:                "project3",
 			DomainUUID:               "domain1",
 			AssetType:                "foo",
@@ -127,7 +127,7 @@ func TestResourceScraping(baseT *testing.T) {
 		)
 
 		// check behavior on a resource without assets
-		t.Must(c.DB.Insert(&db.Resource{
+		t.Must(s.DB.Insert(&db.Resource{
 			ScopeUUID:    "project2",
 			DomainUUID:   "domain1",
 			AssetType:    "foo",

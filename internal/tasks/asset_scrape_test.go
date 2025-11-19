@@ -32,11 +32,11 @@ func runAssetScrapeTest(t test.T, action func(context.Context, test.Setup, *task
 		if !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
 		}
-		_, dbDump := easypg.NewTracker(t.T, c.DB.Db)
+		_, dbDump := easypg.NewTracker(t.T, s.DB.Db)
 		dbDump.AssertEmpty()
 
 		// create a resource and asset to test with
-		t.Must(c.DB.Insert(&db.Resource{
+		t.Must(s.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",
 			AssetType:                "foo",
 			LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
@@ -47,7 +47,7 @@ func runAssetScrapeTest(t test.T, action func(context.Context, test.Setup, *task
 			SizeStepPercent:          20,
 			SingleStep:               false,
 		}))
-		t.Must(c.DB.Insert(&db.Asset{
+		t.Must(s.DB.Insert(&db.Asset{
 			ResourceID:   1,
 			UUID:         "asset1",
 			Size:         1000,
@@ -78,8 +78,8 @@ func TestNoOperationWhenNoThreshold(baseT *testing.T) {
 		// when no threshold is crossed, no operation gets created
 		s.Clock.StepBy(10 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectPendingOperations(c.DB /*, nothing */)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectPendingOperations(s.DB /*, nothing */)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 	})
 }
 
@@ -89,7 +89,7 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 		// set a maximum size that does not contradict the following operations
 		// (down below, there's a separate test for when the maximum size actually
 		// inhibits upsizing)
-		t.MustExec(c.DB, `UPDATE resources SET max_size = 2000`)
+		t.MustExec(s.DB, `UPDATE resources SET max_size = 2000`)
 
 		// when the "High" threshold gets crossed, a "High" operation gets created in
 		// state "created"
@@ -106,8 +106,8 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 800},
 			CreatedAt: s.Clock.Now(),
 		}
-		t.ExpectPendingOperations(c.DB, expectedOp)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectPendingOperations(s.DB, expectedOp)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 
 		// another scrape while the delay is not over should not change the state
 		// (but for single-step resizing which takes the current usage into account,
@@ -116,8 +116,8 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 		s.Clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 820})
 		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectPendingOperations(c.DB, expectedOp)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectPendingOperations(s.DB, expectedOp)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 
 		// when the delay is over, the next scrape moves into state "Confirmed/Greenlit"
 		s.Clock.StepBy(40 * time.Minute)
@@ -125,16 +125,16 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 		t.Must(scrapeJob.ProcessOne(ctx))
 		expectedOp.ConfirmedAt = p2time(s.Clock.Now())
 		expectedOp.GreenlitAt = p2time(s.Clock.Now())
-		t.ExpectPendingOperations(c.DB, expectedOp)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectPendingOperations(s.DB, expectedOp)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 
 		// since the operation is now greenlit and can be picked up by a worker at any
 		// moment, we should not touch it anymore even if the reason disappears
 		s.Clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 780})
 		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectPendingOperations(c.DB, expectedOp)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectPendingOperations(s.DB, expectedOp)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 	})
 }
 
@@ -147,7 +147,7 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 800})
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+		t.ExpectPendingOperations(s.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
 			Reason:    castellum.OperationReasonHigh,
@@ -156,15 +156,15 @@ func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 800},
 			CreatedAt: s.Clock.Now(),
 		})
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 
 		// when the reason disappears within the delay, the operation is cancelled
 		s.Clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 790})
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		t.ExpectPendingOperations(c.DB /*, nothing */)
-		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
+		t.ExpectPendingOperations(s.DB /*, nothing */)
+		t.ExpectFinishedOperations(s.DB, db.FinishedOperation{
 			AssetID:    1,
 			Reason:     castellum.OperationReasonHigh,
 			Outcome:    castellum.OperationOutcomeCancelled,
@@ -183,7 +183,7 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 		// set a minimum size that does not contradict the following operations
 		// (down below, there's a separate test for when the minimum size actually
 		// inhibits upsizing)
-		t.MustExec(c.DB, `UPDATE resources SET min_size = 200`)
+		t.MustExec(s.DB, `UPDATE resources SET min_size = 200`)
 
 		// when the "Low" threshold gets crossed, a "Low" operation gets created in
 		// state "created"
@@ -200,8 +200,8 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 200},
 			CreatedAt: s.Clock.Now(),
 		}
-		t.ExpectPendingOperations(c.DB, expectedOp)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectPendingOperations(s.DB, expectedOp)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 
 		// another scrape while the delay is not over should not change the state
 		// (but for single-step resizing which takes the current usage into account,
@@ -210,8 +210,8 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 		s.Clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 180})
 		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectPendingOperations(c.DB, expectedOp)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectPendingOperations(s.DB, expectedOp)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 
 		// when the delay is over, the next scrape moves into state "Confirmed/Greenlit"
 		s.Clock.StepBy(40 * time.Minute)
@@ -219,16 +219,16 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 		t.Must(scrapeJob.ProcessOne(ctx))
 		expectedOp.ConfirmedAt = p2time(s.Clock.Now())
 		expectedOp.GreenlitAt = p2time(s.Clock.Now())
-		t.ExpectPendingOperations(c.DB, expectedOp)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectPendingOperations(s.DB, expectedOp)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 
 		// since the operation is now greenlit and can be picked up by a worker at any
 		// moment, we should not touch it anymore even if the reason disappears
 		s.Clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 220})
 		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectPendingOperations(c.DB, expectedOp)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectPendingOperations(s.DB, expectedOp)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 	})
 }
 
@@ -241,7 +241,7 @@ func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 200})
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+		t.ExpectPendingOperations(s.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
 			Reason:    castellum.OperationReasonLow,
@@ -250,15 +250,15 @@ func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 200},
 			CreatedAt: s.Clock.Now(),
 		})
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 
 		// when the reason disappears within the delay, the operation is cancelled
 		s.Clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 210})
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		t.ExpectPendingOperations(c.DB /*, nothing */)
-		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
+		t.ExpectPendingOperations(s.DB /*, nothing */)
+		t.ExpectFinishedOperations(s.DB, db.FinishedOperation{
 			AssetID:    1,
 			Reason:     castellum.OperationReasonLow,
 			Outcome:    castellum.OperationOutcomeCancelled,
@@ -291,8 +291,8 @@ func TestCriticalUpsizeTowardsGreenlight(baseT *testing.T) {
 			ConfirmedAt: p2time(s.Clock.Now()),
 			GreenlitAt:  p2time(s.Clock.Now()),
 		}
-		t.ExpectPendingOperations(c.DB, expectedOp)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectPendingOperations(s.DB, expectedOp)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 	})
 }
 
@@ -305,7 +305,7 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 900})
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+		t.ExpectPendingOperations(s.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
 			Reason:    castellum.OperationReasonHigh,
@@ -314,7 +314,7 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 900},
 			CreatedAt: s.Clock.Now(),
 		})
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 
 		// when the "Critical" threshold gets crossed while the "High" operation
 		// is not yet confirmed, the "High" operation is cancelled and a "Critical"
@@ -323,7 +323,7 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 960})
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+		t.ExpectPendingOperations(s.DB, db.PendingOperation{
 			ID:          2,
 			AssetID:     1,
 			Reason:      castellum.OperationReasonCritical,
@@ -334,7 +334,7 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 			ConfirmedAt: p2time(s.Clock.Now()),
 			GreenlitAt:  p2time(s.Clock.Now()),
 		})
-		t.ExpectFinishedOperations(c.DB, db.FinishedOperation{
+		t.ExpectFinishedOperations(s.DB, db.FinishedOperation{
 			AssetID:    1,
 			Reason:     castellum.OperationReasonHigh,
 			Outcome:    castellum.OperationOutcomeCancelled,
@@ -355,7 +355,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 	withContext(s, func(ctx context.Context, c *tasks.Context) {
 		scrapeJob := c.AssetScrapingJob(s.Registry)
 		// create a resource and multiple assets to test with
-		t.Must(c.DB.Insert(&db.Resource{
+		t.Must(s.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",
 			AssetType:                "foo",
 			LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
@@ -391,9 +391,9 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 				ExpectedSize: nil,
 			},
 		}
-		t.Must(c.DB.Insert(&assets[0]))
-		t.Must(c.DB.Insert(&assets[1]))
-		t.Must(c.DB.Insert(&assets[2]))
+		t.Must(s.DB.Insert(&assets[0]))
+		t.Must(s.DB.Insert(&assets[1]))
+		t.Must(s.DB.Insert(&assets[2]))
 
 		amStatic := s.ManagerForAssetType("foo")
 		amStatic.Assets = map[string]map[string]plugins.StaticAsset{
@@ -419,7 +419,7 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 		assets[0].Usage = castellum.UsageValues{castellum.SingularUsageMetric: 510}
 		assets[1].Usage = castellum.UsageValues{castellum.SingularUsageMetric: 520}
 		assets[2].Usage = castellum.UsageValues{castellum.SingularUsageMetric: 530}
-		t.ExpectAssets(c.DB, assets...)
+		t.ExpectAssets(s.DB, assets...)
 
 		// next scrape should work identically
 		s.Clock.StepBy(10 * time.Minute)
@@ -431,11 +431,11 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 		assets[0].NextScrapeAt = s.Clock.Now().Add(3 * time.Minute)
 		assets[1].NextScrapeAt = s.Clock.Now().Add(4 * time.Minute)
 		assets[2].NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
-		t.ExpectAssets(c.DB, assets...)
+		t.ExpectAssets(s.DB, assets...)
 
 		// and all of this should not have created any operations
-		t.ExpectPendingOperations(c.DB /*, nothing */)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectPendingOperations(s.DB /*, nothing */)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 	})
 }
 
@@ -443,7 +443,7 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, c *tasks.Context, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
 		// make asset look like it just completed a resize operation
-		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, s.Clock.Now())
+		t.MustExec(s.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, s.Clock.Now())
 		setAsset(plugins.StaticAsset{
 			Size:           1000,
 			Usage:          1000,
@@ -467,9 +467,9 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 		t.Must(scrapeJob.ProcessOne(ctx))
 
 		asset.NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
-		t.ExpectAssets(c.DB, asset)
+		t.ExpectAssets(s.DB, asset)
 
-		t.ExpectPendingOperations(c.DB /*, nothing */)
+		t.ExpectPendingOperations(s.DB /*, nothing */)
 
 		// second scrape will see the new size and update the asset accordingly, and
 		// it will also create an operation because the usage is still above 80% after
@@ -482,9 +482,9 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 		asset.NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
 		asset.ExpectedSize = nil
 		asset.ResizedAt = nil
-		t.ExpectAssets(c.DB, asset)
+		t.ExpectAssets(s.DB, asset)
 
-		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+		t.ExpectPendingOperations(s.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
 			Reason:    castellum.OperationReasonHigh,
@@ -504,7 +504,7 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, c *tasks.Context, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
 		// make asset look like it just completed a resize operation
-		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, s.Clock.Now())
+		t.MustExec(s.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, s.Clock.Now())
 		setAsset(plugins.StaticAsset{
 			Size:  1200, //!= asset.ExpectedSize (see above)
 			Usage: 600,
@@ -512,7 +512,7 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
 
 		s.Clock.StepBy(5 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectAssets(c.DB, db.Asset{
+		t.ExpectAssets(s.DB, db.Asset{
 			ID:           1,
 			ResourceID:   1,
 			UUID:         "asset1",
@@ -532,7 +532,7 @@ func TestAssetScrapesGivesUpWaitingForResize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, c *tasks.Context, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
 		// make asset look like it just completed a resize operation
-		t.MustExec(c.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, s.Clock.Now())
+		t.MustExec(s.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, s.Clock.Now())
 		setAsset(plugins.StaticAsset{
 			Size:  1000, // == asset.Size (i.e. size before resize)
 			Usage: 500,
@@ -552,8 +552,8 @@ func TestAssetScrapesGivesUpWaitingForResize(baseT *testing.T) {
 		t.Must(scrapeJob.ProcessOne(ctx))
 
 		asset.NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
-		t.ExpectAssets(c.DB, asset)
-		t.ExpectPendingOperations(c.DB /*, nothing */)
+		t.ExpectAssets(s.DB, asset)
+		t.ExpectPendingOperations(s.DB /*, nothing */)
 
 		// after an hour, the scrape gives up waiting for the resize and resumes as normal
 		s.Clock.StepBy(1 * time.Hour)
@@ -562,8 +562,8 @@ func TestAssetScrapesGivesUpWaitingForResize(baseT *testing.T) {
 		asset.ExpectedSize = nil
 		asset.ResizedAt = nil
 		asset.NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
-		t.ExpectAssets(c.DB, asset)
-		t.ExpectPendingOperations(c.DB /*, nothing */)
+		t.ExpectAssets(s.DB, asset)
+		t.ExpectPendingOperations(s.DB /*, nothing */)
 	})
 }
 
@@ -591,7 +591,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 			t.Errorf("expected error %q, got %q", expectedMsg, err.Error())
 		}
 
-		t.ExpectAssets(c.DB, db.Asset{
+		t.ExpectAssets(s.DB, db.Asset{
 			ID:                 1,
 			ResourceID:         1,
 			UUID:               "asset1",
@@ -609,7 +609,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 		s.Clock.StepBy(5 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		t.ExpectAssets(c.DB, db.Asset{
+		t.ExpectAssets(s.DB, db.Asset{
 			ID:                 1,
 			ResourceID:         1,
 			UUID:               "asset1",
@@ -627,7 +627,7 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 600, CannotFindAsset: true})
 		s.Clock.StepBy(5 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectAssets(c.DB /*, nothing */)
+		t.ExpectAssets(s.DB /*, nothing */)
 	})
 }
 
@@ -648,8 +648,8 @@ func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 900},
 			CreatedAt: s.Clock.Now(),
 		}
-		t.ExpectPendingOperations(c.DB, expectedOp)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectPendingOperations(s.DB, expectedOp)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 
 		// while it is not greenlit yet, simulate a resize operation
 		// being performed by an unrelated user
@@ -659,8 +659,8 @@ func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 
 		// ScrapeNextAsset should have adjusted the NewSize to CurrentSize + SizeStep
 		expectedOp.NewSize = 1320
-		t.ExpectPendingOperations(c.DB, expectedOp)
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectPendingOperations(s.DB, expectedOp)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 	})
 }
 
@@ -676,7 +676,7 @@ func TestMaxAssetSizeRules(baseT *testing.T) {
 	)
 	withContext(s, func(ctx context.Context, c *tasks.Context) {
 		scrapeJob := c.AssetScrapingJob(s.Registry)
-		t.Must(c.DB.Insert(&db.Resource{
+		t.Must(s.DB.Insert(&db.Resource{
 			ScopeUUID:                "project1",
 			AssetType:                "foo",
 			LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
@@ -694,7 +694,7 @@ func TestMaxAssetSizeRules(baseT *testing.T) {
 			NextScrapeAt: s.Clock.Now(),
 			ExpectedSize: nil,
 		}
-		t.Must(c.DB.Insert(&asset))
+		t.Must(s.DB.Insert(&asset))
 
 		amStatic := s.ManagerForAssetType("foo")
 		amStatic.Assets = map[string]map[string]plugins.StaticAsset{
@@ -708,9 +708,9 @@ func TestMaxAssetSizeRules(baseT *testing.T) {
 
 		asset.NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
 		asset.Usage = castellum.UsageValues{castellum.SingularUsageMetric: 510}
-		t.ExpectAssets(c.DB, asset)
+		t.ExpectAssets(s.DB, asset)
 
-		t.ExpectPendingOperations(c.DB, db.PendingOperation{
+		t.ExpectPendingOperations(s.DB, db.PendingOperation{
 			ID:        1,
 			AssetID:   1,
 			Reason:    castellum.OperationReasonLow,
@@ -719,6 +719,6 @@ func TestMaxAssetSizeRules(baseT *testing.T) {
 			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 510},
 			CreatedAt: s.Clock.Now(),
 		})
-		t.ExpectFinishedOperations(c.DB /*, nothing */)
+		t.ExpectFinishedOperations(s.DB /*, nothing */)
 	})
 }
