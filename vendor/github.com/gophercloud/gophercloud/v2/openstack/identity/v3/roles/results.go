@@ -21,8 +21,14 @@ type Role struct {
 	// Name is the role name
 	Name string `json:"name"`
 
+	// Description is the description of the role.
+	Description string `json:"description"`
+
 	// Extra is a collection of miscellaneous key/values.
 	Extra map[string]any `json:"-"`
+
+	// Options are a set of defined options that allow certain features for a role
+	Options map[Option]any `json:"options"`
 }
 
 func (r *Role) UnmarshalJSON(b []byte) error {

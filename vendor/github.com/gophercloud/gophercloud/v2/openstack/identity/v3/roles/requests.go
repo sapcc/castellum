@@ -9,6 +9,14 @@ import (
 	"github.com/gophercloud/gophercloud/v2/pagination"
 )
 
+// Option is a specific option defined at the API to enable features
+// on a role.
+type Option string
+
+const (
+	Immutable Option = "immutable"
+)
+
 // ListOptsBuilder allows extensions to add additional parameters to
 // the List request
 type ListOptsBuilder interface {
@@ -86,8 +94,14 @@ type CreateOpts struct {
 	// DomainID is the ID of the domain the role belongs to.
 	DomainID string `json:"domain_id,omitempty"`
 
+	// Description is the description of the new role.
+	Description string `json:"description,omitempty"`
+
 	// Extra is free-form extra key/value pairs to describe the role.
 	Extra map[string]any `json:"-"`
+
+	// Options are defined options in the API to enable certain features.
+	Options map[Option]any `json:"options,omitempty"`
 }
 
 // ToRoleCreateMap formats a CreateOpts into a create request.
@@ -130,11 +144,17 @@ type UpdateOptsBuilder interface {
 
 // UpdateOpts provides options for updating a role.
 type UpdateOpts struct {
-	// Name is the name of the new role.
+	// Name is an updated name for the role.
 	Name string `json:"name,omitempty"`
+
+	// Description is an updated description for the role.
+	Description *string `json:"description,omitempty"`
 
 	// Extra is free-form extra key/value pairs to describe the role.
 	Extra map[string]any `json:"-"`
+
+	// Options are defined options in the API to enable certain features.
+	Options map[Option]any `json:"options,omitempty"`
 }
 
 // ToRoleUpdateMap formats a UpdateOpts into an update request.
