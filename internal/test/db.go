@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2019 SAP SE
+// SPDX-FileCopyrightText: 2019 SAP SE or an SAP affiliate company
 // SPDX-License-Identifier: Apache-2.0
 
 package test
@@ -7,26 +7,9 @@ import (
 	"encoding/json"
 
 	"github.com/go-gorp/gorp/v3"
-	"github.com/sapcc/go-bits/easypg"
 
 	"github.com/sapcc/castellum/internal/db"
 )
-
-// WithDB prepares a DB reference for this test, or fails the test if the DB
-// is not ready.
-func (t T) WithDB(fixtureFile *string, action func(dbi *gorp.DbMap)) {
-	opts := []easypg.TestSetupOption{
-		easypg.ClearTables("resources", "assets", "pending_operations", "finished_operations"),
-		easypg.ResetPrimaryKeys("resources", "assets", "pending_operations"),
-	}
-	if fixtureFile != nil {
-		opts = append(opts, easypg.LoadSQLFile(*fixtureFile))
-	}
-
-	dbConn := easypg.ConnectForTest(t.T, db.Configuration(), opts...)
-	action(db.InitORM(dbConn))
-	t.Must(dbConn.Close())
-}
 
 // MustUpdate aborts the test if dbi.Update(row) throws an error.
 func (t T) MustUpdate(dbi *gorp.DbMap, row any) {
