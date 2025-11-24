@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2019 SAP SE
+// SPDX-FileCopyrightText: 2019 SAP SE or an SAP affiliate company
 // SPDX-License-Identifier: Apache-2.0
 
 package main
@@ -146,7 +146,7 @@ func runAPI(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team core.Ass
 		AllowedHeaders: []string{"Content-Type", "User-Agent", "X-Auth-Token"},
 	})
 	handler := httpapi.Compose(
-		api.NewHandler(cfg, dbi, team, &tv, providerClient, auditor),
+		api.NewHandler(cfg, dbi, team, &tv, providerClient, auditor, time.Now),
 		httpapi.HealthCheckAPI{
 			SkipRequestLog: true,
 			Check: func() error {

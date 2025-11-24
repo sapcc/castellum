@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2019 SAP SE
+// SPDX-FileCopyrightText: 2019 SAP SE or an SAP affiliate company
 // SPDX-License-Identifier: Apache-2.0
 
 package tasks
@@ -31,8 +31,10 @@ var selectAndDeleteNextResizeQuery = sqlext.SimplifyWhitespace(`
 `)
 
 const (
-	maxRetries    = 3
-	retryInterval = 2 * time.Minute
+	// MaxRetries is the maxium number of retries per asset for AssetResizingJob.
+	MaxRetries = 3
+	// RetryInterval is the retry interval for AssetResizingJob.
+	RetryInterval = 2 * time.Minute
 )
 
 // AssetScrapingJob returns a job where each task is a asset that needs to be
@@ -96,10 +98,10 @@ func (c *Context) processAssetResize(ctx context.Context, tx *gorp.Transaction, 
 	// without us failing the entire operation. For outcome "failed", we have a
 	// user error and the user will likely only notice once they see the failed
 	// operation in Castellum, so there is little use retrying here.
-	if outcome == castellum.OperationOutcomeErrored && op.ErroredAttempts < maxRetries {
+	if outcome == castellum.OperationOutcomeErrored && op.ErroredAttempts < MaxRetries {
 		op.ID = 0
 		op.ErroredAttempts++
-		retryAt := c.TimeNow().Add(retryInterval)
+		retryAt := c.TimeNow().Add(RetryInterval)
 		op.RetryAt = &retryAt
 
 		err = tx.Insert(&op)
