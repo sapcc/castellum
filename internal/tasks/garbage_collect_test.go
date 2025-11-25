@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sapcc/go-api-declarations/castellum"
+	"github.com/sapcc/go-bits/easypg"
 
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/tasks"
@@ -74,7 +75,19 @@ func TestCollectGarbage(baseT *testing.T) {
 		t.Must(s.DB.Insert(&op))
 	}
 
-	t.ExpectFinishedOperations(s.DB, ops...)
+	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr0.Ignore()
+
 	t.Must(tasks.CollectGarbage(s.DB, fakeNow.Add(-15*time.Minute)))
-	t.ExpectFinishedOperations(s.DB, ops[2])
+
+	// NOTE: `finished_operations` does not have a primary key, so this diff shows the full deleted records insteadj
+	tr.DBChanges().AssertEqualf(`
+			DELETE FROM finished_operations WHERE asset_id = 1 AND reason = 'high' AND outcome = 'cancelled' AND old_size = 1000 AND new_size = 1200 AND created_at = %[1]d AND confirmed_at = NULL AND greenlit_at = NULL AND finished_at = %[2]d AND greenlit_by_user_uuid = NULL AND error_message = '' AND errored_attempts = 0 AND usage = '{"singular":800}';
+			DELETE FROM finished_operations WHERE asset_id = 2 AND reason = 'high' AND outcome = 'cancelled' AND old_size = 1000 AND new_size = 1200 AND created_at = %[3]d AND confirmed_at = NULL AND greenlit_at = NULL AND finished_at = %[4]d AND greenlit_by_user_uuid = NULL AND error_message = '' AND errored_attempts = 0 AND usage = '{"singular":800}';
+		`,
+		ops[0].CreatedAt.Unix(),
+		ops[0].FinishedAt.Unix(),
+		ops[1].CreatedAt.Unix(),
+		ops[1].FinishedAt.Unix(),
+	)
 }

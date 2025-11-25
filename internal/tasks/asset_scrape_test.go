@@ -11,11 +11,13 @@ import (
 	"time"
 
 	"github.com/sapcc/go-api-declarations/castellum"
+	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/jobloop"
 
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
+	"github.com/sapcc/castellum/internal/tasks"
 	"github.com/sapcc/castellum/internal/test"
 )
 
@@ -73,21 +75,32 @@ func runAssetScrapeTest(t test.T, action func(context.Context, test.Setup, func(
 func TestNoOperationWhenNoThreshold(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
+		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr0.Ignore()
+
 		// when no threshold is crossed, no operation gets created
 		s.Clock.StepBy(10 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectPendingOperations(s.DB /*, nothing */)
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
+
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET next_scrape_at = %[1]d, never_scraped = FALSE WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+		)
 	})
 }
 
 func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
+		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr0.Ignore()
+
 		// set a maximum size that does not contradict the following operations
 		// (down below, there's a separate test for when the maximum size actually
 		// inhibits upsizing)
 		t.MustExec(s.DB, `UPDATE resources SET max_size = 2000`)
+		tr.DBChanges().Ignore()
 
 		// when the "High" threshold gets crossed, a "High" operation gets created in
 		// state "created"
@@ -95,17 +108,13 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 800})
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		expectedOp := db.PendingOperation{
-			ID:        1,
-			AssetID:   1,
-			Reason:    castellum.OperationReasonHigh,
-			OldSize:   1000,
-			NewSize:   1200,
-			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 800},
-			CreatedAt: s.Clock.Now(),
-		}
-		t.ExpectPendingOperations(s.DB, expectedOp)
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET usage = '{"singular":800}', next_scrape_at = %[1]d, never_scraped = FALSE WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+				INSERT INTO pending_operations (id, asset_id, reason, old_size, new_size, created_at, usage) VALUES (1, 1, 'high', 1000, 1200, %[2]d, '{"singular":800}');
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+			s.Clock.Now().Unix(),
+		)
 
 		// another scrape while the delay is not over should not change the state
 		// (but for single-step resizing which takes the current usage into account,
@@ -114,74 +123,89 @@ func TestNormalUpsizeTowardsGreenlight(baseT *testing.T) {
 		s.Clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 820})
 		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectPendingOperations(s.DB, expectedOp)
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
+
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET usage = '{"singular":820}', next_scrape_at = %[1]d WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+		)
 
 		// when the delay is over, the next scrape moves into state "Confirmed/Greenlit"
 		s.Clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 840})
 		t.Must(scrapeJob.ProcessOne(ctx))
-		expectedOp.ConfirmedAt = p2time(s.Clock.Now())
-		expectedOp.GreenlitAt = p2time(s.Clock.Now())
-		t.ExpectPendingOperations(s.DB, expectedOp)
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
+
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET usage = '{"singular":840}', next_scrape_at = %[1]d WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+				UPDATE pending_operations SET confirmed_at = %[2]d, greenlit_at = %[2]d WHERE id = 1 AND asset_id = 1;
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+			s.Clock.Now().Unix(),
+		)
 
 		// since the operation is now greenlit and can be picked up by a worker at any
 		// moment, we should not touch it anymore even if the reason disappears
 		s.Clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 780})
 		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectPendingOperations(s.DB, expectedOp)
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
+
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET usage = '{"singular":780}', next_scrape_at = %[1]d WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+		)
 	})
 }
 
 func TestNormalUpsizeTowardsCancel(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
+		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr0.Ignore()
+
 		// when the "High" threshold gets crossed, a "High" operation gets created in
 		// state "created"
 		s.Clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 800})
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		t.ExpectPendingOperations(s.DB, db.PendingOperation{
-			ID:        1,
-			AssetID:   1,
-			Reason:    castellum.OperationReasonHigh,
-			OldSize:   1000,
-			NewSize:   1200,
-			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 800},
-			CreatedAt: s.Clock.Now(),
-		})
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
+		opCreatedAt := s.Clock.Now()
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET usage = '{"singular":800}', next_scrape_at = %[1]d, never_scraped = FALSE WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+				INSERT INTO pending_operations (id, asset_id, reason, old_size, new_size, created_at, usage) VALUES (1, 1, 'high', 1000, 1200, %[2]d, '{"singular":800}');
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+			opCreatedAt.Unix(),
+		)
 
 		// when the reason disappears within the delay, the operation is cancelled
 		s.Clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 790})
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		t.ExpectPendingOperations(s.DB /*, nothing */)
-		t.ExpectFinishedOperations(s.DB, db.FinishedOperation{
-			AssetID:    1,
-			Reason:     castellum.OperationReasonHigh,
-			Outcome:    castellum.OperationOutcomeCancelled,
-			OldSize:    1000,
-			NewSize:    1200,
-			Usage:      castellum.UsageValues{castellum.SingularUsageMetric: 800},
-			CreatedAt:  s.Clock.Now().Add(-40 * time.Minute),
-			FinishedAt: s.Clock.Now(),
-		})
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET usage = '{"singular":790}', next_scrape_at = %[1]d WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+				INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, finished_at, usage) VALUES (1, 'high', 'cancelled', 1000, 1200, %[2]d, %[3]d, '{"singular":800}');
+				DELETE FROM pending_operations WHERE id = 1 AND asset_id = 1;
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+			opCreatedAt.Unix(),
+			s.Clock.Now().Unix(),
+		)
 	})
 }
 
 func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
+		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr0.Ignore()
+
 		// set a minimum size that does not contradict the following operations
 		// (down below, there's a separate test for when the minimum size actually
 		// inhibits upsizing)
 		t.MustExec(s.DB, `UPDATE resources SET min_size = 200`)
+		tr.DBChanges().Ignore()
 
 		// when the "Low" threshold gets crossed, a "Low" operation gets created in
 		// state "created"
@@ -189,17 +213,13 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 200})
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		expectedOp := db.PendingOperation{
-			ID:        1,
-			AssetID:   1,
-			Reason:    castellum.OperationReasonLow,
-			OldSize:   1000,
-			NewSize:   800,
-			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 200},
-			CreatedAt: s.Clock.Now(),
-		}
-		t.ExpectPendingOperations(s.DB, expectedOp)
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET usage = '{"singular":200}', next_scrape_at = %[1]d, never_scraped = FALSE WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+				INSERT INTO pending_operations (id, asset_id, reason, old_size, new_size, created_at, usage) VALUES (1, 1, 'low', 1000, 800, %[2]d, '{"singular":200}');
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+			s.Clock.Now().Unix(),
+		)
 
 		// another scrape while the delay is not over should not change the state
 		// (but for single-step resizing which takes the current usage into account,
@@ -208,111 +228,120 @@ func TestNormalDownsizeTowardsGreenlight(baseT *testing.T) {
 		s.Clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 180})
 		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectPendingOperations(s.DB, expectedOp)
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
+
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET usage = '{"singular":180}', next_scrape_at = %[1]d WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+		)
 
 		// when the delay is over, the next scrape moves into state "Confirmed/Greenlit"
 		s.Clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 160})
 		t.Must(scrapeJob.ProcessOne(ctx))
-		expectedOp.ConfirmedAt = p2time(s.Clock.Now())
-		expectedOp.GreenlitAt = p2time(s.Clock.Now())
-		t.ExpectPendingOperations(s.DB, expectedOp)
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
+
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET usage = '{"singular":160}', next_scrape_at = %[1]d WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+				UPDATE pending_operations SET confirmed_at = %[2]d, greenlit_at = %[2]d WHERE id = 1 AND asset_id = 1;
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+			s.Clock.Now().Unix(),
+		)
 
 		// since the operation is now greenlit and can be picked up by a worker at any
 		// moment, we should not touch it anymore even if the reason disappears
 		s.Clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 220})
 		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectPendingOperations(s.DB, expectedOp)
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
+
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET usage = '{"singular":220}', next_scrape_at = %[1]d WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+		)
 	})
 }
 
 func TestNormalDownsizeTowardsCancel(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
+		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr0.Ignore()
+
 		// when the "Low" threshold gets crossed, a "Low" operation gets created in
 		// state "created"
 		s.Clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 200})
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		t.ExpectPendingOperations(s.DB, db.PendingOperation{
-			ID:        1,
-			AssetID:   1,
-			Reason:    castellum.OperationReasonLow,
-			OldSize:   1000,
-			NewSize:   800,
-			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 200},
-			CreatedAt: s.Clock.Now(),
-		})
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
+		opCreatedAt := s.Clock.Now()
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET usage = '{"singular":200}', next_scrape_at = %[1]d, never_scraped = FALSE WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+				INSERT INTO pending_operations (id, asset_id, reason, old_size, new_size, created_at, usage) VALUES (1, 1, 'low', 1000, 800, %[2]d, '{"singular":200}');
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+			opCreatedAt.Unix(),
+		)
 
 		// when the reason disappears within the delay, the operation is cancelled
 		s.Clock.StepBy(40 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 210})
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		t.ExpectPendingOperations(s.DB /*, nothing */)
-		t.ExpectFinishedOperations(s.DB, db.FinishedOperation{
-			AssetID:    1,
-			Reason:     castellum.OperationReasonLow,
-			Outcome:    castellum.OperationOutcomeCancelled,
-			OldSize:    1000,
-			NewSize:    800,
-			Usage:      castellum.UsageValues{castellum.SingularUsageMetric: 200},
-			CreatedAt:  s.Clock.Now().Add(-40 * time.Minute),
-			FinishedAt: s.Clock.Now(),
-		})
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET usage = '{"singular":210}', next_scrape_at = %[1]d WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+				INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, finished_at, usage) VALUES (1, 'low', 'cancelled', 1000, 800, %[2]d, %[3]d, '{"singular":200}');
+				DELETE FROM pending_operations WHERE id = 1 AND asset_id = 1;
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+			opCreatedAt.Unix(),
+			s.Clock.Now().Unix(),
+		)
 	})
 }
 
 func TestCriticalUpsizeTowardsGreenlight(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
+		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr0.Ignore()
+
 		// when the "Critical" threshold gets crossed, a "Critical" operation gets
 		// created and immediately confirmed/greenlit
 		s.Clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 950})
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		expectedOp := db.PendingOperation{
-			ID:          1,
-			AssetID:     1,
-			Reason:      castellum.OperationReasonCritical,
-			OldSize:     1000,
-			NewSize:     1200,
-			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 950},
-			CreatedAt:   s.Clock.Now(),
-			ConfirmedAt: p2time(s.Clock.Now()),
-			GreenlitAt:  p2time(s.Clock.Now()),
-		}
-		t.ExpectPendingOperations(s.DB, expectedOp)
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET usage = '{"singular":950}', critical_usages = 'singular', next_scrape_at = %[1]d, never_scraped = FALSE WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+				INSERT INTO pending_operations (id, asset_id, reason, old_size, new_size, created_at, confirmed_at, greenlit_at, usage) VALUES (1, 1, 'critical', 1000, 1200, %[2]d, %[2]d, %[2]d, '{"singular":950}');
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+			s.Clock.Now().Unix(),
+		)
 	})
 }
 
 func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
+		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr0.Ignore()
+
 		// when the "High" threshold gets crossed, a "High" operation gets created in
 		// state "created"
 		s.Clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 900})
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		t.ExpectPendingOperations(s.DB, db.PendingOperation{
-			ID:        1,
-			AssetID:   1,
-			Reason:    castellum.OperationReasonHigh,
-			OldSize:   1000,
-			NewSize:   1200,
-			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 900},
-			CreatedAt: s.Clock.Now(),
-		})
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
+		opCreatedAt := s.Clock.Now()
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET usage = '{"singular":900}', next_scrape_at = %[1]d, never_scraped = FALSE WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+				INSERT INTO pending_operations (id, asset_id, reason, old_size, new_size, created_at, usage) VALUES (1, 1, 'high', 1000, 1200, %[2]d, '{"singular":900}');
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+			opCreatedAt.Unix(),
+		)
 
 		// when the "Critical" threshold gets crossed while the "High" operation
 		// is not yet confirmed, the "High" operation is cancelled and a "Critical"
@@ -321,27 +350,16 @@ func TestReplaceNormalWithCriticalUpsize(baseT *testing.T) {
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 960})
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		t.ExpectPendingOperations(s.DB, db.PendingOperation{
-			ID:          2,
-			AssetID:     1,
-			Reason:      castellum.OperationReasonCritical,
-			OldSize:     1000,
-			NewSize:     1200,
-			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 960},
-			CreatedAt:   s.Clock.Now(),
-			ConfirmedAt: p2time(s.Clock.Now()),
-			GreenlitAt:  p2time(s.Clock.Now()),
-		})
-		t.ExpectFinishedOperations(s.DB, db.FinishedOperation{
-			AssetID:    1,
-			Reason:     castellum.OperationReasonHigh,
-			Outcome:    castellum.OperationOutcomeCancelled,
-			OldSize:    1000,
-			NewSize:    1200,
-			Usage:      castellum.UsageValues{castellum.SingularUsageMetric: 900},
-			CreatedAt:  s.Clock.Now().Add(-10 * time.Minute),
-			FinishedAt: s.Clock.Now(),
-		})
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET usage = '{"singular":960}', critical_usages = 'singular', next_scrape_at = %[1]d WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+				INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, finished_at, usage) VALUES (1, 'high', 'cancelled', 1000, 1200, %[2]d, %[3]d, '{"singular":900}');
+				DELETE FROM pending_operations WHERE id = 1 AND asset_id = 1;
+				INSERT INTO pending_operations (id, asset_id, reason, old_size, new_size, created_at, confirmed_at, greenlit_at, usage) VALUES (2, 1, 'critical', 1000, 1200, %[3]d, %[3]d, %[3]d, '{"singular":960}');
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+			opCreatedAt.Unix(),
+			s.Clock.Now().Unix(),
+		)
 	})
 }
 
@@ -402,6 +420,9 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 		},
 	}
 
+	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr0.Ignore()
+
 	// this should scrape each asset once, in order
 	s.Clock.StepBy(10 * time.Minute)
 	t.Must(scrapeJob.ProcessOne(ctx))
@@ -410,14 +431,15 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 	s.Clock.StepBy(time.Minute)
 	t.Must(scrapeJob.ProcessOne(ctx))
 
-	// so the asset table should look like this now
-	assets[0].NextScrapeAt = s.Clock.Now().Add(3 * time.Minute)
-	assets[1].NextScrapeAt = s.Clock.Now().Add(4 * time.Minute)
-	assets[2].NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
-	assets[0].Usage = castellum.UsageValues{castellum.SingularUsageMetric: 510}
-	assets[1].Usage = castellum.UsageValues{castellum.SingularUsageMetric: 520}
-	assets[2].Usage = castellum.UsageValues{castellum.SingularUsageMetric: 530}
-	t.ExpectAssets(s.DB, assets...)
+	tr.DBChanges().AssertEqualf(`
+			UPDATE assets SET usage = '{"singular":510}', next_scrape_at = %[1]d WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+			UPDATE assets SET usage = '{"singular":520}', next_scrape_at = %[2]d WHERE id = 2 AND resource_id = 1 AND uuid = 'asset2';
+			UPDATE assets SET usage = '{"singular":530}', next_scrape_at = %[3]d WHERE id = 3 AND resource_id = 1 AND uuid = 'asset3';
+		`,
+		s.Clock.Now().Add(3*time.Minute).Unix(),
+		s.Clock.Now().Add(4*time.Minute).Unix(),
+		s.Clock.Now().Add(5*time.Minute).Unix(),
+	)
 
 	// next scrape should work identically
 	s.Clock.StepBy(10 * time.Minute)
@@ -426,36 +448,33 @@ func TestAssetScrapeOrdering(baseT *testing.T) {
 	t.Must(scrapeJob.ProcessOne(ctx))
 	s.Clock.StepBy(time.Minute)
 	t.Must(scrapeJob.ProcessOne(ctx))
-	assets[0].NextScrapeAt = s.Clock.Now().Add(3 * time.Minute)
-	assets[1].NextScrapeAt = s.Clock.Now().Add(4 * time.Minute)
-	assets[2].NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
-	t.ExpectAssets(s.DB, assets...)
 
-	// and all of this should not have created any operations
-	t.ExpectPendingOperations(s.DB /*, nothing */)
-	t.ExpectFinishedOperations(s.DB /*, nothing */)
+	tr.DBChanges().AssertEqualf(`
+			UPDATE assets SET next_scrape_at = %[1]d WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+			UPDATE assets SET next_scrape_at = %[2]d WHERE id = 2 AND resource_id = 1 AND uuid = 'asset2';
+			UPDATE assets SET next_scrape_at = %[3]d WHERE id = 3 AND resource_id = 1 AND uuid = 'asset3';
+		`,
+		s.Clock.Now().Add(3*time.Minute).Unix(),
+		s.Clock.Now().Add(4*time.Minute).Unix(),
+		s.Clock.Now().Add(5*time.Minute).Unix(),
+	)
 }
 
 func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
 		// make asset look like it just completed a resize operation
-		t.MustExec(s.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, s.Clock.Now())
+		resizedAt := s.Clock.Now()
+		t.MustExec(s.DB, `UPDATE assets SET expected_size = 1100, resized_at = $1`, resizedAt)
 		setAsset(plugins.StaticAsset{
 			Size:           1000,
 			Usage:          1000,
 			NewSize:        1100,
 			RemainingDelay: 2,
 		})
-		asset := db.Asset{
-			ID:           1,
-			ResourceID:   1,
-			UUID:         "asset1",
-			Size:         1000,
-			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
-			ExpectedSize: p2uint64(1100),
-			ResizedAt:    p2time(s.Clock.Now()),
-		}
+
+		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr0.Ignore()
 
 		// first scrape will not touch anything about the asset, and also not create
 		// any operations (even though it could because of the currently high usage)
@@ -463,10 +482,11 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 		s.Clock.StepBy(5 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		asset.NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
-		t.ExpectAssets(s.DB, asset)
-
-		t.ExpectPendingOperations(s.DB /*, nothing */)
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET next_scrape_at = %[1]d, never_scraped = FALSE WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+		)
 
 		// second scrape will see the new size and update the asset accordingly, and
 		// it will also create an operation because the usage is still above 80% after
@@ -474,22 +494,13 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(baseT *testing.T) {
 		s.Clock.StepBy(5 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		asset.Size = 1100
-		asset.Usage = castellum.UsageValues{castellum.SingularUsageMetric: 1000}
-		asset.NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
-		asset.ExpectedSize = nil
-		asset.ResizedAt = nil
-		t.ExpectAssets(s.DB, asset)
-
-		t.ExpectPendingOperations(s.DB, db.PendingOperation{
-			ID:        1,
-			AssetID:   1,
-			Reason:    castellum.OperationReasonHigh,
-			OldSize:   1100,
-			NewSize:   1320,
-			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 1000},
-			CreatedAt: s.Clock.Now(),
-		})
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET size = 1100, expected_size = NULL, usage = '{"singular":1000}', next_scrape_at = %[1]d, resized_at = NULL WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+				INSERT INTO pending_operations (id, asset_id, reason, old_size, new_size, created_at, usage) VALUES (1, 1, 'high', 1100, 1320, %[2]d, '{"singular":1000}');
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+			s.Clock.Now().Unix(),
+		)
 	})
 }
 
@@ -507,17 +518,17 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(baseT *testing.T) {
 			Usage: 600,
 		})
 
+		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr0.Ignore()
+
 		s.Clock.StepBy(5 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectAssets(s.DB, db.Asset{
-			ID:           1,
-			ResourceID:   1,
-			UUID:         "asset1",
-			Size:         1200,
-			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 600},
-			NextScrapeAt: s.Clock.Now().Add(5 * time.Minute),
-			ExpectedSize: nil,
-		})
+
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET size = 1200, expected_size = NULL, usage = '{"singular":600}', next_scrape_at = %[1]d, never_scraped = FALSE, resized_at = NULL WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+		)
 	})
 }
 
@@ -534,33 +545,29 @@ func TestAssetScrapesGivesUpWaitingForResize(baseT *testing.T) {
 			Size:  1000, // == asset.Size (i.e. size before resize)
 			Usage: 500,
 		})
-		asset := db.Asset{
-			ID:           1,
-			ResourceID:   1,
-			UUID:         "asset1",
-			Size:         1000,
-			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
-			ExpectedSize: p2uint64(1100),
-			ResizedAt:    p2time(s.Clock.Now()),
-		}
+
+		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr0.Ignore()
 
 		// first scrape will not touch anything, since it's still waiting for the resize to complete
 		s.Clock.StepBy(5 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		asset.NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
-		t.ExpectAssets(s.DB, asset)
-		t.ExpectPendingOperations(s.DB /*, nothing */)
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET next_scrape_at = %[1]d, never_scraped = FALSE WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+		)
 
 		// after an hour, the scrape gives up waiting for the resize and resumes as normal
 		s.Clock.StepBy(1 * time.Hour)
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		asset.ExpectedSize = nil
-		asset.ResizedAt = nil
-		asset.NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
-		t.ExpectAssets(s.DB, asset)
-		t.ExpectPendingOperations(s.DB /*, nothing */)
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET expected_size = NULL, next_scrape_at = %[1]d, resized_at = NULL WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+		)
 	})
 }
 
@@ -573,6 +580,9 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 	// the main loop progresses to the next asset.
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
+		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr0.Ignore()
+
 		setAsset(plugins.StaticAsset{
 			Size:                 1000,
 			Usage:                600,
@@ -581,24 +591,14 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 
 		s.Clock.StepBy(5 * time.Minute)
 		err := scrapeJob.ProcessOne(ctx)
-		expectedMsg := `cannot query status of foo asset1: GetAssetStatus failing as requested`
-		if err == nil {
-			t.Error("ScrapeNextAsset should have failed here")
-		} else if err.Error() != expectedMsg {
-			t.Errorf("expected error %q, got %q", expectedMsg, err.Error())
-		}
+		assert.ErrEqual(t, err, "cannot query status of foo asset1: GetAssetStatus failing as requested")
 
-		t.ExpectAssets(s.DB, db.Asset{
-			ID:                 1,
-			ResourceID:         1,
-			UUID:               "asset1",
-			Size:               1000,
-			Usage:              castellum.UsageValues{castellum.SingularUsageMetric: 500}, // changed usage not observed because of error
-			NextScrapeAt:       s.Clock.Now().Add(5 * time.Minute),
-			ExpectedSize:       nil,
-			ScrapeErrorMessage: "GetAssetStatus failing as requested",
-			NeverScraped:       true,
-		})
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET scrape_error_message = '%[1]s', next_scrape_at = %[2]d WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+			`,
+			"GetAssetStatus failing as requested",
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+		)
 
 		// when GetAssetStatus starts working again, next ScrapeNextAsset should clear
 		// the error field
@@ -606,17 +606,11 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 		s.Clock.StepBy(5 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		t.ExpectAssets(s.DB, db.Asset{
-			ID:                 1,
-			ResourceID:         1,
-			UUID:               "asset1",
-			Size:               1000,
-			Usage:              castellum.UsageValues{castellum.SingularUsageMetric: 600},
-			NextScrapeAt:       s.Clock.Now().Add(5 * time.Minute),
-			ExpectedSize:       nil,
-			ScrapeErrorMessage: "",
-			NeverScraped:       false,
-		})
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET scrape_error_message = '', usage = '{"singular":600}', next_scrape_at = %[1]d, never_scraped = FALSE WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+		)
 
 		//Note: this test should be at the end, see below.
 		// Run GetAssetStatus on the same asset again except this time the
@@ -624,29 +618,29 @@ func TestAssetScrapeWithGetAssetStatusError(baseT *testing.T) {
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 600, CannotFindAsset: true})
 		s.Clock.StepBy(5 * time.Minute)
 		t.Must(scrapeJob.ProcessOne(ctx))
-		t.ExpectAssets(s.DB /*, nothing */)
+
+		tr.DBChanges().AssertEqualf(`DELETE FROM assets WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';`)
 	})
 }
 
 func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 	t := test.T{T: baseT}
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
+		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr0.Ignore()
+
 		// create a "High" operation
 		s.Clock.StepBy(10 * time.Minute)
 		setAsset(plugins.StaticAsset{Size: 1000, Usage: 900})
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		expectedOp := db.PendingOperation{
-			ID:        1,
-			AssetID:   1,
-			Reason:    castellum.OperationReasonHigh,
-			OldSize:   1000,
-			NewSize:   1200,
-			Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 900},
-			CreatedAt: s.Clock.Now(),
-		}
-		t.ExpectPendingOperations(s.DB, expectedOp)
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET usage = '{"singular":900}', next_scrape_at = %[1]d, never_scraped = FALSE WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+				INSERT INTO pending_operations (id, asset_id, reason, old_size, new_size, created_at, usage) VALUES (1, 1, 'high', 1000, 1200, %[2]d, '{"singular":900}');
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+			s.Clock.Now().Unix(),
+		)
 
 		// while it is not greenlit yet, simulate a resize operation
 		// being performed by an unrelated user
@@ -654,10 +648,14 @@ func TestExternalResizeWhileOperationPending(baseT *testing.T) {
 		setAsset(plugins.StaticAsset{Size: 1100, Usage: 900}) // bigger, but still >80% usage
 		t.Must(scrapeJob.ProcessOne(ctx))
 
-		// ScrapeNextAsset should have adjusted the NewSize to CurrentSize + SizeStep
-		expectedOp.NewSize = 1320
-		t.ExpectPendingOperations(s.DB, expectedOp)
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
+		// ScrapeJob should have adjusted the NewSize to CurrentSize + SizeStep
+		tr.DBChanges().AssertEqualf(`
+				UPDATE assets SET size = 1100, next_scrape_at = %[1]d WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+				UPDATE pending_operations SET new_size = 1320 WHERE id = 1 AND asset_id = 1;
+			`,
+			s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+			s.Clock.Now().Unix(),
+		)
 	})
 }
 
@@ -693,6 +691,9 @@ func TestMaxAssetSizeRules(baseT *testing.T) {
 	}
 	t.Must(s.DB.Insert(&asset))
 
+	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr0.Ignore()
+
 	amStatic := s.ManagerForAssetType("foo")
 	amStatic.Assets = map[string]map[string]plugins.StaticAsset{
 		"project1": {
@@ -703,18 +704,11 @@ func TestMaxAssetSizeRules(baseT *testing.T) {
 	s.Clock.StepBy(10 * time.Minute)
 	t.Must(scrapeJob.ProcessOne(ctx))
 
-	asset.NextScrapeAt = s.Clock.Now().Add(5 * time.Minute)
-	asset.Usage = castellum.UsageValues{castellum.SingularUsageMetric: 510}
-	t.ExpectAssets(s.DB, asset)
-
-	t.ExpectPendingOperations(s.DB, db.PendingOperation{
-		ID:        1,
-		AssetID:   1,
-		Reason:    castellum.OperationReasonLow,
-		OldSize:   1000,
-		NewSize:   800,
-		Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 510},
-		CreatedAt: s.Clock.Now(),
-	})
-	t.ExpectFinishedOperations(s.DB /*, nothing */)
+	tr.DBChanges().AssertEqualf(`
+			UPDATE assets SET usage = '{"singular":510}', next_scrape_at = %[1]d WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+			INSERT INTO pending_operations (id, asset_id, reason, old_size, new_size, created_at, usage) VALUES (1, 1, 'low', 1000, 800, %[2]d, '{"singular":510}');
+		`,
+		s.Clock.Now().Add(tasks.AssetScrapeInterval).Unix(),
+		s.Clock.Now().Unix(),
+	)
 }

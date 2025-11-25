@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/sapcc/go-api-declarations/castellum"
+	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/jobloop"
 
 	"github.com/sapcc/castellum/internal/db"
@@ -72,44 +73,33 @@ func TestSuccessfulResize(baseT *testing.T) {
 	}
 	t.Must(s.DB.Insert(&pendingOp))
 
+	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr0.Ignore()
+
 	// ExecuteOne(AssetResizeJob{}) should do nothing right now because that operation is
 	// only greenlit in the future, but not right now
 	err := resizeJob.ProcessOne(ctx)
 	if !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("expected sql.ErrNoRows, got %s instead", err.Error())
 	}
-	t.ExpectPendingOperations(s.DB, pendingOp)
-	t.ExpectFinishedOperations(s.DB /*, nothing */)
+	tr.DBChanges().AssertEmpty()
 
-	// go into the future and check that the operation gets executed
+	// go into the future and check that the operation gets executed;
+	// also the asset should now report an expected size, but still show the old size
+	// (until the next asset scrape)
 	s.Clock.StepBy(10 * time.Minute)
 	err = resizeJob.ProcessOne(ctx)
 	t.Must(err)
-	t.ExpectPendingOperations(s.DB /*, nothing */)
-	t.ExpectFinishedOperations(s.DB, db.FinishedOperation{
-		AssetID:     1,
-		Reason:      castellum.OperationReasonHigh,
-		OldSize:     1000,
-		NewSize:     1200,
-		Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 500},
-		CreatedAt:   s.Clock.Now().Add(-15 * time.Minute),
-		ConfirmedAt: p2time(s.Clock.Now().Add(-10 * time.Minute)),
-		GreenlitAt:  p2time(s.Clock.Now().Add(-5 * time.Minute)),
-		FinishedAt:  s.Clock.Now(),
-		Outcome:     castellum.OperationOutcomeSucceeded,
-	})
-
-	// expect asset to report an expected size, but still show the old size
-	// (until the next asset scrape)
-	t.ExpectAssets(s.DB, db.Asset{
-		ID:           1,
-		ResourceID:   1,
-		UUID:         "asset1",
-		Size:         1000,
-		Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
-		ExpectedSize: p2uint64(1200),
-		ResizedAt:    p2time(s.Clock.Now()),
-	})
+	tr.DBChanges().AssertEqualf(`
+			UPDATE assets SET expected_size = 1200, resized_at = %[4]d WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
+			INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, finished_at, usage) VALUES (1, 'high', 'succeeded', 1000, 1200, %[1]d, %[2]d, %[3]d, %[4]d, '{"singular":500}');
+			DELETE FROM pending_operations WHERE id = 1 AND asset_id = 1;
+		`,
+		s.Clock.Now().Add(-15*time.Minute).Unix(),
+		s.Clock.Now().Add(-10*time.Minute).Unix(),
+		s.Clock.Now().Add(-5*time.Minute).Unix(),
+		s.Clock.Now().Unix(),
+	)
 }
 
 func TestFailingResize(tBase *testing.T) {
@@ -134,35 +124,24 @@ func TestFailingResize(tBase *testing.T) {
 	}
 	t.Must(s.DB.Insert(&pendingOp))
 
+	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr0.Ignore()
+
 	amStatic := s.ManagerForAssetType("foo")
 	amStatic.SetAssetSizeFails = true
 	t.Must(resizeJob.ProcessOne(ctx))
 
-	// check that resizing fails as expected
-	t.ExpectPendingOperations(s.DB /*, nothing */)
-	t.ExpectFinishedOperations(s.DB, db.FinishedOperation{
-		AssetID:      1,
-		Reason:       castellum.OperationReasonLow,
-		OldSize:      1000,
-		NewSize:      600,
-		Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
-		CreatedAt:    s.Clock.Now().Add(-10 * time.Minute),
-		ConfirmedAt:  p2time(s.Clock.Now().Add(-5 * time.Minute)),
-		GreenlitAt:   p2time(s.Clock.Now().Add(-5 * time.Minute)),
-		FinishedAt:   s.Clock.Now(),
-		Outcome:      castellum.OperationOutcomeFailed,
-		ErrorMessage: "SetAssetSize failing as requested",
-	})
-
-	// check that asset does not have an ExpectedSize
-	t.ExpectAssets(s.DB, db.Asset{
-		ID:           1,
-		ResourceID:   1,
-		UUID:         "asset1",
-		Size:         1000,
-		Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
-		ExpectedSize: nil,
-	})
+	// check that resizing fails as expected,
+	// and thus the asset does not have an ExpectedSize
+	tr.DBChanges().AssertEqualf(`
+			INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, finished_at, error_message, usage) VALUES (1, 'low', 'failed', 1000, 600, %[1]d, %[2]d, %[2]d, %[3]d, '%[4]s', '{"singular":500}');
+			DELETE FROM pending_operations WHERE id = 1 AND asset_id = 1;
+		`,
+		s.Clock.Now().Add(-10*time.Minute).Unix(),
+		s.Clock.Now().Add(-5*time.Minute).Unix(),
+		s.Clock.Now().Unix(),
+		"SetAssetSize failing as requested",
+	)
 }
 
 func TestErroringResize(tBase *testing.T) {
@@ -187,16 +166,25 @@ func TestErroringResize(tBase *testing.T) {
 	}
 	t.Must(s.DB.Insert(&pendingOp))
 
+	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr0.Ignore()
+
 	// when the outcome of the resize is "errored", we can retry several times
-	for range tasks.MaxRetries {
+	for attempt := range tasks.MaxRetries {
 		s.Clock.StepBy(10 * time.Minute)
 		t.Must(resizeJob.ProcessOne(ctx))
 
-		pendingOp.ID++
-		pendingOp.ErroredAttempts++
-		pendingOp.RetryAt = p2time(s.Clock.Now().Add(tasks.RetryInterval))
-		t.ExpectPendingOperations(s.DB, pendingOp)
-		t.ExpectFinishedOperations(s.DB /*, nothing */)
+		tr.DBChanges().AssertEqualf(`
+				DELETE FROM pending_operations WHERE id = %[1]d AND asset_id = 1;
+				INSERT INTO pending_operations (id, asset_id, reason, old_size, new_size, created_at, confirmed_at, greenlit_at, errored_attempts, retry_at, usage) VALUES (%[2]d, 1, 'low', 1000, 400, %[3]d, %[4]d, %[5]d, %[1]d, %[6]d, '{"singular":500}');
+			`,
+			attempt+1, // ID of pending operation deleted in this attempt
+			attempt+2, // ID of pending operation created after this attempt
+			pendingOp.CreatedAt.Unix(),
+			pendingOp.ConfirmedAt.Unix(),
+			pendingOp.GreenlitAt.Unix(),
+			s.Clock.Now().Add(tasks.RetryInterval).Unix(),
+		)
 	}
 
 	// ExecuteOne(AssetResizeJob{}) should do nothing right now because, although the
@@ -205,35 +193,20 @@ func TestErroringResize(tBase *testing.T) {
 	if !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("expected sql.ErrNoRows, got %s instead", err.Error())
 	}
-	t.ExpectPendingOperations(s.DB, pendingOp)
-	t.ExpectFinishedOperations(s.DB /*, nothing */)
+	tr.DBChanges().AssertEmpty()
 
-	// check that resizing errors as expected once the retry budget is exceeded
+	// check that resizing errors as expected once the retry budget is exceeded,
+	// and thus the asset does not have an ExpectedSize
 	s.Clock.StepBy(10 * time.Minute)
 	t.Must(resizeJob.ProcessOne(ctx))
-	t.ExpectPendingOperations(s.DB /*, nothing */)
-	t.ExpectFinishedOperations(s.DB, db.FinishedOperation{
-		AssetID:         1,
-		Reason:          castellum.OperationReasonLow,
-		OldSize:         1000,
-		NewSize:         400,
-		Usage:           castellum.UsageValues{castellum.SingularUsageMetric: 500},
-		CreatedAt:       pendingOp.CreatedAt,
-		ConfirmedAt:     pendingOp.ConfirmedAt,
-		GreenlitAt:      pendingOp.GreenlitAt,
-		FinishedAt:      s.Clock.Now(),
-		Outcome:         castellum.OperationOutcomeErrored,
-		ErrorMessage:    "cannot set size smaller than current usage",
-		ErroredAttempts: tasks.MaxRetries,
-	})
-
-	// check that asset does not have an ExpectedSize
-	t.ExpectAssets(s.DB, db.Asset{
-		ID:           1,
-		ResourceID:   1,
-		UUID:         "asset1",
-		Size:         1000,
-		Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
-		ExpectedSize: nil,
-	})
+	tr.DBChanges().AssertEqualf(`
+			INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, finished_at, error_message, errored_attempts, usage) VALUES (1, 'low', 'errored', 1000, 400, %[1]d, %[2]d, %[3]d, %[4]d, '%[5]s', 3, '{"singular":500}');
+			DELETE FROM pending_operations WHERE id = 4 AND asset_id = 1;
+		`,
+		pendingOp.CreatedAt.Unix(),
+		pendingOp.ConfirmedAt.Unix(),
+		pendingOp.GreenlitAt.Unix(),
+		s.Clock.Now().Unix(),
+		"cannot set size smaller than current usage",
+	)
 }
