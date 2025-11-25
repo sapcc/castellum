@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
@@ -112,20 +113,20 @@ func TestGetAsset(t *testing.T) {
 	req.Check(t, hh)
 
 	// check rendering of a pending operation in state "confirmed"
-	pendingOp.ConfirmedAt = p2time(time.Unix(22, 0).UTC())
+	pendingOp.ConfirmedAt = Some(time.Unix(22, 0).UTC())
 	must.SucceedT(t, s.DBUpdate(&pendingOp))
 	pendingOpJSON["state"] = "confirmed"
 	pendingOpJSON["confirmed"] = assert.JSONObject{"at": 22}
 	req.Check(t, hh)
 
 	// check rendering of a pending operation in state "greenlit"
-	pendingOp.GreenlitAt = p2time(time.Unix(23, 0).UTC())
+	pendingOp.GreenlitAt = Some(time.Unix(23, 0).UTC())
 	must.SucceedT(t, s.DBUpdate(&pendingOp))
 	pendingOpJSON["state"] = "greenlit"
 	pendingOpJSON["greenlit"] = assert.JSONObject{"at": 23}
 	req.Check(t, hh)
 
-	pendingOp.GreenlitByUserUUID = p2string("user1")
+	pendingOp.GreenlitByUserUUID = Some("user1")
 	must.SucceedT(t, s.DBUpdate(&pendingOp))
 	pendingOpJSON["greenlit"] = assert.JSONObject{"at": 23, "by_user": "user1"}
 	req.Check(t, hh)
@@ -270,11 +271,4 @@ func TestPostAssetErrorResolved(t *testing.T) {
 		Path:         "/v1/projects/project1/assets/foo/fooasset1/error-resolved",
 		ExpectStatus: http.StatusConflict,
 	}.Check(t, hh)
-}
-
-func p2string(val string) *string {
-	return &val
-}
-func p2time(val time.Time) *time.Time {
-	return &val
 }

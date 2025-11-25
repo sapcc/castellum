@@ -17,6 +17,7 @@ import (
 	"github.com/dlmiddlecote/sqlstats"
 	"github.com/go-gorp/gorp/v3"
 	"github.com/gophercloud/gophercloud/v2/openstack"
+	. "github.com/majewsky/gg/option"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
@@ -301,10 +302,10 @@ PROMPT:
 			}
 
 		case "show":
-			var previousStatus *core.AssetStatus
+			var previousStatus Option[core.AssetStatus]
 			switch {
 			case len(fields) == 3:
-				previousStatus = nil
+				previousStatus = None[core.AssetStatus]()
 			case len(fields) >= 5:
 				size, err := strconv.ParseUint(fields[3], 10, 64)
 				if err != nil {
@@ -325,7 +326,7 @@ PROMPT:
 					}
 					usageValues[castellum.UsageMetric(subfields[0])] = usage
 				}
-				previousStatus = &core.AssetStatus{Size: size, Usage: usageValues}
+				previousStatus = Some(core.AssetStatus{Size: size, Usage: usageValues})
 			default:
 				logg.Error("wrong number of arguments")
 				continue
@@ -339,8 +340,11 @@ PROMPT:
 			for metric, value := range result.Usage {
 				logg.Info("usage[%s] = %g", metric, value)
 			}
-			if result.StrictMinimumSize != nil {
-				logg.Info("minsize = %d", *result.StrictMinimumSize)
+			if value, ok := result.StrictMinimumSize.Unpack(); ok {
+				logg.Info("minSize = %d", value)
+			}
+			if value, ok := result.StrictMaximumSize.Unpack(); ok {
+				logg.Info("maxSize = %d", value)
 			}
 
 		case "resize":

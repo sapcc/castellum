@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/go-gorp/gorp/v3"
+	. "github.com/majewsky/gg/option"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/errext"
@@ -91,14 +92,14 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 	}
 
 	// check asset status
-	var oldStatus *core.AssetStatus
+	oldStatus := None[core.AssetStatus]()
 	if !asset.NeverScraped {
-		oldStatus = &core.AssetStatus{
+		oldStatus = Some(core.AssetStatus{
 			Size:              asset.Size,
 			Usage:             asset.Usage,
 			StrictMinimumSize: asset.StrictMinimumSize,
 			StrictMaximumSize: asset.StrictMaximumSize,
-		}
+		})
 	}
 	startedAt := c.TimeNow()
 	status, err := manager.GetAssetStatus(ctx, res, asset.UUID, oldStatus)
@@ -135,11 +136,11 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 
 	if logScrapes {
 		var valueLogStrings []string
-		if status.StrictMinimumSize != nil {
-			valueLogStrings = append(valueLogStrings, fmt.Sprintf("minimum size = %d", *status.StrictMinimumSize))
+		if val, ok := status.StrictMinimumSize.Unpack(); ok {
+			valueLogStrings = append(valueLogStrings, fmt.Sprintf("minimum size = %d", val))
 		}
-		if status.StrictMaximumSize != nil {
-			valueLogStrings = append(valueLogStrings, fmt.Sprintf("maximum size = %d", *status.StrictMaximumSize))
+		if val, ok := status.StrictMaximumSize.Unpack(); ok {
+			valueLogStrings = append(valueLogStrings, fmt.Sprintf("maximum size = %d", val))
 		}
 		for metric, usage := range status.Usage {
 			valueLogStrings = append(valueLogStrings, fmt.Sprintf(
@@ -161,11 +162,11 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 	asset.NeverScraped = false
 	var writeScrapeResults bool
 	switch {
-	case asset.ExpectedSize == nil:
+	case asset.ExpectedSize == None[uint64]():
 		// normal case: no resize operation has recently completed -> record
 		// status.Size as actual size
 		writeScrapeResults = true
-	case *asset.ExpectedSize == status.Size:
+	case asset.ExpectedSize == Some(status.Size):
 		// a resize operation has completed, and now we're seeing the new size in
 		// the backend -> record status.Size as actualSize and clear ExpectedSize
 		writeScrapeResults = true
@@ -175,14 +176,14 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 		// OldSize nor its NewSize) -> assume that some other user changed the size
 		// in parallel and take that new value as the actual size
 		writeScrapeResults = true
-	case asset.ResizedAt != nil && asset.ResizedAt.Before(c.TimeNow().Add(-1*time.Hour)):
+	case asset.ResizedAt.IsSomeAnd(func(t time.Time) bool { return t.Before(c.TimeNow().Add(-1 * time.Hour)) }):
 		// we waited for a resize operation to be reflected in the backend, but it
 		// has been more than an hour since then -> assume that the resize was
 		// interrupted in some way and resume normal behavior
 		writeScrapeResults = true
 		logg.Info("giving up on waiting for resize of %s %s from size = %d to size = %d to be completed in the backend",
 			res.AssetType, asset.UUID,
-			asset.Size, *asset.ExpectedSize,
+			asset.Size, asset.ExpectedSize.UnwrapOrPanic("cannot be None"),
 		)
 	default:
 		// we are waiting for a resize operation to reflect in the backend, but
@@ -190,7 +191,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 		writeScrapeResults = false
 		logg.Info("still waiting for resize of %s %s from size = %d to size = %d to be completed in the backend",
 			res.AssetType, asset.UUID,
-			asset.Size, *asset.ExpectedSize,
+			asset.Size, asset.ExpectedSize.UnwrapOrPanic("cannot be None"),
 		)
 	}
 	if writeScrapeResults {
@@ -198,13 +199,13 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 		asset.Usage = status.Usage
 		asset.StrictMinimumSize = status.StrictMinimumSize
 		asset.StrictMaximumSize = status.StrictMaximumSize
-		asset.ExpectedSize = nil
-		asset.ResizedAt = nil
+		asset.ExpectedSize = None[uint64]()
+		asset.ResizedAt = None[time.Time]()
 	}
 
 	// compute value of `asset.CriticalUsages` field (for reporting to admin only)
 	var criticalUsageMetrics []string
-	if res.CriticalThresholdPercent.IsNonZero() && (res.MaximumSize == nil || asset.Size < *res.MaximumSize) {
+	if res.CriticalThresholdPercent.IsNonZero() && res.MaximumSize.IsNoneOr(func(maxSize uint64) bool { return asset.Size < maxSize }) {
 		usagePerc := core.GetMultiUsagePercent(asset.Size, asset.Usage)
 		for _, metric := range info.UsageMetrics {
 			if usagePerc[metric] >= res.CriticalThresholdPercent[metric] {
@@ -225,7 +226,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 
 	// never touch operations in status "greenlit" - they may be executing on a
 	// worker right now
-	if pendingOp != nil && pendingOp.GreenlitAt != nil && !pendingOp.GreenlitAt.After(c.TimeNow()) {
+	if pendingOp != nil && pendingOp.GreenlitAt.IsSomeAnd(func(t time.Time) bool { return !t.After(c.TimeNow()) }) {
 		return tx.Commit()
 	}
 
@@ -291,7 +292,7 @@ func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, ass
 
 	// critical operations can be confirmed immediately
 	if op.Reason == castellum.OperationReasonCritical {
-		op.ConfirmedAt = &op.CreatedAt
+		op.ConfirmedAt = Some(op.CreatedAt)
 		// right now, nothing requires operator approval
 		op.GreenlitAt = op.ConfirmedAt
 	}
@@ -368,7 +369,7 @@ func (c Context) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, as
 
 	previousState := op.State()
 	confirmedAt := c.TimeNow()
-	op.ConfirmedAt = &confirmedAt
+	op.ConfirmedAt = Some(confirmedAt)
 	op.GreenlitAt = op.ConfirmedAt // right now, nothing requires operator approval
 	_, err := tx.Update(&op)
 	core.CountStateTransition(res, asset.UUID, previousState, op.State())

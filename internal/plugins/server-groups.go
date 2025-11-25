@@ -25,6 +25,7 @@ import (
 	"github.com/gophercloud/gophercloud/v2/openstack/image/v2/images"
 	"github.com/gophercloud/gophercloud/v2/openstack/keymanager/v1/secrets"
 	"github.com/gophercloud/gophercloud/v2/openstack/loadbalancer/v2/pools"
+	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/must"
@@ -90,14 +91,14 @@ func (m *assetManagerServerGroups) Init(ctx context.Context, provider core.Provi
 }
 
 // InfoForAssetType implements the core.AssetManager interface.
-func (m *assetManagerServerGroups) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
+func (m *assetManagerServerGroups) InfoForAssetType(assetType db.AssetType) Option[core.AssetTypeInfo] {
 	if strings.HasPrefix(string(assetType), "server-group:") {
-		return &core.AssetTypeInfo{
+		return Some(core.AssetTypeInfo{
 			AssetType:    assetType,
 			UsageMetrics: []castellum.UsageMetric{"cpu", "ram"},
-		}
+		})
 	}
-	return nil
+	return None[core.AssetTypeInfo]()
 }
 
 // CheckResourceAllowed implements the core.AssetManager interface.
@@ -124,7 +125,7 @@ func (m *assetManagerServerGroups) ListAssets(_ context.Context, res db.Resource
 }
 
 // GetAssetStatus implements the core.AssetManager interface.
-func (m *assetManagerServerGroups) GetAssetStatus(ctx context.Context, res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
+func (m *assetManagerServerGroups) GetAssetStatus(ctx context.Context, res db.Resource, assetUUID string, previousStatus Option[core.AssetStatus]) (core.AssetStatus, error) {
 	computeV2, err := m.Provider.CloudAdminClient(openstack.NewComputeV2)
 	if err != nil {
 		return core.AssetStatus{}, err

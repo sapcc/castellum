@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/cadf"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/audittools"
@@ -37,38 +38,37 @@ func (h handler) ResourceFromDB(res db.Resource) (castellum.Resource, error) {
 		SizeSteps:  castellum.SizeSteps{Percent: res.SizeStepPercent, Single: res.SingleStep},
 	}
 	if res.ConfigJSON != "" {
-		val := json.RawMessage(res.ConfigJSON)
-		result.ConfigJSON = &val
+		result.ConfigJSON = Some(json.RawMessage(res.ConfigJSON))
 	}
 	if res.ScrapeErrorMessage != "" {
-		result.Checked = &castellum.Checked{
+		result.Checked = Some(castellum.Checked{
 			ErrorMessage: res.ScrapeErrorMessage,
-		}
+		})
 	}
 	if res.LowThresholdPercent.IsNonZero() {
-		result.LowThreshold = &castellum.Threshold{
+		result.LowThreshold = Some(castellum.Threshold{
 			UsagePercent: res.LowThresholdPercent,
 			DelaySeconds: res.LowDelaySeconds,
-		}
+		})
 	}
 	if res.HighThresholdPercent.IsNonZero() {
-		result.HighThreshold = &castellum.Threshold{
+		result.HighThreshold = Some(castellum.Threshold{
 			UsagePercent: res.HighThresholdPercent,
 			DelaySeconds: res.HighDelaySeconds,
-		}
+		})
 	}
 	if res.CriticalThresholdPercent.IsNonZero() {
-		result.CriticalThreshold = &castellum.Threshold{
+		result.CriticalThreshold = Some(castellum.Threshold{
 			UsagePercent: res.CriticalThresholdPercent,
-		}
+		})
 	}
-	if res.MinimumSize != nil || res.MaximumSize != nil || res.MinimumFreeSize != nil || res.MinimumFreeIsCritical {
-		result.SizeConstraints = &castellum.SizeConstraints{
+	if res.MinimumSize.IsSome() || res.MaximumSize.IsSome() || res.MinimumFreeSize.IsSome() || res.MinimumFreeIsCritical {
+		result.SizeConstraints = Some(castellum.SizeConstraints{
 			Minimum:               res.MinimumSize,
 			Maximum:               res.MaximumSize,
 			MinimumFree:           res.MinimumFreeSize,
 			MinimumFreeIsCritical: res.MinimumFreeIsCritical,
-		}
+		})
 	}
 	return result, nil
 }

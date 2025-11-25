@@ -111,14 +111,14 @@ func (m *assetManagerNFS) Init(ctx context.Context, provider core.ProviderClient
 }
 
 // InfoForAssetType implements the core.AssetManager interface.
-func (m *assetManagerNFS) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
+func (m *assetManagerNFS) InfoForAssetType(assetType db.AssetType) Option[core.AssetTypeInfo] {
 	if m.parseAssetType(assetType).IsSome() {
-		return &core.AssetTypeInfo{
+		return Some(core.AssetTypeInfo{
 			AssetType:    assetType,
 			UsageMetrics: []castellum.UsageMetric{castellum.SingularUsageMetric},
-		}
+		})
 	}
-	return nil
+	return None[core.AssetTypeInfo]()
 }
 
 // CheckResourceAllowed implements the core.AssetManager interface.
@@ -251,7 +251,7 @@ func (m *assetManagerNFS) resize(ctx context.Context, assetUUID string, oldSize,
 }
 
 // GetAssetStatus implements the core.AssetManager interface.
-func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
+func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, assetUUID string, previousStatus Option[core.AssetStatus]) (core.AssetStatus, error) {
 	// query Prometheus metrics for size and usage
 	metrics, err := m.ShareMetrics.Get(ctx, manilaShareMetricsKey{
 		ProjectUUID: res.ScopeUUID,
@@ -277,13 +277,13 @@ func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res db.Resource, a
 
 	status := core.AssetStatus{
 		Size:              *metrics.SizeGiB,
-		StrictMinimumSize: &metrics.MinSizeGiB,
+		StrictMinimumSize: Some(metrics.MinSizeGiB),
 		Usage:             castellum.UsageValues{castellum.SingularUsageMetric: *metrics.UsedGiB},
 	}
 
 	// when size has changed compared to last time, double-check with the Manila
 	// API (this call is expensive, so we only do it when really necessary)
-	if previousStatus == nil || previousStatus.Size != status.Size {
+	if previousStatus.IsSomeAnd(func(prev core.AssetStatus) bool { return prev.Size != status.Size }) {
 		share, err := shares.Get(ctx, m.Manila, assetUUID).Extract()
 		if err != nil {
 			return core.AssetStatus{}, fmt.Errorf("cannot get status of share %s from Manila API: %w", assetUUID, err)

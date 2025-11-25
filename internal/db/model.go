@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-gorp/gorp/v3"
+	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/easypg"
 )
@@ -48,12 +49,12 @@ type Resource struct {
 
 	// This defines absolute boundaries for the asset size. If configured, resize
 	// operations will never move to a size outside this range.
-	MinimumSize *uint64 `db:"min_size"`
-	MaximumSize *uint64 `db:"max_size"`
+	MinimumSize Option[uint64] `db:"min_size"`
+	MaximumSize Option[uint64] `db:"max_size"`
 	// If configured, downsize operations will be inhibited when
 	// `newSize - absoluteUsage` would be smaller than this, and upsize operations
 	// will be forced when `currentSize - absoluteUsage` is smaller than this.
-	MinimumFreeSize *uint64 `db:"min_free_size"`
+	MinimumFreeSize Option[uint64] `db:"min_free_size"`
 	// When true, upsize operations forced by MinimumFreeSize will be critical actions.
 	MinimumFreeIsCritical bool `db:"min_free_is_critical"`
 
@@ -119,8 +120,8 @@ type Asset struct {
 	// by contrast, are actively enforced: Sizes beyond these boundaries will
 	// result in a resize operation to move back into the boundary (hence the
 	// qualifier "strict").
-	StrictMinimumSize *uint64 `db:"strict_min_size"`
-	StrictMaximumSize *uint64 `db:"strict_max_size"`
+	StrictMinimumSize Option[uint64] `db:"strict_min_size"`
+	StrictMaximumSize Option[uint64] `db:"strict_max_size"`
 
 	// This flag is set by a Castellum worker after a resize operation to indicate
 	// that the .Size attribute is outdated. The value is the new_size of the
@@ -129,9 +130,9 @@ type Asset struct {
 	// delays. That's why we have both .Size and .ExpectedSize: to accurately
 	// detect when the resize operation has reflected in the datastore that we're
 	// polling for GetAssetStatus().
-	ExpectedSize *uint64 `db:"expected_size"`
+	ExpectedSize Option[uint64] `db:"expected_size"`
 	// If ExpectedSize is not nil, this is the timestamp when ExpectedSize is filled.
-	ResizedAt *time.Time `db:"resized_at"`
+	ResizedAt Option[time.Time] `db:"resized_at"`
 
 	// If the last scrape failed, contains the error message returned by
 	// GetAssetStatus(). Contains the empty string otherwise.
@@ -168,18 +169,18 @@ type PendingOperation struct {
 	// When we first saw usage crossing the threshold.
 	CreatedAt time.Time `db:"created_at"`
 	// When we confirmed that usage had crossed the threshold for the required time. (For .Reason == OperationReasonCritical, this is equal to CreatedAt.)
-	ConfirmedAt *time.Time `db:"confirmed_at"`
+	ConfirmedAt Option[time.Time] `db:"confirmed_at"`
 	// When a user permitted this operation to go ahead. (For operations not
 	// subject to operator approval, this is equal to ConfirmedAt.) The value may
 	// be in the future when the operator wants to delay the operation until the
 	// next maintenance window. The resize will only be executed once .GreenlitAt
 	// is non-null and refers to a point in time that is in the past.
-	GreenlitAt *time.Time `db:"greenlit_at"`
+	GreenlitAt Option[time.Time] `db:"greenlit_at"`
 
 	// The UUID of the user that greenlit this operation, if any. If GreenlitAt is
 	// not null, but this field is null, it means that the operation did not
 	// require operator approval.
-	GreenlitByUserUUID *string `db:"greenlit_by_user_uuid"`
+	GreenlitByUserUUID Option[string] `db:"greenlit_by_user_uuid"`
 
 	// When the resize results in the outcome "errored", we have the option of
 	// retrying at a later point in time. This field tracks how many times the
@@ -187,7 +188,7 @@ type PendingOperation struct {
 	ErroredAttempts uint32 `db:"errored_attempts"`
 	// When we will attempt the next resize. This field is only filled after an
 	// errored resize, i.e. when `op.ErroredAttempts > 0`.
-	RetryAt *time.Time `db:"retry_at"`
+	RetryAt Option[time.Time] `db:"retry_at"`
 }
 
 // IntoFinishedOperation creates the FinishedOperation for this PendingOperation.
@@ -220,23 +221,23 @@ type FinishedOperation struct {
 	NewSize uint64                `db:"new_size"`
 	Usage   castellum.UsageValues `db:"usage"`
 
-	CreatedAt   time.Time  `db:"created_at"`
-	ConfirmedAt *time.Time `db:"confirmed_at"`
-	GreenlitAt  *time.Time `db:"greenlit_at"`
+	CreatedAt   time.Time         `db:"created_at"`
+	ConfirmedAt Option[time.Time] `db:"confirmed_at"`
+	GreenlitAt  Option[time.Time] `db:"greenlit_at"`
 	// When the resize operation succeeded, failed, errored, or was cancelled.
 	FinishedAt time.Time `db:"finished_at"`
 
-	GreenlitByUserUUID *string `db:"greenlit_by_user_uuid"`
-	ErrorMessage       string  `db:"error_message"`
-	ErroredAttempts    uint32  `db:"errored_attempts"`
+	GreenlitByUserUUID Option[string] `db:"greenlit_by_user_uuid"`
+	ErrorMessage       string         `db:"error_message"`
+	ErroredAttempts    uint32         `db:"errored_attempts"`
 }
 
 // State returns the operation's state as a word.
 func (o PendingOperation) State() castellum.OperationState {
 	switch {
-	case o.ConfirmedAt == nil:
+	case o.ConfirmedAt.IsNone():
 		return castellum.OperationStateCreated
-	case o.GreenlitAt == nil:
+	case o.GreenlitAt.IsNone():
 		return castellum.OperationStateConfirmed
 	default:
 		return castellum.OperationStateGreenlit

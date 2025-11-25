@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/cadf"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
@@ -393,13 +394,13 @@ func TestMaxAssetSizeFor(t *testing.T) {
 		}
 	)
 
-	assert.DeepEqual(t, "foo", *cfg.MaxAssetSizeFor(db.AssetType("foo"), ""), maxFooSize)
-	assert.DeepEqual(t, "bar", *cfg.MaxAssetSizeFor(db.AssetType("bar"), ""), maxBarSize)
-	assert.DeepEqual(t, "foobar", *cfg.MaxAssetSizeFor(db.AssetType("foobar"), ""), maxBarSize)
-	assert.DeepEqual(t, "somebar", *cfg.MaxAssetSizeFor(db.AssetType("somebar"), ""), maxBarSize)
-	assert.DeepEqual(t, "somebar+scope", *cfg.MaxAssetSizeFor(db.AssetType("somebar"), "somescope"), maxSomeSize)
-	assert.DeepEqual(t, "buz", cfg.MaxAssetSizeFor(db.AssetType("buz"), ""), (*uint64)(nil))
-	assert.DeepEqual(t, "somefoo", cfg.MaxAssetSizeFor(db.AssetType("somefoo"), ""), (*uint64)(nil))
+	assert.Equal(t, cfg.MaxAssetSizeFor(db.AssetType("foo"), ""), Some(maxFooSize))
+	assert.Equal(t, cfg.MaxAssetSizeFor(db.AssetType("bar"), ""), Some(maxBarSize))
+	assert.Equal(t, cfg.MaxAssetSizeFor(db.AssetType("foobar"), ""), Some(maxBarSize))
+	assert.Equal(t, cfg.MaxAssetSizeFor(db.AssetType("somebar"), ""), Some(maxBarSize))
+	assert.Equal(t, cfg.MaxAssetSizeFor(db.AssetType("somebar"), "somescope"), Some(maxSomeSize))
+	assert.Equal(t, cfg.MaxAssetSizeFor(db.AssetType("buz"), ""), None[uint64]())
+	assert.Equal(t, cfg.MaxAssetSizeFor(db.AssetType("somefoo"), ""), None[uint64]())
 }
 
 func TestPutResourceValidationErrors(t *testing.T) {
