@@ -10,14 +10,14 @@ import (
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
+	"github.com/sapcc/go-bits/must"
 
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/test"
 )
 
-func TestGetResourceScrapeErrors(baseT *testing.T) {
-	t := test.T{T: baseT}
-	s := test.NewSetup(t.T,
+func TestGetResourceScrapeErrors(t *testing.T) {
+	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
 	hh := s.Handler
@@ -28,7 +28,7 @@ func TestGetResourceScrapeErrors(baseT *testing.T) {
 		Method:       "GET",
 		Path:         "/v1/admin/resource-scrape-errors",
 		ExpectStatus: http.StatusForbidden,
-	}.Check(t.T, hh)
+	}.Check(t, hh)
 	s.Validator.Enforcer.Allow("cluster:access")
 
 	// happy path
@@ -56,12 +56,11 @@ func TestGetResourceScrapeErrors(baseT *testing.T) {
 				},
 			},
 		},
-	}.Check(t.T, hh)
+	}.Check(t, hh)
 }
 
-func TestGetAssetScrapeErrors(baseT *testing.T) {
-	t := test.T{T: baseT}
-	s := test.NewSetup(t.T,
+func TestGetAssetScrapeErrors(t *testing.T) {
+	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
 	hh := s.Handler
@@ -72,7 +71,7 @@ func TestGetAssetScrapeErrors(baseT *testing.T) {
 		Method:       "GET",
 		Path:         "/v1/admin/asset-scrape-errors",
 		ExpectStatus: http.StatusForbidden,
-	}.Check(t.T, hh)
+	}.Check(t, hh)
 	s.Validator.Enforcer.Allow("cluster:access")
 
 	assert.HTTPRequest{
@@ -92,12 +91,11 @@ func TestGetAssetScrapeErrors(baseT *testing.T) {
 				},
 			},
 		},
-	}.Check(t.T, hh)
+	}.Check(t, hh)
 }
 
-func TestGetAssetResizeErrors(baseT *testing.T) {
-	t := test.T{T: baseT}
-	s := test.NewSetup(t.T,
+func TestGetAssetResizeErrors(t *testing.T) {
+	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
 	hh := s.Handler
@@ -108,7 +106,7 @@ func TestGetAssetResizeErrors(baseT *testing.T) {
 		Method:       "GET",
 		Path:         "/v1/admin/asset-resize-errors",
 		ExpectStatus: http.StatusForbidden,
-	}.Check(t.T, hh)
+	}.Check(t, hh)
 	s.Validator.Enforcer.Allow("cluster:access")
 
 	// check that the "errored" resize operation is rendered properly
@@ -133,11 +131,11 @@ func TestGetAssetResizeErrors(baseT *testing.T) {
 			},
 		},
 	}
-	req.Check(t.T, hh)
+	req.Check(t, hh)
 
 	// add a new operation on the same asset that results with outcome
 	// "succeeded" and check that we get an empty list
-	t.Must(s.DB.Insert(&db.FinishedOperation{
+	must.SucceedT(t, s.DB.Insert(&db.FinishedOperation{
 		AssetID:     1,
 		Reason:      castellum.OperationReasonCritical,
 		Outcome:     castellum.OperationOutcomeSucceeded,
@@ -152,5 +150,5 @@ func TestGetAssetResizeErrors(baseT *testing.T) {
 	req.ExpectBody = assert.JSONObject{
 		"asset_resize_errors": []assert.JSONObject{},
 	}
-	req.Check(t.T, hh)
+	req.Check(t, hh)
 }

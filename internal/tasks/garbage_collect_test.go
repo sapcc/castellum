@@ -9,30 +9,30 @@ import (
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/easypg"
+	"github.com/sapcc/go-bits/must"
 
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/tasks"
 	"github.com/sapcc/castellum/internal/test"
 )
 
-func TestCollectGarbage(baseT *testing.T) {
-	t := test.T{T: baseT}
-	s := test.NewSetup(t.T,
+func TestCollectGarbage(t *testing.T) {
+	s := test.NewSetup(t,
 		commonSetupOptionsForWorkerTest(),
 	)
 	fakeNow := time.Unix(0, 0).UTC()
 
 	// setup some minimal scaffolding (we can only insert finished_operations
 	// with valid asset IDs into the DB)
-	t.Must(s.DB.Insert(&db.Resource{
+	must.SucceedT(t, s.DB.Insert(&db.Resource{
 		ScopeUUID: "project1",
 		AssetType: "foo",
 	}))
-	t.Must(s.DB.Insert(&db.Asset{
+	must.SucceedT(t, s.DB.Insert(&db.Asset{
 		ResourceID: 1,
 		UUID:       "asset1",
 	}))
-	t.Must(s.DB.Insert(&db.Asset{
+	must.SucceedT(t, s.DB.Insert(&db.Asset{
 		ResourceID: 1,
 		UUID:       "asset2",
 	}))
@@ -72,13 +72,13 @@ func TestCollectGarbage(baseT *testing.T) {
 		},
 	}
 	for _, op := range ops {
-		t.Must(s.DB.Insert(&op))
+		must.SucceedT(t, s.DB.Insert(&op))
 	}
 
 	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
 	tr0.Ignore()
 
-	t.Must(tasks.CollectGarbage(s.DB, fakeNow.Add(-15*time.Minute)))
+	must.SucceedT(t, tasks.CollectGarbage(s.DB, fakeNow.Add(-15*time.Minute)))
 
 	// NOTE: `finished_operations` does not have a primary key, so this diff shows the full deleted records insteadj
 	tr.DBChanges().AssertEqualf(`

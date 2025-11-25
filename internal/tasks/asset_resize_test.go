@@ -13,6 +13,7 @@ import (
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/jobloop"
+	"github.com/sapcc/go-bits/must"
 
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
@@ -20,11 +21,11 @@ import (
 	"github.com/sapcc/castellum/internal/test"
 )
 
-func setupAssetResizeTest(t test.T, s test.Setup, assetCount int) jobloop.Job {
+func setupAssetResizeTest(t *testing.T, s test.Setup, assetCount int) jobloop.Job {
 	amStatic := s.ManagerForAssetType("foo")
 
 	// create a resource and assets to test with
-	t.Must(s.DB.Insert(&db.Resource{
+	must.SucceedT(t, s.DB.Insert(&db.Resource{
 		ScopeUUID: "project1",
 		AssetType: "foo",
 	}))
@@ -34,7 +35,7 @@ func setupAssetResizeTest(t test.T, s test.Setup, assetCount int) jobloop.Job {
 
 	for idx := 1; idx <= assetCount; idx++ {
 		uuid := fmt.Sprintf("asset%d", idx)
-		t.Must(s.DB.Insert(&db.Asset{
+		must.SucceedT(t, s.DB.Insert(&db.Asset{
 			ResourceID:   1,
 			UUID:         uuid,
 			Size:         1000,
@@ -51,10 +52,9 @@ func setupAssetResizeTest(t test.T, s test.Setup, assetCount int) jobloop.Job {
 	return s.TaskContext.AssetResizingJob(s.Registry)
 }
 
-func TestSuccessfulResize(baseT *testing.T) {
-	t := test.T{T: baseT}
+func TestSuccessfulResize(t *testing.T) {
 	ctx := t.Context()
-	s := test.NewSetup(t.T,
+	s := test.NewSetup(t,
 		commonSetupOptionsForWorkerTest(),
 	)
 	resizeJob := setupAssetResizeTest(t, s, 1)
@@ -71,7 +71,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 		ConfirmedAt: p2time(s.Clock.Now()),
 		GreenlitAt:  p2time(s.Clock.Now().Add(5 * time.Minute)),
 	}
-	t.Must(s.DB.Insert(&pendingOp))
+	must.SucceedT(t, s.DB.Insert(&pendingOp))
 
 	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
 	tr0.Ignore()
@@ -88,8 +88,7 @@ func TestSuccessfulResize(baseT *testing.T) {
 	// also the asset should now report an expected size, but still show the old size
 	// (until the next asset scrape)
 	s.Clock.StepBy(10 * time.Minute)
-	err = resizeJob.ProcessOne(ctx)
-	t.Must(err)
+	must.SucceedT(t, resizeJob.ProcessOne(ctx))
 	tr.DBChanges().AssertEqualf(`
 			UPDATE assets SET expected_size = 1200, resized_at = %[4]d WHERE id = 1 AND resource_id = 1 AND uuid = 'asset1';
 			INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, finished_at, usage) VALUES (1, 'high', 'succeeded', 1000, 1200, %[1]d, %[2]d, %[3]d, %[4]d, '{"singular":500}');
@@ -102,10 +101,9 @@ func TestSuccessfulResize(baseT *testing.T) {
 	)
 }
 
-func TestFailingResize(tBase *testing.T) {
-	t := test.T{T: tBase}
+func TestFailingResize(t *testing.T) {
 	ctx := t.Context()
-	s := test.NewSetup(t.T,
+	s := test.NewSetup(t,
 		commonSetupOptionsForWorkerTest(),
 	)
 	resizeJob := setupAssetResizeTest(t, s, 1)
@@ -122,14 +120,14 @@ func TestFailingResize(tBase *testing.T) {
 		ConfirmedAt: p2time(s.Clock.Now().Add(-5 * time.Minute)),
 		GreenlitAt:  p2time(s.Clock.Now().Add(-5 * time.Minute)),
 	}
-	t.Must(s.DB.Insert(&pendingOp))
+	must.SucceedT(t, s.DB.Insert(&pendingOp))
 
 	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
 	tr0.Ignore()
 
 	amStatic := s.ManagerForAssetType("foo")
 	amStatic.SetAssetSizeFails = true
-	t.Must(resizeJob.ProcessOne(ctx))
+	must.SucceedT(t, resizeJob.ProcessOne(ctx))
 
 	// check that resizing fails as expected,
 	// and thus the asset does not have an ExpectedSize
@@ -144,10 +142,9 @@ func TestFailingResize(tBase *testing.T) {
 	)
 }
 
-func TestErroringResize(tBase *testing.T) {
-	t := test.T{T: tBase}
+func TestErroringResize(t *testing.T) {
 	ctx := t.Context()
-	s := test.NewSetup(t.T,
+	s := test.NewSetup(t,
 		commonSetupOptionsForWorkerTest(),
 	)
 	resizeJob := setupAssetResizeTest(t, s, 1)
@@ -164,7 +161,7 @@ func TestErroringResize(tBase *testing.T) {
 		ConfirmedAt: p2time(s.Clock.Now().Add(-5 * time.Minute)),
 		GreenlitAt:  p2time(s.Clock.Now().Add(-5 * time.Minute)),
 	}
-	t.Must(s.DB.Insert(&pendingOp))
+	must.SucceedT(t, s.DB.Insert(&pendingOp))
 
 	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
 	tr0.Ignore()
@@ -172,7 +169,7 @@ func TestErroringResize(tBase *testing.T) {
 	// when the outcome of the resize is "errored", we can retry several times
 	for attempt := range tasks.MaxRetries {
 		s.Clock.StepBy(10 * time.Minute)
-		t.Must(resizeJob.ProcessOne(ctx))
+		must.SucceedT(t, resizeJob.ProcessOne(ctx))
 
 		tr.DBChanges().AssertEqualf(`
 				DELETE FROM pending_operations WHERE id = %[1]d AND asset_id = 1;
@@ -198,7 +195,7 @@ func TestErroringResize(tBase *testing.T) {
 	// check that resizing errors as expected once the retry budget is exceeded,
 	// and thus the asset does not have an ExpectedSize
 	s.Clock.StepBy(10 * time.Minute)
-	t.Must(resizeJob.ProcessOne(ctx))
+	must.SucceedT(t, resizeJob.ProcessOne(ctx))
 	tr.DBChanges().AssertEqualf(`
 			INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, finished_at, error_message, errored_attempts, usage) VALUES (1, 'low', 'errored', 1000, 400, %[1]d, %[2]d, %[3]d, %[4]d, '%[5]s', 3, '{"singular":500}');
 			DELETE FROM pending_operations WHERE id = 4 AND asset_id = 1;

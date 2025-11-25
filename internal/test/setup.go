@@ -179,3 +179,15 @@ func (s Setup) ManagerForAssetType(assetType db.AssetType) *plugins.AssetManager
 	}
 	return mgrStatic
 }
+
+// DBExec is a shorthand for s.DB.Exec() that discards the unused return value.
+func (s Setup) DBExec(query string, args ...any) error {
+	_, err := s.DB.Exec(query, args...)
+	return err
+}
+
+// DBUpdate is a shorthand for s.DB.Update() that discards the unused return value.
+func (s Setup) DBUpdate(records ...any) error {
+	_, err := s.DB.Update(records...)
+	return err
+}

@@ -31,7 +31,7 @@ func commonSetupOptionsForAPITest() test.SetupOption {
 	)
 }
 
-func testCommonEndpointBehavior(t test.T, hh http.Handler, s test.Setup, pathPattern string) {
+func testCommonEndpointBehavior(t *testing.T, hh http.Handler, s test.Setup, pathPattern string) {
 	path := func(projectID, resourceID string) string {
 		return fmt.Sprintf(pathPattern, projectID, resourceID)
 	}
@@ -42,7 +42,7 @@ func testCommonEndpointBehavior(t test.T, hh http.Handler, s test.Setup, pathPat
 		Method:       "GET",
 		Path:         path("project1", "foo"),
 		ExpectStatus: http.StatusForbidden,
-	}.Check(t.T, hh)
+	}.Check(t, hh)
 	s.Validator.Enforcer.Allow("project:access")
 
 	// expect error for unknown project or resource
@@ -50,12 +50,12 @@ func testCommonEndpointBehavior(t test.T, hh http.Handler, s test.Setup, pathPat
 		Method:       "GET",
 		Path:         path("project2", "foo"),
 		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
+	}.Check(t, hh)
 	assert.HTTPRequest{
 		Method:       "GET",
 		Path:         path("project1", "doesnotexist"),
 		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
+	}.Check(t, hh)
 
 	// the "unknown" resource exists, but it should be 404 regardless because we
 	// don't have an asset manager for it
@@ -63,7 +63,7 @@ func testCommonEndpointBehavior(t test.T, hh http.Handler, s test.Setup, pathPat
 		Method:       "GET",
 		Path:         path("project1", "unknown"),
 		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
+	}.Check(t, hh)
 
 	// expect error for inaccessible resource
 	s.Validator.Enforcer.Forbid("project:show:foo")
@@ -71,6 +71,6 @@ func testCommonEndpointBehavior(t test.T, hh http.Handler, s test.Setup, pathPat
 		Method:       "GET",
 		Path:         path("project1", "foo"),
 		ExpectStatus: http.StatusForbidden,
-	}.Check(t.T, hh)
+	}.Check(t, hh)
 	s.Validator.Enforcer.Allow("project:show:foo")
 }
