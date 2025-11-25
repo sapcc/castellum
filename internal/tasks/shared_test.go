@@ -27,8 +27,3 @@ func commonSetupOptionsForWorkerTest() test.SetupOption {
 func p2time(t time.Time) *time.Time {
 	return &t
 }
-
-// Take pointer to uint64 expression.
-func p2uint64(x uint64) *uint64 {
-	return &x
-}

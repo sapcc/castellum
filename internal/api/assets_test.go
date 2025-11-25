@@ -11,14 +11,14 @@ import (
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
+	"github.com/sapcc/go-bits/must"
 
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/test"
 )
 
-func TestGetAssets(baseT *testing.T) {
-	t := test.T{T: baseT}
-	s := test.NewSetup(t.T,
+func TestGetAssets(t *testing.T) {
+	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
 	hh := s.Handler
@@ -53,12 +53,11 @@ func TestGetAssets(baseT *testing.T) {
 		Path:         "/v1/projects/project1/assets/foo",
 		ExpectStatus: http.StatusOK,
 		ExpectBody:   assert.JSONObject{"assets": expectedAssets},
-	}.Check(t.T, hh)
+	}.Check(t, hh)
 }
 
-func TestGetAsset(baseT *testing.T) {
-	t := test.T{T: baseT}
-	s := test.NewSetup(t.T,
+func TestGetAsset(t *testing.T) {
+	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
 	hh := s.Handler
@@ -71,7 +70,7 @@ func TestGetAsset(baseT *testing.T) {
 		Method:       "GET",
 		Path:         "/v1/projects/project1/assets/foo/doesnotexist",
 		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
+	}.Check(t, hh)
 
 	// happy path: just an asset without any operations
 	s.Validator.Enforcer.Forbid("project:edit:foo") // this should not be an issue
@@ -87,7 +86,7 @@ func TestGetAsset(baseT *testing.T) {
 		ExpectStatus: http.StatusOK,
 		ExpectBody:   response,
 	}
-	req.Check(t.T, hh)
+	req.Check(t, hh)
 
 	// check rendering of a pending operation in state "created"
 	pendingOp := db.PendingOperation{
@@ -98,7 +97,7 @@ func TestGetAsset(baseT *testing.T) {
 		Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 768},
 		CreatedAt: time.Unix(21, 0).UTC(),
 	}
-	t.Must(s.DB.Insert(&pendingOp))
+	must.SucceedT(t, s.DB.Insert(&pendingOp))
 	pendingOpJSON := assert.JSONObject{
 		"state":    "created",
 		"reason":   "high",
@@ -110,33 +109,33 @@ func TestGetAsset(baseT *testing.T) {
 		},
 	}
 	response["pending_operation"] = pendingOpJSON
-	req.Check(t.T, hh)
+	req.Check(t, hh)
 
 	// check rendering of a pending operation in state "confirmed"
 	pendingOp.ConfirmedAt = p2time(time.Unix(22, 0).UTC())
-	t.MustUpdate(s.DB, &pendingOp)
+	must.SucceedT(t, s.DBUpdate(&pendingOp))
 	pendingOpJSON["state"] = "confirmed"
 	pendingOpJSON["confirmed"] = assert.JSONObject{"at": 22}
-	req.Check(t.T, hh)
+	req.Check(t, hh)
 
 	// check rendering of a pending operation in state "greenlit"
 	pendingOp.GreenlitAt = p2time(time.Unix(23, 0).UTC())
-	t.MustUpdate(s.DB, &pendingOp)
+	must.SucceedT(t, s.DBUpdate(&pendingOp))
 	pendingOpJSON["state"] = "greenlit"
 	pendingOpJSON["greenlit"] = assert.JSONObject{"at": 23}
-	req.Check(t.T, hh)
+	req.Check(t, hh)
 
 	pendingOp.GreenlitByUserUUID = p2string("user1")
-	t.MustUpdate(s.DB, &pendingOp)
+	must.SucceedT(t, s.DBUpdate(&pendingOp))
 	pendingOpJSON["greenlit"] = assert.JSONObject{"at": 23, "by_user": "user1"}
-	req.Check(t.T, hh)
+	req.Check(t, hh)
 
 	// check rendering of a scraping error
-	t.MustExec(s.DB, `UPDATE assets SET scrape_error_message = $1 WHERE id = 1`, "filer is on fire")
+	must.SucceedT(t, s.DBExec(`UPDATE assets SET scrape_error_message = $1 WHERE id = 1`, "filer is on fire"))
 	response["checked"] = assert.JSONObject{
 		"error": "filer is on fire",
 	}
-	req.Check(t.T, hh)
+	req.Check(t, hh)
 
 	// check rendering of finished operations in all possible states
 	response["finished_operations"] = []assert.JSONObject{
@@ -195,10 +194,10 @@ func TestGetAsset(baseT *testing.T) {
 		},
 	}
 	req.Path += "?history"
-	req.Check(t.T, hh)
+	req.Check(t, hh)
 
 	// check rendering of an asset that has never had a successful scrape
-	t.Must(s.DB.Insert(&db.Asset{
+	must.SucceedT(t, s.DB.Insert(&db.Asset{
 		ResourceID:         1,
 		UUID:               "fooasset3",
 		ScrapeErrorMessage: "filer has stranger anxiety",
@@ -215,17 +214,16 @@ func TestGetAsset(baseT *testing.T) {
 			"stale":         false,
 			"usage_percent": 0,
 		},
-	}.Check(t.T, hh)
+	}.Check(t, hh)
 }
 
-func TestPostAssetErrorResolved(baseT *testing.T) {
-	t := test.T{T: baseT}
-	s := test.NewSetup(t.T,
+func TestPostAssetErrorResolved(t *testing.T) {
+	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
 	hh := s.Handler
 
-	tr, tr0 := easypg.NewTracker(t.T, s.DB.Db)
+	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
 	tr0.Ignore()
 
 	// endpoint requires cluster access
@@ -234,7 +232,7 @@ func TestPostAssetErrorResolved(baseT *testing.T) {
 		Method:       "POST",
 		Path:         "/v1/projects/project1/assets/foo/fooasset1/error-resolved",
 		ExpectStatus: http.StatusForbidden,
-	}.Check(t.T, hh)
+	}.Check(t, hh)
 	s.Validator.Enforcer.Allow("cluster:access")
 
 	// expect error for unknown project
@@ -242,14 +240,14 @@ func TestPostAssetErrorResolved(baseT *testing.T) {
 		Method:       "POST",
 		Path:         "/v1/projects/project1/assets/projectdoesnotexist/fooasset1/error-resolved",
 		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
+	}.Check(t, hh)
 
 	// expect error for unknown asset
 	assert.HTTPRequest{
 		Method:       "POST",
 		Path:         "/v1/projects/project1/assets/foo/assetdoesnotexist/error-resolved",
 		ExpectStatus: http.StatusNotFound,
-	}.Check(t.T, hh)
+	}.Check(t, hh)
 
 	tr.DBChanges().AssertEmpty()
 
@@ -259,7 +257,7 @@ func TestPostAssetErrorResolved(baseT *testing.T) {
 		Path:         "/v1/projects/project1/assets/foo/fooasset1/error-resolved",
 		ExpectStatus: http.StatusOK,
 	}
-	req.Check(t.T, hh)
+	req.Check(t, hh)
 
 	tr.DBChanges().AssertEqualf(`
 		INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, finished_at, greenlit_by_user_uuid, usage) VALUES (1, 'critical', 'error-resolved', 0, 0, %[1]d, %[1]d, %[1]d, %[1]d, '', 'null');
@@ -271,7 +269,7 @@ func TestPostAssetErrorResolved(baseT *testing.T) {
 		Method:       "POST",
 		Path:         "/v1/projects/project1/assets/foo/fooasset1/error-resolved",
 		ExpectStatus: http.StatusConflict,
-	}.Check(t.T, hh)
+	}.Check(t, hh)
 }
 
 func p2string(val string) *string {
