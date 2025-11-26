@@ -13,20 +13,20 @@ type ResourceScrapeError struct {
 
 // AssetScrapeError is the API representation for an asset scrape error.
 type AssetScrapeError struct {
-	AssetUUID   string   `json:"asset_id"`
-	ProjectUUID string   `json:"project_id,omitempty"`
-	DomainUUID  string   `json:"domain_id"`
-	AssetType   string   `json:"asset_type"`
-	Checked     *Checked `json:"checked,omitempty"`
+	AssetUUID   string  `json:"asset_id"`
+	ProjectUUID string  `json:"project_id,omitempty"`
+	DomainUUID  string  `json:"domain_id"`
+	AssetType   string  `json:"asset_type"`
+	Checked     Checked `json:"checked"`
 }
 
 // AssetResizeError is the API representation for an asset resize error.
 type AssetResizeError struct {
-	AssetUUID   string           `json:"asset_id"`
-	ProjectUUID string           `json:"project_id,omitempty"`
-	DomainUUID  string           `json:"domain_id"`
-	AssetType   string           `json:"asset_type"`
-	OldSize     uint64           `json:"old_size,omitempty"`
-	NewSize     uint64           `json:"new_size,omitempty"`
-	Finished    *OperationFinish `json:"finished,omitempty"`
+	AssetUUID   string          `json:"asset_id"`
+	ProjectUUID string          `json:"project_id,omitempty"`
+	DomainUUID  string          `json:"domain_id"`
+	AssetType   string          `json:"asset_type"`
+	OldSize     uint64          `json:"old_size,omitempty"`
+	NewSize     uint64          `json:"new_size,omitempty"`
+	Finished    OperationFinish `json:"finished"`
 }

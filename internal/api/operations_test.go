@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/must"
@@ -65,20 +66,20 @@ func TestGetPendingOperationsForResource(t *testing.T) {
 	req.Check(t, hh)
 
 	// check rendering of a pending operation in state "confirmed"
-	pendingOp.ConfirmedAt = p2time(time.Unix(22, 0).UTC())
+	pendingOp.ConfirmedAt = Some(time.Unix(22, 0).UTC())
 	must.SucceedT(t, s.DBUpdate(&pendingOp))
 	pendingOpJSON["state"] = "confirmed"
 	pendingOpJSON["confirmed"] = assert.JSONObject{"at": 22}
 	req.Check(t, hh)
 
 	// check rendering of a pending operation in state "greenlit"
-	pendingOp.GreenlitAt = p2time(time.Unix(23, 0).UTC())
+	pendingOp.GreenlitAt = Some(time.Unix(23, 0).UTC())
 	must.SucceedT(t, s.DBUpdate(&pendingOp))
 	pendingOpJSON["state"] = "greenlit"
 	pendingOpJSON["greenlit"] = assert.JSONObject{"at": 23}
 	req.Check(t, hh)
 
-	pendingOp.GreenlitByUserUUID = p2string("user1")
+	pendingOp.GreenlitByUserUUID = Some("user1")
 	must.SucceedT(t, s.DBUpdate(&pendingOp))
 	pendingOpJSON["greenlit"] = assert.JSONObject{"at": 23, "by_user": "user1"}
 	req.Check(t, hh)
@@ -199,8 +200,8 @@ func TestGetRecentlyFailedOperationsForResource(t *testing.T) {
 			NewSize:     2048,
 			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 768},
 			CreatedAt:   time.Unix(61, 0).UTC(),
-			ConfirmedAt: p2time(time.Unix(61, 0).UTC()),
-			GreenlitAt:  p2time(time.Unix(61, 0).UTC()),
+			ConfirmedAt: Some(time.Unix(61, 0).UTC()),
+			GreenlitAt:  Some(time.Unix(61, 0).UTC()),
 			FinishedAt:  time.Unix(61, 0).UTC(),
 		}))
 		expectedOps = []assert.JSONObject{}

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/jobloop"
@@ -40,7 +41,7 @@ func setupAssetResizeTest(t *testing.T, s test.Setup, assetCount int) jobloop.Jo
 			UUID:         uuid,
 			Size:         1000,
 			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
-			ExpectedSize: nil,
+			ExpectedSize: None[uint64](),
 		}))
 
 		amStatic.Assets["project1"][uuid] = plugins.StaticAsset{
@@ -68,8 +69,8 @@ func TestSuccessfulResize(t *testing.T) {
 		NewSize:     1200,
 		Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 500},
 		CreatedAt:   s.Clock.Now().Add(-5 * time.Minute),
-		ConfirmedAt: p2time(s.Clock.Now()),
-		GreenlitAt:  p2time(s.Clock.Now().Add(5 * time.Minute)),
+		ConfirmedAt: Some(s.Clock.Now()),
+		GreenlitAt:  Some(s.Clock.Now().Add(5 * time.Minute)),
 	}
 	must.SucceedT(t, s.DB.Insert(&pendingOp))
 
@@ -117,8 +118,8 @@ func TestFailingResize(t *testing.T) {
 		NewSize:     600,
 		Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 500},
 		CreatedAt:   s.Clock.Now().Add(-10 * time.Minute),
-		ConfirmedAt: p2time(s.Clock.Now().Add(-5 * time.Minute)),
-		GreenlitAt:  p2time(s.Clock.Now().Add(-5 * time.Minute)),
+		ConfirmedAt: Some(s.Clock.Now().Add(-5 * time.Minute)),
+		GreenlitAt:  Some(s.Clock.Now().Add(-5 * time.Minute)),
 	}
 	must.SucceedT(t, s.DB.Insert(&pendingOp))
 
@@ -151,15 +152,20 @@ func TestErroringResize(t *testing.T) {
 
 	// add a greenlit PendingOperation that will error in SetAssetSize()
 	s.Clock.StepBy(10 * time.Minute)
+	var (
+		createdAt   = s.Clock.Now().Add(-10 * time.Minute)
+		confirmedAt = s.Clock.Now().Add(-5 * time.Minute)
+		greenlitAt  = s.Clock.Now().Add(-5 * time.Minute)
+	)
 	pendingOp := db.PendingOperation{
 		AssetID:     1,
 		Reason:      castellum.OperationReasonLow,
 		OldSize:     1000,
 		NewSize:     400, // will error because `new_size < usage` (usage = 500, see above)
 		Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 500},
-		CreatedAt:   s.Clock.Now().Add(-10 * time.Minute),
-		ConfirmedAt: p2time(s.Clock.Now().Add(-5 * time.Minute)),
-		GreenlitAt:  p2time(s.Clock.Now().Add(-5 * time.Minute)),
+		CreatedAt:   createdAt,
+		ConfirmedAt: Some(confirmedAt),
+		GreenlitAt:  Some(greenlitAt),
 	}
 	must.SucceedT(t, s.DB.Insert(&pendingOp))
 
@@ -177,9 +183,9 @@ func TestErroringResize(t *testing.T) {
 			`,
 			attempt+1, // ID of pending operation deleted in this attempt
 			attempt+2, // ID of pending operation created after this attempt
-			pendingOp.CreatedAt.Unix(),
-			pendingOp.ConfirmedAt.Unix(),
-			pendingOp.GreenlitAt.Unix(),
+			createdAt.Unix(),
+			confirmedAt.Unix(),
+			greenlitAt.Unix(),
 			s.Clock.Now().Add(tasks.RetryInterval).Unix(),
 		)
 	}
@@ -200,9 +206,9 @@ func TestErroringResize(t *testing.T) {
 			INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, finished_at, error_message, errored_attempts, usage) VALUES (1, 'low', 'errored', 1000, 400, %[1]d, %[2]d, %[3]d, %[4]d, '%[5]s', 3, '{"singular":500}');
 			DELETE FROM pending_operations WHERE id = 4 AND asset_id = 1;
 		`,
-		pendingOp.CreatedAt.Unix(),
-		pendingOp.ConfirmedAt.Unix(),
-		pendingOp.GreenlitAt.Unix(),
+		createdAt.Unix(),
+		confirmedAt.Unix(),
+		greenlitAt.Unix(),
 		s.Clock.Now().Unix(),
 		"cannot set size smaller than current usage",
 	)

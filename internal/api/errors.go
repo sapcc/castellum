@@ -96,7 +96,7 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 					ProjectUUID: projectID,
 					DomainUUID:  res.DomainUUID,
 					AssetType:   string(res.AssetType),
-					Checked: &castellum.Checked{
+					Checked: castellum.Checked{
 						ErrorMessage: a.ScrapeErrorMessage,
 					},
 				})
@@ -165,7 +165,7 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 					AssetType:   string(res.AssetType),
 					OldSize:     o.OldSize,
 					NewSize:     o.NewSize,
-					Finished: &castellum.OperationFinish{
+					Finished: castellum.OperationFinish{
 						AtUnix:       o.FinishedAt.Unix(),
 						ErrorMessage: o.ErrorMessage,
 					},

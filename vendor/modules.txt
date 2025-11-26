@@ -75,6 +75,7 @@ github.com/lib/pq/scram
 ## explicit; go 1.24
 github.com/majewsky/gg/jsonmatch
 github.com/majewsky/gg/option
+github.com/majewsky/gg/options
 # github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
 ## explicit
 github.com/modern-go/concurrent
@@ -113,7 +114,7 @@ github.com/rabbitmq/amqp091-go
 ## explicit; go 1.13
 github.com/rs/cors
 github.com/rs/cors/internal
-# github.com/sapcc/go-api-declarations v1.17.4
+# github.com/sapcc/go-api-declarations v1.18.0
 ## explicit; go 1.24
 github.com/sapcc/go-api-declarations/bininfo
 github.com/sapcc/go-api-declarations/cadf

@@ -5,7 +5,6 @@ package tasks_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/sapcc/go-bits/easypg"
 
@@ -21,9 +20,4 @@ func commonSetupOptionsForWorkerTest() test.SetupOption {
 	return test.WithAssetManagers(
 		&plugins.AssetManagerStatic{AssetType: "foo"},
 	)
-}
-
-// Take pointer to time.Time expression.
-func p2time(t time.Time) *time.Time {
-	return &t
 }

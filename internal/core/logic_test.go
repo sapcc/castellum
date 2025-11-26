@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/logg"
@@ -458,11 +459,11 @@ func mustParseResourceLogic(t *testing.T, input string) (result ResourceLogic) {
 			result.SizeStepPercent = mustParseFloatPercent(t, parts[1])
 			result.SingleStep = false
 		case "min":
-			result.MinimumSize = mustParsePointerToUint64(t, parts[1])
+			result.MinimumSize = Some(mustParseUint64(t, parts[1]))
 		case "max":
-			result.MaximumSize = mustParsePointerToUint64(t, parts[1])
+			result.MaximumSize = Some(mustParseUint64(t, parts[1]))
 		case "min_free":
-			result.MinimumFreeSize = mustParsePointerToUint64(t, parts[1])
+			result.MinimumFreeSize = Some(mustParseUint64(t, parts[1]))
 		case "min_free_is_critical":
 			result.MinimumFreeIsCritical = mustParseBool(t, parts[1])
 		default:
@@ -484,9 +485,9 @@ func mustParseAssetStatus(t *testing.T, input string) (result AssetStatus) {
 		case "usage":
 			result.Usage = singular(mustParseFloat(t, parts[1]))
 		case "smin":
-			result.StrictMinimumSize = mustParsePointerToUint64(t, parts[1])
+			result.StrictMinimumSize = Some(mustParseUint64(t, parts[1]))
 		case "smax":
-			result.StrictMaximumSize = mustParsePointerToUint64(t, parts[1])
+			result.StrictMaximumSize = Some(mustParseUint64(t, parts[1]))
 		default:
 			panic("unknown field in AssetStatus string: " + parts[0])
 		}
@@ -542,12 +543,6 @@ func mustParseUint64(t *testing.T, input string) uint64 {
 		t.Fatal(err)
 	}
 	return val
-}
-
-func mustParsePointerToUint64(t *testing.T, input string) *uint64 {
-	t.Helper()
-	val := mustParseUint64(t, input)
-	return &val
 }
 
 func singular(x float64) castellum.UsageValues {

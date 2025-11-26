@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 
+	. "github.com/majewsky/gg/option"
+	"github.com/majewsky/gg/options"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/pluggable"
 
@@ -21,8 +23,8 @@ import (
 type AssetStatus struct {
 	Size              uint64
 	Usage             castellum.UsageValues
-	StrictMinimumSize *uint64
-	StrictMaximumSize *uint64
+	StrictMinimumSize Option[uint64]
+	StrictMaximumSize Option[uint64]
 }
 
 // StatusOfAsset converts an Asset into just its AssetStatus.
@@ -32,15 +34,11 @@ type AssetStatus struct {
 // AssetStatus to avoid accidental dependencies on non-logic attributes
 // like timestamps, UUIDs or error message strings.
 func StatusOfAsset(asset db.Asset, cfg Config, res db.Resource) AssetStatus {
-	strictMaximumSize := asset.StrictMaximumSize
-	if val := cfg.MaxAssetSizeFor(res.AssetType, res.ScopeUUID); val != nil && (strictMaximumSize == nil || *val < *strictMaximumSize) {
-		strictMaximumSize = val
-	}
 	return AssetStatus{
 		Size:              asset.Size,
 		Usage:             asset.Usage,
 		StrictMinimumSize: asset.StrictMinimumSize,
-		StrictMaximumSize: strictMaximumSize,
+		StrictMaximumSize: options.Min(asset.StrictMaximumSize, cfg.MaxAssetSizeFor(res.AssetType, res.ScopeUUID)),
 	}
 }
 
@@ -105,8 +103,8 @@ type AssetManager interface {
 	Init(ctx context.Context, provider ProviderClient) error
 
 	// If this asset type is supported by this asset manager, return information
-	// about it. Otherwise return nil.
-	InfoForAssetType(assetType db.AssetType) *AssetTypeInfo
+	// about it. Otherwise return None.
+	InfoForAssetType(assetType db.AssetType) Option[AssetTypeInfo]
 
 	// A non-nil return value makes the API deny any attempts to create a resource
 	// with that scope and asset type with that error.
@@ -128,7 +126,7 @@ type AssetManager interface {
 	SetAssetSize(ctx context.Context, res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error)
 	// previousStatus will be nil when this function is called for the first time
 	// for the given asset.
-	GetAssetStatus(ctx context.Context, res db.Resource, assetUUID string, previousStatus *AssetStatus) (AssetStatus, error)
+	GetAssetStatus(ctx context.Context, res db.Resource, assetUUID string, previousStatus Option[AssetStatus]) (AssetStatus, error)
 }
 
 // AssetManagerRegistry is a pluggable.Registry for AssetManager implementations.
@@ -160,9 +158,9 @@ func CreateAssetManagers(ctx context.Context, pluginTypeIDs []string, provider P
 // the asset type is not supported.
 func (team AssetManagerTeam) ForAssetType(assetType db.AssetType) (AssetManager, AssetTypeInfo) {
 	for _, manager := range team {
-		info := manager.InfoForAssetType(assetType)
-		if info != nil {
-			return manager, *info
+		info, ok := manager.InfoForAssetType(assetType).Unpack()
+		if ok {
+			return manager, info
 		}
 	}
 	return nil, AssetTypeInfo{

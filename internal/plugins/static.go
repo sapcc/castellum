@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sort"
 
+	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -20,8 +21,8 @@ import (
 type StaticAsset struct {
 	Size              uint64
 	Usage             uint64
-	StrictMinimumSize *uint64
-	StrictMaximumSize *uint64
+	StrictMinimumSize Option[uint64]
+	StrictMaximumSize Option[uint64]
 
 	// When non-zero, these fields model a resize operation that will only be
 	// reflected after GetAssetStatus() has been called for as many times as
@@ -60,18 +61,18 @@ func (m AssetManagerStatic) Init(ctx context.Context, provider core.ProviderClie
 }
 
 // InfoForAssetType implements the core.AssetManager interface.
-func (m AssetManagerStatic) InfoForAssetType(assetType db.AssetType) *core.AssetTypeInfo {
+func (m AssetManagerStatic) InfoForAssetType(assetType db.AssetType) Option[core.AssetTypeInfo] {
 	if assetType == m.AssetType {
 		usageMetrics := m.UsageMetrics
 		if len(usageMetrics) == 0 {
 			usageMetrics = []castellum.UsageMetric{castellum.SingularUsageMetric}
 		}
-		return &core.AssetTypeInfo{
+		return Some(core.AssetTypeInfo{
 			AssetType:    m.AssetType,
 			UsageMetrics: usageMetrics,
-		}
+		})
 	}
-	return nil
+	return None[core.AssetTypeInfo]()
 }
 
 // CheckResourceAllowed implements the core.AssetManager interface.
@@ -132,7 +133,7 @@ func (m AssetManagerStatic) ListAssets(_ context.Context, res db.Resource) ([]st
 }
 
 // GetAssetStatus implements the core.AssetManager interface.
-func (m AssetManagerStatic) GetAssetStatus(_ context.Context, res db.Resource, assetUUID string, previousStatus *core.AssetStatus) (core.AssetStatus, error) {
+func (m AssetManagerStatic) GetAssetStatus(_ context.Context, res db.Resource, assetUUID string, previousStatus Option[core.AssetStatus]) (core.AssetStatus, error) {
 	if res.AssetType != m.AssetType {
 		return core.AssetStatus{}, errWrongAssetType
 	}
@@ -163,17 +164,9 @@ func (m AssetManagerStatic) GetAssetStatus(_ context.Context, res db.Resource, a
 	return core.AssetStatus{
 		Size:              asset.Size,
 		Usage:             castellum.UsageValues{castellum.SingularUsageMetric: float64(asset.Usage)},
-		StrictMinimumSize: clonePointer(asset.StrictMinimumSize),
-		StrictMaximumSize: clonePointer(asset.StrictMaximumSize),
+		StrictMinimumSize: asset.StrictMinimumSize,
+		StrictMaximumSize: asset.StrictMaximumSize,
 	}, nil
-}
-
-func clonePointer[T any](in *T) *T {
-	if in == nil {
-		return nil
-	}
-	val := *in
-	return &val
 }
 
 // SetAssetSize implements the core.AssetManager interface.

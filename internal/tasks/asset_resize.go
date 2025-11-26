@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-gorp/gorp/v3"
+	. "github.com/majewsky/gg/option"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/jobloop"
@@ -101,8 +102,7 @@ func (c *Context) processAssetResize(ctx context.Context, tx *gorp.Transaction, 
 	if outcome == castellum.OperationOutcomeErrored && op.ErroredAttempts < MaxRetries {
 		op.ID = 0
 		op.ErroredAttempts++
-		retryAt := c.TimeNow().Add(RetryInterval)
-		op.RetryAt = &retryAt
+		op.RetryAt = Some(c.TimeNow().Add(RetryInterval))
 
 		err = tx.Insert(&op)
 		if err != nil {

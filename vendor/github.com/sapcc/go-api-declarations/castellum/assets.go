@@ -3,17 +3,19 @@
 
 package castellum
 
+import . "github.com/majewsky/gg/option"
+
 // Asset is the API representation of an asset.
 type Asset struct {
-	UUID               string                 `json:"id"`
-	Size               uint64                 `json:"size,omitempty"`
-	UsagePercent       UsageValues            `json:"usage_percent"`
-	MinimumSize        *uint64                `json:"min_size,omitempty"`
-	MaximumSize        *uint64                `json:"max_size,omitempty"`
-	Checked            *Checked               `json:"checked,omitempty"`
-	Stale              bool                   `json:"stale"`
-	PendingOperation   *StandaloneOperation   `json:"pending_operation,omitempty"`
-	FinishedOperations *[]StandaloneOperation `json:"finished_operations,omitempty"`
+	UUID               string                      `json:"id"`
+	Size               uint64                      `json:"size,omitempty"`
+	UsagePercent       UsageValues                 `json:"usage_percent"`
+	MinimumSize        Option[uint64]              `json:"min_size,omitzero"`
+	MaximumSize        Option[uint64]              `json:"max_size,omitzero"`
+	Checked            Option[Checked]             `json:"checked,omitzero"`
+	Stale              bool                        `json:"stale"`
+	PendingOperation   Option[StandaloneOperation] `json:"pending_operation,omitzero"`
+	FinishedOperations []StandaloneOperation       `json:"finished_operations,omitempty"`
 }
 
 // Checked appears in type Asset and Resource.
@@ -34,14 +36,14 @@ type StandaloneOperation struct {
 // StandaloneOperation is the API representation for a pending or finished
 // resize operation when the operation appears within its respective asset.
 type Operation struct {
-	State     OperationState         `json:"state"`
-	Reason    OperationReason        `json:"reason"`
-	OldSize   uint64                 `json:"old_size"`
-	NewSize   uint64                 `json:"new_size"`
-	Created   OperationCreation      `json:"created"`
-	Confirmed *OperationConfirmation `json:"confirmed,omitempty"`
-	Greenlit  *OperationGreenlight   `json:"greenlit,omitempty"`
-	Finished  *OperationFinish       `json:"finished,omitempty"`
+	State     OperationState                `json:"state"`
+	Reason    OperationReason               `json:"reason"`
+	OldSize   uint64                        `json:"old_size"`
+	NewSize   uint64                        `json:"new_size"`
+	Created   OperationCreation             `json:"created"`
+	Confirmed Option[OperationConfirmation] `json:"confirmed,omitzero"`
+	Greenlit  Option[OperationGreenlight]   `json:"greenlit,omitzero"`
+	Finished  Option[OperationFinish]       `json:"finished,omitzero"`
 }
 
 // OperationCreation appears in type Operation.
@@ -57,8 +59,8 @@ type OperationConfirmation struct {
 
 // OperationGreenlight appears in type Operation.
 type OperationGreenlight struct {
-	AtUnix     int64   `json:"at"`
-	ByUserUUID *string `json:"by_user,omitempty"`
+	AtUnix     int64          `json:"at"`
+	ByUserUUID Option[string] `json:"by_user,omitzero"`
 }
 
 // OperationFinish appears in type Operation.

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
@@ -56,7 +57,7 @@ func runAssetScrapeTest(t *testing.T, action func(context.Context, test.Setup, f
 		Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 		NextScrapeAt: s.Clock.Now(),
 		NeverScraped: true,
-		ExpectedSize: nil,
+		ExpectedSize: None[uint64](),
 	}))
 
 	// setup asset with configurable size
@@ -381,7 +382,7 @@ func TestAssetScrapeOrdering(t *testing.T) {
 			Size:         1000,
 			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			NextScrapeAt: s.Clock.Now(),
-			ExpectedSize: nil,
+			ExpectedSize: None[uint64](),
 		},
 		{
 			ResourceID:   1,
@@ -389,7 +390,7 @@ func TestAssetScrapeOrdering(t *testing.T) {
 			Size:         1000,
 			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			NextScrapeAt: s.Clock.Now(),
-			ExpectedSize: nil,
+			ExpectedSize: None[uint64](),
 		},
 		{
 			ResourceID:   1,
@@ -397,7 +398,7 @@ func TestAssetScrapeOrdering(t *testing.T) {
 			Size:         1000,
 			Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 			NextScrapeAt: s.Clock.Now(),
-			ExpectedSize: nil,
+			ExpectedSize: None[uint64](),
 		},
 	}
 	must.SucceedT(t, s.DB.Insert(&assets[0]))
@@ -674,7 +675,7 @@ func TestMaxAssetSizeRules(t *testing.T) {
 		Size:         1000,
 		Usage:        castellum.UsageValues{castellum.SingularUsageMetric: 500},
 		NextScrapeAt: s.Clock.Now(),
-		ExpectedSize: nil,
+		ExpectedSize: None[uint64](),
 	}
 	must.SucceedT(t, s.DB.Insert(&asset))
 

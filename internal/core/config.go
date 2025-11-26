@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 
+	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/regexpext"
 
@@ -45,11 +46,10 @@ type MaxAssetSizeRule struct {
 
 // MaxAssetSizeFor computes the highest permissible max_size value for this
 // asset type. If no constraints apply, nil is returned.
-func (c Config) MaxAssetSizeFor(assetType db.AssetType, scopeUUID string) (result *uint64) {
+func (c Config) MaxAssetSizeFor(assetType db.AssetType, scopeUUID string) (result Option[uint64]) {
 	for _, rule := range c.MaxAssetSizeRules {
 		if rule.AssetTypeRx.MatchString(string(assetType)) && (rule.ScopeUUID == "" || rule.ScopeUUID == scopeUUID) {
-			val := rule.Value
-			result = &val
+			result = Some(rule.Value)
 		}
 	}
 

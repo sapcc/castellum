@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/must"
@@ -66,8 +67,8 @@ func TestCollectGarbage(t *testing.T) {
 			NewSize:     1200,
 			Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 800},
 			CreatedAt:   fakeNow.Add(-20 * time.Minute),
-			ConfirmedAt: p2time(fakeNow.Add(-20 * time.Minute)),
-			GreenlitAt:  p2time(fakeNow.Add(-20 * time.Minute)),
+			ConfirmedAt: Some(fakeNow.Add(-20 * time.Minute)),
+			GreenlitAt:  Some(fakeNow.Add(-20 * time.Minute)),
 			FinishedAt:  fakeNow.Add(-10 * time.Minute),
 		},
 	}

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/must"
@@ -143,8 +144,8 @@ func TestGetAssetResizeErrors(t *testing.T) {
 		NewSize:     1025,
 		Usage:       castellum.UsageValues{castellum.SingularUsageMetric: 983.04},
 		CreatedAt:   time.Unix(70, 0).UTC(),
-		ConfirmedAt: p2time(time.Unix(71, 0).UTC()),
-		GreenlitAt:  p2time(time.Unix(71, 0).UTC()),
+		ConfirmedAt: Some(time.Unix(71, 0).UTC()),
+		GreenlitAt:  Some(time.Unix(71, 0).UTC()),
 		FinishedAt:  time.Unix(73, 0).UTC(),
 	}))
 	req.ExpectBody = assert.JSONObject{

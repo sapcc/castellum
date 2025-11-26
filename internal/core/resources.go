@@ -5,8 +5,10 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
 
+	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/errext"
 
@@ -30,14 +32,10 @@ func ApplyResourceSpecInto(ctx context.Context, res *db.Resource, spec castellum
 		return
 	}
 
-	if spec.ConfigJSON == nil {
-		res.ConfigJSON = ""
-	} else {
-		res.ConfigJSON = string(*spec.ConfigJSON)
-	}
+	res.ConfigJSON = string(spec.ConfigJSON.UnwrapOr(json.RawMessage("")))
 	errs.Add(manager.CheckResourceAllowed(ctx, res.AssetType, res.ScopeUUID, res.ConfigJSON, existingResources))
 
-	if spec.Checked != nil {
+	if spec.Checked.IsSome() {
 		errs.Addf("resource.checked cannot be set via the API")
 	}
 	if spec.AssetCount != 0 {
@@ -52,38 +50,38 @@ func ApplyResourceSpecInto(ctx context.Context, res *db.Resource, spec castellum
 }
 
 func applyThresholdSpecsInto(res *db.Resource, spec castellum.Resource, info AssetTypeInfo) (errs errext.ErrorSet) {
-	if spec.LowThreshold == nil {
-		res.LowThresholdPercent = info.MakeZeroUsageValues()
-		res.LowDelaySeconds = 0
-	} else {
-		res.LowThresholdPercent = spec.LowThreshold.UsagePercent
+	if threshold, ok := spec.LowThreshold.Unpack(); ok {
+		res.LowThresholdPercent = threshold.UsagePercent
 		errs.Append(checkThresholdCommon(info, "low", res.LowThresholdPercent))
-		res.LowDelaySeconds = spec.LowThreshold.DelaySeconds
+		res.LowDelaySeconds = threshold.DelaySeconds
 		if res.LowDelaySeconds == 0 {
 			errs.Addf("delay for low threshold is missing")
 		}
+	} else {
+		res.LowThresholdPercent = info.MakeZeroUsageValues()
+		res.LowDelaySeconds = 0
 	}
 
-	if spec.HighThreshold == nil {
-		res.HighThresholdPercent = info.MakeZeroUsageValues()
-		res.HighDelaySeconds = 0
-	} else {
-		res.HighThresholdPercent = spec.HighThreshold.UsagePercent
+	if threshold, ok := spec.HighThreshold.Unpack(); ok {
+		res.HighThresholdPercent = threshold.UsagePercent
 		errs.Append(checkThresholdCommon(info, "high", res.HighThresholdPercent))
-		res.HighDelaySeconds = spec.HighThreshold.DelaySeconds
+		res.HighDelaySeconds = threshold.DelaySeconds
 		if res.HighDelaySeconds == 0 {
 			errs.Addf("delay for high threshold is missing")
 		}
+	} else {
+		res.HighThresholdPercent = info.MakeZeroUsageValues()
+		res.HighDelaySeconds = 0
 	}
 
-	if spec.CriticalThreshold == nil {
-		res.CriticalThresholdPercent = info.MakeZeroUsageValues()
-	} else {
-		res.CriticalThresholdPercent = spec.CriticalThreshold.UsagePercent
+	if threshold, ok := spec.CriticalThreshold.Unpack(); ok {
+		res.CriticalThresholdPercent = threshold.UsagePercent
 		errs.Append(checkThresholdCommon(info, "critical", res.CriticalThresholdPercent))
-		if spec.CriticalThreshold.DelaySeconds != 0 {
+		if threshold.DelaySeconds != 0 {
 			errs.Addf("critical threshold may not have a delay")
 		}
+	} else {
+		res.CriticalThresholdPercent = info.MakeZeroUsageValues()
 	}
 
 	return
@@ -120,21 +118,21 @@ func checkThresholdCommon(info AssetTypeInfo, tType string, vals castellum.Usage
 
 //nolint:gocognit // This function is just above the limit at cognit = 33, but factoring out the repetitive part is unreasonably complicated.
 func checkIntraThresholdConsistency(res *db.Resource, spec castellum.Resource, info AssetTypeInfo) (errs errext.ErrorSet) {
-	if spec.LowThreshold != nil && spec.HighThreshold != nil {
+	if spec.LowThreshold.IsSome() && spec.HighThreshold.IsSome() {
 		for _, metric := range info.UsageMetrics {
 			if res.LowThresholdPercent[metric] > res.HighThresholdPercent[metric] {
 				errs.Addf("low threshold%s must be below high threshold", Identifier(metric, " for %s"))
 			}
 		}
 	}
-	if spec.LowThreshold != nil && spec.CriticalThreshold != nil {
+	if spec.LowThreshold.IsSome() && spec.CriticalThreshold.IsSome() {
 		for _, metric := range info.UsageMetrics {
 			if res.LowThresholdPercent[metric] > res.CriticalThresholdPercent[metric] {
 				errs.Addf("low threshold%s must be below critical threshold", Identifier(metric, " for %s"))
 			}
 		}
 	}
-	if spec.HighThreshold != nil && spec.CriticalThreshold != nil {
+	if spec.HighThreshold.IsSome() && spec.CriticalThreshold.IsSome() {
 		for _, metric := range info.UsageMetrics {
 			if res.HighThresholdPercent[metric] > res.CriticalThresholdPercent[metric] {
 				errs.Addf("high threshold%s must be below critical threshold", Identifier(metric, " for %s"))
@@ -142,7 +140,7 @@ func checkIntraThresholdConsistency(res *db.Resource, spec castellum.Resource, i
 		}
 	}
 
-	if spec.LowThreshold == nil && spec.HighThreshold == nil && spec.CriticalThreshold == nil {
+	if spec.LowThreshold.IsNone() && spec.HighThreshold.IsNone() && spec.CriticalThreshold.IsNone() {
 		errs.Addf("at least one threshold must be configured")
 	}
 
@@ -165,47 +163,34 @@ func applySteppingSpecInto(res *db.Resource, spec castellum.Resource) (errs erre
 	return
 }
 
-func applySizeConstraintsSpecInto(res *db.Resource, spec castellum.Resource, maxAssetSize *uint64) (errs errext.ErrorSet) {
-	if spec.SizeConstraints == nil {
-		if maxAssetSize != nil {
-			errs.Addf("maximum size must be configured for %s", res.AssetType)
-		}
-		res.MinimumSize = nil
-		res.MaximumSize = nil
-		res.MinimumFreeSize = nil
-	} else {
-		res.MinimumSize = spec.SizeConstraints.Minimum
-		if res.MinimumSize != nil && *res.MinimumSize == 0 {
-			res.MinimumSize = nil
-		}
+func applySizeConstraintsSpecInto(res *db.Resource, spec castellum.Resource, maxAssetSize Option[uint64]) (errs errext.ErrorSet) {
+	sc := spec.SizeConstraints.UnwrapOr(castellum.SizeConstraints{})
 
-		res.MaximumSize = spec.SizeConstraints.Maximum
-		if res.MaximumSize == nil {
-			if maxAssetSize != nil {
-				errs.Addf("maximum size must be configured for %s", res.AssetType)
-			}
-		} else {
-			minimum := uint64(0)
-			if res.MinimumSize != nil {
-				minimum = *res.MinimumSize
-			}
-			if *res.MaximumSize <= minimum {
-				errs.Addf("maximum size must be greater than minimum size")
-			}
-			if maxAssetSize != nil && *res.MaximumSize > *maxAssetSize {
-				errs.Addf("maximum size must be %d or less", *maxAssetSize)
-			}
-		}
+	res.MinimumSize = sc.Minimum
+	if res.MinimumSize == Some[uint64](0) {
+		res.MinimumSize = None[uint64]()
+	}
 
-		res.MinimumFreeSize = spec.SizeConstraints.MinimumFree
-		if res.MinimumFreeSize != nil && *res.MinimumFreeSize == 0 {
-			res.MinimumFreeSize = nil
+	res.MaximumSize = sc.Maximum
+	if maxSize, ok := res.MaximumSize.Unpack(); ok {
+		if maxSize <= res.MinimumSize.UnwrapOr(0) {
+			errs.Addf("maximum size must be greater than minimum size")
 		}
+		if limit, ok := maxAssetSize.Unpack(); ok && maxSize > limit {
+			errs.Addf("maximum size must be %d or less", limit)
+		}
+	} else if maxAssetSize.IsSome() {
+		errs.Addf("maximum size must be configured for %s", res.AssetType)
+	}
 
-		res.MinimumFreeIsCritical = spec.SizeConstraints.MinimumFreeIsCritical
-		if res.MinimumFreeIsCritical && res.MinimumFreeSize == nil {
-			errs.Addf("threshold for minimum free space must be configured")
-		}
+	res.MinimumFreeSize = sc.MinimumFree
+	if res.MinimumFreeSize == Some[uint64](0) {
+		res.MinimumFreeSize = None[uint64]()
+	}
+
+	res.MinimumFreeIsCritical = sc.MinimumFreeIsCritical
+	if res.MinimumFreeIsCritical && res.MinimumFreeSize.IsNone() {
+		errs.Addf("threshold for minimum free space must be configured")
 	}
 
 	return

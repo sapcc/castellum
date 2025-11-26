@@ -10,6 +10,7 @@ import (
 	"sort"
 
 	"github.com/gorilla/mux"
+	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/respondwith"
@@ -27,12 +28,12 @@ func AssetFromDB(asset db.Asset) castellum.Asset {
 		MinimumSize:  asset.StrictMinimumSize,
 		MaximumSize:  asset.StrictMaximumSize,
 		UsagePercent: core.GetMultiUsagePercent(asset.Size, asset.Usage),
-		Stale:        asset.ExpectedSize != nil,
+		Stale:        asset.ExpectedSize.IsSome(),
 	}
 	if asset.ScrapeErrorMessage != "" {
-		a.Checked = &castellum.Checked{
+		a.Checked = Some(castellum.Checked{
 			ErrorMessage: asset.ScrapeErrorMessage,
-		}
+		})
 	}
 	return a
 }
@@ -50,23 +51,23 @@ func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, res *db.Re
 				AtUnix:       dbOp.CreatedAt.Unix(),
 				UsagePercent: core.GetMultiUsagePercent(dbOp.OldSize, dbOp.Usage),
 			},
-			Finished: nil,
+			Finished: None[castellum.OperationFinish](),
 		},
 	}
 	if res != nil {
 		op.ProjectUUID = res.ScopeUUID
 		op.AssetType = string(res.AssetType)
 	}
-	if dbOp.ConfirmedAt != nil {
-		op.Confirmed = &castellum.OperationConfirmation{
-			AtUnix: dbOp.ConfirmedAt.Unix(),
-		}
+	if t, ok := dbOp.ConfirmedAt.Unpack(); ok {
+		op.Confirmed = Some(castellum.OperationConfirmation{
+			AtUnix: t.Unix(),
+		})
 	}
-	if dbOp.GreenlitAt != nil {
-		op.Greenlit = &castellum.OperationGreenlight{
-			AtUnix:     dbOp.GreenlitAt.Unix(),
+	if t, ok := dbOp.GreenlitAt.Unpack(); ok {
+		op.Greenlit = Some(castellum.OperationGreenlight{
+			AtUnix:     t.Unix(),
 			ByUserUUID: dbOp.GreenlitByUserUUID,
-		}
+		})
 	}
 	return op
 }
@@ -84,26 +85,26 @@ func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string, res *db.
 				AtUnix:       dbOp.CreatedAt.Unix(),
 				UsagePercent: core.GetMultiUsagePercent(dbOp.OldSize, dbOp.Usage),
 			},
-			Finished: &castellum.OperationFinish{
+			Finished: Some(castellum.OperationFinish{
 				AtUnix:       dbOp.FinishedAt.Unix(),
 				ErrorMessage: dbOp.ErrorMessage,
-			},
+			}),
 		},
 	}
 	if res != nil {
 		op.ProjectUUID = res.ScopeUUID
 		op.AssetType = string(res.AssetType)
 	}
-	if dbOp.ConfirmedAt != nil {
-		op.Confirmed = &castellum.OperationConfirmation{
-			AtUnix: dbOp.ConfirmedAt.Unix(),
-		}
+	if t, ok := dbOp.ConfirmedAt.Unpack(); ok {
+		op.Confirmed = Some(castellum.OperationConfirmation{
+			AtUnix: t.Unix(),
+		})
 	}
-	if dbOp.GreenlitAt != nil {
-		op.Greenlit = &castellum.OperationGreenlight{
-			AtUnix:     dbOp.GreenlitAt.Unix(),
+	if t, ok := dbOp.GreenlitAt.Unpack(); ok {
+		op.Greenlit = Some(castellum.OperationGreenlight{
+			AtUnix:     t.Unix(),
 			ByUserUUID: dbOp.GreenlitByUserUUID,
-		}
+		})
 	}
 	return op
 }
@@ -171,12 +172,11 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		dbAsset.ID)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		asset.PendingOperation = nil
+		asset.PendingOperation = None[castellum.StandaloneOperation]()
 	case respondwith.ObfuscatedErrorText(w, err):
 		return
 	default:
-		op := PendingOperationFromDB(dbPendingOp, "", nil)
-		asset.PendingOperation = &op
+		asset.PendingOperation = Some(PendingOperationFromDB(dbPendingOp, "", nil))
 	}
 
 	_, wantsFinishedOps := r.URL.Query()["history"]
@@ -190,11 +190,10 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
-		finishedOps := make([]castellum.StandaloneOperation, len(dbFinishedOps))
+		asset.FinishedOperations = make([]castellum.StandaloneOperation, len(dbFinishedOps))
 		for idx, op := range dbFinishedOps {
-			finishedOps[idx] = FinishedOperationFromDB(op, "", nil)
+			asset.FinishedOperations[idx] = FinishedOperationFromDB(op, "", nil)
 		}
-		asset.FinishedOperations = &finishedOps
 	}
 
 	respondwith.JSON(w, http.StatusOK, asset)
@@ -251,10 +250,10 @@ func (h handler) PostAssetErrorResolved(w http.ResponseWriter, r *http.Request) 
 		Reason:             lastReason,
 		Outcome:            castellum.OperationOutcomeErrorResolved,
 		CreatedAt:          now,
-		ConfirmedAt:        &now,
-		GreenlitAt:         &now,
+		ConfirmedAt:        Some(now),
+		GreenlitAt:         Some(now),
 		FinishedAt:         now,
-		GreenlitByUserUUID: &userUUID,
+		GreenlitByUserUUID: Some(userUUID),
 	})
 
 	if respondwith.ObfuscatedErrorText(w, err) {
