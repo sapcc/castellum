@@ -7,12 +7,12 @@ require (
 	github.com/go-gorp/gorp/v3 v3.1.0
 	github.com/gophercloud/gophercloud/v2 v2.9.0
 	github.com/gorilla/mux v1.8.1
-	github.com/majewsky/gg v1.4.0
+	github.com/majewsky/gg v1.5.0
 	github.com/prometheus/client_golang v1.23.2
-	github.com/prometheus/common v0.67.3
+	github.com/prometheus/common v0.67.4
 	github.com/rs/cors v1.11.1
 	github.com/sapcc/go-api-declarations v1.18.0
-	github.com/sapcc/go-bits v0.0.0-20251126153508-cbe15dbfcd15
+	github.com/sapcc/go-bits v0.0.0-20251127001757-54a64663b18f
 	go.uber.org/automaxprocs v1.6.0
 )
 
