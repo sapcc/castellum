@@ -8,6 +8,7 @@ import (
 	"math"
 	"slices"
 
+	"github.com/majewsky/gg/is"
 	. "github.com/majewsky/gg/option"
 	"github.com/majewsky/gg/options"
 	"github.com/sapcc/go-api-declarations/castellum"
@@ -136,7 +137,7 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 		for _, metric := range res.UsageMetrics {
 			minSize := minimumFreeSize + uint64(math.Ceil(asset.Usage[metric]))
 			// Only apply MinimumFreeSize constraint if there is no conflict with strict constraints
-			if enforceableMaxSize.IsSomeAnd(func(value uint64) bool { return value < minSize }) {
+			if enforceableMaxSize.IsSomeAnd(is.Below(minSize)) {
 				continue
 			}
 			enforceableMinSize = options.Max(enforceableMinSize, Some(minSize))
@@ -284,12 +285,12 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 	// but only if it is actually a proper downsize or upsize
 	if reason == castellum.OperationReasonLow {
 		target := a.Min()
-		if target.IsSomeAnd(func(value uint64) bool { return value < asset.Size }) {
+		if target.IsSomeAnd(is.Below(asset.Size)) {
 			return target
 		}
 	} else {
 		target := a.Max()
-		if target.IsSomeAnd(func(value uint64) bool { return value > asset.Size }) {
+		if target.IsSomeAnd(is.Above(asset.Size)) {
 			return target
 		}
 	}
