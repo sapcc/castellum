@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/go-gorp/gorp/v3"
+	"github.com/majewsky/gg/is"
 	. "github.com/majewsky/gg/option"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-api-declarations/castellum"
@@ -176,7 +177,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 		// OldSize nor its NewSize) -> assume that some other user changed the size
 		// in parallel and take that new value as the actual size
 		writeScrapeResults = true
-	case asset.ResizedAt.IsSomeAnd(func(t time.Time) bool { return t.Before(c.TimeNow().Add(-1 * time.Hour)) }):
+	case asset.ResizedAt.IsSomeAnd(is.Before(c.TimeNow().Add(-1 * time.Hour))):
 		// we waited for a resize operation to be reflected in the backend, but it
 		// has been more than an hour since then -> assume that the resize was
 		// interrupted in some way and resume normal behavior
@@ -205,7 +206,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 
 	// compute value of `asset.CriticalUsages` field (for reporting to admin only)
 	var criticalUsageMetrics []string
-	if res.CriticalThresholdPercent.IsNonZero() && res.MaximumSize.IsNoneOr(func(maxSize uint64) bool { return asset.Size < maxSize }) {
+	if res.CriticalThresholdPercent.IsNonZero() && res.MaximumSize.IsNoneOr(is.Above(asset.Size)) {
 		usagePerc := core.GetMultiUsagePercent(asset.Size, asset.Usage)
 		for _, metric := range info.UsageMetrics {
 			if usagePerc[metric] >= res.CriticalThresholdPercent[metric] {
@@ -226,7 +227,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 
 	// never touch operations in status "greenlit" - they may be executing on a
 	// worker right now
-	if pendingOp != nil && pendingOp.GreenlitAt.IsSomeAnd(func(t time.Time) bool { return !t.After(c.TimeNow()) }) {
+	if pendingOp != nil && pendingOp.GreenlitAt.IsSomeAnd(is.NotAfter(c.TimeNow())) {
 		return tx.Commit()
 	}
 

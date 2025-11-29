@@ -6,7 +6,6 @@ package test
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"testing"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/httpapi"
+	"github.com/sapcc/go-bits/httptest"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/mock"
 	"github.com/sapcc/go-bits/must"
@@ -77,7 +77,7 @@ type Setup struct {
 
 	// for API tests only
 	Auditor   *audittools.MockAuditor
-	Handler   http.Handler
+	Handler   httptest.Handler
 	Validator *mock.Validator[*mock.Enforcer]
 
 	// for worker tests only
@@ -111,7 +111,7 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 		},
 		Team:        core.AssetManagerTeam(params.AssetManagers),
 		Auditor:     audittools.NewMockAuditor(),
-		Handler:     nil, // see below
+		Handler:     httptest.Handler{}, // see below
 		Validator:   mock.NewValidator(mock.NewEnforcer(), nil),
 		Registry:    prometheus.NewPedanticRegistry(),
 		TaskContext: nil, // see below
@@ -144,10 +144,10 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 	})
 
 	// initialize HTTP handler for API tests
-	s.Handler = httpapi.Compose(
+	s.Handler = httptest.NewHandler(httpapi.Compose(
 		api.NewHandler(s.Config, s.DB, s.Team, s.Validator, s.ProviderClient, s.Auditor, s.Clock.Now),
 		httpapi.WithoutLogging(),
-	)
+	))
 
 	// initialize context for worker tests
 	noJitter := func(d time.Duration) time.Duration {

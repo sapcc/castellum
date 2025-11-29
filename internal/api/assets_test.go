@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/majewsky/gg/jsonmatch"
 	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
-	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/must"
 
@@ -22,12 +22,12 @@ func TestGetAssets(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
-	hh := s.Handler
+	ctx := t.Context()
 
-	testCommonEndpointBehavior(t, hh, s,
+	testCommonEndpointBehavior(t, s,
 		"/v1/projects/%s/assets/%s")
 
-	expectedAssets := []assert.JSONObject{
+	expectedAssets := []jsonmatch.Object{
 		{
 			"id":            "fooasset1",
 			"size":          1024,
@@ -40,7 +40,7 @@ func TestGetAssets(t *testing.T) {
 			"usage_percent": 80,
 			"min_size":      256,
 			"max_size":      1024,
-			"checked": assert.JSONObject{
+			"checked": jsonmatch.Object{
 				"error": "unexpected uptime",
 			},
 			"stale": false,
@@ -49,45 +49,33 @@ func TestGetAssets(t *testing.T) {
 
 	// happy path
 	s.Validator.Enforcer.Forbid("project:edit:foo") // this should not be an issue
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/assets/foo",
-		ExpectStatus: http.StatusOK,
-		ExpectBody:   assert.JSONObject{"assets": expectedAssets},
-	}.Check(t, hh)
+	s.Handler.RespondTo(ctx, "GET /v1/projects/project1/assets/foo").
+		ExpectJSON(t, http.StatusOK, jsonmatch.Object{"assets": expectedAssets})
 }
 
 func TestGetAsset(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
-	hh := s.Handler
+	ctx := t.Context()
 
-	testCommonEndpointBehavior(t, hh, s,
+	testCommonEndpointBehavior(t, s,
 		"/v1/projects/%s/assets/%s/fooasset1")
 
 	// expect error for unknown asset
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/assets/foo/doesnotexist",
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t, hh)
+	s.Handler.RespondTo(ctx, "GET /v1/projects/project1/assets/foo/doesnotexist").
+		ExpectStatus(t, http.StatusNotFound)
 
 	// happy path: just an asset without any operations
 	s.Validator.Enforcer.Forbid("project:edit:foo") // this should not be an issue
-	response := assert.JSONObject{
+	response := jsonmatch.Object{
 		"id":            "fooasset1",
 		"size":          1024,
 		"usage_percent": 50,
 		"stale":         true,
 	}
-	req := assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/assets/foo/fooasset1",
-		ExpectStatus: http.StatusOK,
-		ExpectBody:   response,
-	}
-	req.Check(t, hh)
+	s.Handler.RespondTo(ctx, "GET /v1/projects/project1/assets/foo/fooasset1").
+		ExpectJSON(t, http.StatusOK, response)
 
 	// check rendering of a pending operation in state "created"
 	pendingOp := db.PendingOperation{
@@ -99,57 +87,60 @@ func TestGetAsset(t *testing.T) {
 		CreatedAt: time.Unix(21, 0).UTC(),
 	}
 	must.SucceedT(t, s.DB.Insert(&pendingOp))
-	pendingOpJSON := assert.JSONObject{
+	pendingOpJSON := jsonmatch.Object{
 		"state":    "created",
 		"reason":   "high",
 		"old_size": 1024,
 		"new_size": 2048,
-		"created": assert.JSONObject{
+		"created": jsonmatch.Object{
 			"at":            21,
 			"usage_percent": 75,
 		},
 	}
 	response["pending_operation"] = pendingOpJSON
-	req.Check(t, hh)
+	s.Handler.RespondTo(ctx, "GET /v1/projects/project1/assets/foo/fooasset1").
+		ExpectJSON(t, http.StatusOK, response)
 
 	// check rendering of a pending operation in state "confirmed"
 	pendingOp.ConfirmedAt = Some(time.Unix(22, 0).UTC())
 	must.SucceedT(t, s.DBUpdate(&pendingOp))
 	pendingOpJSON["state"] = "confirmed"
-	pendingOpJSON["confirmed"] = assert.JSONObject{"at": 22}
-	req.Check(t, hh)
+	pendingOpJSON["confirmed"] = jsonmatch.Object{"at": 22}
+	s.Handler.RespondTo(ctx, "GET /v1/projects/project1/assets/foo/fooasset1").
+		ExpectJSON(t, http.StatusOK, response)
 
 	// check rendering of a pending operation in state "greenlit"
 	pendingOp.GreenlitAt = Some(time.Unix(23, 0).UTC())
 	must.SucceedT(t, s.DBUpdate(&pendingOp))
 	pendingOpJSON["state"] = "greenlit"
-	pendingOpJSON["greenlit"] = assert.JSONObject{"at": 23}
-	req.Check(t, hh)
+	pendingOpJSON["greenlit"] = jsonmatch.Object{"at": 23}
+	s.Handler.RespondTo(ctx, "GET /v1/projects/project1/assets/foo/fooasset1").
+		ExpectJSON(t, http.StatusOK, response)
 
 	pendingOp.GreenlitByUserUUID = Some("user1")
 	must.SucceedT(t, s.DBUpdate(&pendingOp))
-	pendingOpJSON["greenlit"] = assert.JSONObject{"at": 23, "by_user": "user1"}
-	req.Check(t, hh)
+	pendingOpJSON["greenlit"] = jsonmatch.Object{"at": 23, "by_user": "user1"}
+	s.Handler.RespondTo(ctx, "GET /v1/projects/project1/assets/foo/fooasset1").
+		ExpectJSON(t, http.StatusOK, response)
 
 	// check rendering of a scraping error
 	must.SucceedT(t, s.DBExec(`UPDATE assets SET scrape_error_message = $1 WHERE id = 1`, "filer is on fire"))
-	response["checked"] = assert.JSONObject{
-		"error": "filer is on fire",
-	}
-	req.Check(t, hh)
+	response["checked"] = jsonmatch.Object{"error": "filer is on fire"}
+	s.Handler.RespondTo(ctx, "GET /v1/projects/project1/assets/foo/fooasset1").
+		ExpectJSON(t, http.StatusOK, response)
 
 	// check rendering of finished operations in all possible states
-	response["finished_operations"] = []assert.JSONObject{
+	response["finished_operations"] = []jsonmatch.Object{
 		{
 			"reason":   "low",
 			"state":    "cancelled",
 			"old_size": 1000,
 			"new_size": 900,
-			"created": assert.JSONObject{
+			"created": jsonmatch.Object{
 				"at":            31,
 				"usage_percent": 20,
 			},
-			"finished": assert.JSONObject{
+			"finished": jsonmatch.Object{
 				"at": 32,
 			},
 		},
@@ -158,18 +149,18 @@ func TestGetAsset(t *testing.T) {
 			"state":    "succeeded",
 			"old_size": 1023,
 			"new_size": 1024,
-			"created": assert.JSONObject{
+			"created": jsonmatch.Object{
 				"at":            41,
 				"usage_percent": 80,
 			},
-			"confirmed": assert.JSONObject{
+			"confirmed": jsonmatch.Object{
 				"at": 42,
 			},
-			"greenlit": assert.JSONObject{
+			"greenlit": jsonmatch.Object{
 				"at":      43,
 				"by_user": "user2",
 			},
-			"finished": assert.JSONObject{
+			"finished": jsonmatch.Object{
 				"at": 44,
 			},
 		},
@@ -178,24 +169,24 @@ func TestGetAsset(t *testing.T) {
 			"state":    "errored",
 			"old_size": 1024,
 			"new_size": 1025,
-			"created": assert.JSONObject{
+			"created": jsonmatch.Object{
 				"at":            51,
 				"usage_percent": 96,
 			},
-			"confirmed": assert.JSONObject{
+			"confirmed": jsonmatch.Object{
 				"at": 52,
 			},
-			"greenlit": assert.JSONObject{
+			"greenlit": jsonmatch.Object{
 				"at": 52,
 			},
-			"finished": assert.JSONObject{
+			"finished": jsonmatch.Object{
 				"at":    53,
 				"error": "datacenter is on fire",
 			},
 		},
 	}
-	req.Path += "?history"
-	req.Check(t, hh)
+	s.Handler.RespondTo(ctx, "GET /v1/projects/project1/assets/foo/fooasset1?history").
+		ExpectJSON(t, http.StatusOK, response)
 
 	// check rendering of an asset that has never had a successful scrape
 	must.SucceedT(t, s.DB.Insert(&db.Asset{
@@ -203,62 +194,45 @@ func TestGetAsset(t *testing.T) {
 		UUID:               "fooasset3",
 		ScrapeErrorMessage: "filer has stranger anxiety",
 	}))
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/projects/project1/assets/foo/fooasset3",
-		ExpectStatus: http.StatusOK,
-		ExpectBody: assert.JSONObject{
+	s.Handler.RespondTo(ctx, "GET /v1/projects/project1/assets/foo/fooasset3").
+		ExpectJSON(t, http.StatusOK, jsonmatch.Object{
 			"id": "fooasset3",
-			"checked": assert.JSONObject{
+			"checked": jsonmatch.Object{
 				"error": "filer has stranger anxiety",
 			},
 			"stale":         false,
 			"usage_percent": 0,
-		},
-	}.Check(t, hh)
+		})
 }
 
 func TestPostAssetErrorResolved(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
-	hh := s.Handler
+	ctx := t.Context()
 
 	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
 	tr0.Ignore()
 
 	// endpoint requires cluster access
 	s.Validator.Enforcer.Forbid("cluster:access")
-	assert.HTTPRequest{
-		Method:       "POST",
-		Path:         "/v1/projects/project1/assets/foo/fooasset1/error-resolved",
-		ExpectStatus: http.StatusForbidden,
-	}.Check(t, hh)
+	s.Handler.RespondTo(ctx, "POST /v1/projects/project1/assets/foo/fooasset1/error-resolved").
+		ExpectStatus(t, http.StatusForbidden)
 	s.Validator.Enforcer.Allow("cluster:access")
 
 	// expect error for unknown project
-	assert.HTTPRequest{
-		Method:       "POST",
-		Path:         "/v1/projects/project1/assets/projectdoesnotexist/fooasset1/error-resolved",
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t, hh)
+	s.Handler.RespondTo(ctx, "POST /v1/projects/project1/assets/projectdoesnotexist/fooasset1/error-resolved").
+		ExpectStatus(t, http.StatusNotFound)
 
 	// expect error for unknown asset
-	assert.HTTPRequest{
-		Method:       "POST",
-		Path:         "/v1/projects/project1/assets/foo/assetdoesnotexist/error-resolved",
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t, hh)
+	s.Handler.RespondTo(ctx, "POST /v1/projects/project1/assets/foo/assetdoesnotexist/error-resolved").
+		ExpectStatus(t, http.StatusNotFound)
 
 	tr.DBChanges().AssertEmpty()
 
 	// happy path
-	req := assert.HTTPRequest{
-		Method:       "POST",
-		Path:         "/v1/projects/project1/assets/foo/fooasset1/error-resolved",
-		ExpectStatus: http.StatusOK,
-	}
-	req.Check(t, hh)
+	s.Handler.RespondTo(ctx, "POST /v1/projects/project1/assets/foo/fooasset1/error-resolved").
+		ExpectStatus(t, http.StatusOK)
 
 	tr.DBChanges().AssertEqualf(`
 		INSERT INTO finished_operations (asset_id, reason, outcome, old_size, new_size, created_at, confirmed_at, greenlit_at, finished_at, greenlit_by_user_uuid, usage) VALUES (1, 'critical', 'error-resolved', 0, 0, %[1]d, %[1]d, %[1]d, %[1]d, '', 'null');
@@ -266,9 +240,6 @@ func TestPostAssetErrorResolved(t *testing.T) {
 		s.Clock.Now().Unix())
 
 	// expect conflict for asset where the last operation is not "errored"
-	assert.HTTPRequest{
-		Method:       "POST",
-		Path:         "/v1/projects/project1/assets/foo/fooasset1/error-resolved",
-		ExpectStatus: http.StatusConflict,
-	}.Check(t, hh)
+	s.Handler.RespondTo(ctx, "POST /v1/projects/project1/assets/foo/fooasset1/error-resolved").
+		ExpectStatus(t, http.StatusConflict)
 }

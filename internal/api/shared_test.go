@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/sapcc/go-api-declarations/castellum"
-	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
 
 	"github.com/sapcc/castellum/internal/plugins"
@@ -31,46 +30,32 @@ func commonSetupOptionsForAPITest() test.SetupOption {
 	)
 }
 
-func testCommonEndpointBehavior(t *testing.T, hh http.Handler, s test.Setup, pathPattern string) {
-	path := func(projectID, resourceID string) string {
-		return fmt.Sprintf(pathPattern, projectID, resourceID)
+func testCommonEndpointBehavior(t *testing.T, s test.Setup, pathPattern string) {
+	ctx := t.Context()
+	getPath := func(projectID, resourceID string) string {
+		return "GET " + fmt.Sprintf(pathPattern, projectID, resourceID)
 	}
 
 	// endpoint requires a token with project access
 	s.Validator.Enforcer.Forbid("project:access")
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         path("project1", "foo"),
-		ExpectStatus: http.StatusForbidden,
-	}.Check(t, hh)
+	s.Handler.RespondTo(ctx, getPath("project1", "foo")).
+		ExpectStatus(t, http.StatusForbidden)
 	s.Validator.Enforcer.Allow("project:access")
 
 	// expect error for unknown project or resource
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         path("project2", "foo"),
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t, hh)
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         path("project1", "doesnotexist"),
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t, hh)
+	s.Handler.RespondTo(ctx, getPath("project2", "foo")).
+		ExpectStatus(t, http.StatusNotFound)
+	s.Handler.RespondTo(ctx, getPath("project1", "doesnotexist")).
+		ExpectStatus(t, http.StatusNotFound)
 
 	// the "unknown" resource exists, but it should be 404 regardless because we
 	// don't have an asset manager for it
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         path("project1", "unknown"),
-		ExpectStatus: http.StatusNotFound,
-	}.Check(t, hh)
+	s.Handler.RespondTo(ctx, getPath("project1", "unknown")).
+		ExpectStatus(t, http.StatusNotFound)
 
 	// expect error for inaccessible resource
 	s.Validator.Enforcer.Forbid("project:show:foo")
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         path("project1", "foo"),
-		ExpectStatus: http.StatusForbidden,
-	}.Check(t, hh)
+	s.Handler.RespondTo(ctx, getPath("project1", "foo")).
+		ExpectStatus(t, http.StatusForbidden)
 	s.Validator.Enforcer.Allow("project:show:foo")
 }
