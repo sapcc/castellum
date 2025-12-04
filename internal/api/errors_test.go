@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/majewsky/gg/jsonmatch"
 	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
-	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/must"
 
 	"github.com/sapcc/castellum/internal/db"
@@ -21,27 +21,21 @@ func TestGetResourceScrapeErrors(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
-	hh := s.Handler
+	ctx := t.Context()
 
 	// endpoint requires a token with cluster access
 	s.Validator.Enforcer.Forbid("cluster:access")
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/admin/resource-scrape-errors",
-		ExpectStatus: http.StatusForbidden,
-	}.Check(t, hh)
+	s.Handler.RespondTo(ctx, "GET /v1/admin/resource-scrape-errors").
+		ExpectStatus(t, http.StatusForbidden)
 	s.Validator.Enforcer.Allow("cluster:access")
 
 	// happy path
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/admin/resource-scrape-errors",
-		ExpectStatus: http.StatusOK,
-		ExpectBody: assert.JSONObject{
-			"resource_scrape_errors": []assert.JSONObject{
+	s.Handler.RespondTo(ctx, "GET /v1/admin/resource-scrape-errors").
+		ExpectJSON(t, http.StatusOK, jsonmatch.Object{
+			"resource_scrape_errors": []jsonmatch.Object{
 				{
 					"asset_type": "bar",
-					"checked": assert.JSONObject{
+					"checked": jsonmatch.Object{
 						"error": "datacenter is on fire",
 					},
 					"domain_id":  "domain1",
@@ -49,79 +43,65 @@ func TestGetResourceScrapeErrors(t *testing.T) {
 				},
 				{
 					"asset_type": "foo",
-					"checked": assert.JSONObject{
+					"checked": jsonmatch.Object{
 						"error": "datacenter is on fire",
 					},
 					"domain_id":  "domain1",
 					"project_id": "something-else",
 				},
 			},
-		},
-	}.Check(t, hh)
+		})
 }
 
 func TestGetAssetScrapeErrors(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
-	hh := s.Handler
+	ctx := t.Context()
 
 	// endpoint requires a token with cluster access
 	s.Validator.Enforcer.Forbid("cluster:access")
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/admin/asset-scrape-errors",
-		ExpectStatus: http.StatusForbidden,
-	}.Check(t, hh)
+	s.Handler.RespondTo(ctx, "GET /v1/admin/asset-scrape-errors").
+		ExpectStatus(t, http.StatusForbidden)
 	s.Validator.Enforcer.Allow("cluster:access")
 
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/admin/asset-scrape-errors",
-		ExpectStatus: http.StatusOK,
-		ExpectBody: assert.JSONObject{
-			"asset_scrape_errors": []assert.JSONObject{
+	s.Handler.RespondTo(ctx, "GET /v1/admin/asset-scrape-errors").
+		ExpectJSON(t, http.StatusOK, jsonmatch.Object{
+			"asset_scrape_errors": []jsonmatch.Object{
 				{
 					"asset_id":   "fooasset2",
 					"asset_type": "foo",
-					"checked": assert.JSONObject{
+					"checked": jsonmatch.Object{
 						"error": "unexpected uptime",
 					},
 					"domain_id":  "domain1",
 					"project_id": "project1",
 				},
 			},
-		},
-	}.Check(t, hh)
+		})
 }
 
 func TestGetAssetResizeErrors(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
-	hh := s.Handler
+	ctx := t.Context()
 
 	// endpoint requires a token with cluster access
 	s.Validator.Enforcer.Forbid("cluster:access")
-	assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/admin/asset-resize-errors",
-		ExpectStatus: http.StatusForbidden,
-	}.Check(t, hh)
+	s.Handler.RespondTo(ctx, "GET /v1/admin/asset-resize-errors").
+		ExpectStatus(t, http.StatusForbidden)
 	s.Validator.Enforcer.Allow("cluster:access")
 
 	// check that the "errored" resize operation is rendered properly
-	req := assert.HTTPRequest{
-		Method:       "GET",
-		Path:         "/v1/admin/asset-resize-errors",
-		ExpectStatus: http.StatusOK,
-		ExpectBody: assert.JSONObject{
-			"asset_resize_errors": []assert.JSONObject{
+	s.Handler.RespondTo(ctx, "GET /v1/admin/asset-resize-errors").
+		ExpectJSON(t, http.StatusOK, jsonmatch.Object{
+			"asset_resize_errors": []jsonmatch.Object{
 				{
 					"asset_id":   "fooasset1",
 					"asset_type": "foo",
 					"domain_id":  "domain1",
-					"finished": assert.JSONObject{
+					"finished": jsonmatch.Object{
 						"at":    53,
 						"error": "datacenter is on fire",
 					},
@@ -130,9 +110,7 @@ func TestGetAssetResizeErrors(t *testing.T) {
 					"project_id": "project1",
 				},
 			},
-		},
-	}
-	req.Check(t, hh)
+		})
 
 	// add a new operation on the same asset that results with outcome
 	// "succeeded" and check that we get an empty list
@@ -148,8 +126,8 @@ func TestGetAssetResizeErrors(t *testing.T) {
 		GreenlitAt:  Some(time.Unix(71, 0).UTC()),
 		FinishedAt:  time.Unix(73, 0).UTC(),
 	}))
-	req.ExpectBody = assert.JSONObject{
-		"asset_resize_errors": []assert.JSONObject{},
-	}
-	req.Check(t, hh)
+	s.Handler.RespondTo(ctx, "GET /v1/admin/asset-resize-errors").
+		ExpectJSON(t, http.StatusOK, jsonmatch.Object{
+			"asset_resize_errors": jsonmatch.Array{},
+		})
 }
