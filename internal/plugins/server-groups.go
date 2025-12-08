@@ -275,7 +275,7 @@ func (m *assetManagerServerGroups) terminateServers(ctx context.Context, res db.
 
 	// delete oldest servers
 	serversInDeletion := make(map[string]string)
-	for idx := 0; uint64(idx) < countToDelete && idx < len(allServers); idx++ {
+	for idx := 0; uint64(idx) < countToDelete && idx < len(allServers); idx++ { //nolint:gosec // int -> uint64 overflow not possible in practice
 		server := allServers[idx]
 		logg.Info("deleting server %s from %s", server.ID, res.AssetType)
 		for _, lb := range cfg.LoadbalancerPoolMemberships {
@@ -398,7 +398,7 @@ func (m *assetManagerServerGroups) createServers(ctx context.Context, res db.Res
 
 	// create servers
 	serversInCreation := make(map[string]string)
-	for idx := 0; uint64(idx) < countToCreate; idx++ {
+	for idx := 0; uint64(idx) < countToCreate; idx++ { //nolint:gosec // int -> uint64 overflow not possible in practice
 		name := fmt.Sprintf("%s-%s", group.Name, makeNameDisambiguator())
 		logg.Info("creating server %s in %s", name, res.AssetType)
 
