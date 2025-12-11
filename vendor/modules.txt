@@ -114,7 +114,7 @@ github.com/rs/cors/internal
 github.com/sapcc/go-api-declarations/bininfo
 github.com/sapcc/go-api-declarations/cadf
 github.com/sapcc/go-api-declarations/castellum
-# github.com/sapcc/go-bits v0.0.0-20251204133412-746f1e02903e
+# github.com/sapcc/go-bits v0.0.0-20251211170253-467ecb6aaf3d
 ## explicit; go 1.25
 github.com/sapcc/go-bits/assert
 github.com/sapcc/go-bits/audittools
@@ -138,6 +138,7 @@ github.com/sapcc/go-bits/promquery
 github.com/sapcc/go-bits/regexpext
 github.com/sapcc/go-bits/respondwith
 github.com/sapcc/go-bits/sqlext
+github.com/sapcc/go-bits/syncext
 # github.com/sergi/go-diff v1.4.0
 ## explicit; go 1.13
 github.com/sergi/go-diff/diffmatchpatch
