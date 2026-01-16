@@ -32,7 +32,7 @@ var selectAndDeleteNextResizeQuery = sqlext.SimplifyWhitespace(`
 `)
 
 const (
-	// MaxRetries is the maxium number of retries per asset for AssetResizingJob.
+	// MaxRetries is the maximum number of retries per asset for AssetResizingJob.
 	MaxRetries = 3
 	// RetryInterval is the retry interval for AssetResizingJob.
 	RetryInterval = 2 * time.Minute

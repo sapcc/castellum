@@ -33,7 +33,6 @@ import (
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
-	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/sapcc/castellum/internal/api"
 	"github.com/sapcc/castellum/internal/core"
@@ -61,8 +60,6 @@ func main() {
 	bininfo.SetTaskName(taskName)
 
 	logg.ShowDebug = osext.GetenvBool("CASTELLUM_DEBUG")
-	undoMaxprocs := must.Return(maxprocs.Set(maxprocs.Logger(logg.Debug)))
-	defer undoMaxprocs()
 
 	wrap := httpext.WrapTransport(&http.DefaultTransport)
 	wrap.SetInsecureSkipVerify(osext.GetenvBool("CASTELLUM_INSECURE")) // for debugging with mitmproxy etc. (DO NOT SET IN PRODUCTION)
