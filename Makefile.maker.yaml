@@ -35,6 +35,10 @@ renovate:
     - majewsky
     - SuperSandro2000
 
+typos:
+  extendWords:
+    fo: fo # legitimate abbreviation for `finished_operations`
+
 verbatim: |
   # convenience targets for developers: `make run-api/run-collector/run-worker/test-asset-type-*`
   # runs one of the components, with environment options sourced from $PWD/.env; and configuration
