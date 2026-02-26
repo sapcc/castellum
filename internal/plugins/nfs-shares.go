@@ -355,7 +355,7 @@ var (
 			Description: "Manila share size bytes",
 			Keyer:       manilaShareMetricsKeyer,
 			Filler: func(entry *manilaShareMetrics, sample *model.Sample) {
-				entry.SizeGiB = pointerTo(uint64(math.Round(asGigabytes(sample.Value))))
+				entry.SizeGiB = new(uint64(math.Round(asGigabytes(sample.Value))))
 			},
 		},
 		{
@@ -371,7 +371,7 @@ var (
 			Description: "Manila share used bytes",
 			Keyer:       manilaShareMetricsKeyer,
 			Filler: func(entry *manilaShareMetrics, sample *model.Sample) {
-				entry.UsedGiB = pointerTo(asGigabytes(sample.Value))
+				entry.UsedGiB = new(asGigabytes(sample.Value))
 			},
 		},
 	}
@@ -379,8 +379,4 @@ var (
 
 func asGigabytes(bytes model.SampleValue) float64 {
 	return float64(bytes) / (1 << 30)
-}
-
-func pointerTo[T any](value T) *T {
-	return &value
 }

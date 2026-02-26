@@ -459,7 +459,7 @@ func (m *assetManagerServerGroups) createServers(ctx context.Context, res db.Res
 				}
 				delete(serversInCreation, serverID)
 			case "ERROR":
-				msgs = append(msgs, fmt.Sprintf("server %s has entered status ERROR with message %q", serverID, server.Fault.Code))
+				msgs = append(msgs, fmt.Sprintf("server %s has entered status ERROR with message %d", serverID, server.Fault.Code))
 				delete(serversInCreation, serverID)
 			default:
 				// keep waiting for this server to get into ACTIVE (or ERROR)
