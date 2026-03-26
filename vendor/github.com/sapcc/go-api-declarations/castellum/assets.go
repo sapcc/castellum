@@ -33,7 +33,7 @@ type StandaloneOperation struct {
 	AssetID     string `json:"asset_id,omitempty"`
 }
 
-// StandaloneOperation is the API representation for a pending or finished
+// Operation is the API representation for a pending or finished
 // resize operation when the operation appears within its respective asset.
 type Operation struct {
 	State     OperationState                `json:"state"`
