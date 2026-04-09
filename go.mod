@@ -12,7 +12,7 @@ require (
 	github.com/prometheus/common v0.67.5
 	github.com/rs/cors v1.11.1
 	github.com/sapcc/go-api-declarations v1.21.0
-	github.com/sapcc/go-bits v0.0.0-20260408114239-ecd3902a31cc
+	github.com/sapcc/go-bits v0.0.0-20260409170436-d7b7822ab7d3
 )
 
 require (
@@ -22,10 +22,10 @@ require (
 	github.com/gofrs/uuid/v5 v5.4.0 // indirect
 	github.com/golang-migrate/migrate/v4 v4.19.1 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
-	github.com/itchyny/gojq v0.12.18 // indirect
-	github.com/itchyny/timefmt-go v0.1.7 // indirect
+	github.com/itchyny/gojq v0.12.19 // indirect
+	github.com/itchyny/timefmt-go v0.1.8 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/lib/pq v1.12.1 // indirect
+	github.com/lib/pq v1.12.3 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
