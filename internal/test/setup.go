@@ -4,21 +4,23 @@
 package test
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/go-gorp/gorp/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/httptest"
+	"github.com/sapcc/go-bits/jobloop"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/mock"
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
+	"go.xyrillian.de/oblast"
 
 	"github.com/sapcc/castellum/internal/api"
 	"github.com/sapcc/castellum/internal/core"
@@ -71,7 +73,7 @@ type Setup struct {
 	// for all types of integration tests
 	Clock          *mock.Clock
 	Config         core.Config
-	DB             *gorp.DbMap
+	DB             *sql.DB
 	ProviderClient MockProviderClient
 	Team           core.AssetManagerTeam
 
@@ -137,10 +139,9 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 	if params.DBFixtureFile != "" {
 		dbOpts = append(dbOpts, easypg.LoadSQLFile(params.DBFixtureFile))
 	}
-	dbConn := easypg.ConnectForTest(t, db.Configuration(), dbOpts...)
-	s.DB = db.InitORM(dbConn)
+	s.DB = easypg.ConnectForTest(t, db.Configuration(), dbOpts...)
 	t.Cleanup(func() {
-		_ = dbConn.Close()
+		_ = s.DB.Close()
 	})
 
 	// initialize HTTP handler for API tests
@@ -150,17 +151,13 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 	))
 
 	// initialize context for worker tests
-	noJitter := func(d time.Duration) time.Duration {
-		// Tests should be deterministic, so we do not add random jitter here.
-		return d
-	}
 	s.TaskContext = &tasks.Context{
 		Config:         s.Config,
 		DB:             s.DB,
 		Team:           s.Team,
 		ProviderClient: s.ProviderClient,
 		TimeNow:        s.Clock.Now,
-		AddJitter:      noJitter,
+		AddJitter:      jobloop.NoJitter,
 	}
 
 	return s
@@ -186,8 +183,11 @@ func (s Setup) DBExec(query string, args ...any) error {
 	return err
 }
 
-// DBUpdate is a shorthand for s.DB.Update() that discards the unused return value.
-func (s Setup) DBUpdate(records ...any) error {
-	_, err := s.DB.Update(records...)
+// Insert is a shorthand for store.Insert() that reads the result back into `record`.
+func Insert[R any](dbi *sql.DB, store oblast.Store[R], record *R) error {
+	result, err := store.Insert(dbi, *record)
+	if err == nil {
+		*record = result[0]
+	}
 	return err
 }

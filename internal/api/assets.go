@@ -123,9 +123,7 @@ func (h handler) GetAssets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var dbAssets []db.Asset
-	_, err := h.DB.Select(&dbAssets,
-		`SELECT * FROM assets WHERE resource_id = $1 ORDER BY uuid`, dbResource.ID)
+	dbAssets, err := db.AssetStore.SelectWhere(h.DB, `resource_id = $1 ORDER BY uuid`, dbResource.ID)
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
@@ -153,9 +151,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var dbAsset db.Asset
-	err := h.DB.SelectOne(&dbAsset,
-		`SELECT * FROM assets WHERE resource_id = $1 AND uuid = $2`,
+	dbAsset, err := db.AssetStore.SelectOneWhere(h.DB, `resource_id = $1 AND uuid = $2`,
 		dbResource.ID, mux.Vars(r)["asset_uuid"])
 	if errors.Is(err, sql.ErrNoRows) {
 		http.NotFound(w, r)
@@ -166,10 +162,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	}
 	asset := AssetFromDB(dbAsset)
 
-	var dbPendingOp db.PendingOperation
-	err = h.DB.SelectOne(&dbPendingOp,
-		`SELECT * FROM pending_operations WHERE asset_id = $1`,
-		dbAsset.ID)
+	dbPendingOp, err := db.PendingOperationStore.SelectOneWhere(h.DB, `asset_id = $1`, dbAsset.ID)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		asset.PendingOperation = None[castellum.StandaloneOperation]()
@@ -181,11 +174,8 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 
 	_, wantsFinishedOps := r.URL.Query()["history"]
 	if wantsFinishedOps {
-		var dbFinishedOps []db.FinishedOperation
-		_, err = h.DB.Select(&dbFinishedOps,
-			`SELECT * FROM finished_operations 
-			 WHERE asset_id = $1 AND outcome != 'error-resolved'
-			 ORDER BY finished_at`,
+		dbFinishedOps, err := db.FinishedOperationStore.SelectWhere(h.DB,
+			`asset_id = $1 AND outcome != 'error-resolved' ORDER BY finished_at`,
 			dbAsset.ID)
 		if respondwith.ObfuscatedErrorText(w, err) {
 			return
@@ -245,7 +235,7 @@ func (h handler) PostAssetErrorResolved(w http.ResponseWriter, r *http.Request) 
 
 	now := h.TimeNow()
 	userUUID := token.UserUUID()
-	err = h.DB.Insert(&db.FinishedOperation{
+	_, err = db.FinishedOperationStore.Insert(h.DB, db.FinishedOperation{
 		AssetID:            assetID,
 		Reason:             lastReason,
 		Outcome:            castellum.OperationOutcomeErrorResolved,

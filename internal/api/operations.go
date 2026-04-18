@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/go-gorp/gorp/v3"
 	"github.com/gorilla/mux"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/gopherpolicy"
@@ -71,9 +70,7 @@ func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (
 	if len(sqlConditions) == 0 {
 		sqlConditions = []string{"TRUE"}
 	}
-	queryStr := `SELECT * FROM resources WHERE ` + strings.Join(sqlConditions, " AND ")
-	var allResources []db.Resource
-	_, err := h.DB.Select(&allResources, queryStr, sqlBindValues...)
+	allResources, err := db.ResourceStore.SelectWhere(h.DB, strings.Join(sqlConditions, " AND "), sqlBindValues...)
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return nil, false
 	}
@@ -109,6 +106,12 @@ func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (
 	return allowedResources, true
 }
 
+var getPendingOpsByResourceIDQuery = sqlext.SimplifyWhitespace(`
+	SELECT o.* FROM pending_operations o
+	  JOIN assets a ON a.id = o.asset_id
+	 WHERE a.resource_id = $1
+`)
+
 func (h handler) GetPendingOperations(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/operations/pending")
 	dbResources, ok := h.LoadMatchingResources(w, r)
@@ -119,12 +122,7 @@ func (h handler) GetPendingOperations(w http.ResponseWriter, r *http.Request) {
 	allOps := []castellum.StandaloneOperation{}
 	for _, dbResource := range dbResources {
 		// find operations
-		var ops []db.PendingOperation
-		_, err := h.DB.Select(&ops, `
-			SELECT o.* FROM pending_operations o
-				JOIN assets a ON a.id = o.asset_id
-			 WHERE a.resource_id = $1
-		`, dbResource.ID)
+		ops, err := db.PendingOperationStore.Select(h.DB, getPendingOpsByResourceIDQuery, dbResource.ID)
 		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
@@ -185,9 +183,7 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 		}
 
 		// check if the assets in question are still eligible for resizing
-		var assets []db.Asset
-		_, err = h.DB.Select(&assets,
-			`SELECT * FROM assets WHERE resource_id = $1 ORDER BY uuid`, dbResource.ID)
+		assets, err := db.AssetStore.SelectWhere(h.DB, `resource_id = $1 ORDER BY uuid`, dbResource.ID)
 		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
@@ -234,9 +230,7 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 		}
 
 		// apply filters and collect response data
-		var assets []db.Asset
-		_, err = h.DB.Select(&assets,
-			`SELECT * FROM assets WHERE resource_id = $1 ORDER BY uuid`, dbResource.ID)
+		assets, err := db.AssetStore.SelectWhere(h.DB, `resource_id = $1 ORDER BY uuid`, dbResource.ID)
 		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
@@ -255,7 +249,7 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 }
 
 type recentOperationQuery struct {
-	DB           *gorp.DbMap
+	DB           *sql.DB
 	ResourceID   int64
 	Outcomes     []castellum.OperationOutcome
 	OverriddenBy string // contains a condition for an SQL WHERE clause
@@ -288,8 +282,7 @@ func (q recentOperationQuery) Execute() (map[int64]db.FinishedOperation, error) 
 		strings.Join(outcomes, "', '"), // interpolating string constants into the query is safe here because q.Outcomes is always hardcoded
 	)
 
-	var matchingOps []db.FinishedOperation
-	_, err := q.DB.Select(&matchingOps, queryStr, q.ResourceID)
+	matchingOps, err := db.FinishedOperationStore.Select(q.DB, queryStr, q.ResourceID)
 	if err != nil {
 		return nil, err
 	}

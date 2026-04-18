@@ -15,7 +15,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-gorp/gorp/v3"
 	"github.com/gorilla/mux"
 	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/gopherpolicy"
@@ -29,7 +28,7 @@ import (
 
 type handler struct {
 	Config    core.Config
-	DB        *gorp.DbMap
+	DB        *sql.DB
 	Team      core.AssetManagerTeam
 	Validator gopherpolicy.Validator
 	Provider  core.ProviderClient
@@ -40,7 +39,7 @@ type handler struct {
 }
 
 // NewAPI constructs the main httpapi.API for this package.
-func NewHandler(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClient, auditor audittools.Auditor, timeNow func() time.Time) httpapi.API {
+func NewHandler(cfg core.Config, dbi *sql.DB, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClient, auditor audittools.Auditor, timeNow func() time.Time) httpapi.API {
 	return &handler{Config: cfg, DB: dbi, Team: team, Validator: validator, Provider: provider, Auditor: auditor, TimeNow: timeNow}
 }
 
@@ -197,11 +196,7 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 		return nil
 	}
 
-	var res db.Resource
-	err := h.DB.SelectOne(&res,
-		`SELECT * FROM resources WHERE scope_uuid = $1 AND asset_type = $2`,
-		projectUUID, assetType,
-	)
+	res, err := db.ResourceStore.SelectOneWhere(h.DB, `scope_uuid = $1 AND asset_type = $2`, projectUUID, assetType)
 	if errors.Is(err, sql.ErrNoRows) {
 		if createIfMissing {
 			proj, err := h.Provider.GetProject(r.Context(), projectUUID)

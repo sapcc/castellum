@@ -114,7 +114,7 @@ func TestGetAssetResizeErrors(t *testing.T) {
 
 	// add a new operation on the same asset that results with outcome
 	// "succeeded" and check that we get an empty list
-	must.SucceedT(t, s.DB.Insert(&db.FinishedOperation{
+	must.SucceedT(t, test.Insert(s.DB, db.FinishedOperationStore, &db.FinishedOperation{
 		AssetID:     1,
 		Reason:      castellum.OperationReasonCritical,
 		Outcome:     castellum.OperationOutcomeSucceeded,

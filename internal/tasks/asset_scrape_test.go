@@ -35,11 +35,11 @@ func runAssetScrapeTest(t *testing.T, action func(context.Context, test.Setup, f
 	if !errors.Is(err, sql.ErrNoRows) {
 		t.Errorf("expected sql.ErrNoRows, got %s instead", err.Error())
 	}
-	_, dbDump := easypg.NewTracker(t, s.DB.Db)
+	_, dbDump := easypg.NewTracker(t, s.DB)
 	dbDump.AssertEmpty()
 
 	// create a resource and asset to test with
-	must.SucceedT(t, s.DB.Insert(&db.Resource{
+	must.SucceedT(t, test.Insert(s.DB, db.ResourceStore, &db.Resource{
 		ScopeUUID:                "project1",
 		AssetType:                "foo",
 		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
@@ -50,7 +50,7 @@ func runAssetScrapeTest(t *testing.T, action func(context.Context, test.Setup, f
 		SizeStepPercent:          20,
 		SingleStep:               false,
 	}))
-	must.SucceedT(t, s.DB.Insert(&db.Asset{
+	must.SucceedT(t, test.Insert(s.DB, db.AssetStore, &db.Asset{
 		ResourceID:   1,
 		UUID:         "asset1",
 		Size:         1000,
@@ -76,7 +76,7 @@ func runAssetScrapeTest(t *testing.T, action func(context.Context, test.Setup, f
 
 func TestNoOperationWhenNoThreshold(t *testing.T) {
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
-		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr, tr0 := easypg.NewTracker(t, s.DB)
 		tr0.Ignore()
 
 		// when no threshold is crossed, no operation gets created
@@ -93,7 +93,7 @@ func TestNoOperationWhenNoThreshold(t *testing.T) {
 
 func TestNormalUpsizeTowardsGreenlight(t *testing.T) {
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
-		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr, tr0 := easypg.NewTracker(t, s.DB)
 		tr0.Ignore()
 
 		// set a maximum size that does not contradict the following operations
@@ -159,7 +159,7 @@ func TestNormalUpsizeTowardsGreenlight(t *testing.T) {
 
 func TestNormalUpsizeTowardsCancel(t *testing.T) {
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
-		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr, tr0 := easypg.NewTracker(t, s.DB)
 		tr0.Ignore()
 
 		// when the "High" threshold gets crossed, a "High" operation gets created in
@@ -196,7 +196,7 @@ func TestNormalUpsizeTowardsCancel(t *testing.T) {
 
 func TestNormalDownsizeTowardsGreenlight(t *testing.T) {
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
-		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr, tr0 := easypg.NewTracker(t, s.DB)
 		tr0.Ignore()
 
 		// set a minimum size that does not contradict the following operations
@@ -262,7 +262,7 @@ func TestNormalDownsizeTowardsGreenlight(t *testing.T) {
 
 func TestNormalDownsizeTowardsCancel(t *testing.T) {
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
-		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr, tr0 := easypg.NewTracker(t, s.DB)
 		tr0.Ignore()
 
 		// when the "Low" threshold gets crossed, a "Low" operation gets created in
@@ -299,7 +299,7 @@ func TestNormalDownsizeTowardsCancel(t *testing.T) {
 
 func TestCriticalUpsizeTowardsGreenlight(t *testing.T) {
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
-		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr, tr0 := easypg.NewTracker(t, s.DB)
 		tr0.Ignore()
 
 		// when the "Critical" threshold gets crossed, a "Critical" operation gets
@@ -320,7 +320,7 @@ func TestCriticalUpsizeTowardsGreenlight(t *testing.T) {
 
 func TestReplaceNormalWithCriticalUpsize(t *testing.T) {
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
-		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr, tr0 := easypg.NewTracker(t, s.DB)
 		tr0.Ignore()
 
 		// when the "High" threshold gets crossed, a "High" operation gets created in
@@ -365,7 +365,7 @@ func TestAssetScrapeOrdering(t *testing.T) {
 	)
 	scrapeJob := s.TaskContext.AssetScrapingJob(s.Registry)
 	// create a resource and multiple assets to test with
-	must.SucceedT(t, s.DB.Insert(&db.Resource{
+	must.SucceedT(t, test.Insert(s.DB, db.ResourceStore, &db.Resource{
 		ScopeUUID:                "project1",
 		AssetType:                "foo",
 		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
@@ -401,9 +401,9 @@ func TestAssetScrapeOrdering(t *testing.T) {
 			ExpectedSize: None[uint64](),
 		},
 	}
-	must.SucceedT(t, s.DB.Insert(&assets[0]))
-	must.SucceedT(t, s.DB.Insert(&assets[1]))
-	must.SucceedT(t, s.DB.Insert(&assets[2]))
+	must.SucceedT(t, test.Insert(s.DB, db.AssetStore, &assets[0]))
+	must.SucceedT(t, test.Insert(s.DB, db.AssetStore, &assets[1]))
+	must.SucceedT(t, test.Insert(s.DB, db.AssetStore, &assets[2]))
 
 	amStatic := s.ManagerForAssetType("foo")
 	amStatic.Assets = map[string]map[string]plugins.StaticAsset{
@@ -414,7 +414,7 @@ func TestAssetScrapeOrdering(t *testing.T) {
 		},
 	}
 
-	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr, tr0 := easypg.NewTracker(t, s.DB)
 	tr0.Ignore()
 
 	// this should scrape each asset once, in order
@@ -466,7 +466,7 @@ func TestAssetScrapeReflectingResizeOperationWithDelay(t *testing.T) {
 			RemainingDelay: 2,
 		})
 
-		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr, tr0 := easypg.NewTracker(t, s.DB)
 		tr0.Ignore()
 
 		// first scrape will not touch anything about the asset, and also not create
@@ -510,7 +510,7 @@ func TestAssetScrapeObservingNewSizeWhileWaitingForResize(t *testing.T) {
 			Usage: 600,
 		})
 
-		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr, tr0 := easypg.NewTracker(t, s.DB)
 		tr0.Ignore()
 
 		s.Clock.StepBy(5 * time.Minute)
@@ -537,7 +537,7 @@ func TestAssetScrapesGivesUpWaitingForResize(t *testing.T) {
 			Usage: 500,
 		})
 
-		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr, tr0 := easypg.NewTracker(t, s.DB)
 		tr0.Ignore()
 
 		// first scrape will not touch anything, since it's still waiting for the resize to complete
@@ -570,7 +570,7 @@ func TestAssetScrapeWithGetAssetStatusError(t *testing.T) {
 	// but the asset's next_scrape_at timestamp is still updated to ensure that
 	// the main loop progresses to the next asset.
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
-		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr, tr0 := easypg.NewTracker(t, s.DB)
 		tr0.Ignore()
 
 		setAsset(plugins.StaticAsset{
@@ -615,7 +615,7 @@ func TestAssetScrapeWithGetAssetStatusError(t *testing.T) {
 
 func TestExternalResizeWhileOperationPending(t *testing.T) {
 	runAssetScrapeTest(t, func(ctx context.Context, s test.Setup, setAsset func(plugins.StaticAsset), scrapeJob jobloop.Job) {
-		tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+		tr, tr0 := easypg.NewTracker(t, s.DB)
 		tr0.Ignore()
 
 		// create a "High" operation
@@ -659,7 +659,7 @@ func TestMaxAssetSizeRules(t *testing.T) {
 		}`),
 	)
 	scrapeJob := s.TaskContext.AssetScrapingJob(s.Registry)
-	must.SucceedT(t, s.DB.Insert(&db.Resource{
+	must.SucceedT(t, test.Insert(s.DB, db.ResourceStore, &db.Resource{
 		ScopeUUID:                "project1",
 		AssetType:                "foo",
 		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
@@ -677,9 +677,9 @@ func TestMaxAssetSizeRules(t *testing.T) {
 		NextScrapeAt: s.Clock.Now(),
 		ExpectedSize: None[uint64](),
 	}
-	must.SucceedT(t, s.DB.Insert(&asset))
+	must.SucceedT(t, test.Insert(s.DB, db.AssetStore, &asset))
 
-	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr, tr0 := easypg.NewTracker(t, s.DB)
 	tr0.Ignore()
 
 	amStatic := s.ManagerForAssetType("foo")

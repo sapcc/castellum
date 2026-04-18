@@ -26,9 +26,8 @@ import (
 
 // ResourceFromDB converts a db.Resource into an castellum.Resource.
 func (h handler) ResourceFromDB(res db.Resource) (castellum.Resource, error) {
-	assetCount, err := h.DB.SelectInt(
-		`SELECT COUNT(*) FROM assets WHERE resource_id = $1`,
-		res.ID)
+	var assetCount int64
+	err := h.DB.QueryRow(`SELECT COUNT(*) FROM assets WHERE resource_id = $1`, res.ID).Scan(&assetCount)
 	if err != nil {
 		return castellum.Resource{}, err
 	}
@@ -83,9 +82,7 @@ func (h handler) GetProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var dbResources []db.Resource
-	_, err := h.DB.Select(&dbResources,
-		`SELECT * FROM resources WHERE scope_uuid = $1 ORDER BY asset_type`, projectUUID)
+	dbResources, err := db.ResourceStore.SelectWhere(h.DB, `scope_uuid = $1 ORDER BY asset_type`, projectUUID)
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
@@ -198,9 +195,11 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 
 	if dbResource.ID == 0 {
 		dbResource.NextScrapeAt = time.Unix(0, 0).UTC() // give new resources a very early next_scrape_at to prioritize them in the scrape queue
-		err = h.DB.Insert(dbResource)
+		var result []db.Resource
+		result, err = db.ResourceStore.Insert(h.DB, *dbResource)
+		*dbResource = result[0]
 	} else {
-		_, err = h.DB.Update(dbResource)
+		err = db.ResourceStore.Update(h.DB, *dbResource)
 	}
 	if respondwith.ObfuscatedErrorText(w, err) {
 		doAudit(http.StatusInternalServerError)

@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-gorp/gorp/v3"
 	"github.com/majewsky/gg/is"
 	. "github.com/majewsky/gg/option"
 	"github.com/prometheus/client_golang/prometheus"
@@ -46,7 +45,7 @@ var logScrapes = osext.GetenvBool("CASTELLUM_LOG_SCRAPES")
 // AssetScrapingJob returns a job where each task is a asset that needs to be
 // scraped. The task checks its status and creates/confirms/cancels operations accordingly.
 func (c *Context) AssetScrapingJob(registerer prometheus.Registerer) jobloop.Job {
-	return (&jobloop.TxGuardedJob[*gorp.Transaction, db.Asset]{
+	return (&jobloop.TxGuardedJob[*sql.Tx, db.Asset]{
 		Metadata: jobloop.JobMetadata{
 			ReadableName:    "asset scraping",
 			ConcurrencySafe: true, // because "FOR UPDATE SKIP LOCKED" is used
@@ -62,15 +61,24 @@ func (c *Context) AssetScrapingJob(registerer prometheus.Registerer) jobloop.Job
 	}).Setup(registerer)
 }
 
-func (c *Context) discoverAssetScrape(ctx context.Context, tx *gorp.Transaction, labels prometheus.Labels) (asset db.Asset, err error) {
-	err = tx.SelectOne(&asset, scrapeAssetSearchQuery, c.TimeNow())
-	return asset, err
+func (c *Context) discoverAssetScrape(ctx context.Context, tx *sql.Tx, labels prometheus.Labels) (db.Asset, error) {
+	return db.AssetStore.SelectOne(tx, scrapeAssetSearchQuery, c.TimeNow())
 }
 
-func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, asset db.Asset, labels prometheus.Labels) error {
+func convertErrNoRowsToNone[T any](value T, err error) (Option[T], error) {
+	switch {
+	case err == nil:
+		return Some(value), nil
+	case errors.Is(err, sql.ErrNoRows):
+		return None[T](), nil
+	default:
+		return None[T](), err
+	}
+}
+
+func (c *Context) processAssetScrape(ctx context.Context, tx *sql.Tx, asset db.Asset, labels prometheus.Labels) error {
 	// find resource for asset
-	var res db.Resource
-	err := tx.SelectOne(&res, `SELECT * FROM resources WHERE id = $1`, asset.ResourceID)
+	res, err := db.ResourceStore.SelectOneWhere(tx, `id = $1`, asset.ResourceID)
 	if err != nil {
 		return err
 	}
@@ -84,11 +92,8 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 	logg.Debug("scraping %s asset %s in scope %s using manager %v", res.AssetType, asset.UUID, res.ScopeUUID, manager)
 
 	// get pending operation for this asset
-	var pendingOp *db.PendingOperation
-	err = tx.SelectOne(&pendingOp, `SELECT * FROM pending_operations WHERE asset_id = $1`, asset.ID)
-	if errors.Is(err, sql.ErrNoRows) {
-		pendingOp = nil
-	} else if err != nil {
+	pendingOp, err := convertErrNoRowsToNone(db.PendingOperationStore.SelectOneWhere(tx, `asset_id = $1`, asset.ID))
+	if err != nil {
 		return err
 	}
 
@@ -111,7 +116,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 			// asset was deleted since the last scrape of this resource
 			logg.Error(errMsg.Error())
 			logg.Info("removing deleted %s asset from DB: UUID = %s, scope UUID = %s", res.AssetType, asset.UUID, res.ScopeUUID)
-			_, dbErr := tx.Delete(&asset)
+			dbErr := db.AssetStore.Delete(tx, asset)
 			if dbErr != nil {
 				return dbErr
 			}
@@ -124,7 +129,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 		// fill the scrape error message to indicate old data
 		asset.ScrapeErrorMessage = err.Error()
 		asset.NextScrapeAt = c.TimeNow().Add(c.AddJitter(AssetScrapeInterval))
-		_, dbErr := tx.Update(&asset)
+		dbErr := db.AssetStore.Update(tx, asset)
 		if dbErr != nil {
 			return dbErr
 		}
@@ -217,7 +222,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 	asset.CriticalUsages = strings.Join(criticalUsageMetrics, ",")
 
 	// update asset in DB
-	_, err = tx.Update(&asset)
+	err = db.AssetStore.Update(tx, asset)
 	if err != nil {
 		return err
 	}
@@ -227,32 +232,32 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 
 	// never touch operations in status "greenlit" - they may be executing on a
 	// worker right now
-	if pendingOp != nil && pendingOp.GreenlitAt.IsSomeAnd(is.NotAfter(c.TimeNow())) {
+	if pendingOp.IsSomeAnd(func(op db.PendingOperation) bool { return op.GreenlitAt.IsSomeAnd(is.NotAfter(c.TimeNow())) }) {
 		return tx.Commit()
 	}
 
 	// if there is a pending operation, try to move it forward
-	if pendingOp != nil {
-		pendingOp, err = c.maybeCancelOperation(tx, res, asset, info, *pendingOp)
+	if op, ok := pendingOp.Unpack(); ok {
+		pendingOp, err = c.maybeCancelOperation(tx, res, asset, info, op)
 		if err != nil {
 			return fmt.Errorf("cannot cancel operation on %s %s: %s", res.AssetType, asset.UUID, err.Error())
 		}
 	}
-	if pendingOp != nil {
-		pendingOp, err = c.maybeUpdateOperation(tx, res, asset, info, *pendingOp)
+	if op, ok := pendingOp.Unpack(); ok {
+		pendingOp, err = c.maybeUpdateOperation(tx, res, asset, info, op)
 		if err != nil {
 			return fmt.Errorf("cannot update operation on %s %s: %s", res.AssetType, asset.UUID, err.Error())
 		}
 	}
-	if pendingOp != nil {
-		pendingOp, err = c.maybeConfirmOperation(tx, res, asset, info, *pendingOp)
+	if op, ok := pendingOp.Unpack(); ok {
+		pendingOp, err = c.maybeConfirmOperation(tx, res, asset, info, op)
 		if err != nil {
 			return fmt.Errorf("cannot confirm operation on %s %s: %s", res.AssetType, asset.UUID, err.Error())
 		}
 	}
 
 	// if there is no pending operation (or if we just cancelled it), see if we can start one
-	if pendingOp == nil {
+	if pendingOp.IsNone() {
 		err = c.maybeCreateOperation(tx, res, asset, info)
 		if err != nil {
 			return fmt.Errorf("cannot create operation on %s %s: %s", res.AssetType, asset.UUID, err.Error())
@@ -262,7 +267,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gorp.Transaction, 
 	return tx.Commit()
 }
 
-func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, info core.AssetTypeInfo) error {
+func (c Context) maybeCreateOperation(tx *sql.Tx, res db.Resource, asset db.Asset, info core.AssetTypeInfo) error {
 	op := db.PendingOperation{
 		AssetID:   asset.ID,
 		OldSize:   asset.Size,
@@ -299,10 +304,11 @@ func (c Context) maybeCreateOperation(tx *gorp.Transaction, res db.Resource, ass
 	}
 
 	core.CountStateTransition(res, asset.UUID, castellum.OperationStateDidNotExist, op.State())
-	return tx.Insert(&op)
+	_, err := db.PendingOperationStore.Insert(tx, op)
+	return err
 }
 
-func (c Context) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (*db.PendingOperation, error) {
+func (c Context) maybeCancelOperation(tx *sql.Tx, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (Option[db.PendingOperation], error) {
 	// cancel when the threshold that triggered this operation is no longer being crossed
 	eligibleFor := core.GetEligibleOperations(core.LogicOfResource(res, info), core.StatusOfAsset(asset, c.Config, res))
 	_, isEligible := eligibleFor[op.Reason]
@@ -316,41 +322,42 @@ func (c Context) maybeCancelOperation(tx *gorp.Transaction, res db.Resource, ass
 		}
 	}
 	if isEligible {
-		return &op, nil
+		return Some(op), nil
 	}
 
 	core.CountStateTransition(res, asset.UUID, op.State(), castellum.OperationStateCancelled)
 	finishedOp := op.IntoFinishedOperation(castellum.OperationOutcomeCancelled, c.TimeNow())
-	_, err := tx.Delete(&op)
+	err := db.PendingOperationStore.Delete(tx, op)
 	if err != nil {
-		return nil, err
+		return None[db.PendingOperation](), err
 	}
-	return nil, tx.Insert(&finishedOp)
+	_, err = db.FinishedOperationStore.Insert(tx, finishedOp)
+	return None[db.PendingOperation](), err
 }
 
-func (c Context) maybeUpdateOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (*db.PendingOperation, error) {
+func (c Context) maybeUpdateOperation(tx *sql.Tx, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (Option[db.PendingOperation], error) {
 	// do not touch `op` unless the corresponding threshold is still being crossed
 	eligibleFor := core.GetEligibleOperations(core.LogicOfResource(res, info), core.StatusOfAsset(asset, c.Config, res))
 	newSize, exists := eligibleFor[op.Reason]
 	if !exists {
-		return &op, nil
+		return Some(op), nil
 	}
 
 	// if the asset size has changed since the operation has been created
 	// (because of resizes not performed by Castellum), calculate a new target size
 	if op.NewSize == newSize {
 		// nothing to do
-		return &op, nil
+		return Some(op), nil
 	}
 	op.NewSize = newSize
-	_, err := tx.Update(&op)
-	return &op, err
+	err := db.PendingOperationStore.Update(tx, op)
+	return Some(op), err
 }
 
-func (c Context) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (*db.PendingOperation, error) {
+func (c Context) maybeConfirmOperation(tx *sql.Tx, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (Option[db.PendingOperation], error) {
 	// can only confirm when the corresponding threshold is still being crossed
 	if _, exists := core.GetEligibleOperations(core.LogicOfResource(res, info), core.StatusOfAsset(asset, c.Config, res))[op.Reason]; !exists {
-		return &op, nil
+		return Some(op), nil
 	}
 
 	// can only confirm when it has been like this for at least the configured delay
@@ -365,14 +372,14 @@ func (c Context) maybeConfirmOperation(tx *gorp.Transaction, res db.Resource, as
 		earliestConfirm = op.CreatedAt
 	}
 	if c.TimeNow().Before(earliestConfirm) {
-		return &op, nil
+		return Some(op), nil
 	}
 
 	previousState := op.State()
 	confirmedAt := c.TimeNow()
 	op.ConfirmedAt = Some(confirmedAt)
 	op.GreenlitAt = op.ConfirmedAt // right now, nothing requires operator approval
-	_, err := tx.Update(&op)
+	err := db.PendingOperationStore.Update(tx, op)
 	core.CountStateTransition(res, asset.UUID, previousState, op.State())
-	return &op, err
+	return Some(op), err
 }

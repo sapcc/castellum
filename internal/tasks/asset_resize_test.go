@@ -26,7 +26,7 @@ func setupAssetResizeTest(t *testing.T, s test.Setup, assetCount int) jobloop.Jo
 	amStatic := s.ManagerForAssetType("foo")
 
 	// create a resource and assets to test with
-	must.SucceedT(t, s.DB.Insert(&db.Resource{
+	must.SucceedT(t, test.Insert(s.DB, db.ResourceStore, &db.Resource{
 		ScopeUUID: "project1",
 		AssetType: "foo",
 	}))
@@ -36,7 +36,7 @@ func setupAssetResizeTest(t *testing.T, s test.Setup, assetCount int) jobloop.Jo
 
 	for idx := 1; idx <= assetCount; idx++ {
 		uuid := fmt.Sprintf("asset%d", idx)
-		must.SucceedT(t, s.DB.Insert(&db.Asset{
+		must.SucceedT(t, test.Insert(s.DB, db.AssetStore, &db.Asset{
 			ResourceID:   1,
 			UUID:         uuid,
 			Size:         1000,
@@ -72,9 +72,9 @@ func TestSuccessfulResize(t *testing.T) {
 		ConfirmedAt: Some(s.Clock.Now()),
 		GreenlitAt:  Some(s.Clock.Now().Add(5 * time.Minute)),
 	}
-	must.SucceedT(t, s.DB.Insert(&pendingOp))
+	must.SucceedT(t, test.Insert(s.DB, db.PendingOperationStore, &pendingOp))
 
-	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr, tr0 := easypg.NewTracker(t, s.DB)
 	tr0.Ignore()
 
 	// ExecuteOne(AssetResizeJob{}) should do nothing right now because that operation is
@@ -121,9 +121,9 @@ func TestFailingResize(t *testing.T) {
 		ConfirmedAt: Some(s.Clock.Now().Add(-5 * time.Minute)),
 		GreenlitAt:  Some(s.Clock.Now().Add(-5 * time.Minute)),
 	}
-	must.SucceedT(t, s.DB.Insert(&pendingOp))
+	must.SucceedT(t, test.Insert(s.DB, db.PendingOperationStore, &pendingOp))
 
-	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr, tr0 := easypg.NewTracker(t, s.DB)
 	tr0.Ignore()
 
 	amStatic := s.ManagerForAssetType("foo")
@@ -167,9 +167,9 @@ func TestErroringResize(t *testing.T) {
 		ConfirmedAt: Some(confirmedAt),
 		GreenlitAt:  Some(greenlitAt),
 	}
-	must.SucceedT(t, s.DB.Insert(&pendingOp))
+	must.SucceedT(t, test.Insert(s.DB, db.PendingOperationStore, &pendingOp))
 
-	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr, tr0 := easypg.NewTracker(t, s.DB)
 	tr0.Ignore()
 
 	// when the outcome of the resize is "errored", we can retry several times

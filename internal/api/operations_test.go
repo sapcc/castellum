@@ -40,7 +40,7 @@ func TestGetPendingOperationsForResource(t *testing.T) {
 		Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 768},
 		CreatedAt: time.Unix(21, 0).UTC(),
 	}
-	must.SucceedT(t, s.DB.Insert(&pendingOp))
+	must.SucceedT(t, test.Insert(s.DB, db.PendingOperationStore, &pendingOp))
 	pendingOpJSON := jsonmatch.Object{
 		"project_id": "project1",
 		"asset_type": "foo",
@@ -62,7 +62,7 @@ func TestGetPendingOperationsForResource(t *testing.T) {
 
 	// check rendering of a pending operation in state "confirmed"
 	pendingOp.ConfirmedAt = Some(time.Unix(22, 0).UTC())
-	must.SucceedT(t, s.DBUpdate(&pendingOp))
+	must.SucceedT(t, db.PendingOperationStore.Update(s.DB, pendingOp))
 	pendingOpJSON["state"] = "confirmed"
 	pendingOpJSON["confirmed"] = jsonmatch.Object{"at": 22}
 	s.Handler.RespondTo(ctx, "GET /v1/projects/project1/resources/foo/operations/pending").
@@ -70,14 +70,14 @@ func TestGetPendingOperationsForResource(t *testing.T) {
 
 	// check rendering of a pending operation in state "greenlit"
 	pendingOp.GreenlitAt = Some(time.Unix(23, 0).UTC())
-	must.SucceedT(t, s.DBUpdate(&pendingOp))
+	must.SucceedT(t, db.PendingOperationStore.Update(s.DB, pendingOp))
 	pendingOpJSON["state"] = "greenlit"
 	pendingOpJSON["greenlit"] = jsonmatch.Object{"at": 23}
 	s.Handler.RespondTo(ctx, "GET /v1/projects/project1/resources/foo/operations/pending").
 		ExpectJSON(t, http.StatusOK, response)
 
 	pendingOp.GreenlitByUserUUID = Some("user1")
-	must.SucceedT(t, s.DBUpdate(&pendingOp))
+	must.SucceedT(t, db.PendingOperationStore.Update(s.DB, pendingOp))
 	pendingOpJSON["greenlit"] = jsonmatch.Object{"at": 23, "by_user": "user1"}
 	s.Handler.RespondTo(ctx, "GET /v1/projects/project1/resources/foo/operations/pending").
 		ExpectJSON(t, http.StatusOK, response)
@@ -163,7 +163,7 @@ func TestGetRecentlyFailedOperationsForResource(t *testing.T) {
 
 		// operation should NOT disappear when there is a pending operation that has
 		// not yet finished
-		must.SucceedT(t, s.DB.Insert(&db.PendingOperation{
+		must.SucceedT(t, test.Insert(s.DB, db.PendingOperationStore, &db.PendingOperation{
 			AssetID:   1,
 			Reason:    castellum.OperationReasonHigh,
 			OldSize:   1024,
@@ -176,7 +176,7 @@ func TestGetRecentlyFailedOperationsForResource(t *testing.T) {
 
 		// operation should disappear when there is a non-failed operation that
 		// finished after the failed one
-		must.SucceedT(t, s.DB.Insert(&db.FinishedOperation{
+		must.SucceedT(t, test.Insert(s.DB, db.FinishedOperationStore, &db.FinishedOperation{
 			AssetID:     1,
 			Reason:      castellum.OperationReasonHigh,
 			Outcome:     castellum.OperationOutcomeSucceeded,
@@ -261,7 +261,7 @@ func TestGetRecentlySucceededOperationsForResource(t *testing.T) {
 
 		// operation should NOT disappear when there is a pending operation that has
 		// not yet finished
-		must.SucceedT(t, s.DB.Insert(&db.PendingOperation{
+		must.SucceedT(t, test.Insert(s.DB, db.PendingOperationStore, &db.PendingOperation{
 			AssetID:   1,
 			Reason:    castellum.OperationReasonHigh,
 			OldSize:   1024,

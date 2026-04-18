@@ -25,21 +25,21 @@ func TestCollectGarbage(t *testing.T) {
 
 	// setup some minimal scaffolding (we can only insert finished_operations
 	// with valid asset IDs into the DB)
-	must.SucceedT(t, s.DB.Insert(&db.Resource{
+	must.SucceedT(t, test.Insert(s.DB, db.ResourceStore, &db.Resource{
 		ScopeUUID: "project1",
 		AssetType: "foo",
 	}))
-	must.SucceedT(t, s.DB.Insert(&db.Asset{
+	must.SucceedT(t, test.Insert(s.DB, db.AssetStore, &db.Asset{
 		ResourceID: 1,
 		UUID:       "asset1",
 	}))
-	must.SucceedT(t, s.DB.Insert(&db.Asset{
+	must.SucceedT(t, test.Insert(s.DB, db.AssetStore, &db.Asset{
 		ResourceID: 1,
 		UUID:       "asset2",
 	}))
 
-	ops := []db.FinishedOperation{
-		{
+	ops := must.ReturnT(db.FinishedOperationStore.Insert(s.DB,
+		db.FinishedOperation{
 			AssetID:    1,
 			Reason:     castellum.OperationReasonHigh,
 			Outcome:    castellum.OperationOutcomeCancelled,
@@ -49,7 +49,7 @@ func TestCollectGarbage(t *testing.T) {
 			CreatedAt:  fakeNow.Add(-40 * time.Minute),
 			FinishedAt: fakeNow.Add(-30 * time.Minute),
 		},
-		{
+		db.FinishedOperation{
 			AssetID:    2,
 			Reason:     castellum.OperationReasonHigh,
 			Outcome:    castellum.OperationOutcomeCancelled,
@@ -59,7 +59,7 @@ func TestCollectGarbage(t *testing.T) {
 			CreatedAt:  fakeNow.Add(-25 * time.Minute),
 			FinishedAt: fakeNow.Add(-20 * time.Minute),
 		},
-		{
+		db.FinishedOperation{
 			AssetID:     2,
 			Reason:      castellum.OperationReasonCritical,
 			Outcome:     castellum.OperationOutcomeSucceeded,
@@ -71,12 +71,9 @@ func TestCollectGarbage(t *testing.T) {
 			GreenlitAt:  Some(fakeNow.Add(-20 * time.Minute)),
 			FinishedAt:  fakeNow.Add(-10 * time.Minute),
 		},
-	}
-	for _, op := range ops {
-		must.SucceedT(t, s.DB.Insert(&op))
-	}
+	))(t)
 
-	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr, tr0 := easypg.NewTracker(t, s.DB)
 	tr0.Ignore()
 
 	must.SucceedT(t, tasks.CollectGarbage(s.DB, fakeNow.Add(-15*time.Minute)))

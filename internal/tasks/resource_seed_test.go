@@ -69,7 +69,7 @@ func TestResourceSeedingSuccess(t *testing.T) {
 	job := s.TaskContext.ResourceSeedingJob(s.Registry)
 
 	// create a resource in a project that is not seeded - this will be ignored by the seeding job
-	must.SucceedT(t, s.DB.Insert(&db.Resource{
+	must.SucceedT(t, test.Insert(s.DB, db.ResourceStore, &db.Resource{
 		ScopeUUID:           "project3",
 		DomainUUID:          "domain1",
 		AssetType:           "foo",
@@ -79,7 +79,7 @@ func TestResourceSeedingSuccess(t *testing.T) {
 	}))
 
 	// create a resource that has a negative seed - the seeding job will delete it
-	must.SucceedT(t, s.DB.Insert(&db.Resource{
+	must.SucceedT(t, test.Insert(s.DB, db.ResourceStore, &db.Resource{
 		ScopeUUID:           "project2",
 		DomainUUID:          "domain1",
 		AssetType:           "foo",
@@ -88,7 +88,7 @@ func TestResourceSeedingSuccess(t *testing.T) {
 		SingleStep:          true,
 	}))
 
-	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr, tr0 := easypg.NewTracker(t, s.DB)
 	tr0.Ignore()
 
 	// test that seeding job applies the seeds (except for the one project that the MockProviderClient reports as nonexistent)
