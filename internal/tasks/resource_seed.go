@@ -72,9 +72,7 @@ func (c *Context) applyResourceSeeds(ctx context.Context) error {
 
 func (c *Context) applyProjectSeed(ctx context.Context, projectUUID string, seed core.ProjectSeed) error {
 	// list existing resources
-	var dbResources []db.Resource
-	_, err := c.DB.Select(&dbResources,
-		`SELECT * FROM resources WHERE scope_uuid = $1`, projectUUID)
+	dbResources, err := db.ResourceStore.SelectWhere(c.DB, `scope_uuid = $1`, projectUUID)
 	if err != nil {
 		return err
 	}
@@ -95,7 +93,7 @@ func (c *Context) applyProjectSeed(ctx context.Context, projectUUID string, seed
 			}
 			if !reflect.DeepEqual(dbResource, dbResourceCopy) {
 				logg.Info("applying %s seed for project %s/%s...", dbResource.AssetType, seed.DomainName, seed.ProjectName)
-				_, err := c.DB.Update(&dbResourceCopy)
+				err := db.ResourceStore.Update(c.DB, dbResourceCopy)
 				if err != nil {
 					return err
 				}
@@ -103,7 +101,7 @@ func (c *Context) applyProjectSeed(ctx context.Context, projectUUID string, seed
 		} else if seed.ForbidsResource(dbResource.AssetType) {
 			// enforce negative seed
 			logg.Info("enforcing negative %s seed for project %s/%s...", dbResource.AssetType, seed.DomainName, seed.ProjectName)
-			_, err := c.DB.Delete(&dbResource)
+			err := db.ResourceStore.Delete(c.DB, dbResource)
 			if err != nil {
 				return err
 			}
@@ -133,7 +131,7 @@ func (c *Context) applyProjectSeed(ctx context.Context, projectUUID string, seed
 			return fmt.Errorf("cannot apply %s seed: %s", dbResource.AssetType, errs.Join(", "))
 		}
 		logg.Info("applying %s seed for project %s/%s...", dbResource.AssetType, seed.DomainName, seed.ProjectName)
-		err = c.DB.Insert(&dbResource)
+		_, err = db.ResourceStore.Insert(c.DB, dbResource)
 		if err != nil {
 			return err
 		}

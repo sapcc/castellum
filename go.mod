@@ -1,10 +1,9 @@
 module github.com/sapcc/castellum
 
-go 1.26
+go 1.26.0
 
 require (
 	github.com/dlmiddlecote/sqlstats v1.0.2
-	github.com/go-gorp/gorp/v3 v3.1.0
 	github.com/gophercloud/gophercloud/v2 v2.12.0
 	github.com/gorilla/mux v1.8.1
 	github.com/majewsky/gg v1.6.0
@@ -13,6 +12,7 @@ require (
 	github.com/rs/cors v1.11.1
 	github.com/sapcc/go-api-declarations v1.21.0
 	github.com/sapcc/go-bits v0.0.0-20260417095247-780e38e22ec4
+	go.xyrillian.de/oblast v0.2.0
 )
 
 require (

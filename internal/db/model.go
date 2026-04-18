@@ -4,14 +4,20 @@
 package db
 
 import (
-	"database/sql"
 	"strings"
 	"time"
 
-	"github.com/go-gorp/gorp/v3"
 	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/easypg"
+	"go.xyrillian.de/oblast"
+)
+
+// ResourceStore provides structured access to the database table "resources".
+var ResourceStore = oblast.MustNewStore[Resource](
+	oblast.PostgresDialect(),
+	oblast.TableNameIs("resources"),
+	oblast.PrimaryKeyIs("id"),
 )
 
 // Resource describes the autoscaling behavior for a single resource in a
@@ -24,7 +30,7 @@ type Resource struct {
 	// The pair of (.ScopeUUID, .AssetType) uniquely identifies a Resource on
 	// the API level. Internally, other tables reference Resource by the numeric
 	// .ID field.
-	ID         int64     `db:"id"`
+	ID         int64     `db:"id,auto"`
 	ScopeUUID  string    `db:"scope_uuid"`  // either project UUID or domain UUID
 	DomainUUID string    `db:"domain_uuid"` // for domain resources: equal to .ScopeUUID
 	AssetType  AssetType `db:"asset_type"`
@@ -87,6 +93,13 @@ func (a AssetType) PolicyRuleForWrite() string {
 	return "project:edit:" + assetTypeFields[0]
 }
 
+// AssetStore provides structured access to the database table "assets".
+var AssetStore = oblast.MustNewStore[Asset](
+	oblast.PostgresDialect(),
+	oblast.TableNameIs("assets"),
+	oblast.PrimaryKeyIs("id"),
+)
+
 // Asset describes a single thing that can be resized dynamically based on its
 // utilization. Assets are grouped into resources, see type Resource. Each
 // individual resizing is an operation, see type Operation.
@@ -98,7 +111,7 @@ type Asset struct {
 	// Note that .UUID may be a project/domain UUID for assets that exist exactly
 	// once per project/domain, e.g. quota. In that case, .UUID does not uniquely
 	// identify an asset unless .ResourceID is also considered.
-	ID         int64  `db:"id"`
+	ID         int64  `db:"id,auto"`
 	ResourceID int64  `db:"resource_id"`
 	UUID       string `db:"uuid"`
 
@@ -152,9 +165,16 @@ type Asset struct {
 	CriticalUsages string `db:"critical_usages"`
 }
 
+// PendingOperationStore provides structured access to the database table "pending_operations".
+var PendingOperationStore = oblast.MustNewStore[PendingOperation](
+	oblast.PostgresDialect(),
+	oblast.TableNameIs("pending_operations"),
+	oblast.PrimaryKeyIs("id"),
+)
+
 // PendingOperation describes an ongoing resize operation for an asset.
 type PendingOperation struct {
-	ID      int64                     `db:"id"`
+	ID      int64                     `db:"id,auto"`
 	AssetID int64                     `db:"asset_id"`
 	Reason  castellum.OperationReason `db:"reason"`
 
@@ -209,6 +229,12 @@ func (o PendingOperation) IntoFinishedOperation(outcome castellum.OperationOutco
 	}
 }
 
+// FinishedOperationStore provides structured access to the database table "finished_operations".
+var FinishedOperationStore = oblast.MustNewStore[FinishedOperation](
+	oblast.PostgresDialect(),
+	oblast.TableNameIs("finished_operations"),
+)
+
 // FinishedOperation describes a finished resize operation for an asset.
 type FinishedOperation struct {
 	// All fields are identical in semantics to those in type PendingOperation, except
@@ -254,17 +280,4 @@ func Configuration() easypg.Configuration {
 	return easypg.Configuration{
 		Migrations: SQLMigrations,
 	}
-}
-
-// InitORM wraps a database connection into a gorp.DbMap instance.
-func InitORM(dbConn *sql.DB) *gorp.DbMap {
-	// ensure that this process does not starve other Castellum processes for DB connections
-	dbConn.SetMaxOpenConns(16)
-
-	gorpDB := &gorp.DbMap{Db: dbConn, Dialect: gorp.PostgresDialect{}}
-	gorpDB.AddTableWithName(Resource{}, "resources").SetKeys(true, "id")
-	gorpDB.AddTableWithName(Asset{}, "assets").SetKeys(true, "id")
-	gorpDB.AddTableWithName(PendingOperation{}, "pending_operations").SetKeys(true, "id")
-	gorpDB.AddTableWithName(FinishedOperation{}, "finished_operations")
-	return gorpDB
 }

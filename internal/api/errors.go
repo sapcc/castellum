@@ -9,6 +9,7 @@ import (
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/respondwith"
+	"github.com/sapcc/go-bits/sqlext"
 
 	"github.com/sapcc/castellum/internal/db"
 )
@@ -23,9 +24,7 @@ func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var dbResources []db.Resource
-	_, err := h.DB.Select(&dbResources,
-		`SELECT * FROM resources WHERE scrape_error_message != '' ORDER BY id`)
+	dbResources, err := db.ResourceStore.SelectWhere(h.DB, `scrape_error_message != '' ORDER BY id`)
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
@@ -64,21 +63,16 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var dbResources []db.Resource
-	_, err := h.DB.Select(&dbResources,
-		`SELECT * FROM resources ORDER BY id`)
+	dbResources, err := db.ResourceStore.Select(h.DB, `SELECT * FROM resources ORDER BY id`)
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
 
 	assetScrapeErrs := []castellum.AssetScrapeError{}
 	for _, res := range dbResources {
-		var dbAssets []db.Asset
-		_, err := h.DB.Select(&dbAssets, `
-			SELECT * FROM assets
-			 WHERE scrape_error_message != '' AND resource_id = $1
-			 ORDER BY id
-			`, res.ID)
+		dbAssets, err := db.AssetStore.SelectWhere(h.DB,
+			`scrape_error_message != '' AND resource_id = $1 ORDER BY id`,
+			res.ID)
 		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
@@ -108,6 +102,19 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 	}{assetScrapeErrs})
 }
 
+// We only care about assets that are still problematic.
+// So we want to skip "errored" operations where a more recent operation
+// on the same asset finished as "succeeded", "cancelled", or "failed".
+var getAssetResizeErrorsQuery = sqlext.SimplifyWhitespace(`
+	WITH latest_finished_operations AS (
+		SELECT DISTINCT ON (asset_id) o.* FROM finished_operations o
+		  JOIN assets a ON a.id = o.asset_id
+		 WHERE a.resource_id = $1
+		 ORDER BY o.asset_id, o.finished_at DESC
+	)
+	SELECT * FROM latest_finished_operations WHERE outcome = 'errored'
+`)
+
 func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/admin/asset-resize-errors")
 	_, token := h.CheckToken(w, r)
@@ -118,28 +125,14 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var dbResources []db.Resource
-	_, err := h.DB.Select(&dbResources,
-		`SELECT * FROM resources ORDER BY id`)
+	dbResources, err := db.ResourceStore.Select(h.DB, `SELECT * FROM resources ORDER BY id`)
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
 
 	assetResizeErrs := []castellum.AssetResizeError{}
 	for _, res := range dbResources {
-		var ops []db.FinishedOperation
-		// We only care about assets that are still problematic.
-		// So we want to skip "errored" operations where a more recent operation
-		// on the same asset finished as "succeeded", "cancelled", or "failed".
-		_, err := h.DB.Select(&ops, `
-			WITH latest_finished_operations AS (
-				SELECT DISTINCT ON (asset_id) o.* FROM finished_operations o
-					JOIN assets a ON a.id = o.asset_id
-				 WHERE a.resource_id = $1
-				 ORDER BY o.asset_id, o.finished_at DESC
-			)
-			SELECT * FROM latest_finished_operations WHERE outcome = 'errored'
-		`, res.ID)
+		ops, err := db.FinishedOperationStore.Select(h.DB, getAssetResizeErrorsQuery, res.ID)
 		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}

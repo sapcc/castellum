@@ -142,7 +142,7 @@ func TestPutResource(t *testing.T) {
 	)
 	ctx := t.Context()
 
-	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr, tr0 := easypg.NewTracker(t, s.DB)
 	tr0.Ignore()
 
 	// mostly like `initialFooResourceJSON`, but with some delays changed and
@@ -344,7 +344,7 @@ func TestPutResourceValidationErrors(t *testing.T) {
 	)
 	ctx := t.Context()
 
-	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr, tr0 := easypg.NewTracker(t, s.DB)
 	tr0.Ignore()
 
 	expectErrors := func(assetType string, body jsonmatch.Object, errors ...string) {
@@ -533,7 +533,7 @@ func TestDeleteResource(t *testing.T) {
 	)
 	ctx := t.Context()
 
-	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr, tr0 := easypg.NewTracker(t, s.DB)
 	tr0.Ignore()
 
 	// endpoint requires a token with project access

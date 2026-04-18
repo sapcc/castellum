@@ -5,9 +5,9 @@ package tasks
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
-	"github.com/go-gorp/gorp/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-bits/jobloop"
 )
@@ -30,7 +30,7 @@ func (c *Context) GarbageCollectionJob(registerer prometheus.Registerer) jobloop
 }
 
 // CollectGarbage removes old entries from the finished_operations table.
-func CollectGarbage(dbi *gorp.DbMap, maxLastUpdatedAt time.Time) error {
+func CollectGarbage(dbi *sql.DB, maxLastUpdatedAt time.Time) error {
 	_, err := dbi.Exec(`DELETE FROM finished_operations WHERE finished_at < $1`, maxLastUpdatedAt)
 	return err
 }

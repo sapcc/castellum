@@ -86,7 +86,7 @@ func TestGetAsset(t *testing.T) {
 		Usage:     castellum.UsageValues{castellum.SingularUsageMetric: 768},
 		CreatedAt: time.Unix(21, 0).UTC(),
 	}
-	must.SucceedT(t, s.DB.Insert(&pendingOp))
+	must.SucceedT(t, test.Insert(s.DB, db.PendingOperationStore, &pendingOp))
 	pendingOpJSON := jsonmatch.Object{
 		"state":    "created",
 		"reason":   "high",
@@ -103,7 +103,7 @@ func TestGetAsset(t *testing.T) {
 
 	// check rendering of a pending operation in state "confirmed"
 	pendingOp.ConfirmedAt = Some(time.Unix(22, 0).UTC())
-	must.SucceedT(t, s.DBUpdate(&pendingOp))
+	must.SucceedT(t, db.PendingOperationStore.Update(s.DB, pendingOp))
 	pendingOpJSON["state"] = "confirmed"
 	pendingOpJSON["confirmed"] = jsonmatch.Object{"at": 22}
 	s.Handler.RespondTo(ctx, "GET /v1/projects/project1/assets/foo/fooasset1").
@@ -111,14 +111,14 @@ func TestGetAsset(t *testing.T) {
 
 	// check rendering of a pending operation in state "greenlit"
 	pendingOp.GreenlitAt = Some(time.Unix(23, 0).UTC())
-	must.SucceedT(t, s.DBUpdate(&pendingOp))
+	must.SucceedT(t, db.PendingOperationStore.Update(s.DB, pendingOp))
 	pendingOpJSON["state"] = "greenlit"
 	pendingOpJSON["greenlit"] = jsonmatch.Object{"at": 23}
 	s.Handler.RespondTo(ctx, "GET /v1/projects/project1/assets/foo/fooasset1").
 		ExpectJSON(t, http.StatusOK, response)
 
 	pendingOp.GreenlitByUserUUID = Some("user1")
-	must.SucceedT(t, s.DBUpdate(&pendingOp))
+	must.SucceedT(t, db.PendingOperationStore.Update(s.DB, pendingOp))
 	pendingOpJSON["greenlit"] = jsonmatch.Object{"at": 23, "by_user": "user1"}
 	s.Handler.RespondTo(ctx, "GET /v1/projects/project1/assets/foo/fooasset1").
 		ExpectJSON(t, http.StatusOK, response)
@@ -189,7 +189,7 @@ func TestGetAsset(t *testing.T) {
 		ExpectJSON(t, http.StatusOK, response)
 
 	// check rendering of an asset that has never had a successful scrape
-	must.SucceedT(t, s.DB.Insert(&db.Asset{
+	must.SucceedT(t, test.Insert(s.DB, db.AssetStore, &db.Asset{
 		ResourceID:         1,
 		UUID:               "fooasset3",
 		ScrapeErrorMessage: "filer has stranger anxiety",
@@ -211,7 +211,7 @@ func TestPostAssetErrorResolved(t *testing.T) {
 	)
 	ctx := t.Context()
 
-	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr, tr0 := easypg.NewTracker(t, s.DB)
 	tr0.Ignore()
 
 	// endpoint requires cluster access
