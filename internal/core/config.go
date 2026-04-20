@@ -81,6 +81,7 @@ func (s ProjectSeed) isSeededResource(assetType db.AssetType) bool {
 	return exists || s.ForbidsResource(assetType)
 }
 
+// ForbidsResource returns whether any DisabledResourceRegexps match the given asset type.
 func (s ProjectSeed) ForbidsResource(assetType db.AssetType) bool {
 	for _, rx := range s.DisabledResourceRegexps {
 		if rx.MatchString(string(assetType)) {

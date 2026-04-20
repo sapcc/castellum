@@ -8,7 +8,9 @@ import (
 	"github.com/gophercloud/gophercloud/v2/pagination"
 )
 
-// TODO: This type is imported from gophercloud, because the "IsPublic" JSON key was changed between OpenStack microversions, but remained the same in gophercloud.
+// ShareType is copied from [gophercloud](https://pkg.go.dev/github.com/gophercloud/gophercloud/v2/openstack/sharedfilesystems/v2/sharetypes#ShareType)
+// because the "IsPublic" JSON key was changed between OpenStack microversions, but remained the same in gophercloud.
+// TODO: remove when remediated.
 type ShareType struct {
 	// The Share Type ID
 	ID string `json:"id"`

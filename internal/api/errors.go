@@ -13,6 +13,7 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
+// GetResourceScrapeErrors handles GET /v1/admin/resource-scrape-errors.
 func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/admin/resource-scrape-errors")
 	_, token := h.CheckToken(w, r)
@@ -54,6 +55,7 @@ func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request)
 	}{resScrapeErrs})
 }
 
+// GetAssetScrapeErrors handles GET /v1/admin/asset-scrape-errors.
 func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/admin/asset-scrape-errors")
 	_, token := h.CheckToken(w, r)
@@ -108,6 +110,7 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 	}{assetScrapeErrs})
 }
 
+// GetAssetResizeErrors handles GET /v1/admin/asset-resize-errors.
 func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/admin/asset-resize-errors")
 	_, token := h.CheckToken(w, r)

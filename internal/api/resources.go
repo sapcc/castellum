@@ -76,6 +76,7 @@ func (h handler) ResourceFromDB(res db.Resource) (castellum.Resource, error) {
 ////////////////////////////////////////////////////////////////////////////////
 // HTTP handlers
 
+// GetProject handles GET /v1/projects/:id.
 func (h handler) GetProject(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/projects/:id")
 	projectUUID, token := h.CheckToken(w, r)
@@ -112,6 +113,7 @@ func (h handler) GetProject(w http.ResponseWriter, r *http.Request) {
 	respondwith.JSON(w, http.StatusOK, result)
 }
 
+// GetResource handles GET /v1/projects/:id/resources/:type.
 func (h handler) GetResource(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/resources/:type")
 	projectUUID, token := h.CheckToken(w, r)
@@ -130,6 +132,7 @@ func (h handler) GetResource(w http.ResponseWriter, r *http.Request) {
 	respondwith.JSON(w, http.StatusOK, resource)
 }
 
+// PutResource handles PUT /v1/projects/:id/resources/:type.
 func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/resources/:type")
 	requestTime := time.Now()
@@ -211,6 +214,7 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// DeleteResource handles DELETE /v1/projects/:id/resources/:type.
 func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/resources/:type")
 	requestTime := time.Now()

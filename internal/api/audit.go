@@ -15,6 +15,7 @@ type scalingEventTarget struct {
 	resource  *castellum.Resource // only used for enable/update action events
 }
 
+// Render implements the audittools.Target interface.
 func (t scalingEventTarget) Render() cadf.Resource {
 	result := cadf.Resource{
 		TypeURI:   "data/security/project",

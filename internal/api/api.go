@@ -39,7 +39,7 @@ type handler struct {
 	TimeNow func() time.Time
 }
 
-// NewAPI constructs the main httpapi.API for this package.
+// NewHandler constructs the main httpapi.API for this package.
 func NewHandler(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClient, auditor audittools.Auditor, timeNow func() time.Time) httpapi.API {
 	return &handler{Config: cfg, DB: dbi, Team: team, Validator: validator, Provider: provider, Auditor: auditor, TimeNow: timeNow}
 }
@@ -114,6 +114,9 @@ func RequireJSON(w http.ResponseWriter, r *http.Request, data any) bool {
 	return true
 }
 
+// CheckToken evaluates whether the Openstack access token fits to the scope specified
+// in the requests' variables or query arguments and returns the projectUUID and a token
+// when the validation was successful.
 func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *gopherpolicy.Token) {
 	// for endpoints requiring the `project_id` variable, check that it's not empty
 	projectUUID, projectScoped := mux.Vars(r)["project_id"]
@@ -149,6 +152,8 @@ func (h handler) CheckToken(w http.ResponseWriter, r *http.Request) (string, *go
 	return projectUUID, token
 }
 
+// SetTokenToProjectScope sets the tokens' request context to the specific projects
+// information when the project exists and if the project exists and any possible errors.
 func (h handler) SetTokenToProjectScope(ctx context.Context, token *gopherpolicy.Token, projectUUID string) (projectExists bool, err error) {
 	objectAttrs := map[string]string{
 		"project_id":        projectUUID,
@@ -180,6 +185,9 @@ func (h handler) SetTokenToProjectScope(ctx context.Context, token *gopherpolicy
 	return projectExists, nil
 }
 
+// LoadResource loads the requested db.Resource and returns it.
+// If the process fails, an error is written to the response and nil is returned.
+// If createIfMissing is true, a new db.Resource will be created.a
 func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUID string, token *gopherpolicy.Token, createIfMissing bool) *db.Resource {
 	assetType := db.AssetType(mux.Vars(r)["asset_type"])
 	if assetType == "" {

@@ -21,7 +21,7 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
-func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (map[int64]db.Resource, bool) {
+func (h handler) loadMatchingResources(w http.ResponseWriter, r *http.Request) (map[int64]db.Resource, bool) {
 	// CheckToken discovers project ID in both URL path and query
 	var token *gopherpolicy.Token
 	projectUUID, token := h.CheckToken(w, r)
@@ -109,9 +109,10 @@ func (h handler) LoadMatchingResources(w http.ResponseWriter, r *http.Request) (
 	return allowedResources, true
 }
 
+// GetPendingOperations handles GET /v1/operations/pending.
 func (h handler) GetPendingOperations(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/operations/pending")
-	dbResources, ok := h.LoadMatchingResources(w, r)
+	dbResources, ok := h.loadMatchingResources(w, r)
 	if !ok {
 		return
 	}
@@ -163,9 +164,10 @@ func (h handler) getAssetUUIDMap(res db.Resource) (map[int64]string, error) {
 	return assetUUIDs, err
 }
 
+// GetRecentlyFailedOperations handles GET /v1/operations/recently-failed.
 func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/operations/recently-failed")
-	dbResources, ok := h.LoadMatchingResources(w, r)
+	dbResources, ok := h.loadMatchingResources(w, r)
 	if !ok {
 		return
 	}
@@ -179,7 +181,7 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 			ResourceID:   dbResource.ID,
 			Outcomes:     []castellum.OperationOutcome{castellum.OperationOutcomeFailed, castellum.OperationOutcomeErrored},
 			OverriddenBy: `TRUE`,
-		}.Execute()
+		}.execute()
 		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
@@ -207,9 +209,10 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 	}{relevantOps})
 }
 
+// GetRecentlySucceededOperations handles GET /v1/operations/recently-succeeded.
 func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/operations/recently-succeeded")
-	dbResources, ok := h.LoadMatchingResources(w, r)
+	dbResources, ok := h.loadMatchingResources(w, r)
 	if !ok {
 		return
 	}
@@ -228,7 +231,7 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 			ResourceID:   dbResource.ID,
 			Outcomes:     []castellum.OperationOutcome{castellum.OperationOutcomeSucceeded},
 			OverriddenBy: fmt.Sprintf(`outcome != '%s'`, castellum.OperationOutcomeCancelled),
-		}.Execute()
+		}.execute()
 		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
@@ -277,7 +280,7 @@ var recentOperationQueryStr = sqlext.SimplifyWhitespace(`
 	 WHERE a.resource_id = $1 AND o.outcome IN ('%s')
 `)
 
-func (q recentOperationQuery) Execute() (map[int64]db.FinishedOperation, error) {
+func (q recentOperationQuery) execute() (map[int64]db.FinishedOperation, error) {
 	outcomes := make([]string, len(q.Outcomes))
 	for idx, o := range q.Outcomes {
 		outcomes[idx] = string(o)
