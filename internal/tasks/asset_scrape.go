@@ -43,7 +43,7 @@ var scrapeAssetSearchQuery = sqlext.SimplifyWhitespace(`
 
 var logScrapes = osext.GetenvBool("CASTELLUM_LOG_SCRAPES")
 
-// AssetScrapingJob returns a job where each task is a asset that needs to be
+// AssetScrapingJob returns a job where each task is an asset that needs to be
 // scraped. The task checks its status and creates/confirms/cancels operations accordingly.
 func (c *Context) AssetScrapingJob(registerer prometheus.Registerer) jobloop.Job {
 	return (&jobloop.TxGuardedJob[*gorp.Transaction, db.Asset]{

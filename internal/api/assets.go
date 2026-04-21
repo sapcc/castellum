@@ -112,6 +112,7 @@ func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string, res *db.
 ////////////////////////////////////////////////////////////////////////////////
 // HTTP handlers
 
+// GetAssets handles GET /v1/projects/:id/assets/:type.
 func (h handler) GetAssets(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/assets/:type")
 	projectUUID, token := h.CheckToken(w, r)
@@ -142,6 +143,7 @@ func (h handler) GetAssets(w http.ResponseWriter, r *http.Request) {
 	respondwith.JSON(w, http.StatusOK, result)
 }
 
+// GetAsset handles GET /v1/projects/:id/assets/:type/:uuid.
 func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/assets/:type/:uuid")
 	projectUUID, token := h.CheckToken(w, r)
@@ -209,6 +211,7 @@ var (
 	`)
 )
 
+// PostAssetErrorResolved handles POST /v1/projects/:id/assets/:type/:uuid/error-resolved.
 func (h handler) PostAssetErrorResolved(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/assets/:type/:uuid/error-resolved")
 

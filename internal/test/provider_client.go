@@ -11,24 +11,28 @@ import (
 	"github.com/sapcc/castellum/internal/core"
 )
 
-// MockProviderClient implements the core.ProviderClientInterface.
+// MockProviderClient implements the core.ProviderClient interface.
 type MockProviderClient struct {
 	Domains  map[string]core.CachedDomain
 	Projects map[string]core.CachedProject
 }
 
+// CloudAdminClient implements the core.ProviderClient interface.
 func (c MockProviderClient) CloudAdminClient(factory core.ServiceClientFactory) (*gophercloud.ServiceClient, error) {
 	panic("CloudAdminClient is not implemented in MockProviderClient")
 }
 
+// ProjectScopedClient implements the core.ProviderClient interface.
 func (c MockProviderClient) ProjectScopedClient(_ context.Context, scope core.ProjectScope) (*gophercloud.ProviderClient, gophercloud.EndpointOpts, error) {
 	panic("ProjectScopedClient is not implemented in MockProviderClient")
 }
 
+// GetAuthResult implements the core.ProviderClient interface.
 func (c MockProviderClient) GetAuthResult() gophercloud.AuthResult {
 	panic("GetAuthResult is not implemented in MockProviderClient")
 }
 
+// GetProject implements the core.ProviderClient interface.
 func (c MockProviderClient) GetProject(_ context.Context, projectID string) (*core.CachedProject, error) {
 	result, exists := c.Projects[projectID]
 	if exists {
@@ -37,6 +41,7 @@ func (c MockProviderClient) GetProject(_ context.Context, projectID string) (*co
 	return nil, nil
 }
 
+// GetDomain implements the core.ProviderClient interface.
 func (c MockProviderClient) GetDomain(_ context.Context, domainID string) (*core.CachedDomain, error) {
 	result, exists := c.Domains[domainID]
 	if exists {
@@ -45,6 +50,7 @@ func (c MockProviderClient) GetDomain(_ context.Context, domainID string) (*core
 	return nil, nil
 }
 
+// FindProjectID implements the core.ProviderClient interface.
 func (c MockProviderClient) FindProjectID(_ context.Context, projectName, projectDomainName string) (string, error) {
 	domainID := c.findDomainID(projectDomainName)
 	if domainID == "" {

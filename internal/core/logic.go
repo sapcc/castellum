@@ -236,7 +236,7 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 		}
 
 		if reason == enforcer {
-			a.AddAction(action{Desired: emin}, *c)
+			a.addAction(action{Desired: emin}, *c)
 			// We also let the rest of this method behave as if the `high` threshold
 			// was crossed. The percentage-step resizing may generate a larger
 			// target size than this action right now did, in which case it will
@@ -247,7 +247,7 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 
 	if emax, ok := enforceableMaxSize.Unpack(); ok && asset.Size > emax {
 		if reason == castellum.OperationReasonLow {
-			a.AddAction(action{Desired: emax, Max: enforceableMaxSize}, *c)
+			a.addAction(action{Desired: emax, Max: enforceableMaxSize}, *c)
 			takeActionBecauseEnforceableConstraint = true // same reasoning as above
 		}
 	}
@@ -274,22 +274,22 @@ func checkReason(res ResourceLogic, asset AssetStatus, reason castellum.Operatio
 	if takeActionBecauseThreshold || takeActionBecauseEnforceableConstraint {
 		if res.SingleStep {
 			for _, metric := range res.UsageMetrics {
-				a.AddAction(getActionSingleStep(res, asset, metric, reason), *c)
+				a.addAction(getActionSingleStep(res, asset, metric, reason), *c)
 			}
 		} else {
-			a.AddAction(getActionPercentageStep(res, asset, reason), *c)
+			a.addAction(getActionPercentageStep(res, asset, reason), *c)
 		}
 	}
 
 	// phase 3: take the boldest action that satisfies the constraints,
 	// but only if it is actually a proper downsize or upsize
 	if reason == castellum.OperationReasonLow {
-		target := a.Min()
+		target := a.min()
 		if target.IsSomeAnd(is.Below(asset.Size)) {
 			return target
 		}
 	} else {
-		target := a.Max()
+		target := a.max()
 		if target.IsSomeAnd(is.Above(asset.Size)) {
 			return target
 		}
@@ -385,7 +385,7 @@ type constraints struct {
 }
 
 func emptyConstraints() *constraints {
-	// Min starts at 1 because we never want to resize to 0
+	// min starts at 1 because we never want to resize to 0
 	return &constraints{1, math.MaxUint64}
 }
 
@@ -416,7 +416,7 @@ type action struct {
 
 type actions []uint64
 
-func (as *actions) AddAction(a action, c constraints) {
+func (as *actions) addAction(a action, c constraints) {
 	c.forbidBelow(a.Min)
 	c.forbidAbove(a.Max)
 	if !c.isSatisfiable() {
@@ -427,7 +427,7 @@ func (as *actions) AddAction(a action, c constraints) {
 	*as = append(*as, val)
 }
 
-func (as actions) Min() Option[uint64] {
+func (as actions) min() Option[uint64] {
 	if len(as) == 0 {
 		return None[uint64]()
 	}
@@ -435,7 +435,7 @@ func (as actions) Min() Option[uint64] {
 	return Some(as[0])
 }
 
-func (as actions) Max() Option[uint64] {
+func (as actions) max() Option[uint64] {
 	if len(as) == 0 {
 		return None[uint64]()
 	}
