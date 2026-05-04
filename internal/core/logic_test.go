@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/logg"
+	. "go.xyrillian.de/gg/option"
 )
 
 func TestGetEligibleOperations(t *testing.T) {

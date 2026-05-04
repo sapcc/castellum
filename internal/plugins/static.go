@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"sort"
 
-	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
+	. "go.xyrillian.de/gg/option"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"

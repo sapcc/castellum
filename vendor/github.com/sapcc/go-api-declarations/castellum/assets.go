@@ -3,7 +3,7 @@
 
 package castellum
 
-import . "github.com/majewsky/gg/option"
+import . "go.xyrillian.de/gg/option"
 
 // Asset is the API representation of an asset.
 type Asset struct {

@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"os"
 
-	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/regexpext"
+	. "go.xyrillian.de/gg/option"
 
 	"github.com/sapcc/castellum/internal/db"
 )

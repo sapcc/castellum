@@ -6,7 +6,7 @@ package castellum
 import (
 	"encoding/json"
 
-	. "github.com/majewsky/gg/option"
+	. "go.xyrillian.de/gg/option"
 )
 
 // Resource is the API representation of a resource.

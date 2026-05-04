@@ -8,10 +8,10 @@ import (
 	"math"
 	"slices"
 
-	"github.com/majewsky/gg/is"
-	. "github.com/majewsky/gg/option"
-	"github.com/majewsky/gg/options"
 	"github.com/sapcc/go-api-declarations/castellum"
+	"go.xyrillian.de/gg/is"
+	. "go.xyrillian.de/gg/option"
+	"go.xyrillian.de/gg/options"
 
 	"github.com/sapcc/castellum/internal/db"
 )

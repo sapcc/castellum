@@ -13,8 +13,6 @@ import (
 	"time"
 
 	"github.com/go-gorp/gorp/v3"
-	"github.com/majewsky/gg/is"
-	. "github.com/majewsky/gg/option"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/errext"
@@ -23,6 +21,8 @@ import (
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
 	"github.com/sapcc/go-bits/sqlext"
+	"go.xyrillian.de/gg/is"
+	. "go.xyrillian.de/gg/option"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"

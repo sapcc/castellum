@@ -17,7 +17,6 @@ import (
 	"github.com/dlmiddlecote/sqlstats"
 	"github.com/go-gorp/gorp/v3"
 	"github.com/gophercloud/gophercloud/v2/openstack"
-	. "github.com/majewsky/gg/option"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
@@ -33,6 +32,7 @@ import (
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
+	. "go.xyrillian.de/gg/option"
 
 	"github.com/sapcc/castellum/internal/api"
 	"github.com/sapcc/castellum/internal/core"

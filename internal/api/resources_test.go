@@ -9,13 +9,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/majewsky/gg/jsonmatch"
-	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/cadf"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/httptest"
+	"go.xyrillian.de/gg/jsonmatch"
+	. "go.xyrillian.de/gg/option"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"

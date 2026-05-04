@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/go-gorp/gorp/v3"
-	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/easypg"
+	. "go.xyrillian.de/gg/option"
 )
 
 // Resource describes the autoscaling behavior for a single resource in a

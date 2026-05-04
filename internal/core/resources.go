@@ -8,9 +8,9 @@ import (
 	"encoding/json"
 	"sort"
 
-	. "github.com/majewsky/gg/option"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/errext"
+	. "go.xyrillian.de/gg/option"
 
 	"github.com/sapcc/castellum/internal/db"
 )

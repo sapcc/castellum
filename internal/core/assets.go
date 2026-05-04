@@ -8,10 +8,10 @@ import (
 	"errors"
 	"fmt"
 
-	. "github.com/majewsky/gg/option"
-	"github.com/majewsky/gg/options"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/pluggable"
+	. "go.xyrillian.de/gg/option"
+	"go.xyrillian.de/gg/options"
 
 	"github.com/sapcc/castellum/internal/db"
 )
