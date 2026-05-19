@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/dlmiddlecote/sqlstats"
-	"github.com/go-gorp/gorp/v3"
 	"github.com/gophercloud/gophercloud/v2/openstack"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -33,6 +32,7 @@ import (
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
 	. "go.xyrillian.de/gg/option"
+	"go.xyrillian.de/oblast"
 
 	"github.com/sapcc/castellum/internal/api"
 	"github.com/sapcc/castellum/internal/core"
@@ -113,7 +113,7 @@ func main() {
 ////////////////////////////////////////////////////////////////////////////////
 // task: API
 
-func runAPI(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
+func runAPI(ctx context.Context, cfg core.Config, dbi *oblast.DB, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
 	identityV3, err := providerClient.CloudAdminClient(openstack.NewIdentityV3)
 	if err != nil {
 		logg.Fatal("cannot find Keystone V3 API: " + err.Error())
@@ -148,7 +148,7 @@ func runAPI(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team core.Ass
 		httpapi.HealthCheckAPI{
 			SkipRequestLog: true,
 			Check: func() error {
-				return dbi.Db.PingContext(ctx)
+				return dbi.PingContext(ctx)
 			},
 		},
 		httpapi.WithGlobalMiddleware(corsMiddleware.Handler),
@@ -163,7 +163,7 @@ func runAPI(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team core.Ass
 
 // This initialization phase is split into a separate method because we only
 // need it for some subcommands.
-func initDB() *gorp.DbMap {
+func initDB() *oblast.DB {
 	dbName := osext.GetenvOrDefault("CASTELLUM_DB_NAME", "castellum")
 	dbURL := must.Return(easypg.URLFrom(easypg.URLParts{
 		HostName:          osext.GetenvOrDefault("CASTELLUM_DB_HOSTNAME", "localhost"),
@@ -175,13 +175,16 @@ func initDB() *gorp.DbMap {
 	}))
 	dbConn := must.Return(easypg.Connect(dbURL, db.Configuration()))
 	prometheus.MustRegister(sqlstats.NewStatsCollector(dbName, dbConn))
-	return db.InitORM(dbConn)
+
+	// ensure that this process does not starve other Castellum processes for DB connections
+	dbConn.SetMaxOpenConns(16)
+	return oblast.NewDB(dbConn)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // task: observer
 
-func runObserver(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
+func runObserver(ctx context.Context, cfg core.Config, dbi *oblast.DB, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
 	c := tasks.Context{Config: cfg, DB: dbi, Team: team, ProviderClient: providerClient}
 	c.ApplyDefaults()
 	prometheus.MustRegister(tasks.StateMetricsCollector{Context: c})
@@ -199,7 +202,7 @@ func runObserver(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team cor
 		httpapi.HealthCheckAPI{
 			SkipRequestLog: true,
 			Check: func() error {
-				return dbi.Db.PingContext(ctx)
+				return dbi.PingContext(ctx)
 			},
 		},
 		pprofapi.API{IsAuthorized: pprofapi.IsRequestFromLocalhost},
@@ -213,7 +216,7 @@ func runObserver(ctx context.Context, cfg core.Config, dbi *gorp.DbMap, team cor
 ////////////////////////////////////////////////////////////////////////////////
 // task: worker
 
-func runWorker(ctx context.Context, dbi *gorp.DbMap, team core.AssetManagerTeam, httpListenAddr string) {
+func runWorker(ctx context.Context, dbi *oblast.DB, team core.AssetManagerTeam, httpListenAddr string) {
 	c := tasks.Context{DB: dbi, Team: team}
 	c.ApplyDefaults()
 
@@ -227,7 +230,7 @@ func runWorker(ctx context.Context, dbi *gorp.DbMap, team core.AssetManagerTeam,
 		httpapi.HealthCheckAPI{
 			SkipRequestLog: true,
 			Check: func() error {
-				return dbi.Db.PingContext(ctx)
+				return dbi.PingContext(ctx)
 			},
 		},
 		pprofapi.API{IsAuthorized: pprofapi.IsRequestFromLocalhost},

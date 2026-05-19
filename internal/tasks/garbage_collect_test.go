@@ -21,24 +21,25 @@ func TestCollectGarbage(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForWorkerTest(),
 	)
+	ctx := t.Context()
 	fakeNow := time.Unix(0, 0).UTC()
 
 	// setup some minimal scaffolding (we can only insert finished_operations
 	// with valid asset IDs into the DB)
-	must.SucceedT(t, s.DB.Insert(&db.Resource{
+	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
 		ScopeUUID: "project1",
 		AssetType: "foo",
 	}))
-	must.SucceedT(t, s.DB.Insert(&db.Asset{
+	must.SucceedT(t, db.AssetStore.Insert(ctx, s.DB, &db.Asset{
 		ResourceID: 1,
 		UUID:       "asset1",
 	}))
-	must.SucceedT(t, s.DB.Insert(&db.Asset{
+	must.SucceedT(t, db.AssetStore.Insert(ctx, s.DB, &db.Asset{
 		ResourceID: 1,
 		UUID:       "asset2",
 	}))
 
-	ops := []db.FinishedOperation{
+	ops := []*db.FinishedOperation{
 		{
 			AssetID:    1,
 			Reason:     castellum.OperationReasonHigh,
@@ -72,11 +73,9 @@ func TestCollectGarbage(t *testing.T) {
 			FinishedAt:  fakeNow.Add(-10 * time.Minute),
 		},
 	}
-	for _, op := range ops {
-		must.SucceedT(t, s.DB.Insert(&op))
-	}
+	must.SucceedT(t, db.FinishedOperationStore.Insert(ctx, s.DB, ops...))
 
-	tr, tr0 := easypg.NewTracker(t, s.DB.Db)
+	tr, tr0 := easypg.NewTracker(t, s.DB.DB)
 	tr0.Ignore()
 
 	must.SucceedT(t, tasks.CollectGarbage(s.DB, fakeNow.Add(-15*time.Minute)))

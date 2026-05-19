@@ -26,9 +26,8 @@ import (
 
 // ResourceFromDB converts a db.Resource into an castellum.Resource.
 func (h handler) ResourceFromDB(res db.Resource) (castellum.Resource, error) {
-	assetCount, err := h.DB.SelectInt(
-		`SELECT COUNT(*) FROM assets WHERE resource_id = $1`,
-		res.ID)
+	var assetCount int64
+	err := h.DB.QueryRow(`SELECT COUNT(*) FROM assets WHERE resource_id = $1`, res.ID).Scan(&assetCount)
 	if err != nil {
 		return castellum.Resource{}, err
 	}
@@ -79,14 +78,13 @@ func (h handler) ResourceFromDB(res db.Resource) (castellum.Resource, error) {
 // GetProject handles GET /v1/projects/:id.
 func (h handler) GetProject(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/projects/:id")
+	ctx := r.Context()
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
 		return
 	}
 
-	var dbResources []db.Resource
-	_, err := h.DB.Select(&dbResources,
-		`SELECT * FROM resources WHERE scope_uuid = $1 ORDER BY asset_type`, projectUUID)
+	dbResources, err := db.ResourceStore.SelectWhere(ctx, h.DB, `scope_uuid = $1 ORDER BY asset_type`, projectUUID)
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
@@ -135,6 +133,7 @@ func (h handler) GetResource(w http.ResponseWriter, r *http.Request) {
 // PutResource handles PUT /v1/projects/:id/resources/:type.
 func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/resources/:type")
+	ctx := r.Context()
 	requestTime := time.Now()
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
@@ -201,10 +200,8 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 
 	if dbResource.ID == 0 {
 		dbResource.NextScrapeAt = time.Unix(0, 0).UTC() // give new resources a very early next_scrape_at to prioritize them in the scrape queue
-		err = h.DB.Insert(dbResource)
-	} else {
-		_, err = h.DB.Update(dbResource)
 	}
+	err = db.ResourceStore.Upsert(ctx, h.DB, dbResource)
 	if respondwith.ObfuscatedErrorText(w, err) {
 		doAudit(http.StatusInternalServerError)
 		return
@@ -217,6 +214,7 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 // DeleteResource handles DELETE /v1/projects/:id/resources/:type.
 func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/resources/:type")
+	ctx := r.Context()
 	requestTime := time.Now()
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
@@ -247,7 +245,7 @@ func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	_, err := h.DB.Exec(`DELETE FROM resources WHERE id = $1`, dbResource.ID)
+	err := db.ResourceStore.Delete(ctx, h.DB, *dbResource)
 	if respondwith.ObfuscatedErrorText(w, err) {
 		doAudit(http.StatusInternalServerError)
 		return

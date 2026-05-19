@@ -15,6 +15,7 @@ import (
 	"github.com/sapcc/go-bits/respondwith"
 	"github.com/sapcc/go-bits/sqlext"
 	. "go.xyrillian.de/gg/option"
+	"go.xyrillian.de/gg/options"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -115,6 +116,7 @@ func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string, res *db.
 // GetAssets handles GET /v1/projects/:id/assets/:type.
 func (h handler) GetAssets(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/assets/:type")
+	ctx := r.Context()
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
 		return
@@ -124,9 +126,7 @@ func (h handler) GetAssets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var dbAssets []db.Asset
-	_, err := h.DB.Select(&dbAssets,
-		`SELECT * FROM assets WHERE resource_id = $1 ORDER BY uuid`, dbResource.ID)
+	dbAssets, err := db.AssetStore.SelectWhere(ctx, h.DB, `resource_id = $1 ORDER BY uuid`, dbResource.ID)
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
@@ -146,6 +146,7 @@ func (h handler) GetAssets(w http.ResponseWriter, r *http.Request) {
 // GetAsset handles GET /v1/projects/:id/assets/:type/:uuid.
 func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/assets/:type/:uuid")
+	ctx := r.Context()
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
 		return
@@ -155,39 +156,28 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var dbAsset db.Asset
-	err := h.DB.SelectOne(&dbAsset,
-		`SELECT * FROM assets WHERE resource_id = $1 AND uuid = $2`,
+	dbAssetOrNone, err := db.AssetStore.SelectOneOrNoneWhere(ctx, h.DB, `resource_id = $1 AND uuid = $2`,
 		dbResource.ID, mux.Vars(r)["asset_uuid"])
-	if errors.Is(err, sql.ErrNoRows) {
-		http.NotFound(w, r)
+	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
-	if respondwith.ObfuscatedErrorText(w, err) {
+	dbAsset, ok := dbAssetOrNone.Unpack()
+	if !ok {
+		http.NotFound(w, r)
 		return
 	}
 	asset := AssetFromDB(dbAsset)
 
-	var dbPendingOp db.PendingOperation
-	err = h.DB.SelectOne(&dbPendingOp,
-		`SELECT * FROM pending_operations WHERE asset_id = $1`,
-		dbAsset.ID)
-	switch {
-	case errors.Is(err, sql.ErrNoRows):
-		asset.PendingOperation = None[castellum.StandaloneOperation]()
-	case respondwith.ObfuscatedErrorText(w, err):
+	dbPendingOp, err := db.PendingOperationStore.SelectOneOrNoneWhere(ctx, h.DB, `asset_id = $1`, dbAsset.ID)
+	if respondwith.ObfuscatedErrorText(w, err) {
 		return
-	default:
-		asset.PendingOperation = Some(PendingOperationFromDB(dbPendingOp, "", nil))
 	}
+	asset.PendingOperation = options.Map(dbPendingOp, func(op db.PendingOperation) castellum.StandaloneOperation { return PendingOperationFromDB(op, "", nil) })
 
 	_, wantsFinishedOps := r.URL.Query()["history"]
 	if wantsFinishedOps {
-		var dbFinishedOps []db.FinishedOperation
-		_, err = h.DB.Select(&dbFinishedOps,
-			`SELECT * FROM finished_operations 
-			 WHERE asset_id = $1 AND outcome != 'error-resolved'
-			 ORDER BY finished_at`,
+		dbFinishedOps, err := db.FinishedOperationStore.SelectWhere(ctx, h.DB,
+			`asset_id = $1 AND outcome != 'error-resolved' ORDER BY finished_at`,
 			dbAsset.ID)
 		if respondwith.ObfuscatedErrorText(w, err) {
 			return
@@ -214,6 +204,7 @@ var (
 // PostAssetErrorResolved handles POST /v1/projects/:id/assets/:type/:uuid/error-resolved.
 func (h handler) PostAssetErrorResolved(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/assets/:type/:uuid/error-resolved")
+	ctx := r.Context()
 
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
@@ -248,7 +239,7 @@ func (h handler) PostAssetErrorResolved(w http.ResponseWriter, r *http.Request) 
 
 	now := h.TimeNow()
 	userUUID := token.UserUUID()
-	err = h.DB.Insert(&db.FinishedOperation{
+	err = db.FinishedOperationStore.Insert(ctx, h.DB, &db.FinishedOperation{
 		AssetID:            assetID,
 		Reason:             lastReason,
 		Outcome:            castellum.OperationOutcomeErrorResolved,
