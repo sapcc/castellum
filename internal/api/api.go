@@ -5,9 +5,7 @@ package api
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -15,13 +13,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-gorp/gorp/v3"
 	"github.com/gorilla/mux"
 	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/respondwith"
+	"go.xyrillian.de/oblast"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -29,7 +27,7 @@ import (
 
 type handler struct {
 	Config    core.Config
-	DB        *gorp.DbMap
+	DB        *oblast.DB
 	Team      core.AssetManagerTeam
 	Validator gopherpolicy.Validator
 	Provider  core.ProviderClient
@@ -40,7 +38,7 @@ type handler struct {
 }
 
 // NewHandler constructs the main httpapi.API for this package.
-func NewHandler(cfg core.Config, dbi *gorp.DbMap, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClient, auditor audittools.Auditor, timeNow func() time.Time) httpapi.API {
+func NewHandler(cfg core.Config, dbi *oblast.DB, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClient, auditor audittools.Auditor, timeNow func() time.Time) httpapi.API {
 	return &handler{Config: cfg, DB: dbi, Team: team, Validator: validator, Provider: provider, Auditor: auditor, TimeNow: timeNow}
 }
 
@@ -187,8 +185,9 @@ func (h handler) SetTokenToProjectScope(ctx context.Context, token *gopherpolicy
 
 // LoadResource loads the requested db.Resource and returns it.
 // If the process fails, an error is written to the response and nil is returned.
-// If createIfMissing is true, a new db.Resource will be created.a
+// If createIfMissing is true, a new db.Resource will be created.
 func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUID string, token *gopherpolicy.Token, createIfMissing bool) *db.Resource {
+	ctx := r.Context()
 	assetType := db.AssetType(mux.Vars(r)["asset_type"])
 	if assetType == "" {
 		http.NotFound(w, r)
@@ -205,30 +204,28 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 		return nil
 	}
 
-	var res db.Resource
-	err := h.DB.SelectOne(&res,
-		`SELECT * FROM resources WHERE scope_uuid = $1 AND asset_type = $2`,
-		projectUUID, assetType,
-	)
-	if errors.Is(err, sql.ErrNoRows) {
-		if createIfMissing {
-			proj, err := h.Provider.GetProject(r.Context(), projectUUID)
-			if respondwith.ObfuscatedErrorText(w, err) {
-				return nil
-			}
-			return &db.Resource{
-				ScopeUUID:  projectUUID,
-				DomainUUID: proj.DomainID,
-				AssetType:  assetType,
-			}
-		}
-		http.NotFound(w, r)
-		return nil
-	}
+	resOrNone, err := db.ResourceStore.SelectOneOrNoneWhere(ctx, h.DB, `scope_uuid = $1 AND asset_type = $2`, projectUUID, assetType)
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return nil
 	}
-	return &res
+	res, ok := resOrNone.Unpack()
+	if ok {
+		return &res
+	}
+
+	if createIfMissing {
+		proj, err := h.Provider.GetProject(r.Context(), projectUUID)
+		if respondwith.ObfuscatedErrorText(w, err) {
+			return nil
+		}
+		return &db.Resource{
+			ScopeUUID:  projectUUID,
+			DomainUUID: proj.DomainID,
+			AssetType:  assetType,
+		}
+	}
+	http.NotFound(w, r)
+	return nil
 }
 
 func (h handler) rejectIfResourceSeeded(w http.ResponseWriter, r *http.Request, res db.Resource) bool {

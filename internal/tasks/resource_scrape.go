@@ -7,11 +7,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-gorp/gorp/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-bits/jobloop"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/sqlext"
+	"go.xyrillian.de/oblast"
 
 	"github.com/sapcc/castellum/internal/db"
 )
@@ -32,7 +32,7 @@ var scrapeResourceSearchQuery = sqlext.SimplifyWhitespace(`
 // ResourceScrapingJob returns a job where each task is a resource that needs
 // to be scraped. The task looks for new and deleted assets within that resource.
 func (c *Context) ResourceScrapingJob(registerer prometheus.Registerer) jobloop.Job {
-	return (&jobloop.TxGuardedJob[*gorp.Transaction, db.Resource]{
+	return (&jobloop.TxGuardedJob[*oblast.Tx, db.Resource]{
 		Metadata: jobloop.JobMetadata{
 			ReadableName:    "resource scraping",
 			ConcurrencySafe: true, // because "FOR UPDATE SKIP LOCKED" is used
@@ -48,15 +48,15 @@ func (c *Context) ResourceScrapingJob(registerer prometheus.Registerer) jobloop.
 	}).Setup(registerer)
 }
 
-func (c *Context) discoverResourceScrape(ctx context.Context, tx *gorp.Transaction, labels prometheus.Labels) (res db.Resource, err error) {
-	err = tx.SelectOne(&res, scrapeResourceSearchQuery, c.TimeNow())
+func (c *Context) discoverResourceScrape(ctx context.Context, tx *oblast.Tx, labels prometheus.Labels) (db.Resource, error) {
+	res, err := db.ResourceStore.SelectOne(ctx, tx, scrapeResourceSearchQuery, c.TimeNow())
 	if err == nil {
 		labels["asset_type"] = string(res.AssetType)
 	}
 	return res, err
 }
 
-func (c *Context) processResourceScrape(ctx context.Context, tx *gorp.Transaction, res db.Resource, labels prometheus.Labels) error {
+func (c *Context) processResourceScrape(ctx context.Context, tx *oblast.Tx, res db.Resource, labels prometheus.Labels) error {
 	manager, info := c.Team.ForAssetType(res.AssetType)
 	if manager == nil {
 		return fmt.Errorf("no asset manager for asset type %q", res.AssetType)
@@ -72,7 +72,7 @@ func (c *Context) processResourceScrape(ctx context.Context, tx *gorp.Transactio
 		// but fill the error message to indicate old data
 		res.ScrapeErrorMessage = err.Error()
 		res.NextScrapeAt = c.TimeNow().Add(c.AddJitter(ResourceScrapeInterval))
-		_, dbErr := tx.Update(&res)
+		dbErr := db.ResourceStore.Update(ctx, tx, res)
 		if dbErr != nil {
 			return dbErr
 		}
@@ -89,8 +89,7 @@ func (c *Context) processResourceScrape(ctx context.Context, tx *gorp.Transactio
 	}
 
 	// load existing asset entries from DB
-	var dbAssets []db.Asset
-	_, err = tx.Select(&dbAssets, `SELECT * FROM assets WHERE resource_id = $1`, res.ID)
+	dbAssets, err := db.AssetStore.SelectWhere(ctx, tx, `resource_id = $1`, res.ID)
 	if err != nil {
 		return err
 	}
@@ -103,7 +102,7 @@ func (c *Context) processResourceScrape(ctx context.Context, tx *gorp.Transactio
 			continue
 		}
 		logg.Info("removing deleted %s asset from DB: UUID = %s, scope UUID = %s", res.AssetType, dbAsset.UUID, res.ScopeUUID)
-		_, err = tx.Delete(&dbAsset)
+		err := db.AssetStore.Delete(ctx, tx, dbAsset)
 		if err != nil {
 			return err
 		}
@@ -115,7 +114,7 @@ func (c *Context) processResourceScrape(ctx context.Context, tx *gorp.Transactio
 			continue
 		}
 		logg.Info("adding new %s asset to DB: UUID = %s, scope UUID = %s", res.AssetType, assetUUID, res.ScopeUUID)
-		err = tx.Insert(&db.Asset{
+		err := db.AssetStore.Insert(ctx, tx, &db.Asset{
 			ResourceID:   res.ID,
 			UUID:         assetUUID,
 			Size:         0,
@@ -132,7 +131,7 @@ func (c *Context) processResourceScrape(ctx context.Context, tx *gorp.Transactio
 	res.ScrapeErrorMessage = ""
 	res.NextScrapeAt = finishedAt.Add(c.AddJitter(ResourceScrapeInterval))
 	res.ScrapeDurationSecs = finishedAt.Sub(startedAt).Seconds()
-	_, err = tx.Update(&res)
+	err = db.ResourceStore.Update(ctx, tx, res)
 	if err != nil {
 		return err
 	}

@@ -8,13 +8,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-gorp/gorp/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/jobloop"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/sqlext"
 	. "go.xyrillian.de/gg/option"
+	"go.xyrillian.de/oblast"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -41,7 +41,7 @@ const (
 // AssetResizingJob returns a job where each task is an asset that needs to be
 // resized.
 func (c *Context) AssetResizingJob(registerer prometheus.Registerer) jobloop.Job {
-	return (&jobloop.TxGuardedJob[*gorp.Transaction, db.PendingOperation]{
+	return (&jobloop.TxGuardedJob[*oblast.Tx, db.PendingOperation]{
 		Metadata: jobloop.JobMetadata{
 			ReadableName:    "asset resizing",
 			ConcurrencySafe: true, // because "FOR UPDATE SKIP LOCKED" is used
@@ -57,23 +57,20 @@ func (c *Context) AssetResizingJob(registerer prometheus.Registerer) jobloop.Job
 	}).Setup(registerer)
 }
 
-func (c *Context) discoverAssetResize(ctx context.Context, tx *gorp.Transaction, labels prometheus.Labels) (op db.PendingOperation, err error) {
-	err = tx.SelectOne(&op, selectAndDeleteNextResizeQuery, c.TimeNow())
-	return op, err
+func (c *Context) discoverAssetResize(ctx context.Context, tx *oblast.Tx, labels prometheus.Labels) (db.PendingOperation, error) {
+	return db.PendingOperationStore.SelectOne(ctx, tx, selectAndDeleteNextResizeQuery, c.TimeNow())
 }
 
-func (c *Context) processAssetResize(ctx context.Context, tx *gorp.Transaction, op db.PendingOperation, labels prometheus.Labels) error {
+func (c *Context) processAssetResize(ctx context.Context, tx *oblast.Tx, op db.PendingOperation, labels prometheus.Labels) error {
 	// find the corresponding asset, resource and asset manager
-	var asset db.Asset
-	err := tx.SelectOne(&asset, `SELECT * FROM assets WHERE id = $1`, op.AssetID)
+	asset, err := db.AssetStore.SelectOneWhere(ctx, tx, `id = $1`, op.AssetID)
 	if err != nil {
-		return err
+		return fmt.Errorf("while loading asset with ID = %d: %w", op.AssetID, err)
 	}
 
-	var res db.Resource
-	err = tx.SelectOne(&res, `SELECT * FROM resources WHERE id = $1`, asset.ResourceID)
+	res, err := db.ResourceStore.SelectOneWhere(ctx, tx, `id = $1`, asset.ResourceID)
 	if err != nil {
-		return err
+		return fmt.Errorf("while loading resource with ID = %d: %w", asset.ResourceID, err)
 	}
 	labels["asset_type"] = string(res.AssetType)
 
@@ -104,7 +101,7 @@ func (c *Context) processAssetResize(ctx context.Context, tx *gorp.Transaction, 
 		op.ErroredAttempts++
 		op.RetryAt = Some(c.TimeNow().Add(RetryInterval))
 
-		err = tx.Insert(&op)
+		err = db.PendingOperationStore.Insert(ctx, tx, &op)
 		if err != nil {
 			return err
 		}
@@ -113,7 +110,7 @@ func (c *Context) processAssetResize(ctx context.Context, tx *gorp.Transaction, 
 
 	finishedOp := op.IntoFinishedOperation(outcome, c.TimeNow())
 	finishedOp.ErrorMessage = errorMessage
-	err = tx.Insert(&finishedOp)
+	err = db.FinishedOperationStore.Insert(ctx, tx, &finishedOp)
 	if err != nil {
 		return err
 	}
