@@ -4,9 +4,15 @@
 package oblast
 
 import (
+	"database/sql"
 	"fmt"
 	"strconv"
 	"strings"
+)
+
+var (
+	// force imports to make docstring links work
+	_ = sql.Result(nil)
 )
 
 // Dialect accounts for differences between different SQL dialects
@@ -26,6 +32,11 @@ type Dialect interface {
 	// QuoteIdentifier wraps the name of a column or table in quotes,
 	// in order to avoid the name from being interpreted as a keyword.
 	QuoteIdentifier(name string) string
+
+	// CanUseLastInsertId returns true if this type of database system can report
+	// a single auto-generated int primary key using [sql.Result.LastInsertId].
+	// If true, the RETURNING clause will be omitted for matching INSERT queries.
+	CanUseLastInsertId() bool
 
 	// UpsertClause generates an "ON CONFLICT" or similar clause
 	// that can be appended to an INSERT query to make it fall back to
@@ -50,6 +61,10 @@ func (mariadbDialect) Placeholder(_ int) string {
 
 func (mariadbDialect) QuoteIdentifier(name string) string {
 	return "`" + strings.ReplaceAll(name, "`", "``") + "`"
+}
+
+func (mariadbDialect) CanUseLastInsertId() bool {
+	return true
 }
 
 func (d mariadbDialect) UpsertClause(pkColumns, otherColumns []string) string {
@@ -79,6 +94,10 @@ func (postgresDialect) Placeholder(i int) string {
 
 func (postgresDialect) QuoteIdentifier(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+}
+
+func (postgresDialect) CanUseLastInsertId() bool {
+	return false
 }
 
 func (d postgresDialect) UpsertClause(pkColumns, otherColumns []string) string {
@@ -114,6 +133,10 @@ func (sqliteDialect) Placeholder(_ int) string {
 
 func (sqliteDialect) QuoteIdentifier(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+}
+
+func (sqliteDialect) CanUseLastInsertId() bool {
+	return true
 }
 
 func (sqliteDialect) UpsertClause(pkColumns, otherColumns []string) string {
