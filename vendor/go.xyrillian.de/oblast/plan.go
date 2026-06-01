@@ -26,6 +26,16 @@ type plan struct {
 	// Pointer-typed fields that need to be initialized before scanning into this type.
 	TransparentPointerStructFields []fieldInfo
 
+	// Whether the INSERT query uses QueryRow or Exec.
+	// - When no auto-generated values are collected, or when a single value can be collected through LastInsertId(),
+	//   this will be false because Exec() is more memory-efficient than QueryRow(); it does not have to allocate an *sql.Rows instance.
+	// - Otherwise, i.e. when auto-generated values are collected with a RETURNING clause,
+	//   this will be true because Exec() does not support scanning result values.
+	InsertUsesQueryRow bool
+	// If InsertUsesQueryRow = false and a primary key is collected from LastInsertId(),
+	// this decides whether we write it with reflect.Value.SetInt() or reflect.Value.SetUint().
+	LastInsertIdIsUnsigned bool
+
 	// Planned queries.
 	Select plannedQuery // only `SELECT ... FROM ... WHERE `; user supplies the rest during Select{,One}Where()
 	Insert plannedQuery
@@ -187,6 +197,33 @@ func buildPlan(t reflect.Type, dialect Dialect, opts planOpts) (plan, error) {
 		}
 	}
 
+	// pick strategy for INSERT
+	if p.TableName != "" {
+		switch len(p.AutoColumnNames) {
+		case 0:
+			p.InsertUsesQueryRow = false
+		case 1:
+			if dialect.CanUseLastInsertId() {
+				columnName := p.AutoColumnNames[0]
+				field := t.FieldByIndex(p.IndexByColumnName[columnName])
+				switch field.Type.Kind() { //nolint:exhaustive // false positive
+				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+					p.InsertUsesQueryRow = false
+					p.LastInsertIdIsUnsigned = false
+				case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+					p.InsertUsesQueryRow = false
+					p.LastInsertIdIsUnsigned = true
+				default:
+					p.InsertUsesQueryRow = true
+				}
+			} else {
+				p.InsertUsesQueryRow = true
+			}
+		default:
+			p.InsertUsesQueryRow = true
+		}
+	}
+
 	// prepare query strings
 	p.Select = p.buildSelectQueryIfPossible(dialect)
 	p.Insert = p.buildInsertQueryIfPossible(dialect, false)
@@ -282,7 +319,7 @@ func (p plan) buildInsertQueryIfPossible(dialect Dialect, isUpsert bool) planned
 	if isUpsert {
 		query += dialect.UpsertClause(p.PrimaryKeyColumnNames, p.getNonPrimaryKeyColumnNames())
 	}
-	if len(p.AutoColumnNames) > 0 {
+	if len(p.AutoColumnNames) > 0 && p.InsertUsesQueryRow {
 		quotedAutoColumns := make([]string, len(p.AutoColumnNames))
 		for idx, name := range p.AutoColumnNames {
 			quotedAutoColumns[idx] = dialect.QuoteIdentifier(name)

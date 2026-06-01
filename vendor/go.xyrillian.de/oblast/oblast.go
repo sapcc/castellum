@@ -112,7 +112,7 @@ var (
 	_ driver.NamedValueChecker = nil
 )
 
-// PlanOption is an option that can be given to NewStore() to influence query planning for a certain type of record.
+// PlanOption is an option that can be given to [NewStore] to influence query planning for a certain type of record.
 type PlanOption func(*planOpts)
 
 // TableNameIs is a PlanOption for record types that correspond to exactly one database table (as opposed to a join of multiple tables).
