@@ -7,11 +7,11 @@ require (
 	github.com/gophercloud/gophercloud/v2 v2.12.0
 	github.com/gorilla/mux v1.8.1
 	github.com/prometheus/client_golang v1.23.2
-	github.com/prometheus/common v0.68.0
+	github.com/prometheus/common v0.68.1
 	github.com/rs/cors v1.11.1
 	github.com/sapcc/go-api-declarations v1.22.0
-	github.com/sapcc/go-bits v0.0.0-20260601105830-9141380a390c
-	go.xyrillian.de/gg v1.7.0
+	github.com/sapcc/go-bits v0.0.0-20260604095421-6bd206943957
+	go.xyrillian.de/gg v1.8.1
 	go.xyrillian.de/oblast v0.10.0
 )
 
