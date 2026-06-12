@@ -113,12 +113,12 @@ github.com/rabbitmq/amqp091-go
 ## explicit; go 1.13
 github.com/rs/cors
 github.com/rs/cors/internal
-# github.com/sapcc/go-api-declarations v1.22.0
-## explicit; go 1.24
+# github.com/sapcc/go-api-declarations v1.23.0
+## explicit; go 1.26
 github.com/sapcc/go-api-declarations/bininfo
 github.com/sapcc/go-api-declarations/cadf
 github.com/sapcc/go-api-declarations/castellum
-# github.com/sapcc/go-bits v0.0.0-20260604151206-e698d422ff96
+# github.com/sapcc/go-bits v0.0.0-20260611141223-328f49772fed
 ## explicit; go 1.26
 github.com/sapcc/go-bits/assert
 github.com/sapcc/go-bits/audittools
@@ -156,7 +156,7 @@ go.xyrillian.de/gg/options
 ## explicit; go 1.26.0
 go.xyrillian.de/oblast
 go.xyrillian.de/oblast/handle
-# golang.org/x/sys v0.45.0
+# golang.org/x/sys v0.46.0
 ## explicit; go 1.25.0
 golang.org/x/sys/unix
 golang.org/x/sys/windows
