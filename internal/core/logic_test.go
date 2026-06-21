@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/sapcc/go-api-declarations/castellum"
-	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/logg"
+	"go.xyrillian.de/gg/assert"
 	. "go.xyrillian.de/gg/option"
 )
 
@@ -22,17 +22,17 @@ func TestGetEligibleOperations(t *testing.T) {
 		t.Helper()
 		resLogic := mustParseResourceLogic(t, resLogicStr)
 		assetStatus := mustParseAssetStatus(t, assetStatusStr)
-		assert.DeepEqual(t, "eligible operations with percentage-step resizing",
-			eligibleOperationsToString(GetEligibleOperations(resLogic, assetStatus)),
-			expectedWithPercentageStep,
-		)
+		actual := eligibleOperationsToString(GetEligibleOperations(resLogic, assetStatus))
+		if !assert.Equal(t, actual, expectedWithPercentageStep) {
+			t.Logf("^ This diff is for percentage-step resizing.")
+		}
 
 		resLogic.SizeStepPercent = 0
 		resLogic.SingleStep = true
-		assert.DeepEqual(t, "eligible operations with single-step resizing",
-			eligibleOperationsToString(GetEligibleOperations(resLogic, assetStatus)),
-			expectedWithSingleStep,
-		)
+		actual = eligibleOperationsToString(GetEligibleOperations(resLogic, assetStatus))
+		if !assert.Equal(t, actual, expectedWithSingleStep) {
+			t.Logf("^ This diff is for single-step resizing.")
+		}
 	}
 
 	// if no threshold is crossed, do not do anything
@@ -435,10 +435,7 @@ func TestGetEligibleOperations(t *testing.T) {
 		Size:  4,
 		Usage: castellum.UsageValues{"cpu": 1.05, "ram": 3.95},
 	}
-	assert.DeepEqual(t, "eligible operations with percentage-step resizing",
-		eligibleOperationsToString(GetEligibleOperations(resLogic, assetStatus)),
-		"critical->5",
-	)
+	assert.Equal(t, eligibleOperationsToString(GetEligibleOperations(resLogic, assetStatus)), "critical->5")
 }
 
 // Builds a ResourceLogic from a compact string representation like "low=20%, high=80%, step=single, min=200".
