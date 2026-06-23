@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/sapcc/go-api-declarations/castellum"
-	"github.com/sapcc/go-bits/assert"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/must"
+	"go.xyrillian.de/gg/assert"
 
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/test"
@@ -142,11 +142,6 @@ func TestResourceSeedingBadResource(t *testing.T) {
 	)
 	job := s.TaskContext.ResourceSeedingJob(s.Registry)
 
-	err := job.ProcessOne(ctx)
-	if err == nil {
-		t.Error("expected ResourceSeedingJob to fail, but succeeded!")
-	} else {
-		assert.DeepEqual(t, "error message from ResourceSeedingJob", err.Error(),
-			`while applying seed for project "First Domain/First Project" (project1): cannot apply foo seed: delay for high threshold is missing`)
-	}
+	assert.ErrEqual(t, job.ProcessOne(ctx),
+		`while applying seed for project "First Domain/First Project" (project1): cannot apply foo seed: delay for high threshold is missing`)
 }
