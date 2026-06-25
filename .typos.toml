@@ -5,6 +5,7 @@
 [default.extend-words]
 fo = "fo"
 
+
 [files]
 extend-exclude = [
   "go.mod",
