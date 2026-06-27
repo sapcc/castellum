@@ -22,7 +22,7 @@ github.com/golang-migrate/migrate/v4/database/postgres
 github.com/golang-migrate/migrate/v4/internal/url
 github.com/golang-migrate/migrate/v4/source
 github.com/golang-migrate/migrate/v4/source/go_bindata
-# github.com/gophercloud/gophercloud/v2 v2.12.0
+# github.com/gophercloud/gophercloud/v2 v2.13.0
 ## explicit; go 1.25.0
 github.com/gophercloud/gophercloud/v2
 github.com/gophercloud/gophercloud/v2/openstack
@@ -142,7 +142,7 @@ github.com/sapcc/go-bits/regexpext
 github.com/sapcc/go-bits/respondwith
 github.com/sapcc/go-bits/sqlext
 github.com/sapcc/go-bits/syncext
-# go.xyrillian.de/gg v1.10.1
+# go.xyrillian.de/gg v1.11.1
 ## explicit; go 1.26
 go.xyrillian.de/gg/assert
 go.xyrillian.de/gg/internal/path
