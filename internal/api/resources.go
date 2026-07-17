@@ -84,28 +84,29 @@ func (h handler) GetProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbResources, err := db.ResourceStore.SelectWhere(ctx, h.DB, `scope_uuid = $1 ORDER BY asset_type`, projectUUID)
-	if respondwith.ObfuscatedErrorText(w, err) {
-		return
-	}
-
 	// show only those resources where there is a corresponding asset manager, and
 	// where the user has permission to see the resource
 	var result struct {
 		Resources map[db.AssetType]castellum.Resource `json:"resources"`
 	}
 	result.Resources = make(map[db.AssetType]castellum.Resource)
-	for _, res := range dbResources {
-		manager, _ := h.Team.ForAssetType(res.AssetType)
-		if manager == nil {
-			continue
-		}
-		if token.Check(res.AssetType.PolicyRuleForRead()) {
-			result.Resources[res.AssetType], err = h.ResourceFromDB(res)
-			if respondwith.ObfuscatedErrorText(w, err) {
-				return
+	err := db.ResourceStore.SelectWhere(ctx, h.DB, `scope_uuid = $1 ORDER BY asset_type`, projectUUID).
+		Foreach(func(res db.Resource) error {
+			manager, _ := h.Team.ForAssetType(res.AssetType)
+			if manager == nil {
+				return nil
 			}
-		}
+			if token.Check(res.AssetType.PolicyRuleForRead()) {
+				var err error
+				result.Resources[res.AssetType], err = h.ResourceFromDB(res)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	if respondwith.ObfuscatedErrorText(w, err) {
+		return
 	}
 
 	respondwith.JSON(w, http.StatusOK, result)

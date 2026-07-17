@@ -126,14 +126,13 @@ func (h handler) GetAssets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbAssets, err := db.AssetStore.SelectWhere(ctx, h.DB, `resource_id = $1 ORDER BY uuid`, dbResource.ID)
+	var assets []castellum.Asset
+	err := db.AssetStore.SelectWhere(ctx, h.DB, `resource_id = $1 ORDER BY uuid`, dbResource.ID).Foreach(func(dbAsset db.Asset) error {
+		assets = append(assets, AssetFromDB(dbAsset))
+		return nil
+	})
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return
-	}
-
-	assets := make([]castellum.Asset, len(dbAssets))
-	for idx, dbAsset := range dbAssets {
-		assets[idx] = AssetFromDB(dbAsset)
 	}
 	sort.Slice(assets, func(i, j int) bool { return assets[i].UUID < assets[j].UUID })
 
@@ -176,15 +175,14 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 
 	_, wantsFinishedOps := r.URL.Query()["history"]
 	if wantsFinishedOps {
-		dbFinishedOps, err := db.FinishedOperationStore.SelectWhere(ctx, h.DB,
-			`asset_id = $1 AND outcome != 'error-resolved' ORDER BY finished_at`,
-			dbAsset.ID)
+		err = db.FinishedOperationStore.SelectWhere(ctx, h.DB,
+			`asset_id = $1 AND outcome != 'error-resolved' ORDER BY finished_at`, dbAsset.ID).
+			Foreach(func(op db.FinishedOperation) error {
+				asset.FinishedOperations = append(asset.FinishedOperations, FinishedOperationFromDB(op, "", nil))
+				return nil
+			})
 		if respondwith.ObfuscatedErrorText(w, err) {
 			return
-		}
-		asset.FinishedOperations = make([]castellum.StandaloneOperation, len(dbFinishedOps))
-		for idx, op := range dbFinishedOps {
-			asset.FinishedOperations[idx] = FinishedOperationFromDB(op, "", nil)
 		}
 	}
 

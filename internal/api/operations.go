@@ -74,7 +74,7 @@ func (h handler) loadMatchingResources(w http.ResponseWriter, r *http.Request) (
 	if len(sqlConditions) == 0 {
 		sqlConditions = []string{"TRUE"}
 	}
-	allResources, err := db.ResourceStore.SelectWhere(ctx, h.DB, strings.Join(sqlConditions, " AND "), sqlBindValues...)
+	allResources, err := db.ResourceStore.SelectWhere(ctx, h.DB, strings.Join(sqlConditions, " AND "), sqlBindValues...).Collect()
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return nil, false
 	}
@@ -127,21 +127,20 @@ func (h handler) GetPendingOperations(w http.ResponseWriter, r *http.Request) {
 
 	allOps := []castellum.StandaloneOperation{}
 	for _, dbResource := range dbResources {
-		// find operations
-		ops, err := db.PendingOperationStore.Select(ctx, h.DB, getPendingOpsByResourceIDQuery, dbResource.ID)
-		if respondwith.ObfuscatedErrorText(w, err) {
-			return
-		}
-
 		// find asset UUIDs
 		assetUUIDs, err := h.getAssetUUIDMap(dbResource)
 		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
 
-		// prepare for response body
-		for _, op := range ops {
-			allOps = append(allOps, PendingOperationFromDB(op, assetUUIDs[op.AssetID], &dbResource))
+		// find operations
+		err = db.PendingOperationStore.Select(ctx, h.DB, getPendingOpsByResourceIDQuery, dbResource.ID).
+			Foreach(func(op db.PendingOperation) error {
+				allOps = append(allOps, PendingOperationFromDB(op, assetUUIDs[op.AssetID], &dbResource))
+				return nil
+			})
+		if respondwith.ObfuscatedErrorText(w, err) {
+			return
 		}
 	}
 
@@ -191,18 +190,19 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 		}
 
 		// check if the assets in question are still eligible for resizing
-		assets, err := db.AssetStore.SelectWhere(ctx, h.DB, `resource_id = $1 ORDER BY uuid`, dbResource.ID)
+		err = db.AssetStore.SelectWhere(ctx, h.DB, `resource_id = $1 ORDER BY uuid`, dbResource.ID).
+			Foreach(func(asset db.Asset) error {
+				op, exists := failedOpsByAssetID[asset.ID]
+				if !exists {
+					return nil
+				}
+				if _, exists := core.GetEligibleOperations(core.LogicOfResource(dbResource, info), core.StatusOfAsset(asset, h.Config, dbResource))[op.Reason]; exists {
+					relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &dbResource))
+				}
+				return nil
+			})
 		if respondwith.ObfuscatedErrorText(w, err) {
 			return
-		}
-		for _, asset := range assets {
-			op, exists := failedOpsByAssetID[asset.ID]
-			if !exists {
-				continue
-			}
-			if _, exists := core.GetEligibleOperations(core.LogicOfResource(dbResource, info), core.StatusOfAsset(asset, h.Config, dbResource))[op.Reason]; exists {
-				relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &dbResource))
-			}
 		}
 	}
 
@@ -240,16 +240,17 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 		}
 
 		// apply filters and collect response data
-		assets, err := db.AssetStore.SelectWhere(ctx, h.DB, `resource_id = $1 ORDER BY uuid`, dbResource.ID)
+		err = db.AssetStore.SelectWhere(ctx, h.DB, `resource_id = $1 ORDER BY uuid`, dbResource.ID).
+			Foreach(func(asset db.Asset) error {
+				op, exists := succeededOpsByAssetID[asset.ID]
+				if !exists || op.FinishedAt.Before(maxFinishedAt) {
+					return nil
+				}
+				relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &dbResource))
+				return nil
+			})
 		if respondwith.ObfuscatedErrorText(w, err) {
 			return
-		}
-		for _, asset := range assets {
-			op, exists := succeededOpsByAssetID[asset.ID]
-			if !exists || op.FinishedAt.Before(maxFinishedAt) {
-				continue
-			}
-			relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &dbResource))
 		}
 	}
 
@@ -281,6 +282,8 @@ var recentOperationQueryStr = sqlext.SimplifyWhitespace(`
 	 WHERE a.resource_id = $1 AND o.outcome IN ('%s')
 `)
 
+var finishedOpByAssetIDIndex = oblast.NewRuntimeIndex(func(op db.FinishedOperation) int64 { return op.AssetID })
+
 func (q recentOperationQuery) execute(ctx context.Context) (map[int64]db.FinishedOperation, error) {
 	outcomes := make([]string, len(q.Outcomes))
 	for idx, o := range q.Outcomes {
@@ -292,14 +295,5 @@ func (q recentOperationQuery) execute(ctx context.Context) (map[int64]db.Finishe
 		strings.Join(outcomes, "', '"), // interpolating string constants into the query is safe here because q.Outcomes is always hardcoded
 	)
 
-	matchingOps, err := db.FinishedOperationStore.Select(ctx, q.DB, queryStr, q.ResourceID)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make(map[int64]db.FinishedOperation, len(matchingOps))
-	for _, op := range matchingOps {
-		result[op.AssetID] = op
-	}
-	return result, nil
+	return finishedOpByAssetIDIndex.IndexFrom(db.FinishedOperationStore.Select(ctx, q.DB, queryStr, q.ResourceID))
 }

@@ -72,7 +72,7 @@ func (c *Context) applyResourceSeeds(ctx context.Context) error {
 
 func (c *Context) applyProjectSeed(ctx context.Context, projectUUID string, seed core.ProjectSeed) error {
 	// list existing resources
-	dbResources, err := db.ResourceStore.SelectWhere(ctx, c.DB, `scope_uuid = $1`, projectUUID)
+	dbResources, err := db.ResourceStore.SelectWhere(ctx, c.DB, `scope_uuid = $1`, projectUUID).Collect()
 	if err != nil {
 		return err
 	}
