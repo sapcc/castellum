@@ -26,21 +26,16 @@ func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	dbResources, err := db.ResourceStore.SelectWhere(ctx, h.DB, `scrape_error_message != '' ORDER BY id`)
-	if respondwith.ObfuscatedErrorText(w, err) {
-		return
-	}
-
 	resScrapeErrs := []castellum.ResourceScrapeError{}
-	for _, res := range dbResources {
-		projectID := ""
-		// .ScopeUUID is either a domain- or project UUID.
-		if res.ScopeUUID != res.DomainUUID {
-			projectID = res.ScopeUUID
-		}
+	err := db.ResourceStore.SelectWhere(ctx, h.DB, `scrape_error_message != '' ORDER BY id`).
+		Foreach(func(res db.Resource) error {
+			projectID := ""
+			// .ScopeUUID is either a domain- or project UUID.
+			if res.ScopeUUID != res.DomainUUID {
+				projectID = res.ScopeUUID
+			}
 
-		resScrapeErrs = append(resScrapeErrs,
-			castellum.ResourceScrapeError{
+			resScrapeErrs = append(resScrapeErrs, castellum.ResourceScrapeError{
 				ProjectUUID: projectID,
 				DomainUUID:  res.DomainUUID,
 				AssetType:   string(res.AssetType),
@@ -48,6 +43,10 @@ func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request)
 					ErrorMessage: res.ScrapeErrorMessage,
 				},
 			})
+			return nil
+		})
+	if respondwith.ObfuscatedErrorText(w, err) {
+		return
 	}
 
 	respondwith.JSON(w, http.StatusOK, struct {
@@ -67,29 +66,22 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbResources, err := db.ResourceStore.Select(ctx, h.DB, `SELECT * FROM resources ORDER BY id`)
+	dbResources, err := db.ResourceStore.Select(ctx, h.DB, `SELECT * FROM resources ORDER BY id`).Collect()
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
 
 	assetScrapeErrs := []castellum.AssetScrapeError{}
 	for _, res := range dbResources {
-		dbAssets, err := db.AssetStore.SelectWhere(ctx, h.DB,
-			`scrape_error_message != '' AND resource_id = $1 ORDER BY id`,
-			res.ID)
-		if respondwith.ObfuscatedErrorText(w, err) {
-			return
-		}
-
 		projectID := ""
 		// res.ScopeUUID is either a domain- or project UUID.
 		if res.ScopeUUID != res.DomainUUID {
 			projectID = res.ScopeUUID
 		}
 
-		for _, a := range dbAssets {
-			assetScrapeErrs = append(assetScrapeErrs,
-				castellum.AssetScrapeError{
+		err := db.AssetStore.SelectWhere(ctx, h.DB, `scrape_error_message != '' AND resource_id = $1 ORDER BY id`, res.ID).
+			Foreach(func(a db.Asset) error {
+				assetScrapeErrs = append(assetScrapeErrs, castellum.AssetScrapeError{
 					AssetUUID:   a.UUID,
 					ProjectUUID: projectID,
 					DomainUUID:  res.DomainUUID,
@@ -98,6 +90,10 @@ func (h handler) GetAssetScrapeErrors(w http.ResponseWriter, r *http.Request) {
 						ErrorMessage: a.ScrapeErrorMessage,
 					},
 				})
+				return nil
+			})
+		if respondwith.ObfuscatedErrorText(w, err) {
+			return
 		}
 	}
 
@@ -131,18 +127,13 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbResources, err := db.ResourceStore.Select(ctx, h.DB, `SELECT * FROM resources ORDER BY id`)
+	dbResources, err := db.ResourceStore.Select(ctx, h.DB, `SELECT * FROM resources ORDER BY id`).Collect()
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
 
 	assetResizeErrs := []castellum.AssetResizeError{}
 	for _, res := range dbResources {
-		ops, err := db.FinishedOperationStore.Select(ctx, h.DB, getAssetResizeErrorsQuery, res.ID)
-		if respondwith.ObfuscatedErrorText(w, err) {
-			return
-		}
-
 		projectID := ""
 		// res.ScopeUUID is either a domain- or project UUID.
 		if res.ScopeUUID != res.DomainUUID {
@@ -155,9 +146,9 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		for _, o := range ops {
-			assetResizeErrs = append(assetResizeErrs,
-				castellum.AssetResizeError{
+		err = db.FinishedOperationStore.Select(ctx, h.DB, getAssetResizeErrorsQuery, res.ID).
+			Foreach(func(o db.FinishedOperation) error {
+				assetResizeErrs = append(assetResizeErrs, castellum.AssetResizeError{
 					AssetUUID:   assetUUIDs[o.AssetID],
 					ProjectUUID: projectID,
 					DomainUUID:  res.DomainUUID,
@@ -169,6 +160,10 @@ func (h handler) GetAssetResizeErrors(w http.ResponseWriter, r *http.Request) {
 						ErrorMessage: o.ErrorMessage,
 					},
 				})
+				return nil
+			})
+		if respondwith.ObfuscatedErrorText(w, err) {
+			return
 		}
 	}
 

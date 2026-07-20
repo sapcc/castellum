@@ -89,7 +89,7 @@ func (c *Context) processResourceScrape(ctx context.Context, tx *oblast.Tx, res 
 	}
 
 	// load existing asset entries from DB
-	dbAssets, err := db.AssetStore.SelectWhere(ctx, tx, `resource_id = $1`, res.ID)
+	dbAssets, err := db.AssetStore.SelectWhere(ctx, tx, `resource_id = $1`, res.ID).Collect()
 	if err != nil {
 		return err
 	}
