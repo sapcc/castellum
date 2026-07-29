@@ -22,6 +22,7 @@ func TestGetAssets(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
+	commonSetupFillDB(t, s)
 	ctx := t.Context()
 
 	testCommonEndpointBehavior(t, s,
@@ -57,6 +58,7 @@ func TestGetAsset(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
+	commonSetupFillDB(t, s)
 	ctx := t.Context()
 
 	testCommonEndpointBehavior(t, s,
@@ -209,6 +211,7 @@ func TestPostAssetErrorResolved(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
+	commonSetupFillDB(t, s)
 	ctx := t.Context()
 
 	tr, tr0 := easypg.NewTracker(t, s.DB.DB)

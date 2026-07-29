@@ -31,7 +31,6 @@ import (
 type setupParams struct {
 	AssetManagers []core.AssetManager
 	ConfigJSON    string
-	DBFixtureFile string
 }
 
 // SetupOption is an option that can be given to NewSetup().
@@ -48,22 +47,6 @@ func WithAssetManagers(managers ...core.AssetManager) SetupOption {
 func WithConfig(configJSON string) SetupOption {
 	return func(params *setupParams) {
 		params.ConfigJSON = configJSON
-	}
-}
-
-// WithDBFixtureFile is a SetupOption that initializes the DB by executing the given SQL file.
-func WithDBFixtureFile(path string) SetupOption {
-	return func(params *setupParams) {
-		params.DBFixtureFile = path
-	}
-}
-
-// WithSeveral combines several SetupOption instances into a single object.
-func WithSeveral(opts ...SetupOption) SetupOption {
-	return func(params *setupParams) {
-		for _, opt := range opts {
-			opt(params)
-		}
 	}
 }
 
@@ -131,14 +114,10 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 	s.Clock.StepBy(time.Hour)
 
 	// initialize DB
-	dbOpts := []easypg.TestSetupOption{
+	s.DB = oblast.NewDB(easypg.ConnectForTest(t, db.Configuration(),
 		easypg.ClearTables("resources", "assets", "pending_operations", "finished_operations"),
 		easypg.ResetPrimaryKeys("resources", "assets", "pending_operations"),
-	}
-	if params.DBFixtureFile != "" {
-		dbOpts = append(dbOpts, easypg.LoadSQLFile(params.DBFixtureFile))
-	}
-	s.DB = oblast.NewDB(easypg.ConnectForTest(t, db.Configuration(), dbOpts...))
+	))
 	t.Cleanup(func() {
 		_ = s.DB.Close()
 	})
