@@ -21,6 +21,7 @@ func TestGetResourceScrapeErrors(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
+	commonSetupFillDB(t, s)
 	ctx := t.Context()
 
 	// endpoint requires a token with cluster access
@@ -57,6 +58,7 @@ func TestGetAssetScrapeErrors(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
+	commonSetupFillDB(t, s)
 	ctx := t.Context()
 
 	// endpoint requires a token with cluster access
@@ -85,6 +87,7 @@ func TestGetAssetResizeErrors(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
+	commonSetupFillDB(t, s)
 	ctx := t.Context()
 
 	// endpoint requires a token with cluster access

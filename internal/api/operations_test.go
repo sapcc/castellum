@@ -21,6 +21,7 @@ func TestGetPendingOperationsForResource(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
+	commonSetupFillDB(t, s)
 	ctx := t.Context()
 
 	testCommonEndpointBehavior(t, s,
@@ -111,6 +112,7 @@ func TestGetRecentlyFailedOperationsForResource(t *testing.T) {
 		s := test.NewSetup(t,
 			commonSetupOptionsForAPITest(),
 		)
+		commonSetupFillDB(t, s)
 		ctx := t.Context()
 
 		testCommonEndpointBehavior(t, s,
@@ -213,6 +215,7 @@ func TestGetRecentlySucceededOperationsForResource(t *testing.T) {
 		s := test.NewSetup(t,
 			commonSetupOptionsForAPITest(),
 		)
+		commonSetupFillDB(t, s)
 		ctx := t.Context()
 
 		testCommonEndpointBehavior(t, s,

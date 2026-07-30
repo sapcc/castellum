@@ -65,6 +65,7 @@ func TestGetProject(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
+	commonSetupFillDB(t, s)
 	ctx := t.Context()
 
 	// endpoint requires a token with project access
@@ -103,6 +104,7 @@ func TestGetResource(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
+	commonSetupFillDB(t, s)
 	ctx := t.Context()
 
 	// endpoint requires a token with project access
@@ -140,6 +142,7 @@ func TestPutResource(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
+	commonSetupFillDB(t, s)
 	ctx := t.Context()
 
 	tr, tr0 := easypg.NewTracker(t, s.DB.DB)
@@ -342,6 +345,7 @@ func TestPutResourceValidationErrors(t *testing.T) {
 			]
 		}`),
 	)
+	commonSetupFillDB(t, s)
 	ctx := t.Context()
 
 	tr, tr0 := easypg.NewTracker(t, s.DB.DB)
@@ -531,6 +535,7 @@ func TestDeleteResource(t *testing.T) {
 	s := test.NewSetup(t,
 		commonSetupOptionsForAPITest(),
 	)
+	commonSetupFillDB(t, s)
 	ctx := t.Context()
 
 	tr, tr0 := easypg.NewTracker(t, s.DB.DB)
@@ -616,6 +621,7 @@ func TestSeedBlocksResourceUpdates(t *testing.T) {
 			]
 		}`),
 	)
+	commonSetupFillDB(t, s)
 	ctx := t.Context()
 
 	// cannot PUT an existing resource defined by the seed
