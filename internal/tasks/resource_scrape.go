@@ -11,7 +11,7 @@ import (
 	"github.com/sapcc/go-bits/jobloop"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/sqlext"
-	"go.xyrillian.de/oblast"
+	"go.xyrillian.de/gg/gsql"
 
 	"github.com/sapcc/castellum/internal/db"
 )
@@ -32,7 +32,7 @@ var scrapeResourceSearchQuery = sqlext.SimplifyWhitespace(`
 // ResourceScrapingJob returns a job where each task is a resource that needs
 // to be scraped. The task looks for new and deleted assets within that resource.
 func (c *Context) ResourceScrapingJob(registerer prometheus.Registerer) jobloop.Job {
-	return (&jobloop.TxGuardedJob[*oblast.Tx, db.Resource]{
+	return (&jobloop.TxGuardedJob[*gsql.Tx, db.Resource]{
 		Metadata: jobloop.JobMetadata{
 			ReadableName:    "resource scraping",
 			ConcurrencySafe: true, // because "FOR UPDATE SKIP LOCKED" is used
@@ -48,7 +48,7 @@ func (c *Context) ResourceScrapingJob(registerer prometheus.Registerer) jobloop.
 	}).Setup(registerer)
 }
 
-func (c *Context) discoverResourceScrape(ctx context.Context, tx *oblast.Tx, labels prometheus.Labels) (db.Resource, error) {
+func (c *Context) discoverResourceScrape(ctx context.Context, tx *gsql.Tx, labels prometheus.Labels) (db.Resource, error) {
 	res, err := db.ResourceStore.SelectOne(ctx, tx, scrapeResourceSearchQuery, c.TimeNow())
 	if err == nil {
 		labels["asset_type"] = string(res.AssetType)
@@ -56,7 +56,7 @@ func (c *Context) discoverResourceScrape(ctx context.Context, tx *oblast.Tx, lab
 	return res, err
 }
 
-func (c *Context) processResourceScrape(ctx context.Context, tx *oblast.Tx, res db.Resource, labels prometheus.Labels) error {
+func (c *Context) processResourceScrape(ctx context.Context, tx *gsql.Tx, res db.Resource, labels prometheus.Labels) error {
 	manager, info := c.Team.ForAssetType(res.AssetType)
 	if manager == nil {
 		return fmt.Errorf("no asset manager for asset type %q", res.AssetType)

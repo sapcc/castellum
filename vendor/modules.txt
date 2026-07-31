@@ -142,18 +142,19 @@ github.com/sapcc/go-bits/regexpext
 github.com/sapcc/go-bits/respondwith
 github.com/sapcc/go-bits/sqlext
 github.com/sapcc/go-bits/syncext
-# go.xyrillian.de/gg v1.11.1
+# go.xyrillian.de/gg v1.12.0
 ## explicit; go 1.26
 go.xyrillian.de/gg/assert
+go.xyrillian.de/gg/errext
+go.xyrillian.de/gg/gsql
 go.xyrillian.de/gg/internal/path
 go.xyrillian.de/gg/is
 go.xyrillian.de/gg/jsonmatch
 go.xyrillian.de/gg/option
 go.xyrillian.de/gg/options
-# go.xyrillian.de/oblast v0.12.0
+# go.xyrillian.de/oblast v0.13.2
 ## explicit; go 1.26
 go.xyrillian.de/oblast
-go.xyrillian.de/oblast/handle
 # golang.org/x/sys v0.47.0
 ## explicit; go 1.25.0
 golang.org/x/sys/unix

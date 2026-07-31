@@ -31,8 +31,8 @@ import (
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
+	"go.xyrillian.de/gg/gsql"
 	. "go.xyrillian.de/gg/option"
-	"go.xyrillian.de/oblast"
 
 	"github.com/sapcc/castellum/internal/api"
 	"github.com/sapcc/castellum/internal/core"
@@ -113,7 +113,7 @@ func main() {
 ////////////////////////////////////////////////////////////////////////////////
 // task: API
 
-func runAPI(ctx context.Context, cfg core.Config, dbi *oblast.DB, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
+func runAPI(ctx context.Context, cfg core.Config, dbi *gsql.DB, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
 	identityV3, err := providerClient.CloudAdminClient(openstack.NewIdentityV3)
 	if err != nil {
 		logg.Fatal("cannot find Keystone V3 API: " + err.Error())
@@ -163,7 +163,7 @@ func runAPI(ctx context.Context, cfg core.Config, dbi *oblast.DB, team core.Asse
 
 // This initialization phase is split into a separate method because we only
 // need it for some subcommands.
-func initDB() *oblast.DB {
+func initDB() *gsql.DB {
 	dbName := osext.GetenvOrDefault("CASTELLUM_DB_NAME", "castellum")
 	dbURL := must.Return(easypg.URLFrom(easypg.URLParts{
 		HostName:          osext.GetenvOrDefault("CASTELLUM_DB_HOSTNAME", "localhost"),
@@ -178,13 +178,13 @@ func initDB() *oblast.DB {
 
 	// ensure that this process does not starve other Castellum processes for DB connections
 	dbConn.SetMaxOpenConns(16)
-	return oblast.NewDB(dbConn)
+	return gsql.NewDB(dbConn)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // task: observer
 
-func runObserver(ctx context.Context, cfg core.Config, dbi *oblast.DB, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
+func runObserver(ctx context.Context, cfg core.Config, dbi *gsql.DB, team core.AssetManagerTeam, providerClient core.ProviderClient, httpListenAddr string) {
 	c := tasks.Context{Config: cfg, DB: dbi, Team: team, ProviderClient: providerClient}
 	c.ApplyDefaults()
 	prometheus.MustRegister(tasks.StateMetricsCollector{Context: c})
@@ -216,7 +216,7 @@ func runObserver(ctx context.Context, cfg core.Config, dbi *oblast.DB, team core
 ////////////////////////////////////////////////////////////////////////////////
 // task: worker
 
-func runWorker(ctx context.Context, dbi *oblast.DB, team core.AssetManagerTeam, httpListenAddr string) {
+func runWorker(ctx context.Context, dbi *gsql.DB, team core.AssetManagerTeam, httpListenAddr string) {
 	c := tasks.Context{DB: dbi, Team: team}
 	c.ApplyDefaults()
 

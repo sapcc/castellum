@@ -13,8 +13,8 @@ import (
 	"github.com/sapcc/go-bits/jobloop"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/sqlext"
+	"go.xyrillian.de/gg/gsql"
 	. "go.xyrillian.de/gg/option"
-	"go.xyrillian.de/oblast"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -41,7 +41,7 @@ const (
 // AssetResizingJob returns a job where each task is an asset that needs to be
 // resized.
 func (c *Context) AssetResizingJob(registerer prometheus.Registerer) jobloop.Job {
-	return (&jobloop.TxGuardedJob[*oblast.Tx, db.PendingOperation]{
+	return (&jobloop.TxGuardedJob[*gsql.Tx, db.PendingOperation]{
 		Metadata: jobloop.JobMetadata{
 			ReadableName:    "asset resizing",
 			ConcurrencySafe: true, // because "FOR UPDATE SKIP LOCKED" is used
@@ -57,11 +57,11 @@ func (c *Context) AssetResizingJob(registerer prometheus.Registerer) jobloop.Job
 	}).Setup(registerer)
 }
 
-func (c *Context) discoverAssetResize(ctx context.Context, tx *oblast.Tx, labels prometheus.Labels) (db.PendingOperation, error) {
+func (c *Context) discoverAssetResize(ctx context.Context, tx *gsql.Tx, labels prometheus.Labels) (db.PendingOperation, error) {
 	return db.PendingOperationStore.SelectOne(ctx, tx, selectAndDeleteNextResizeQuery, c.TimeNow())
 }
 
-func (c *Context) processAssetResize(ctx context.Context, tx *oblast.Tx, op db.PendingOperation, labels prometheus.Labels) error {
+func (c *Context) processAssetResize(ctx context.Context, tx *gsql.Tx, op db.PendingOperation, labels prometheus.Labels) error {
 	// find the corresponding asset, resource and asset manager
 	asset, err := db.AssetStore.SelectOneWhere(ctx, tx, `id = $1`, op.AssetID)
 	if err != nil {

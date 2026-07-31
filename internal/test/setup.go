@@ -19,7 +19,7 @@ import (
 	"github.com/sapcc/go-bits/mock"
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
-	"go.xyrillian.de/oblast"
+	"go.xyrillian.de/gg/gsql"
 
 	"github.com/sapcc/castellum/internal/api"
 	"github.com/sapcc/castellum/internal/core"
@@ -55,7 +55,7 @@ type Setup struct {
 	// for all types of integration tests
 	Clock          *mock.Clock
 	Config         core.Config
-	DB             *oblast.DB
+	DB             *gsql.DB
 	ProviderClient MockProviderClient
 	Team           core.AssetManagerTeam
 
@@ -114,7 +114,7 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 	s.Clock.StepBy(time.Hour)
 
 	// initialize DB
-	s.DB = oblast.NewDB(easypg.ConnectForTest(t, db.Configuration(),
+	s.DB = gsql.NewDB(easypg.ConnectForTest(t, db.Configuration(),
 		easypg.ClearTables("resources", "assets", "pending_operations", "finished_operations"),
 		easypg.ResetPrimaryKeys("resources", "assets", "pending_operations"),
 	))

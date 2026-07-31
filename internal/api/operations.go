@@ -16,6 +16,7 @@ import (
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/respondwith"
 	"github.com/sapcc/go-bits/sqlext"
+	"go.xyrillian.de/gg/gsql"
 	"go.xyrillian.de/oblast"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -260,7 +261,7 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 }
 
 type recentOperationQuery struct {
-	DB           *oblast.DB
+	DB           *gsql.DB
 	ResourceID   int64
 	Outcomes     []castellum.OperationOutcome
 	OverriddenBy string // contains a condition for an SQL WHERE clause

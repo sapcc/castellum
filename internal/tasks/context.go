@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/sapcc/go-bits/jobloop"
-	"go.xyrillian.de/oblast"
+	"go.xyrillian.de/gg/gsql"
 
 	"github.com/sapcc/castellum/internal/core"
 )
@@ -16,7 +16,7 @@ import (
 // package.
 type Context struct {
 	Config         core.Config
-	DB             *oblast.DB
+	DB             *gsql.DB
 	Team           core.AssetManagerTeam
 	ProviderClient core.ProviderClient
 
