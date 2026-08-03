@@ -19,7 +19,7 @@ import (
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/respondwith"
-	"go.xyrillian.de/oblast"
+	"go.xyrillian.de/gg/gsql"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -27,7 +27,7 @@ import (
 
 type handler struct {
 	Config    core.Config
-	DB        *oblast.DB
+	DB        *gsql.DB
 	Team      core.AssetManagerTeam
 	Validator gopherpolicy.Validator
 	Provider  core.ProviderClient
@@ -38,7 +38,7 @@ type handler struct {
 }
 
 // NewHandler constructs the main httpapi.API for this package.
-func NewHandler(cfg core.Config, dbi *oblast.DB, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClient, auditor audittools.Auditor, timeNow func() time.Time) httpapi.API {
+func NewHandler(cfg core.Config, dbi *gsql.DB, team core.AssetManagerTeam, validator gopherpolicy.Validator, provider core.ProviderClient, auditor audittools.Auditor, timeNow func() time.Time) httpapi.API {
 	return &handler{Config: cfg, DB: dbi, Team: team, Validator: validator, Provider: provider, Auditor: auditor, TimeNow: timeNow}
 }
 

@@ -18,9 +18,9 @@ import (
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
 	"github.com/sapcc/go-bits/sqlext"
+	"go.xyrillian.de/gg/gsql"
 	"go.xyrillian.de/gg/is"
 	. "go.xyrillian.de/gg/option"
-	"go.xyrillian.de/oblast"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -44,7 +44,7 @@ var logScrapes = osext.GetenvBool("CASTELLUM_LOG_SCRAPES")
 // AssetScrapingJob returns a job where each task is an asset that needs to be
 // scraped. The task checks its status and creates/confirms/cancels operations accordingly.
 func (c *Context) AssetScrapingJob(registerer prometheus.Registerer) jobloop.Job {
-	return (&jobloop.TxGuardedJob[*oblast.Tx, db.Asset]{
+	return (&jobloop.TxGuardedJob[*gsql.Tx, db.Asset]{
 		Metadata: jobloop.JobMetadata{
 			ReadableName:    "asset scraping",
 			ConcurrencySafe: true, // because "FOR UPDATE SKIP LOCKED" is used
@@ -60,11 +60,11 @@ func (c *Context) AssetScrapingJob(registerer prometheus.Registerer) jobloop.Job
 	}).Setup(registerer)
 }
 
-func (c *Context) discoverAssetScrape(ctx context.Context, tx *oblast.Tx, labels prometheus.Labels) (db.Asset, error) {
+func (c *Context) discoverAssetScrape(ctx context.Context, tx *gsql.Tx, labels prometheus.Labels) (db.Asset, error) {
 	return db.AssetStore.SelectOne(ctx, tx, scrapeAssetSearchQuery, c.TimeNow())
 }
 
-func (c *Context) processAssetScrape(ctx context.Context, tx *oblast.Tx, asset db.Asset, labels prometheus.Labels) error {
+func (c *Context) processAssetScrape(ctx context.Context, tx *gsql.Tx, asset db.Asset, labels prometheus.Labels) error {
 	// find resource for asset
 	res, err := db.ResourceStore.SelectOneWhere(ctx, tx, `id = $1`, asset.ResourceID)
 	if err != nil {
@@ -255,7 +255,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *oblast.Tx, asset d
 	return tx.Commit()
 }
 
-func (c Context) maybeCreateOperation(ctx context.Context, tx *oblast.Tx, res db.Resource, asset db.Asset, info core.AssetTypeInfo) error {
+func (c Context) maybeCreateOperation(ctx context.Context, tx *gsql.Tx, res db.Resource, asset db.Asset, info core.AssetTypeInfo) error {
 	op := db.PendingOperation{
 		AssetID:   asset.ID,
 		OldSize:   asset.Size,
@@ -295,7 +295,7 @@ func (c Context) maybeCreateOperation(ctx context.Context, tx *oblast.Tx, res db
 	return db.PendingOperationStore.Insert(ctx, tx, &op)
 }
 
-func (c Context) maybeCancelOperation(ctx context.Context, tx *oblast.Tx, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (Option[db.PendingOperation], error) {
+func (c Context) maybeCancelOperation(ctx context.Context, tx *gsql.Tx, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (Option[db.PendingOperation], error) {
 	// cancel when the threshold that triggered this operation is no longer being crossed
 	eligibleFor := core.GetEligibleOperations(core.LogicOfResource(res, info), core.StatusOfAsset(asset, c.Config, res))
 	_, isEligible := eligibleFor[op.Reason]
@@ -322,7 +322,7 @@ func (c Context) maybeCancelOperation(ctx context.Context, tx *oblast.Tx, res db
 	return None[db.PendingOperation](), err
 }
 
-func (c Context) maybeUpdateOperation(ctx context.Context, tx *oblast.Tx, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (Option[db.PendingOperation], error) {
+func (c Context) maybeUpdateOperation(ctx context.Context, tx *gsql.Tx, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (Option[db.PendingOperation], error) {
 	// do not touch `op` unless the corresponding threshold is still being crossed
 	eligibleFor := core.GetEligibleOperations(core.LogicOfResource(res, info), core.StatusOfAsset(asset, c.Config, res))
 	newSize, exists := eligibleFor[op.Reason]
@@ -341,7 +341,7 @@ func (c Context) maybeUpdateOperation(ctx context.Context, tx *oblast.Tx, res db
 	return Some(op), err
 }
 
-func (c Context) maybeConfirmOperation(ctx context.Context, tx *oblast.Tx, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (Option[db.PendingOperation], error) {
+func (c Context) maybeConfirmOperation(ctx context.Context, tx *gsql.Tx, res db.Resource, asset db.Asset, info core.AssetTypeInfo, op db.PendingOperation) (Option[db.PendingOperation], error) {
 	// can only confirm when the corresponding threshold is still being crossed
 	if _, exists := core.GetEligibleOperations(core.LogicOfResource(res, info), core.StatusOfAsset(asset, c.Config, res))[op.Reason]; !exists {
 		return Some(op), nil
