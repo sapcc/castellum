@@ -171,6 +171,7 @@ func initDB(ctx context.Context) *gsql.DB {
 		Password:          os.Getenv("CASTELLUM_DB_PASSWORD"),
 		ConnectionOptions: os.Getenv("CASTELLUM_DB_CONNECTION_OPTIONS"),
 		DatabaseName:      osext.GetenvOrDefault("CASTELLUM_DB_NAME", "castellum"),
+		ApplicationName:   bininfo.Component(),
 	}
 	dbConn := must.Return(pgruntime.StdConnector("postgres").Connect(ctx, target, db.Configuration()))
 	prometheus.MustRegister(sqlstats.NewStatsCollector(target.DatabaseName, dbConn))
