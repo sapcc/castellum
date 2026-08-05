@@ -11,7 +11,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-bits/audittools"
-	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/httptest"
 	"github.com/sapcc/go-bits/jobloop"
@@ -20,6 +19,7 @@ import (
 	"github.com/sapcc/go-bits/must"
 	"github.com/sapcc/go-bits/osext"
 	"go.xyrillian.de/gg/gsql"
+	"go.xyrillian.de/gg/pgruntime"
 
 	"github.com/sapcc/castellum/internal/api"
 	"github.com/sapcc/castellum/internal/core"
@@ -114,10 +114,7 @@ func NewSetup(t *testing.T, opts ...SetupOption) Setup {
 	s.Clock.StepBy(time.Hour)
 
 	// initialize DB
-	s.DB = gsql.NewDB(easypg.ConnectForTest(t, db.Configuration(),
-		easypg.ClearTables("resources", "assets", "pending_operations", "finished_operations"),
-		easypg.ResetPrimaryKeys("resources", "assets", "pending_operations"),
-	))
+	s.DB, _ = pgruntime.StdConnector("postgres").ConnectForTest(t, db.Configuration())
 	t.Cleanup(func() {
 		_ = s.DB.Close()
 	})

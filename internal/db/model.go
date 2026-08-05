@@ -8,9 +8,12 @@ import (
 	"time"
 
 	"github.com/sapcc/go-api-declarations/castellum"
-	"github.com/sapcc/go-bits/easypg"
 	. "go.xyrillian.de/gg/option"
+	"go.xyrillian.de/gg/pgruntime"
 	"go.xyrillian.de/oblast"
+
+	// include DB driver
+	_ "github.com/lib/pq"
 )
 
 // ResourceStore provides structured access to the database table "resources".
@@ -275,9 +278,9 @@ func (o FinishedOperation) State() castellum.OperationState {
 	return castellum.OperationState(o.Outcome)
 }
 
-// Configuration returns the easypg.Configuration object that func main() needs to initialize the DB connection.
-func Configuration() easypg.Configuration {
-	return easypg.Configuration{
-		Migrations: SQLMigrations,
+// Configuration returns the [pgruntime.ConnectionBehavior] object that func main() needs to initialize the DB connection.
+func Configuration() pgruntime.ConnectionBehavior {
+	return pgruntime.ConnectionBehavior{
+		Migrations: sqlMigrations,
 	}
 }

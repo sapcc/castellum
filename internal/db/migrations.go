@@ -3,19 +3,10 @@
 
 package db
 
-// SQLMigrations must be public because it's also used by tests.
-var SQLMigrations = map[string]string{
+var sqlMigrations = map[int64]string{
 	//NOTE: Migrations 1 through 21 have been rolled up into one at 2024-02-26
 	// to better represent the current baseline of the DB schema.
-	"021_rollup.down.sql": `
-		DROP TABLE resources;
-		DROP TABLE assets;
-		DROP TYPE op_reason;
-		DROP TYPE op_outcome;
-		DROP TABLE pending_operations;
-		DROP TABLE finished_operations;
-	`,
-	"021_rollup.up.sql": `
+	21: `
 		CREATE TABLE resources (
 			id                          BIGSERIAL         NOT NULL PRIMARY KEY,
 			scope_uuid                  TEXT              NOT NULL,
@@ -92,32 +83,18 @@ var SQLMigrations = map[string]string{
 			usage                  TEXT        NOT NULL
 		);
 	`,
-	"022_add_index_to_assets_next_scrape_at.up.sql": `
+	22: `
 		CREATE INDEX ON assets (next_scrape_at);
 	`,
-	"022_add_index_to_assets_next_scrape_at.down.sql": `
-		DROP INDEX assets_next_scrape_at_idx;
-	`,
-	"023_add_resource_min_free_is_critical_flag.down.sql": `
-		ALTER TABLE resources
-			DROP COLUMN min_free_is_critical;
-	`,
-	"023_add_resource_min_free_is_critical_flag.up.sql": `
+	23: `
 		ALTER TABLE resources
 			ADD COLUMN min_free_is_critical BOOLEAN DEFAULT FALSE;
 	`,
-	"024_add_error-resolved_to_op_outcome.up.sql": `
+	24: `
 		ALTER TYPE op_outcome ADD VALUE 'error-resolved';
 	`,
-	"024_add_error-resolved_to_op_outcome.down.sql": `
-		ALTER TYPE op_outcome REMOVE VALUE 'error-resolved';
-	`,
-	"025_clarify_asset_column_names.up.sql": `
+	25: `
 		ALTER TABLE assets RENAME min_size TO strict_min_size;
 		ALTER TABLE assets RENAME max_size TO strict_max_size;
-	`,
-	"025_clarify_asset_column_names.down.sql": `
-		ALTER TABLE assets RENAME strict_min_size TO min_size;
-		ALTER TABLE assets RENAME strict_max_size TO max_size;
 	`,
 }

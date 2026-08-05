@@ -22,7 +22,6 @@ import (
 	"github.com/sapcc/go-api-declarations/bininfo"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/audittools"
-	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/httpapi/pprofapi"
@@ -33,6 +32,7 @@ import (
 	"github.com/sapcc/go-bits/osext"
 	"go.xyrillian.de/gg/gsql"
 	. "go.xyrillian.de/gg/option"
+	"go.xyrillian.de/gg/pgruntime"
 
 	"github.com/sapcc/castellum/internal/api"
 	"github.com/sapcc/castellum/internal/core"
@@ -85,17 +85,17 @@ func main() {
 		if len(os.Args) != 3 {
 			usage()
 		}
-		runAPI(ctx, cfg, initDB(), team, providerClient, httpListenAddr)
+		runAPI(ctx, cfg, initDB(ctx), team, providerClient, httpListenAddr)
 	case "observer":
 		if len(os.Args) != 3 {
 			usage()
 		}
-		runObserver(ctx, cfg, initDB(), team, providerClient, httpListenAddr)
+		runObserver(ctx, cfg, initDB(ctx), team, providerClient, httpListenAddr)
 	case "worker":
 		if len(os.Args) != 3 {
 			usage()
 		}
-		runWorker(ctx, initDB(), team, httpListenAddr)
+		runWorker(ctx, initDB(ctx), team, httpListenAddr)
 	case "test-asset-type":
 		if len(os.Args) != 4 && len(os.Args) != 5 {
 			usage()
@@ -163,22 +163,21 @@ func runAPI(ctx context.Context, cfg core.Config, dbi *gsql.DB, team core.AssetM
 
 // This initialization phase is split into a separate method because we only
 // need it for some subcommands.
-func initDB() *gsql.DB {
-	dbName := osext.GetenvOrDefault("CASTELLUM_DB_NAME", "castellum")
-	dbURL := must.Return(easypg.URLFrom(easypg.URLParts{
+func initDB(ctx context.Context) *gsql.DB {
+	target := pgruntime.ConnectionTarget{
 		HostName:          osext.GetenvOrDefault("CASTELLUM_DB_HOSTNAME", "localhost"),
 		Port:              osext.GetenvOrDefault("CASTELLUM_DB_PORT", "5432"),
 		UserName:          osext.GetenvOrDefault("CASTELLUM_DB_USERNAME", "postgres"),
 		Password:          os.Getenv("CASTELLUM_DB_PASSWORD"),
 		ConnectionOptions: os.Getenv("CASTELLUM_DB_CONNECTION_OPTIONS"),
-		DatabaseName:      dbName,
-	}))
-	dbConn := must.Return(easypg.Connect(dbURL, db.Configuration()))
-	prometheus.MustRegister(sqlstats.NewStatsCollector(dbName, dbConn))
+		DatabaseName:      osext.GetenvOrDefault("CASTELLUM_DB_NAME", "castellum"),
+	}
+	dbConn := must.Return(pgruntime.StdConnector("postgres").Connect(ctx, target, db.Configuration()))
+	prometheus.MustRegister(sqlstats.NewStatsCollector(target.DatabaseName, dbConn))
 
 	// ensure that this process does not starve other Castellum processes for DB connections
 	dbConn.SetMaxOpenConns(16)
-	return gsql.NewDB(dbConn)
+	return dbConn
 }
 
 ////////////////////////////////////////////////////////////////////////////////
