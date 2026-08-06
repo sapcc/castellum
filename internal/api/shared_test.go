@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/sapcc/go-api-declarations/castellum"
-	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/must"
 	. "go.xyrillian.de/gg/option"
+	"go.xyrillian.de/gg/pgruntime"
 
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
@@ -20,7 +20,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	easypg.WithTestDB(m, func() int { return m.Run() })
+	pgruntime.WithTestDB(m, m.Run)
 }
 
 func commonSetupOptionsForAPITest() test.SetupOption {
