@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/dlmiddlecote/sqlstats v1.0.2
-	github.com/gophercloud/gophercloud/v2 v2.13.0
+	github.com/gophercloud/gophercloud/v2 v2.14.0
 	github.com/gorilla/mux v1.8.1
 	github.com/lib/pq v1.12.3
 	github.com/prometheus/client_golang v1.24.1
