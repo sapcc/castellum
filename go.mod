@@ -1,6 +1,6 @@
 module github.com/sapcc/castellum
 
-go 1.26.0
+go 1.27
 
 require (
 	github.com/dlmiddlecote/sqlstats v1.0.2
