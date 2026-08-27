@@ -10,9 +10,6 @@ github.com/databus23/goslo.policy
 # github.com/dlmiddlecote/sqlstats v1.0.2
 ## explicit; go 1.11
 github.com/dlmiddlecote/sqlstats
-# github.com/gofrs/uuid/v5 v5.5.1
-## explicit; go 1.25
-github.com/gofrs/uuid/v5
 # github.com/gophercloud/gophercloud/v2 v2.14.0
 ## explicit; go 1.25.0
 github.com/gophercloud/gophercloud/v2
@@ -111,8 +108,8 @@ github.com/rs/cors/internal
 github.com/sapcc/go-api-declarations/bininfo
 github.com/sapcc/go-api-declarations/cadf
 github.com/sapcc/go-api-declarations/castellum
-# github.com/sapcc/go-bits v0.0.0-20260818140528-75bdd20c7867
-## explicit; go 1.26
+# github.com/sapcc/go-bits v0.0.0-20260827091731-7669cbdb53fb
+## explicit; go 1.27
 github.com/sapcc/go-bits/audittools
 github.com/sapcc/go-bits/easypg
 github.com/sapcc/go-bits/errext
