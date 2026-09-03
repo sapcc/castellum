@@ -43,17 +43,15 @@ func AssetFromDB(asset db.Asset) castellum.Asset {
 func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, res *db.Resource) castellum.StandaloneOperation {
 	op := castellum.StandaloneOperation{
 		AssetID: assetID,
-		Operation: castellum.Operation{
-			State:   dbOp.State(),
-			Reason:  dbOp.Reason,
-			OldSize: dbOp.OldSize,
-			NewSize: dbOp.NewSize,
-			Created: castellum.OperationCreation{
-				AtUnix:       dbOp.CreatedAt.Unix(),
-				UsagePercent: core.GetMultiUsagePercent(dbOp.OldSize, dbOp.Usage),
-			},
-			Finished: None[castellum.OperationFinish](),
+		State:   dbOp.State(),
+		Reason:  dbOp.Reason,
+		OldSize: dbOp.OldSize,
+		NewSize: dbOp.NewSize,
+		Created: castellum.OperationCreation{
+			AtUnix:       dbOp.CreatedAt.Unix(),
+			UsagePercent: core.GetMultiUsagePercent(dbOp.OldSize, dbOp.Usage),
 		},
+		Finished: None[castellum.OperationFinish](),
 	}
 	if res != nil {
 		op.ProjectUUID = res.ScopeUUID
@@ -77,20 +75,18 @@ func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, res *db.Re
 func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string, res *db.Resource) castellum.StandaloneOperation {
 	op := castellum.StandaloneOperation{
 		AssetID: assetID,
-		Operation: castellum.Operation{
-			State:   dbOp.State(),
-			Reason:  dbOp.Reason,
-			OldSize: dbOp.OldSize,
-			NewSize: dbOp.NewSize,
-			Created: castellum.OperationCreation{
-				AtUnix:       dbOp.CreatedAt.Unix(),
-				UsagePercent: core.GetMultiUsagePercent(dbOp.OldSize, dbOp.Usage),
-			},
-			Finished: Some(castellum.OperationFinish{
-				AtUnix:       dbOp.FinishedAt.Unix(),
-				ErrorMessage: dbOp.ErrorMessage,
-			}),
+		State:   dbOp.State(),
+		Reason:  dbOp.Reason,
+		OldSize: dbOp.OldSize,
+		NewSize: dbOp.NewSize,
+		Created: castellum.OperationCreation{
+			AtUnix:       dbOp.CreatedAt.Unix(),
+			UsagePercent: core.GetMultiUsagePercent(dbOp.OldSize, dbOp.Usage),
 		},
+		Finished: Some(castellum.OperationFinish{
+			AtUnix:       dbOp.FinishedAt.Unix(),
+			ErrorMessage: dbOp.ErrorMessage,
+		}),
 	}
 	if res != nil {
 		op.ProjectUUID = res.ScopeUUID
