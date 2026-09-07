@@ -43,7 +43,9 @@ func NewHandler(cfg core.Config, dbi *gsql.DB, team core.AssetManagerTeam, valid
 }
 
 // AddTo implements the httpapi.API interface.
-func (h *handler) AddTo(router *mux.Router) {
+func (h *handler) AddTo(c *httpapi.Composer) {
+	router := c.Router()
+
 	router.Methods("GET").
 		Path(`/v1/projects/{project_id}`).
 		HandlerFunc(h.GetProject)
