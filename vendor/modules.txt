@@ -108,7 +108,7 @@ github.com/rs/cors/internal
 github.com/sapcc/go-api-declarations/bininfo
 github.com/sapcc/go-api-declarations/cadf
 github.com/sapcc/go-api-declarations/castellum
-# github.com/sapcc/go-bits v0.0.0-20260907125021-ceb8c12b73ac
+# github.com/sapcc/go-bits v0.0.0-20260908173957-572b68774a1c
 ## explicit; go 1.27
 github.com/sapcc/go-bits/audittools
 github.com/sapcc/go-bits/easypg
@@ -132,7 +132,7 @@ github.com/sapcc/go-bits/regexpext
 github.com/sapcc/go-bits/respondwith
 github.com/sapcc/go-bits/sqlext
 github.com/sapcc/go-bits/syncext
-# go.xyrillian.de/gg v1.14.0
+# go.xyrillian.de/gg v1.15.0
 ## explicit; go 1.26
 go.xyrillian.de/gg/assert
 go.xyrillian.de/gg/errext
