@@ -8,12 +8,12 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/lib/pq v1.12.3
 	github.com/prometheus/client_golang v1.24.1
-	github.com/prometheus/common v0.70.1
+	github.com/prometheus/common v0.71.0
 	github.com/rs/cors v1.11.1
 	github.com/sapcc/go-api-declarations v1.25.0
 	github.com/sapcc/go-bits v0.0.0-20260908173957-572b68774a1c
 	go.xyrillian.de/gg v1.15.0
-	go.xyrillian.de/oblast v0.13.2
+	go.xyrillian.de/oblast v0.14.0
 )
 
 require (
@@ -32,5 +32,5 @@ require (
 	github.com/prometheus/procfs v0.21.1 // indirect
 	github.com/rabbitmq/amqp091-go v1.14.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
+	google.golang.org/protobuf v1.36.12 // indirect
 )
