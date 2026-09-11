@@ -145,7 +145,7 @@ func (m *assetManagerServerGroups) GetAssetStatus(ctx context.Context, res db.Re
 		if err != nil {
 			return core.AssetStatus{}, fmt.Errorf("cannot inspect server %s: %w", serverID, err)
 		}
-		// if any instance is not in error state, that's a huge red flag and we
+		// if any instance is in error state, that's a huge red flag and we
 		// should not attempt any autoscaling
 		if server.Status == "ERROR" {
 			return core.AssetStatus{}, fmt.Errorf("server %s is in status %s", serverID, server.Status)
