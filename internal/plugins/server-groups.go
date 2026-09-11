@@ -119,9 +119,13 @@ func (m *assetManagerServerGroups) CheckResourceAllowed(ctx context.Context, ass
 }
 
 // ListAssets implements the core.AssetManager interface.
-func (m *assetManagerServerGroups) ListAssets(_ context.Context, res db.Resource) ([]string, error) {
-	groupUUID := strings.TrimPrefix(string(res.AssetType), "server-group:")
-	return []string{groupUUID}, nil
+func (m *assetManagerServerGroups) ListAssets(ctx context.Context, scopeUUID string, resources map[db.AssetType]core.ResourceInfo) (map[db.AssetType][]string, error) {
+	groupUUIDs := make(map[db.AssetType][]string)
+
+	for _, resource := range resources {
+		groupUUIDs[resource.AssetType] = append(groupUUIDs[resource.AssetType], strings.TrimPrefix(string(resource.AssetType), "server-group:"))
+	}
+	return groupUUIDs, nil
 }
 
 // GetAssetStatus implements the core.AssetManager interface.
