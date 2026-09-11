@@ -87,7 +87,7 @@ github.com/prometheus/client_golang/prometheus/promhttp/internal
 # github.com/prometheus/client_model v0.6.2
 ## explicit; go 1.22.0
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.70.1
+# github.com/prometheus/common v0.71.0
 ## explicit; go 1.25.0
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/model
@@ -144,14 +144,14 @@ go.xyrillian.de/gg/option
 go.xyrillian.de/gg/options
 go.xyrillian.de/gg/pgruntime
 go.xyrillian.de/gg/testcapture
-# go.xyrillian.de/oblast v0.13.2
+# go.xyrillian.de/oblast v0.14.0
 ## explicit; go 1.26
 go.xyrillian.de/oblast
 # golang.org/x/sys v0.47.0
 ## explicit; go 1.25.0
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# google.golang.org/protobuf v1.36.11
+# google.golang.org/protobuf v1.36.12
 ## explicit; go 1.23
 google.golang.org/protobuf/encoding/protodelim
 google.golang.org/protobuf/encoding/prototext
