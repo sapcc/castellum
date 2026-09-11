@@ -121,19 +121,21 @@ var (
 )
 
 // ListAssets implements the core.AssetManager interface.
-func (m AssetManagerStatic) ListAssets(_ context.Context, group db.ResourceGroup, res db.Resource) ([]string, error) {
-	if res.AssetType != m.AssetType {
-		return nil, errWrongAssetType
+func (m AssetManagerStatic) ListAssets(_ context.Context, _ string, resources map[db.AssetType]core.ResourceInfo) (map[db.AssetType][]string, error) {
+	uuids := make(map[db.AssetType][]string)
+	for _, resource := range resources {
+		if resource.AssetType != m.AssetType {
+			return nil, errWrongAssetType
+		}
+		assets, exists := m.Assets[resource.ScopeUUID]
+		if !exists {
+			return nil, errUnknownProject
+		}
+		for uuid := range assets {
+			uuids[resource.AssetType] = append(uuids[resource.AssetType], uuid)
+		}
+		sort.Strings(uuids[resource.AssetType]) // for deterministic test behavior
 	}
-	assets, exists := m.Assets[group.ScopeUUID]
-	if !exists {
-		return nil, errUnknownProject
-	}
-	uuids := make([]string, 0, len(assets))
-	for uuid := range assets {
-		uuids = append(uuids, uuid)
-	}
-	sort.Strings(uuids) // for deterministic test behavior
 	return uuids, nil
 }
 

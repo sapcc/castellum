@@ -88,6 +88,16 @@ var (
 	ErrNoConfigurationProvided = errors.New("type-specific configuration must be provided for this asset type")
 )
 
+// ResourceInfo holds the configuration of a resource on the AssetManager level.
+// It does not contain configuration used for autoscaling decisions (e.g. thresholds and constraints)
+// because asset managers are not supposed to care about scaling.
+// The semantics of all fields match their equivalently-named counterparts on the db.Resource type.
+type ResourceInfo struct {
+	ScopeUUID  string
+	AssetType  db.AssetType
+	ConfigJSON string
+}
+
 // AssetManager is the main modularization interface in Castellum. It
 // provides a separation boundary between the plugins that implement the
 // concrete behavior for specific asset types, and the core logic of Castellum.
@@ -121,7 +131,7 @@ type AssetManager interface {
 	// `core.ErrNoConfigurationAllowed` otherwise.
 	CheckResourceAllowed(ctx context.Context, assetType db.AssetType, scopeUUID string, configJSON string, existingResources map[db.AssetType]struct{}) error
 
-	ListAssets(ctx context.Context, group db.ResourceGroup, res db.Resource) ([]string, error)
+	ListAssets(ctx context.Context, scopeUUID string, resources map[db.AssetType]ResourceInfo) (map[db.AssetType][]string, error)
 	// The returned Outcome should be either Succeeded, Failed or Errored, but not Cancelled.
 	// The returned error should be nil if and only if the outcome is Succeeded.
 	SetAssetSize(ctx context.Context, group db.ResourceGroup, res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error)

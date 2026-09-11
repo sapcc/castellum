@@ -15,6 +15,7 @@ import (
 	"github.com/sapcc/go-bits/sqlext"
 	"go.xyrillian.de/gg/gsql"
 
+	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 )
 
@@ -91,11 +92,24 @@ func (c *Context) processResourceGroupScrape(ctx context.Context, tx *gsql.Tx, g
 		}
 		logg.Debug("scraping %s resource in scope %s using manager %v", res.AssetType, group.ScopeUUID, manager)
 
-		assetUUIDs, err := manager.ListAssets(ctx, group, res)
+		resources := make(map[db.AssetType]core.ResourceInfo)
+		for _, otherRes := range dbResources {
+			if _, ok := manager.InfoForAssetType(otherRes.AssetType).Unpack(); !ok {
+				continue
+			}
+			resources[otherRes.AssetType] = core.ResourceInfo{
+				ScopeUUID:  group.ScopeUUID,
+				AssetType:  otherRes.AssetType,
+				ConfigJSON: otherRes.ConfigJSON,
+			}
+		}
+
+		assetsByType, err := manager.ListAssets(ctx, group.ScopeUUID, resources)
 		if err != nil {
 			scrapeErrs = append(scrapeErrs, fmt.Sprintf("cannot list %s assets in scope %s: %s", string(res.AssetType), group.ScopeUUID, err.Error()))
 			continue
 		}
+		assetUUIDs := assetsByType[res.AssetType]
 		logg.Debug("scraped %d assets for %s resource for scope %s", len(assetUUIDs), res.AssetType, group.ScopeUUID)
 
 		isExistingAsset := make(map[string]bool, len(assetUUIDs))
