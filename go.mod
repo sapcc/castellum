@@ -12,8 +12,8 @@ require (
 	github.com/rs/cors v1.11.1
 	github.com/sapcc/go-api-declarations v1.25.0
 	github.com/sapcc/go-bits v0.0.0-20260908173957-572b68774a1c
-	go.xyrillian.de/gg v1.15.0
-	go.xyrillian.de/oblast v0.13.2
+	go.xyrillian.de/gg v1.16.0
+	go.xyrillian.de/oblast v0.17.0
 )
 
 require (

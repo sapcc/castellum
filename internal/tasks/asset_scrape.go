@@ -80,7 +80,7 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gsql.Tx, asset db.
 	logg.Debug("scraping %s asset %s in scope %s using manager %v", res.AssetType, asset.UUID, res.ScopeUUID, manager)
 
 	// get pending operation for this asset
-	pendingOp, err := db.PendingOperationStore.SelectOneOrNoneWhere(ctx, tx, `asset_id = $1`, asset.ID)
+	pendingOp, err := gsql.NoneIfNoRows(db.PendingOperationStore.SelectOneWhere(ctx, tx, `asset_id = $1`, asset.ID))
 	if err != nil {
 		return err
 	}

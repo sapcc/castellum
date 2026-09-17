@@ -206,7 +206,7 @@ func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUI
 		return nil
 	}
 
-	resOrNone, err := db.ResourceStore.SelectOneOrNoneWhere(ctx, h.DB, `scope_uuid = $1 AND asset_type = $2`, projectUUID, assetType)
+	resOrNone, err := gsql.NoneIfNoRows(db.ResourceStore.SelectOneWhere(ctx, h.DB, `scope_uuid = $1 AND asset_type = $2`, projectUUID, assetType))
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return nil
 	}
