@@ -15,6 +15,7 @@ import (
 
 // planOpts holds additional arguments to buildPlan().
 type planOpts struct {
+	ReadOnly              bool
 	StructTagKey          string // defaults to "db"
 	TableName             string
 	PrimaryKeyColumnNames []string
@@ -33,14 +34,17 @@ func collectPlanOptions(popts []PlanOption) planOpts {
 type planCacheKey struct {
 	Type                  reflect.Type
 	Dialect               string
+	ReadOnly              bool
 	StructTagKey          string
 	TableName             string
 	PrimaryKeyColumnNames string
 }
 
 var (
-	generatedPlans      = make(map[planCacheKey]plan)
-	generatedPlansMutex sync.RWMutex
+	generatedPlans           = make(map[planCacheKey]plan)
+	generatedPlansMutex      sync.RWMutex
+	generatedTuplePlans      = make(map[reflect.Type]plan)
+	generatedTuplePlansMutex sync.Mutex
 )
 
 // getOrBuildPlan is like [buildPlan], but caches generated plans and tries to reuse cached plans.
@@ -48,6 +52,7 @@ func getOrBuildPlan(t reflect.Type, dialect Dialect, opts planOpts) (plan, error
 	key := planCacheKey{
 		Type:                  t,
 		Dialect:               dialect.String(),
+		ReadOnly:              opts.ReadOnly,
 		StructTagKey:          opts.StructTagKey,
 		TableName:             opts.TableName,
 		PrimaryKeyColumnNames: strings.Join(opts.PrimaryKeyColumnNames, "\000"),
@@ -70,17 +75,39 @@ func getOrBuildPlan(t reflect.Type, dialect Dialect, opts planOpts) (plan, error
 	return p, nil
 }
 
+// getOrBuildTuplePlan is like [getOrBuildPlan], but generates the plans used by TupleSelect() et al
+func getOrBuildTuplePlan(t reflect.Type) plan {
+	generatedTuplePlansMutex.Lock()
+	defer generatedTuplePlansMutex.Unlock()
+
+	p, ok := generatedTuplePlans[t]
+	if !ok {
+		indexes := make([][]int, t.NumField())
+		for idx := range indexes {
+			indexes[idx] = []int{idx}
+		}
+		p = plan{
+			TypeName:      t.Name(),
+			StaticIndexes: indexes,
+		}
+		generatedTuplePlans[t] = p
+	}
+	return p
+}
+
 // plan holds all information that we can derive from reflecting on a given type.
 // The queries held within are only valid within the context of a given SQL dialect.
 type plan struct {
 	TypeName              string   // for use in error messages
 	TableName             string   // from info.TableNameIs marker (if any)
-	AllColumnNames        []string // in order of struct fields
+	AllColumnNames        []string // in order of struct fields (not set for TupleSelect() plans)
 	PrimaryKeyColumnNames []string // from info.PrimaryKeyIs marker (if any)
 	AutoColumnNames       []string // subset of AllColumnNames where field has `,auto` marker
 
-	// Field index (i.e. argument for reflect.Value.FieldByIndex()) for each column name.
+	// Field index (i.e. argument for reflect.Value.FieldByIndex()) for each column name. Not set for TupleSelect() plans.
 	IndexByColumnName map[string][]int
+	// Select indexes for TupleSelect() plans. Always of the form [[0], [1], [2], ..., [N]]. Not set for regular plans.
+	StaticIndexes [][]int
 	// Pointer-typed fields that need to be initialized before scanning into this type.
 	TransparentPointerStructFields []fieldInfo
 
@@ -100,6 +127,10 @@ type plan struct {
 	Upsert plannedQuery
 	Update plannedQuery
 	Delete plannedQuery
+
+	// Whether Insert/Upsert/Update/Delete query planning was inhibited by the ReadOnly option.
+	// This information is preserved in order to render more useful error messages.
+	ReadOnly bool
 }
 
 // fieldInfo appears in type plan.
@@ -130,6 +161,7 @@ func buildPlan(t reflect.Type, dialect Dialect, opts planOpts) (plan, error) {
 		TableName:             opts.TableName,
 		PrimaryKeyColumnNames: opts.PrimaryKeyColumnNames,
 		IndexByColumnName:     make(map[string][]int),
+		ReadOnly:              opts.ReadOnly,
 	}
 
 	var (
@@ -142,7 +174,7 @@ func buildPlan(t reflect.Type, dialect Dialect, opts planOpts) (plan, error) {
 	}
 
 	// discover addressable fields in this type, collect information from markers and tags
-	for _, field := range reflect.VisibleFields(t) {
+	for _, field := range assignableFields(t) {
 		// recurse into struct fields (i.e. ignore the struct itself and consider its members instead)
 		// unless the field itself has a `db:"..."` tag
 		if field.Type.Kind() == reflect.Struct || (field.Type.Kind() == reflect.Pointer && field.Type.Elem().Kind() == reflect.Struct) {
@@ -160,11 +192,6 @@ func buildPlan(t reflect.Type, dialect Dialect, opts planOpts) (plan, error) {
 				continue
 			}
 			indexesOfOpaqueStructs = append(indexesOfOpaqueStructs, field.Index)
-		}
-
-		// ignore unexported fields (otherwise reflect.Value.Interface() on the field would panic)
-		if field.PkgPath != "" {
-			continue
 		}
 
 		// ignore fields that are within a struct type that is mapped as a whole
@@ -272,12 +299,39 @@ func buildPlan(t reflect.Type, dialect Dialect, opts planOpts) (plan, error) {
 
 	// prepare query strings
 	p.Select = p.buildSelectQueryIfPossible(dialect)
-	p.Insert = p.buildInsertQueryIfPossible(dialect, false)
-	p.Upsert = p.buildInsertQueryIfPossible(dialect, true)
-	p.Update = p.buildUpdateQueryIfPossible(dialect)
-	p.Delete = p.buildDeleteQueryIfPossible(dialect)
+	if !opts.ReadOnly {
+		p.Insert = p.buildInsertQueryIfPossible(dialect, false)
+		p.Upsert = p.buildInsertQueryIfPossible(dialect, true)
+		p.Update = p.buildUpdateQueryIfPossible(dialect)
+		p.Delete = p.buildDeleteQueryIfPossible(dialect)
+	}
 
 	return p, nil
+}
+
+// Like reflect.VisibleFields(), but considers all fields within the type that
+// are assignable (i.e. `v.FieldByIndex(...).Set(...)` does not panic).
+func assignableFields(t reflect.Type) (result []reflect.StructField) {
+	for field := range t.Fields() {
+		// assignment is allowed for exported or embedded fields only
+		if field.IsExported() || field.Anonymous {
+			result = append(result, field)
+
+			// recurse into struct fields
+			ft := field.Type
+			if ft.Kind() == reflect.Pointer {
+				ft = ft.Elem()
+			}
+			if ft.Kind() == reflect.Struct {
+				for _, subfield := range assignableFields(ft) {
+					subfield.Index = append(slices.Clone(field.Index), subfield.Index...)
+					result = append(result, subfield)
+				}
+			}
+		}
+	}
+
+	return result
 }
 
 func (p plan) getNonAutoColumnNames() []string {

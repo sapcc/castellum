@@ -14,6 +14,7 @@ import (
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/respondwith"
 	"github.com/sapcc/go-bits/sqlext"
+	"go.xyrillian.de/gg/gsql"
 	. "go.xyrillian.de/gg/option"
 	"go.xyrillian.de/gg/options"
 
@@ -151,8 +152,8 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbAssetOrNone, err := db.AssetStore.SelectOneOrNoneWhere(ctx, h.DB, `resource_id = $1 AND uuid = $2`,
-		dbResource.ID, mux.Vars(r)["asset_uuid"])
+	dbAssetOrNone, err := gsql.NoneIfNoRows(db.AssetStore.SelectOneWhere(ctx, h.DB, `resource_id = $1 AND uuid = $2`,
+		dbResource.ID, mux.Vars(r)["asset_uuid"]))
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
@@ -163,7 +164,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	}
 	asset := AssetFromDB(dbAsset)
 
-	dbPendingOp, err := db.PendingOperationStore.SelectOneOrNoneWhere(ctx, h.DB, `asset_id = $1`, dbAsset.ID)
+	dbPendingOp, err := gsql.NoneIfNoRows(db.PendingOperationStore.SelectOneWhere(ctx, h.DB, `asset_id = $1`, dbAsset.ID))
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
