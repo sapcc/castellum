@@ -97,4 +97,60 @@ var sqlMigrations = map[int64]string{
 		ALTER TABLE assets RENAME min_size TO strict_min_size;
 		ALTER TABLE assets RENAME max_size TO strict_max_size;
 	`,
+	26: `
+		CREATE TABLE resource_groups (
+			id                    BIGSERIAL NOT NULL PRIMARY KEY,
+			scope_uuid            TEXT      NOT NULL,
+			domain_uuid           TEXT      NOT NULL,
+			asset_manager         TEXT      NOT NULL,
+			next_scrape_at        TIMESTAMP NOT NULL DEFAULT NOW(),
+			scrape_error_message  TEXT      NOT NULL DEFAULT '',
+			scrape_duration_secs  REAL      NOT NULL DEFAULT 0,
+			UNIQUE(scope_uuid, asset_manager)
+		);
+
+		ALTER TABLE resources ADD COLUMN resource_group_id BIGINT
+			REFERENCES resource_groups ON DELETE CASCADE;
+
+		INSERT INTO resource_groups
+			(scope_uuid, domain_uuid, asset_manager,
+			 next_scrape_at, scrape_error_message, scrape_duration_secs)
+		SELECT
+			scope_uuid,
+			MIN(domain_uuid),
+			CASE
+				WHEN asset_type = 'nfs-shares'           THEN 'nfs-shares'
+				WHEN asset_type LIKE 'nfs-shares-type:%' THEN 'nfs-shares'
+				WHEN asset_type = 'server-groups'        THEN 'server-groups'
+				WHEN asset_type LIKE 'server-group:%'    THEN 'server-groups'
+				ELSE 'static'
+			END,
+			MIN(next_scrape_at),
+			COALESCE(MAX(NULLIF(scrape_error_message, '')), ''),
+			MAX(scrape_duration_secs)
+		FROM resources
+		GROUP BY scope_uuid, 3;
+
+		UPDATE resources r SET resource_group_id = g.id
+		FROM resource_groups g
+		WHERE r.scope_uuid = g.scope_uuid
+		  AND g.asset_manager = CASE
+				WHEN r.asset_type = 'nfs-shares'           THEN 'nfs-shares'
+				WHEN r.asset_type LIKE 'nfs-shares-type:%' THEN 'nfs-shares'
+				WHEN r.asset_type = 'server-groups'        THEN 'server-groups'
+				WHEN r.asset_type LIKE 'server-group:%'    THEN 'server-groups'
+				ELSE 'static'
+			END;
+
+		ALTER TABLE resources
+			ALTER COLUMN resource_group_id SET NOT NULL,
+			DROP CONSTRAINT resources_scope_uuid_asset_type_key,
+			ADD  CONSTRAINT resources_resource_group_id_asset_type_key
+				UNIQUE (resource_group_id, asset_type),
+			DROP COLUMN scope_uuid,
+			DROP COLUMN domain_uuid,
+			DROP COLUMN next_scrape_at,
+			DROP COLUMN scrape_error_message,
+			DROP COLUMN scrape_duration_secs;
+	`,
 }

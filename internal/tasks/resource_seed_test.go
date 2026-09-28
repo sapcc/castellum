@@ -69,9 +69,13 @@ func TestResourceSeedingSuccess(t *testing.T) {
 	job := s.TaskContext.ResourceSeedingJob(s.Registry)
 
 	// create a resource in a project that is not seeded - this will be ignored by the seeding job
+	must.SucceedT(t, db.ResourceGroupStore.Insert(ctx, s.DB, &db.ResourceGroup{
+		ScopeUUID:    "project3",
+		DomainUUID:   "domain1",
+		AssetManager: "static",
+	}))
 	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
-		ScopeUUID:           "project3",
-		DomainUUID:          "domain1",
+		ResourceGroupID:     1,
 		AssetType:           "foo",
 		LowThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 60},
 		LowDelaySeconds:     3600,
@@ -79,9 +83,13 @@ func TestResourceSeedingSuccess(t *testing.T) {
 	}))
 
 	// create a resource that has a negative seed - the seeding job will delete it
+	must.SucceedT(t, db.ResourceGroupStore.Insert(ctx, s.DB, &db.ResourceGroup{
+		ScopeUUID:    "project2",
+		DomainUUID:   "domain1",
+		AssetManager: "static",
+	}))
 	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
-		ScopeUUID:           "project2",
-		DomainUUID:          "domain1",
+		ResourceGroupID:     2,
 		AssetType:           "foo",
 		LowThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 60},
 		LowDelaySeconds:     3600,
@@ -94,8 +102,10 @@ func TestResourceSeedingSuccess(t *testing.T) {
 	// test that seeding job applies the seeds (except for the one project that the MockProviderClient reports as nonexistent)
 	must.SucceedT(t, job.ProcessOne(ctx))
 	tr.DBChanges().AssertEqualf(`
-		DELETE FROM resources WHERE id = 2 AND scope_uuid = 'project2' AND asset_type = 'foo';
-		INSERT INTO resources (id, scope_uuid, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, domain_uuid, next_scrape_at) VALUES (3, 'project1', 'foo', '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":95}', 20, 'domain1', 0);
+		DELETE FROM resource_groups WHERE id = 2 AND scope_uuid = 'project2' AND asset_manager = 'static';
+		INSERT INTO resource_groups (id, scope_uuid, domain_uuid, asset_manager, next_scrape_at) VALUES (3, 'project1', 'domain1', 'static', 0);
+		DELETE FROM resources WHERE id = 2 AND asset_type = 'foo' AND resource_group_id = 2;
+		INSERT INTO resources (id, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, resource_group_id) VALUES (3, 'foo', '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":95}', 20, 3);
 	`)
 
 	// test that the next seeding run does not change anything
@@ -103,7 +113,7 @@ func TestResourceSeedingSuccess(t *testing.T) {
 	tr.DBChanges().AssertEmpty()
 
 	// perturb one of the seeded resources
-	must.SucceedT(t, s.DBExec(`UPDATE resources SET high_threshold_percent = $1, high_delay_seconds = $2 WHERE scope_uuid = $3`,
+	must.SucceedT(t, s.DBExec(`UPDATE resources SET high_threshold_percent = $1, high_delay_seconds = $2 WHERE resource_group_id IN (SELECT id FROM resource_groups WHERE scope_uuid = $3)`,
 		castellum.UsageValues{castellum.SingularUsageMetric: 80}, 7200, "project1",
 	))
 
