@@ -19,5 +19,6 @@ func TestMain(m *testing.M) {
 func commonSetupOptionsForWorkerTest() test.SetupOption {
 	return test.WithAssetManagers(
 		&plugins.AssetManagerStatic{AssetType: "foo"},
+		&plugins.AssetManagerStatic{AssetType: "bar"},
 	)
 }

@@ -119,13 +119,13 @@ func (m *assetManagerServerGroups) CheckResourceAllowed(ctx context.Context, ass
 }
 
 // ListAssets implements the core.AssetManager interface.
-func (m *assetManagerServerGroups) ListAssets(_ context.Context, res db.Resource) ([]string, error) {
+func (m *assetManagerServerGroups) ListAssets(_ context.Context, _ db.ResourceGroup, res db.Resource) ([]string, error) {
 	groupUUID := strings.TrimPrefix(string(res.AssetType), "server-group:")
 	return []string{groupUUID}, nil
 }
 
 // GetAssetStatus implements the core.AssetManager interface.
-func (m *assetManagerServerGroups) GetAssetStatus(ctx context.Context, res db.Resource, assetUUID string, previousStatus Option[core.AssetStatus]) (core.AssetStatus, error) {
+func (m *assetManagerServerGroups) GetAssetStatus(ctx context.Context, _ db.ResourceGroup, res db.Resource, assetUUID string, previousStatus Option[core.AssetStatus]) (core.AssetStatus, error) {
 	computeV2, err := m.Provider.CloudAdminClient(openstack.NewComputeV2)
 	if err != nil {
 		return core.AssetStatus{}, err
@@ -200,7 +200,7 @@ func (m *assetManagerServerGroups) GetAssetStatus(ctx context.Context, res db.Re
 }
 
 // SetAssetSize implements the core.AssetManager interface.
-func (m *assetManagerServerGroups) SetAssetSize(ctx context.Context, res db.Resource, assetUUID string, _, newSize uint64) (castellum.OperationOutcome, error) {
+func (m *assetManagerServerGroups) SetAssetSize(ctx context.Context, group db.ResourceGroup, res db.Resource, assetUUID string, _, newSize uint64) (castellum.OperationOutcome, error) {
 	cfg, err := m.parseAndValidateConfig(res.ConfigJSON)
 	if err != nil {
 		// if validation fails here, we should not have accepted the configuration
@@ -211,31 +211,31 @@ func (m *assetManagerServerGroups) SetAssetSize(ctx context.Context, res db.Reso
 
 	// double-check actual `oldSize` by counting current group members
 	groupID := strings.TrimPrefix(string(res.AssetType), "server-group:")
-	group, err := m.getServerGroup(ctx, groupID)
+	sg, err := m.getServerGroup(ctx, groupID)
 	if err != nil {
 		return castellum.OperationOutcomeErrored, err
 	}
-	oldSize := uint64(len(group.Members))
+	oldSize := uint64(len(sg.Members))
 
 	// perform server creations/deletions
 	if oldSize > newSize {
-		return m.terminateServers(ctx, res, cfg, group, oldSize-newSize)
+		return m.terminateServers(ctx, group, res, cfg, sg, oldSize-newSize)
 	}
 	if newSize > oldSize {
-		return m.createServers(ctx, res, cfg, group, newSize-oldSize)
+		return m.createServers(ctx, group, res, cfg, sg, newSize-oldSize)
 	}
 
 	// nothing to do (should be unreachable in practice since we would not get called at all when `oldSize == newSize`)
 	return castellum.OperationOutcomeSucceeded, nil
 }
 
-func (m *assetManagerServerGroups) terminateServers(ctx context.Context, res db.Resource, cfg configForServerGroup, group serverGroup, countToDelete uint64) (castellum.OperationOutcome, error) {
+func (m *assetManagerServerGroups) terminateServers(ctx context.Context, group db.ResourceGroup, res db.Resource, cfg configForServerGroup, sg serverGroup, countToDelete uint64) (castellum.OperationOutcome, error) {
 	computeV2, err := m.Provider.CloudAdminClient(openstack.NewComputeV2)
 	if err != nil {
 		return castellum.OperationOutcomeErrored, err
 	}
 	provider, eo, err := m.Provider.ProjectScopedClient(ctx, core.ProjectScope{
-		ID:        res.ScopeUUID,
+		ID:        group.ScopeUUID,
 		RoleNames: m.LocalRoleNames,
 	})
 	if err != nil {
@@ -248,7 +248,7 @@ func (m *assetManagerServerGroups) terminateServers(ctx context.Context, res db.
 
 	// get creation timestamps for all servers in this group
 	var allServers []*servers.Server
-	for _, serverID := range group.Members {
+	for _, serverID := range sg.Members {
 		server, err := servers.Get(ctx, computeV2, serverID).Extract()
 		if err != nil {
 			return castellum.OperationOutcomeErrored, fmt.Errorf("cannot inspect server %s in %s: %w", serverID, res.AssetType, err)
@@ -331,9 +331,9 @@ func (m *assetManagerServerGroups) terminateServers(ctx context.Context, res db.
 	return castellum.OperationOutcomeSucceeded, nil
 }
 
-func (m *assetManagerServerGroups) createServers(ctx context.Context, res db.Resource, cfg configForServerGroup, group serverGroup, countToCreate uint64) (castellum.OperationOutcome, error) {
+func (m *assetManagerServerGroups) createServers(ctx context.Context, group db.ResourceGroup, res db.Resource, cfg configForServerGroup, sg serverGroup, countToCreate uint64) (castellum.OperationOutcome, error) {
 	provider, eo, err := m.Provider.ProjectScopedClient(ctx, core.ProjectScope{
-		ID:        res.ScopeUUID,
+		ID:        group.ScopeUUID,
 		RoleNames: m.LocalRoleNames,
 	})
 	if err != nil {
@@ -393,13 +393,13 @@ func (m *assetManagerServerGroups) createServers(ctx context.Context, res db.Res
 		return opts
 	}
 	schedulerhints := servers.SchedulerHintOpts{
-		Group: group.ID,
+		Group: sg.ID,
 	}
 
 	// create servers
 	serversInCreation := make(map[string]string)
 	for idx := 0; uint64(idx) < countToCreate; idx++ {
-		name := fmt.Sprintf("%s-%s", group.Name, makeNameDisambiguator())
+		name := fmt.Sprintf("%s-%s", sg.Name, makeNameDisambiguator())
 		logg.Info("creating server %s in %s", name, res.AssetType)
 
 		server, err := servers.Create(ctx, computeV2, opts(name), schedulerhints).Extract()

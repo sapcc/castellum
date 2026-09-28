@@ -41,7 +41,7 @@ func AssetFromDB(asset db.Asset) castellum.Asset {
 }
 
 // PendingOperationFromDB converts a db.PendingOperation into an api.Operation.
-func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, res *db.Resource) castellum.StandaloneOperation {
+func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, group *db.ResourceGroup, res *db.Resource) castellum.StandaloneOperation {
 	op := castellum.StandaloneOperation{
 		AssetID: assetID,
 		State:   dbOp.State(),
@@ -54,8 +54,8 @@ func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, res *db.Re
 		},
 		Finished: None[castellum.OperationFinish](),
 	}
-	if res != nil {
-		op.ProjectUUID = res.ScopeUUID
+	if res != nil && group != nil {
+		op.ProjectUUID = group.ScopeUUID
 		op.AssetType = string(res.AssetType)
 	}
 	if t, ok := dbOp.ConfirmedAt.Unpack(); ok {
@@ -73,7 +73,7 @@ func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, res *db.Re
 }
 
 // FinishedOperationFromDB converts a db.FinishedOperation into an api.Operation.
-func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string, res *db.Resource) castellum.StandaloneOperation {
+func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string, group *db.ResourceGroup, res *db.Resource) castellum.StandaloneOperation {
 	op := castellum.StandaloneOperation{
 		AssetID: assetID,
 		State:   dbOp.State(),
@@ -89,8 +89,8 @@ func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string, res *db.
 			ErrorMessage: dbOp.ErrorMessage,
 		}),
 	}
-	if res != nil {
-		op.ProjectUUID = res.ScopeUUID
+	if res != nil && group != nil {
+		op.ProjectUUID = group.ScopeUUID
 		op.AssetType = string(res.AssetType)
 	}
 	if t, ok := dbOp.ConfirmedAt.Unpack(); ok {
@@ -118,7 +118,7 @@ func (h handler) GetAssets(w http.ResponseWriter, r *http.Request) {
 	if token == nil {
 		return
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token, false)
+	_, dbResource := h.LoadResourceAndGroup(w, r, projectUUID, token, false)
 	if dbResource == nil {
 		return
 	}
@@ -147,7 +147,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	if token == nil {
 		return
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token, false)
+	_, dbResource := h.LoadResourceAndGroup(w, r, projectUUID, token, false)
 	if dbResource == nil {
 		return
 	}
@@ -168,14 +168,16 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
-	asset.PendingOperation = options.Map(dbPendingOp, func(op db.PendingOperation) castellum.StandaloneOperation { return PendingOperationFromDB(op, "", nil) })
+	asset.PendingOperation = options.Map(dbPendingOp, func(op db.PendingOperation) castellum.StandaloneOperation {
+		return PendingOperationFromDB(op, "", nil, nil)
+	})
 
 	_, wantsFinishedOps := r.URL.Query()["history"]
 	if wantsFinishedOps {
 		err = db.FinishedOperationStore.SelectWhere(ctx, h.DB,
 			`asset_id = $1 AND outcome != 'error-resolved' ORDER BY finished_at`, dbAsset.ID).
 			Foreach(func(op db.FinishedOperation) error {
-				asset.FinishedOperations = append(asset.FinishedOperations, FinishedOperationFromDB(op, "", nil))
+				asset.FinishedOperations = append(asset.FinishedOperations, FinishedOperationFromDB(op, "", nil, nil))
 				return nil
 			})
 		if respondwith.ObfuscatedErrorText(w, err) {
@@ -208,7 +210,7 @@ func (h handler) PostAssetErrorResolved(w http.ResponseWriter, r *http.Request) 
 	if !token.Require(w, "cluster:access") {
 		return
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token, false)
+	_, dbResource := h.LoadResourceAndGroup(w, r, projectUUID, token, false)
 	if dbResource == nil {
 		return
 	}
