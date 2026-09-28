@@ -38,9 +38,13 @@ func runAssetScrapeTest(t *testing.T, action func(context.Context, test.Setup, f
 	_, dbDump := easypg.NewTracker(t, s.DB.DB)
 	dbDump.AssertEmpty()
 
-	// create a resource and asset to test with
+	// create a resource group, resource and asset to test with
+	must.SucceedT(t, db.ResourceGroupStore.Insert(ctx, s.DB, &db.ResourceGroup{
+		ScopeUUID:    "project1",
+		AssetManager: "static",
+	}))
 	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
-		ScopeUUID:                "project1",
+		ResourceGroupID:          1,
 		AssetType:                "foo",
 		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
 		LowDelaySeconds:          3600,
@@ -364,9 +368,13 @@ func TestAssetScrapeOrdering(t *testing.T) {
 		commonSetupOptionsForWorkerTest(),
 	)
 	scrapeJob := s.TaskContext.AssetScrapingJob(s.Registry)
-	// create a resource and multiple assets to test with
+	// create a resource group, resource and multiple assets to test with
+	must.SucceedT(t, db.ResourceGroupStore.Insert(ctx, s.DB, &db.ResourceGroup{
+		ScopeUUID:    "project1",
+		AssetManager: "static",
+	}))
 	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
-		ScopeUUID:                "project1",
+		ResourceGroupID:          1,
 		AssetType:                "foo",
 		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
 		LowDelaySeconds:          3600,
@@ -656,8 +664,12 @@ func TestMaxAssetSizeRules(t *testing.T) {
 		}`),
 	)
 	scrapeJob := s.TaskContext.AssetScrapingJob(s.Registry)
+	must.SucceedT(t, db.ResourceGroupStore.Insert(ctx, s.DB, &db.ResourceGroup{
+		ScopeUUID:    "project1",
+		AssetManager: "static",
+	}))
 	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
-		ScopeUUID:                "project1",
+		ResourceGroupID:          1,
 		AssetType:                "foo",
 		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 20},
 		LowDelaySeconds:          3600,

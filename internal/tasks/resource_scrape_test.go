@@ -33,24 +33,32 @@ func TestResourceScraping(t *testing.T) {
 	tr, tr0 := easypg.NewTracker(t, s.DB.DB)
 	tr0.AssertEmpty()
 
-	// create some project resources for testing
-	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
-		ScopeUUID:                "project1",
-		DomainUUID:               "domain1",
-		AssetType:                "foo",
-		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 0},
-		HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 0},
-		CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 0},
-		NextScrapeAt:             s.Clock.Now(),
+	// create some project resource groups + resources for testing
+	must.SucceedT(t, db.ResourceGroupStore.Insert(ctx, s.DB, &db.ResourceGroup{
+		ScopeUUID:    "project1",
+		DomainUUID:   "domain1",
+		AssetManager: "static",
+		NextScrapeAt: s.Clock.Now(),
 	}))
 	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
-		ScopeUUID:                "project3",
-		DomainUUID:               "domain1",
+		ResourceGroupID:          1,
 		AssetType:                "foo",
 		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 0},
 		HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 0},
 		CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 0},
-		NextScrapeAt:             s.Clock.Now(),
+	}))
+	must.SucceedT(t, db.ResourceGroupStore.Insert(ctx, s.DB, &db.ResourceGroup{
+		ScopeUUID:    "project3",
+		DomainUUID:   "domain1",
+		AssetManager: "static",
+		NextScrapeAt: s.Clock.Now(),
+	}))
+	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
+		ResourceGroupID:          2,
+		AssetType:                "foo",
+		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 0},
+		HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 0},
+		CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 0},
 	}))
 
 	// create some mock assets that ScrapeNextResource() can find
@@ -73,7 +81,7 @@ func TestResourceScraping(t *testing.T) {
 	tr.DBChanges().AssertEqualf(`
 			INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (1, 1, 'asset1', 0, '{"singular":0}', %[1]d, TRUE);
 			INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (2, 1, 'asset2', 0, '{"singular":0}', %[1]d, TRUE);
-			UPDATE resources SET next_scrape_at = %[2]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+			UPDATE resource_groups SET next_scrape_at = %[2]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_manager = 'static';
 		`,
 		s.Clock.Now().Unix(),
 		s.Clock.Now().Add(30*time.Minute).Unix(),
@@ -85,7 +93,7 @@ func TestResourceScraping(t *testing.T) {
 	tr.DBChanges().AssertEqualf(`
 			INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (3, 2, 'asset5', 0, '{"singular":0}', %[1]d, TRUE);
 			INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (4, 2, 'asset6', 0, '{"singular":0}', %[1]d, TRUE);
-			UPDATE resources SET next_scrape_at = %[2]d WHERE id = 2 AND scope_uuid = 'project3' AND asset_type = 'foo';
+			UPDATE resource_groups SET next_scrape_at = %[2]d WHERE id = 2 AND scope_uuid = 'project3' AND asset_manager = 'static';
 		`,
 		s.Clock.Now().Unix(),
 		s.Clock.Now().Add(30*time.Minute).Unix(),
@@ -93,11 +101,11 @@ func TestResourceScraping(t *testing.T) {
 
 	// next ScrapeNextResource() should scrape project1/foo again because its
 	// next_scrape_at timestamp is the smallest; there should be no changes except for
-	// resources.next_scrape_at
+	// resource_groups.next_scrape_at
 	s.Clock.StepBy(time.Hour)
 	must.SucceedT(t, job.ProcessOne(ctx))
 	tr.DBChanges().AssertEqualf(`
-			UPDATE resources SET next_scrape_at = %d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+			UPDATE resource_groups SET next_scrape_at = %d WHERE id = 1 AND scope_uuid = 'project1' AND asset_manager = 'static';
 		`,
 		s.Clock.Now().Add(30*time.Minute).Unix(),
 	)
@@ -108,7 +116,7 @@ func TestResourceScraping(t *testing.T) {
 	must.SucceedT(t, job.ProcessOne(ctx))
 	tr.DBChanges().AssertEqualf(`
 			DELETE FROM assets WHERE id = 4 AND resource_id = 2 AND uuid = 'asset6';
-			UPDATE resources SET next_scrape_at = %d WHERE id = 2 AND scope_uuid = 'project3' AND asset_type = 'foo';
+			UPDATE resource_groups SET next_scrape_at = %d WHERE id = 2 AND scope_uuid = 'project3' AND asset_manager = 'static';
 		`,
 		s.Clock.Now().Add(30*time.Minute).Unix(),
 	)
@@ -118,24 +126,95 @@ func TestResourceScraping(t *testing.T) {
 	must.SucceedT(t, job.ProcessOne(ctx))
 	tr.DBChanges().AssertEqualf(`
 			INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (5, 1, 'asset7', 0, '{"singular":0}', %[1]d, TRUE);
-			UPDATE resources SET next_scrape_at = %[2]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+			UPDATE resource_groups SET next_scrape_at = %[2]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_manager = 'static';
 		`,
 		s.Clock.Now().Unix(),
 		s.Clock.Now().Add(30*time.Minute).Unix(),
 	)
 
 	// check behavior on a resource without assets
-	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
+	must.SucceedT(t, db.ResourceGroupStore.Insert(ctx, s.DB, &db.ResourceGroup{
 		ScopeUUID:    "project2",
 		DomainUUID:   "domain1",
-		AssetType:    "foo",
+		AssetManager: "static",
 		NextScrapeAt: s.Clock.Now(),
+	}))
+	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
+		ResourceGroupID: 3,
+		AssetType:       "foo",
 	}))
 	amStatic.Assets["project2"] = nil
 	must.SucceedT(t, job.ProcessOne(ctx))
 	tr.DBChanges().AssertEqualf(`
-			INSERT INTO resources (id, scope_uuid, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, domain_uuid, next_scrape_at) VALUES (3, 'project2', 'foo', '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":0}', 0, 'domain1', %d);
+			INSERT INTO resource_groups (id, scope_uuid, domain_uuid, asset_manager, next_scrape_at) VALUES (3, 'project2', 'domain1', 'static', %[1]d);
+			INSERT INTO resources (id, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, resource_group_id) VALUES (3, 'foo', 'null', 0, 'null', 0, 'null', 0, 3);
 		`,
 		s.Clock.Now().Add(30*time.Minute).Unix(),
 	)
+}
+
+// TestResourceScrapingMultipleTypesInGroup verifies that a single resource group containing two asset types is scraped in one pass
+// and that when one manager fails the group error is recorded while assets of the successful manager stay correct.
+func TestResourceScrapingMultipleTypesInGroup(t *testing.T) {
+	ctx := t.Context()
+	s := test.NewSetup(t,
+		commonSetupOptionsForWorkerTest(),
+	)
+	job := s.TaskContext.ResourceScrapingJob(s.Registry)
+
+	// single group with two resources of different asset types
+	must.SucceedT(t, db.ResourceGroupStore.Insert(ctx, s.DB, &db.ResourceGroup{
+		ScopeUUID:    "project1",
+		DomainUUID:   "domain1",
+		AssetManager: "static",
+		NextScrapeAt: s.Clock.Now(),
+	}))
+	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
+		ResourceGroupID:          1,
+		AssetType:                "foo",
+		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 0},
+		HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 0},
+		CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 0},
+	}))
+	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
+		ResourceGroupID:          1,
+		AssetType:                "bar",
+		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 0},
+		HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 0},
+		CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 0},
+	}))
+
+	amFoo := s.ManagerForAssetType("foo")
+	amFoo.Assets = map[string]map[string]plugins.StaticAsset{
+		"project1": {
+			"fooasset1": {Size: 1000, Usage: 400},
+		},
+	}
+	amBar := s.ManagerForAssetType("bar")
+	amBar.Assets = map[string]map[string]plugins.StaticAsset{
+		"project1": {
+			"barasset1": {Size: 2000, Usage: 800},
+		},
+	}
+	tr, _ := easypg.NewTracker(t, s.DB.DB)
+
+	// assets for both types should be discovered in one scrape
+	s.Clock.StepBy(time.Hour)
+	must.SucceedT(t, job.ProcessOne(ctx))
+	tr.DBChanges().AssertEqualf(`
+		INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (1, 1, 'fooasset1', 0, '{"singular":0}', %[1]d, TRUE);
+		INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (2, 2, 'barasset1', 0, '{"singular":0}', %[1]d, TRUE);
+		UPDATE resource_groups SET next_scrape_at = %[2]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_manager = 'static';
+	`, s.Clock.Now().Unix(), s.Clock.Now().Add(30*time.Minute).Unix())
+
+	// Simulate the "foo" manager failing for this project
+	delete(amFoo.Assets, "project1")
+	s.Clock.StepBy(time.Hour)
+	err := job.ProcessOne(ctx)
+	if err == nil {
+		t.Fatal("expected error from failing foo manager, got nil")
+	}
+	tr.DBChanges().AssertEqualf(`
+		UPDATE resource_groups SET next_scrape_at = %d, scrape_error_message = 'cannot list foo assets in scope project1: no such project' WHERE id = 1 AND scope_uuid = 'project1' AND asset_manager = 'static';
+	`, s.Clock.Now().Add(30*time.Minute).Unix())
 }

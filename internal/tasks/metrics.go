@@ -37,7 +37,7 @@ func (c StateMetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	projectResourceExistsGauge.Describe(ch)
 }
 
-var resourceStateQuery = `SELECT scope_uuid, asset_type FROM resources`
+var resourceStateQuery = `SELECT g.scope_uuid, r.asset_type FROM resources r JOIN resource_groups g ON g.id = r.resource_group_id`
 
 // Collect implements the prometheus.Collector interface.
 func (c StateMetricsCollector) Collect(ch chan<- prometheus.Metric) {

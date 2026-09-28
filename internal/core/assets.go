@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/pluggable"
@@ -33,12 +34,12 @@ type AssetStatus struct {
 // a low-level logic function. Low-level functions explicitly take only the
 // AssetStatus to avoid accidental dependencies on non-logic attributes
 // like timestamps, UUIDs or error message strings.
-func StatusOfAsset(asset db.Asset, cfg Config, res db.Resource) AssetStatus {
+func StatusOfAsset(asset db.Asset, cfg Config, group db.ResourceGroup, res db.Resource) AssetStatus {
 	return AssetStatus{
 		Size:              asset.Size,
 		Usage:             asset.Usage,
 		StrictMinimumSize: asset.StrictMinimumSize,
-		StrictMaximumSize: options.Min(asset.StrictMaximumSize, cfg.MaxAssetSizeFor(res.AssetType, res.ScopeUUID)),
+		StrictMaximumSize: options.Min(asset.StrictMaximumSize, cfg.MaxAssetSizeFor(res.AssetType, group.ScopeUUID)),
 	}
 }
 
@@ -120,13 +121,13 @@ type AssetManager interface {
 	// `core.ErrNoConfigurationAllowed` otherwise.
 	CheckResourceAllowed(ctx context.Context, assetType db.AssetType, scopeUUID string, configJSON string, existingResources map[db.AssetType]struct{}) error
 
-	ListAssets(ctx context.Context, res db.Resource) ([]string, error)
+	ListAssets(ctx context.Context, group db.ResourceGroup, res db.Resource) ([]string, error)
 	// The returned Outcome should be either Succeeded, Failed or Errored, but not Cancelled.
 	// The returned error should be nil if and only if the outcome is Succeeded.
-	SetAssetSize(ctx context.Context, res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error)
+	SetAssetSize(ctx context.Context, group db.ResourceGroup, res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error)
 	// previousStatus will be nil when this function is called for the first time
 	// for the given asset.
-	GetAssetStatus(ctx context.Context, res db.Resource, assetUUID string, previousStatus Option[AssetStatus]) (AssetStatus, error)
+	GetAssetStatus(ctx context.Context, group db.ResourceGroup, res db.Resource, assetUUID string, previousStatus Option[AssetStatus]) (AssetStatus, error)
 }
 
 // AssetManagerRegistry is a pluggable.Registry for AssetManager implementations.
@@ -167,5 +168,20 @@ func (team AssetManagerTeam) ForAssetType(assetType db.AssetType) (AssetManager,
 		// provide a reasonable fallback for AssetTypeInfo
 		AssetType:    assetType,
 		UsageMetrics: []castellum.UsageMetric{castellum.SingularUsageMetric},
+	}
+}
+
+// PluginTypeIDForAssetType returns the asset_manager column value for the
+// given asset type, mirroring the CASE expression in migration 26.
+func (team AssetManagerTeam) PluginTypeIDForAssetType(assetType db.AssetType) string {
+	switch {
+	case assetType == "nfs-shares",
+		strings.HasPrefix(string(assetType), "nfs-shares-type:"):
+		return "nfs-shares"
+	case assetType == "server-groups",
+		strings.HasPrefix(string(assetType), "server-group:"):
+		return "server-groups"
+	default:
+		return "static"
 	}
 }

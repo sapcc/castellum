@@ -35,7 +35,7 @@ func TestGetResourceScrapeErrors(t *testing.T) {
 		ExpectJSON(t, http.StatusOK, jsonmatch.Object{
 			"resource_scrape_errors": []jsonmatch.Object{
 				{
-					"asset_type": "bar",
+					"asset_type": "nfs-shares",
 					"checked": jsonmatch.Object{
 						"error": "datacenter is on fire",
 					},
