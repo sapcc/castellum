@@ -185,53 +185,68 @@ func (h handler) SetTokenToProjectScope(ctx context.Context, token *gopherpolicy
 	return projectExists, nil
 }
 
-// LoadResource loads the requested db.Resource and returns it.
-// If the process fails, an error is written to the response and nil is returned.
-// If createIfMissing is true, a new db.Resource will be created.
-func (h handler) LoadResource(w http.ResponseWriter, r *http.Request, projectUUID string, token *gopherpolicy.Token, createIfMissing bool) *db.Resource {
+// LoadResourceAndGroup loads the requested db.Resource and the ResourceGroup it belongs to.
+// If createIfMissing is false and either group or resource don't exist in the DB it will return (nil, nil).
+// If createIfMissing is true, it will synthesize the missing objects.
+// The caller is responsible to persist them in the DB.
+func (h handler) LoadResourceAndGroup(w http.ResponseWriter, r *http.Request, projectUUID string, token *gopherpolicy.Token, createIfMissing bool) (*db.ResourceGroup, *db.Resource) {
 	ctx := r.Context()
 	assetType := db.AssetType(mux.Vars(r)["asset_type"])
 	if assetType == "" {
 		http.NotFound(w, r)
-		return nil
+		return nil, nil
 	}
 	manager, _ := h.Team.ForAssetType(assetType)
 	if manager == nil {
 		// only report resources when we have an asset manager configured
 		http.NotFound(w, r)
-		return nil
+		return nil, nil
 	}
 
 	if !token.Require(w, assetType.PolicyRuleForRead()) {
-		return nil
+		return nil, nil
 	}
 
-	resOrNone, err := gsql.NoneIfNoRows(db.ResourceStore.SelectOneWhere(ctx, h.DB, `scope_uuid = $1 AND asset_type = $2`, projectUUID, assetType))
+	assetManager := manager.PluginTypeID()
+	groupOrNone, err := gsql.NoneIfNoRows(db.ResourceGroupStore.SelectOneWhere(ctx, h.DB, `scope_uuid = $1 AND asset_manager = $2`, projectUUID, assetManager))
 	if respondwith.ObfuscatedErrorText(w, err) {
-		return nil
+		return nil, nil
 	}
-	res, ok := resOrNone.Unpack()
-	if ok {
-		return &res
+
+	if group, ok := groupOrNone.Unpack(); ok {
+		resOrNone, err := gsql.NoneIfNoRows(db.ResourceStore.SelectOneWhere(ctx, h.DB, `resource_group_id = $1 AND asset_type = $2`, group.ID, assetType))
+		if respondwith.ObfuscatedErrorText(w, err) {
+			return nil, nil
+		}
+		if res, ok := resOrNone.Unpack(); ok {
+			return &group, &res
+		}
 	}
 
 	if createIfMissing {
 		proj, err := h.Provider.GetProject(r.Context(), projectUUID)
 		if respondwith.ObfuscatedErrorText(w, err) {
-			return nil
+			return nil, nil
 		}
-		return &db.Resource{
-			ScopeUUID:  projectUUID,
-			DomainUUID: proj.DomainID,
-			AssetType:  assetType,
+		group, ok := groupOrNone.Unpack()
+		if !ok {
+			// synthesize a new group, the caller must persist it before inserting the resource
+			group = db.ResourceGroup{
+				ScopeUUID:    projectUUID,
+				DomainUUID:   proj.DomainID,
+				AssetManager: assetManager,
+			}
+		}
+		return &group, &db.Resource{
+			AssetType: assetType,
 		}
 	}
 	http.NotFound(w, r)
-	return nil
+	return nil, nil
 }
 
-func (h handler) rejectIfResourceSeeded(w http.ResponseWriter, r *http.Request, res db.Resource) bool {
-	proj, err := h.Provider.GetProject(r.Context(), res.ScopeUUID)
+func (h handler) rejectIfResourceSeeded(w http.ResponseWriter, r *http.Request, group db.ResourceGroup, res db.Resource) bool {
+	proj, err := h.Provider.GetProject(r.Context(), group.ScopeUUID)
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return true
 	}

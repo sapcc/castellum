@@ -24,8 +24,8 @@ import (
 // refers to a pre-existing resource).
 //
 // For new resources, a fresh `res` shall be given that shall only be filled
-// with an AssetType and ScopeUUID.
-func ApplyResourceSpecInto(ctx context.Context, res *db.Resource, spec castellum.Resource, existingResources map[db.AssetType]struct{}, cfg Config, team AssetManagerTeam) (errs errext.ErrorSet) {
+// with an AssetType, and `group` shall carry the target ScopeUUID.
+func ApplyResourceSpecInto(ctx context.Context, group db.ResourceGroup, res *db.Resource, spec castellum.Resource, existingResources map[db.AssetType]struct{}, cfg Config, team AssetManagerTeam) (errs errext.ErrorSet) {
 	manager, info := team.ForAssetType(res.AssetType)
 	if manager == nil {
 		errs.Addf("unsupported asset type")
@@ -33,7 +33,7 @@ func ApplyResourceSpecInto(ctx context.Context, res *db.Resource, spec castellum
 	}
 
 	res.ConfigJSON = string(spec.ConfigJSON.UnwrapOr(json.RawMessage("")))
-	errs.Add(manager.CheckResourceAllowed(ctx, res.AssetType, res.ScopeUUID, res.ConfigJSON, existingResources))
+	errs.Add(manager.CheckResourceAllowed(ctx, res.AssetType, group.ScopeUUID, res.ConfigJSON, existingResources))
 
 	if spec.Checked.IsSome() {
 		errs.Addf("resource.checked cannot be set via the API")
@@ -45,7 +45,7 @@ func ApplyResourceSpecInto(ctx context.Context, res *db.Resource, spec castellum
 	errs.Append(applyThresholdSpecsInto(res, spec, info))
 	errs.Append(checkIntraThresholdConsistency(res, spec, info))
 	errs.Append(applySteppingSpecInto(res, spec))
-	errs.Append(applySizeConstraintsSpecInto(res, spec, cfg.MaxAssetSizeFor(res.AssetType, res.ScopeUUID)))
+	errs.Append(applySizeConstraintsSpecInto(res, spec, cfg.MaxAssetSizeFor(res.AssetType, group.ScopeUUID)))
 	return
 }
 

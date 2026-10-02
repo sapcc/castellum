@@ -25,9 +25,9 @@ func init() {
 
 // CountStateTransition must be called whenever an operation changes to a
 // different state.
-func CountStateTransition(res db.Resource, assetUUID string, from, to castellum.OperationState) {
+func CountStateTransition(group db.ResourceGroup, res db.Resource, assetUUID string, from, to castellum.OperationState) {
 	labels := prometheus.Labels{
-		"project_id": res.ScopeUUID,
+		"project_id": group.ScopeUUID,
 		"asset":      string(res.AssetType),
 		"from_state": string(from),
 		"to_state":   string(to),

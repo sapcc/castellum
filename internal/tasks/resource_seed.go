@@ -14,10 +14,28 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sapcc/go-bits/jobloop"
 	"github.com/sapcc/go-bits/logg"
+	"go.xyrillian.de/gg/gsql"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 )
+
+// deleteResourceAndMaybeGCGroup deletes the given resource and
+// if that was the last resource in its group, also deletes the group.
+func (c *Context) deleteResourceAndMaybeGCGroup(ctx context.Context, dbResource db.Resource) error {
+	return c.DB.WithinTransaction(ctx, nil, func(tx *gsql.Tx) error {
+		// Lock the group row first so no concurrent INSERT can slip in between
+		// the resource DELETE and the group emptiness check.
+		_, err := gsql.NoneIfNoRows(db.ResourceGroupStore.SelectOneWhere(ctx, tx, `id = $1 FOR UPDATE`, dbResource.ResourceGroupID))
+		if err != nil {
+			return err
+		}
+		if err := db.ResourceStore.Delete(ctx, tx, dbResource); err != nil {
+			return err
+		}
+		return db.GCResourceGroup(ctx, tx, dbResource.ResourceGroupID)
+	})
+}
 
 // ResourceSeedingJob applies the resource seed from the Config every few minutes.
 //
@@ -71,8 +89,11 @@ func (c *Context) applyResourceSeeds(ctx context.Context) error {
 }
 
 func (c *Context) applyProjectSeed(ctx context.Context, projectUUID string, seed core.ProjectSeed) error {
-	// list existing resources
-	dbResources, err := db.ResourceStore.SelectWhere(ctx, c.DB, `scope_uuid = $1`, projectUUID).Collect()
+	// list existing resources for this scope (joined through resource_groups)
+	dbResources, err := db.ResourceStore.SelectWhere(ctx, c.DB,
+		`resource_group_id IN (SELECT id FROM resource_groups WHERE scope_uuid = $1)`,
+		projectUUID,
+	).Collect()
 	if err != nil {
 		return err
 	}
@@ -81,13 +102,35 @@ func (c *Context) applyProjectSeed(ctx context.Context, projectUUID string, seed
 		isExistingResource[dbResource.AssetType] = struct{}{}
 	}
 
+	// cache of already-loaded groups by (asset_manager) for this scope
+	groupsByManager := make(map[string]db.ResourceGroup)
+	loadGroup := func(assetType db.AssetType) (db.ResourceGroup, error) {
+		manager := c.Team.PluginTypeIDForAssetType(assetType)
+		if group, ok := groupsByManager[manager]; ok {
+			return group, nil
+		}
+		group, err := gsql.NoneIfNoRows(db.ResourceGroupStore.SelectOneWhere(ctx, c.DB, `scope_uuid = $1 AND asset_manager = $2`, projectUUID, manager))
+		if err != nil {
+			return db.ResourceGroup{}, err
+		}
+		if g, ok := group.Unpack(); ok {
+			groupsByManager[manager] = g
+			return g, nil
+		}
+		return db.ResourceGroup{}, nil
+	}
+
 	// check existing resources (positive seeds take preference over negative seeds)
 	for _, dbResource := range dbResources {
 		resource, exists := seed.Resources[dbResource.AssetType]
 		if exists {
 			// apply positive seed
+			group, err := loadGroup(dbResource.AssetType)
+			if err != nil {
+				return err
+			}
 			dbResourceCopy := dbResource
-			errs := core.ApplyResourceSpecInto(ctx, &dbResourceCopy, resource, isExistingResource, c.Config, c.Team)
+			errs := core.ApplyResourceSpecInto(ctx, group, &dbResourceCopy, resource, isExistingResource, c.Config, c.Team)
 			if !errs.IsEmpty() {
 				return fmt.Errorf("cannot apply %s seed: %s", dbResource.AssetType, errs.Join(", "))
 			}
@@ -101,8 +144,7 @@ func (c *Context) applyProjectSeed(ctx context.Context, projectUUID string, seed
 		} else if seed.ForbidsResource(dbResource.AssetType) {
 			// enforce negative seed
 			logg.Info("enforcing negative %s seed for project %s/%s...", dbResource.AssetType, seed.DomainName, seed.ProjectName)
-			err := db.ResourceStore.Delete(ctx, c.DB, dbResource)
-			if err != nil {
+			if err := c.deleteResourceAndMaybeGCGroup(ctx, dbResource); err != nil {
 				return err
 			}
 			delete(isExistingResource, dbResource.AssetType)
@@ -120,21 +162,41 @@ func (c *Context) applyProjectSeed(ctx context.Context, projectUUID string, seed
 		if err != nil {
 			return err
 		}
-		dbResource := db.Resource{
+		assetManager := c.Team.PluginTypeIDForAssetType(assetType)
+
+		// Build a temporary group for validation, so that an invalid seed does not leave behind a dangling resource group
+		tempGroup := db.ResourceGroup{
 			ScopeUUID:    projectUUID,
 			DomainUUID:   proj.DomainID,
-			AssetType:    assetType,
-			NextScrapeAt: time.Unix(0, 0).UTC(), // give new resources a very early next_scrape_at to prioritize them in the scrape queue
+			AssetManager: assetManager,
 		}
-		errs := core.ApplyResourceSpecInto(ctx, &dbResource, resource, isExistingResource, c.Config, c.Team)
+		// Reuse the persisted group if we already have one cached.
+		if g, ok := groupsByManager[assetManager]; ok {
+			tempGroup = g
+		}
+
+		dbResource := db.Resource{
+			AssetType: assetType,
+		}
+		errs := core.ApplyResourceSpecInto(ctx, tempGroup, &dbResource, resource, isExistingResource, c.Config, c.Team)
 		if !errs.IsEmpty() {
 			return fmt.Errorf("cannot apply %s seed: %s", dbResource.AssetType, errs.Join(", "))
 		}
-		logg.Info("applying %s seed for project %s/%s...", dbResource.AssetType, seed.DomainName, seed.ProjectName)
-		err = db.ResourceStore.Insert(ctx, c.DB, &dbResource)
+
+		// Validation passed, now create resource group, if required, and resource atomically
+		err = c.DB.WithinTransaction(ctx, nil, func(tx *gsql.Tx) error {
+			group, err := db.EnsureResourceGroup(ctx, tx, projectUUID, proj.DomainID, assetManager)
+			if err != nil {
+				return err
+			}
+			groupsByManager[group.AssetManager] = group
+			dbResource.ResourceGroupID = group.ID
+			return db.ResourceStore.Insert(ctx, tx, &dbResource)
+		})
 		if err != nil {
 			return err
 		}
+		logg.Info("applying %s seed for project %s/%s...", dbResource.AssetType, seed.DomainName, seed.ProjectName)
 		isExistingResource[assetType] = struct{}{}
 	}
 
