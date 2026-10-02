@@ -155,46 +155,49 @@ func (m *assetManagerNFS) CheckResourceAllowed(ctx context.Context, assetType db
 }
 
 // ListAssets implements the core.AssetManager interface.
-func (m *assetManagerNFS) ListAssets(ctx context.Context, res db.Resource) ([]string, error) {
-	// shares are discovered via Prometheus metrics since that is way faster than
-	// going through the Manila API
-	assetType, ok := m.parseAssetType(res.AssetType).Unpack()
-	if !ok {
-		return nil, fmt.Errorf("could not parse asset type %s", res.AssetType)
-	}
-	var promQuery string
-	if assetType.AllShares {
-		promQuery = fmt.Sprintf(
-			`count by (id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error"})`,
-			res.ScopeUUID,
-		)
-	} else {
-		promQuery = fmt.Sprintf(
-			`count by (id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error",share_type_id="%s"})`,
-			res.ScopeUUID, assetType.ShareTypeID,
-		)
-	}
-	vector, err := m.Discovery.GetVector(ctx, promQuery)
-	if err != nil {
-		return nil, fmt.Errorf("while discovering shares for project %s in Prometheus: %w", res.ScopeUUID, err)
-	}
+func (m *assetManagerNFS) ListAssets(ctx context.Context, scopeUUID string, resources map[db.AssetType]core.ResourceInfo) (map[db.AssetType][]string, error) {
+	allShareIDs := make(map[db.AssetType][]string)
 
-	var allShareIDs []string
-	for _, sample := range vector {
-		shareID := string(sample.Metric["id"])
-
-		// evaluate exclusion rules based on Prometheus metrics
-		metrics, err := m.ShareMetrics.Get(ctx, manilaShareMetricsKey{
-			ProjectUUID: res.ScopeUUID,
-			ShareUUID:   shareID,
-		})
-		if err != nil {
-			return nil, err
+	for _, resource := range resources {
+		// shares are discovered via Prometheus metrics since that is way faster than
+		// going through the Manila API
+		assetType, ok := m.parseAssetType(resource.AssetType).Unpack()
+		if !ok {
+			return nil, fmt.Errorf("could not parse asset type %s", resource.AssetType)
 		}
-		if metrics.ExclusionReason == "" {
-			allShareIDs = append(allShareIDs, shareID)
+		var promQuery string
+		if assetType.AllShares {
+			promQuery = fmt.Sprintf(
+				`count by (id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error"})`,
+				resource.ScopeUUID,
+			)
 		} else {
-			logg.Debug("ignoring share %s because of %s", shareID, metrics.ExclusionReason)
+			promQuery = fmt.Sprintf(
+				`count by (id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error",share_type_id="%s"})`,
+				resource.ScopeUUID, assetType.ShareTypeID,
+			)
+		}
+		vector, err := m.Discovery.GetVector(ctx, promQuery)
+		if err != nil {
+			return nil, fmt.Errorf("while discovering shares for project %s in Prometheus: %w", resource.ScopeUUID, err)
+		}
+
+		for _, sample := range vector {
+			shareID := string(sample.Metric["id"])
+
+			// evaluate exclusion rules based on Prometheus metrics
+			metrics, err := m.ShareMetrics.Get(ctx, manilaShareMetricsKey{
+				ProjectUUID: resource.ScopeUUID,
+				ShareUUID:   shareID,
+			})
+			if err != nil {
+				return nil, err
+			}
+			if metrics.ExclusionReason == "" {
+				allShareIDs[resource.AssetType] = append(allShareIDs[resource.AssetType], shareID)
+			} else {
+				logg.Debug("ignoring share %s because of %s", shareID, metrics.ExclusionReason)
+			}
 		}
 	}
 

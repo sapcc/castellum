@@ -292,13 +292,21 @@ PROMPT:
 				logg.Error("wrong number of arguments")
 				continue
 			}
-			result, err := manager.ListAssets(ctx, res)
+			resources := make(map[db.AssetType]core.ResourceInfo)
+			resources[res.AssetType] = core.ResourceInfo{
+				ScopeUUID:  res.ScopeUUID,
+				AssetType:  res.AssetType,
+				ConfigJSON: res.ConfigJSON,
+			}
+			result, err := manager.ListAssets(ctx, res.ScopeUUID, resources)
 			if err != nil {
 				logg.Error(err.Error())
 				continue
 			}
-			for idx, assetUUID := range result {
-				logg.Info("result[%d] = %q", idx, assetUUID)
+			for assetType, assetUUIDs := range result {
+				for idx, assetUUID := range assetUUIDs {
+					logg.Info("result[%s][%d] = %q", assetType, idx, assetUUID)
+				}
 			}
 
 		case "show":
