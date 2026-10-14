@@ -39,9 +39,6 @@ var (
 		},
 	}
 	initialBarResourceJSON = jsonmatch.Object{
-		"checked": jsonmatch.Object{
-			"error": "datacenter is on fire",
-		},
 		"asset_count": 1,
 		"config": jsonmatch.Object{
 			"foo": "bar",
@@ -57,6 +54,26 @@ var (
 		},
 		"size_steps": jsonmatch.Object{
 			"percent": 10,
+		},
+	}
+	initialNFSSharesResourceJSON = jsonmatch.Object{
+		"checked": jsonmatch.Object{
+			"error": "datacenter is on fire",
+		},
+		"asset_count": 0,
+		"low_threshold": jsonmatch.Object{
+			"usage_percent": 20,
+			"delay_seconds": 3600,
+		},
+		"high_threshold": jsonmatch.Object{
+			"usage_percent": 80,
+			"delay_seconds": 1800,
+		},
+		"critical_threshold": jsonmatch.Object{
+			"usage_percent": 95,
+		},
+		"size_steps": jsonmatch.Object{
+			"percent": 20,
 		},
 	}
 )
@@ -84,8 +101,9 @@ func TestGetProject(t *testing.T) {
 	s.Handler.RespondTo(ctx, "GET /v1/projects/project1").
 		ExpectJSON(t, http.StatusOK, jsonmatch.Object{
 			"resources": jsonmatch.Object{
-				"foo": initialFooResourceJSON,
-				"bar": initialBarResourceJSON,
+				"foo":        initialFooResourceJSON,
+				"bar":        initialBarResourceJSON,
+				"nfs-shares": initialNFSSharesResourceJSON,
 			},
 		})
 
@@ -95,7 +113,8 @@ func TestGetProject(t *testing.T) {
 	s.Handler.RespondTo(ctx, "GET /v1/projects/project1").
 		ExpectJSON(t, http.StatusOK, jsonmatch.Object{
 			"resources": jsonmatch.Object{
-				"foo": initialFooResourceJSON,
+				"foo":        initialFooResourceJSON,
+				"nfs-shares": initialNFSSharesResourceJSON,
 			},
 		})
 }
@@ -214,7 +233,7 @@ func TestPutResource(t *testing.T) {
 
 	// expect the resource to have been updated
 	tr.DBChanges().AssertEqualf(`
-		UPDATE resources SET low_delay_seconds = 1800, high_delay_seconds = 900, size_step_percent = 0, single_step = TRUE WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+		UPDATE resources SET low_delay_seconds = 1800, high_delay_seconds = 900, size_step_percent = 0, single_step = TRUE WHERE id = 1 AND asset_type = 'foo' AND resource_group_id = 1;
 	`)
 	s.Auditor.ExpectEvents(t, cadf.Event{
 		Action:      "update/foo",
@@ -249,7 +268,7 @@ func TestPutResource(t *testing.T) {
 		httptest.WithJSONBody(newFooResourceJSON2),
 	).ExpectStatus(t, http.StatusAccepted)
 	tr.DBChanges().AssertEqualf(`
-		UPDATE resources SET low_threshold_percent = '{"singular":0}', low_delay_seconds = 0, high_threshold_percent = '{"singular":0}', high_delay_seconds = 0, critical_threshold_percent = '{"singular":98}', size_step_percent = 15, min_free_size = 23, single_step = FALSE WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+		UPDATE resources SET low_threshold_percent = '{"singular":0}', low_delay_seconds = 0, high_threshold_percent = '{"singular":0}', high_delay_seconds = 0, critical_threshold_percent = '{"singular":98}', size_step_percent = 15, min_free_size = 23, single_step = FALSE WHERE id = 1 AND asset_type = 'foo' AND resource_group_id = 1;
 	`)
 
 	// test enabling low and high thresholds, and disabling critical threshold
@@ -257,7 +276,7 @@ func TestPutResource(t *testing.T) {
 		httptest.WithJSONBody(newFooResourceJSON1),
 	).ExpectStatus(t, http.StatusAccepted)
 	tr.DBChanges().AssertEqualf(`
-		UPDATE resources SET low_threshold_percent = '{"singular":20}', low_delay_seconds = 1800, high_threshold_percent = '{"singular":80}', high_delay_seconds = 900, critical_threshold_percent = '{"singular":0}', size_step_percent = 0, min_free_size = NULL, single_step = TRUE WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+		UPDATE resources SET low_threshold_percent = '{"singular":20}', low_delay_seconds = 1800, high_threshold_percent = '{"singular":80}', high_delay_seconds = 900, critical_threshold_percent = '{"singular":0}', size_step_percent = 0, min_free_size = NULL, single_step = TRUE WHERE id = 1 AND asset_type = 'foo' AND resource_group_id = 1;
 	`)
 
 	// test creating a new resource from scratch (rather than updating an existing one)
@@ -265,7 +284,8 @@ func TestPutResource(t *testing.T) {
 		httptest.WithJSONBody(newFooResourceJSON2),
 	).ExpectStatus(t, http.StatusAccepted)
 	tr.DBChanges().AssertEqualf(`
-		INSERT INTO resources (id, scope_uuid, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_free_size, domain_uuid, next_scrape_at) VALUES (5, 'project3', 'foo', '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":98}', 15, 23, 'domain1', 0);
+		INSERT INTO resource_groups (id, scope_uuid, domain_uuid, asset_manager, next_scrape_at) VALUES (4, 'project3', 'domain1', 'static', 0);
+		INSERT INTO resources (id, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_free_size, resource_group_id) VALUES (6, 'foo', '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":98}', 15, 23, 4);
 	`)
 
 	// test setting constraints
@@ -289,7 +309,7 @@ func TestPutResource(t *testing.T) {
 
 	// expect the resource to have been updated
 	tr.DBChanges().AssertEqualf(`
-		UPDATE resources SET low_threshold_percent = '{"singular":0}', low_delay_seconds = 0, high_threshold_percent = '{"singular":0}', high_delay_seconds = 0, critical_threshold_percent = '{"singular":98}', size_step_percent = 15, max_size = 42000, min_free_size = 200, single_step = FALSE, min_free_is_critical = TRUE WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+		UPDATE resources SET low_threshold_percent = '{"singular":0}', low_delay_seconds = 0, high_threshold_percent = '{"singular":0}', high_delay_seconds = 0, critical_threshold_percent = '{"singular":98}', size_step_percent = 15, max_size = 42000, min_free_size = 200, single_step = FALSE, min_free_is_critical = TRUE WHERE id = 1 AND asset_type = 'foo' AND resource_group_id = 1;
 	`)
 }
 
@@ -585,7 +605,7 @@ func TestDeleteResource(t *testing.T) {
 		DELETE FROM finished_operations WHERE asset_id = 1 AND reason = 'critical' AND outcome = 'errored' AND old_size = 1024 AND new_size = 1025 AND created_at = 51 AND confirmed_at = 52 AND greenlit_at = 52 AND finished_at = 53 AND greenlit_by_user_uuid = NULL AND error_message = 'datacenter is on fire' AND errored_attempts = 0 AND usage = '{"singular":983.04}';
 		DELETE FROM finished_operations WHERE asset_id = 1 AND reason = 'high' AND outcome = 'succeeded' AND old_size = 1023 AND new_size = 1024 AND created_at = 41 AND confirmed_at = 42 AND greenlit_at = 43 AND finished_at = 44 AND greenlit_by_user_uuid = 'user2' AND error_message = '' AND errored_attempts = 0 AND usage = '{"singular":818.4}';
 		DELETE FROM finished_operations WHERE asset_id = 1 AND reason = 'low' AND outcome = 'cancelled' AND old_size = 1000 AND new_size = 900 AND created_at = 31 AND confirmed_at = NULL AND greenlit_at = NULL AND finished_at = 32 AND greenlit_by_user_uuid = NULL AND error_message = '' AND errored_attempts = 0 AND usage = '{"singular":200}';
-		DELETE FROM resources WHERE id = 1 AND scope_uuid = 'project1' AND asset_type = 'foo';
+		DELETE FROM resources WHERE id = 1 AND asset_type = 'foo' AND resource_group_id = 1;
 	`)
 	s.Auditor.ExpectEvents(t, cadf.Event{
 		Action:      "disable/foo",

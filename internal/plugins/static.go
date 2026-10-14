@@ -50,10 +50,17 @@ type AssetManagerStatic struct {
 	SetAssetSizeFails         bool
 	ExpectsConfiguration      bool
 	ConflictsWithAssetType    db.AssetType
+	// Allow to override PluginTypeID to simulate more advanced tests
+	PluginTypeIDOverride string
 }
 
 // PluginTypeID implements the core.AssetManager interface.
-func (m AssetManagerStatic) PluginTypeID() string { return "static" }
+func (m AssetManagerStatic) PluginTypeID() string {
+	if m.PluginTypeIDOverride != "" {
+		return m.PluginTypeIDOverride
+	}
+	return "static"
+}
 
 // Init implements the core.AssetManager interface.
 func (m AssetManagerStatic) Init(ctx context.Context, provider core.ProviderClient) (err error) {
@@ -116,11 +123,11 @@ var (
 )
 
 // ListAssets implements the core.AssetManager interface.
-func (m AssetManagerStatic) ListAssets(_ context.Context, res db.Resource) ([]string, error) {
+func (m AssetManagerStatic) ListAssets(_ context.Context, group db.ResourceGroup, res db.Resource) ([]string, error) {
 	if res.AssetType != m.AssetType {
 		return nil, errWrongAssetType
 	}
-	assets, exists := m.Assets[res.ScopeUUID]
+	assets, exists := m.Assets[group.ScopeUUID]
 	if !exists {
 		return nil, errUnknownProject
 	}
@@ -133,11 +140,11 @@ func (m AssetManagerStatic) ListAssets(_ context.Context, res db.Resource) ([]st
 }
 
 // GetAssetStatus implements the core.AssetManager interface.
-func (m AssetManagerStatic) GetAssetStatus(_ context.Context, res db.Resource, assetUUID string, previousStatus Option[core.AssetStatus]) (core.AssetStatus, error) {
+func (m AssetManagerStatic) GetAssetStatus(_ context.Context, group db.ResourceGroup, res db.Resource, assetUUID string, previousStatus Option[core.AssetStatus]) (core.AssetStatus, error) {
 	if res.AssetType != m.AssetType {
 		return core.AssetStatus{}, errWrongAssetType
 	}
-	assets, exists := m.Assets[res.ScopeUUID]
+	assets, exists := m.Assets[group.ScopeUUID]
 	if !exists {
 		return core.AssetStatus{}, errUnknownProject
 	}
@@ -170,11 +177,11 @@ func (m AssetManagerStatic) GetAssetStatus(_ context.Context, res db.Resource, a
 }
 
 // SetAssetSize implements the core.AssetManager interface.
-func (m AssetManagerStatic) SetAssetSize(_ context.Context, res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error) {
+func (m AssetManagerStatic) SetAssetSize(_ context.Context, group db.ResourceGroup, res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error) {
 	if res.AssetType != m.AssetType {
 		return castellum.OperationOutcomeErrored, errWrongAssetType
 	}
-	assets, exists := m.Assets[res.ScopeUUID]
+	assets, exists := m.Assets[group.ScopeUUID]
 	if !exists {
 		return castellum.OperationOutcomeErrored, errUnknownProject
 	}

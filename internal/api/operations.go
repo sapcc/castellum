@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/lib/pq"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/gopherpolicy"
 	"github.com/sapcc/go-bits/httpapi"
@@ -23,9 +24,13 @@ import (
 	"github.com/sapcc/castellum/internal/db"
 )
 
-func (h handler) loadMatchingResources(w http.ResponseWriter, r *http.Request) (map[int64]db.Resource, bool) {
-	ctx := r.Context()
+// resourceWithGroup carries a Resource together with its ResourceGroup, that holds the scope/domain UUIDs and scrape state.
+type resourceWithGroup struct {
+	Resource db.Resource
+	Group    db.ResourceGroup
+}
 
+func (h handler) loadMatchingResources(w http.ResponseWriter, r *http.Request) (map[int64]resourceWithGroup, bool) {
 	// CheckToken discovers project ID in both URL path and query
 	var token *gopherpolicy.Token
 	projectUUID, token := h.CheckToken(w, r)
@@ -55,36 +60,65 @@ func (h handler) loadMatchingResources(w http.ResponseWriter, r *http.Request) (
 
 	// find all matching resources
 	var (
-		sqlConditions []string
-		sqlBindValues []any
+		groupConditions []string
+		sqlBindValues   []any
 	)
-	addSQLCondition := func(key string, value any) {
+	addGroupCondition := func(key string, value any) {
 		cond := fmt.Sprintf("%s = $%d", key, len(sqlBindValues)+1)
-		sqlConditions = append(sqlConditions, cond)
+		groupConditions = append(groupConditions, cond)
 		sqlBindValues = append(sqlBindValues, value)
 	}
 	if projectUUID != "" {
-		addSQLCondition("scope_uuid", projectUUID)
+		addGroupCondition("scope_uuid", projectUUID)
 	}
 	if domainUUID != "" {
-		addSQLCondition("domain_uuid", domainUUID)
+		addGroupCondition("domain_uuid", domainUUID)
 	}
+	if len(groupConditions) == 0 {
+		groupConditions = []string{"TRUE"}
+	}
+
+	resourceQuery := fmt.Sprintf(`
+		resource_group_id IN (
+			SELECT g.id FROM resource_groups g
+			 WHERE %s
+		)
+	`, strings.Join(groupConditions, " AND "))
 	if assetTypeStr != "" {
-		addSQLCondition("asset_type", assetTypeStr)
+		resourceQuery += fmt.Sprintf(" AND asset_type = $%d", len(sqlBindValues)+1)
+		sqlBindValues = append(sqlBindValues, assetTypeStr)
 	}
-	if len(sqlConditions) == 0 {
-		sqlConditions = []string{"TRUE"}
-	}
-	allResources, err := db.ResourceStore.SelectWhere(ctx, h.DB, strings.Join(sqlConditions, " AND "), sqlBindValues...).Collect()
+	dbResources, err := db.ResourceStore.SelectWhere(r.Context(), h.DB, resourceQuery, sqlBindValues...).Collect()
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return nil, false
 	}
 
+	// load referenced groups in one query
+	resourcesByGroupID := resourcesByGroupIDIndex.Partition(dbResources)
+	groupIDs := make([]int64, 0, len(resourcesByGroupID))
+	for id := range resourcesByGroupID {
+		groupIDs = append(groupIDs, id)
+	}
+	groupsByID := make(map[int64]db.ResourceGroup, len(groupIDs))
+	if len(groupIDs) > 0 {
+		groupsByID, err = resourceGroupByIDIndex.IndexFrom(
+			db.ResourceGroupStore.SelectWhere(r.Context(), h.DB, `id = ANY($1)`, pq.Array(groupIDs)),
+		)
+		if respondwith.ObfuscatedErrorText(w, err) {
+			return nil, false
+		}
+	}
+
+	allResources := make([]resourceWithGroup, 0, len(dbResources))
+	for _, res := range dbResources {
+		allResources = append(allResources, resourceWithGroup{Resource: res, Group: groupsByID[res.ResourceGroupID]})
+	}
+
 	// check if user has access to all these resources
-	allowedResources := make(map[int64]db.Resource)
+	allowedResources := make(map[int64]resourceWithGroup)
 	canAccessAnyMatchingProject := false
 	for _, res := range allResources {
-		projectExists, err := h.SetTokenToProjectScope(r.Context(), token, res.ScopeUUID)
+		projectExists, err := h.SetTokenToProjectScope(r.Context(), token, res.Group.ScopeUUID)
 		if respondwith.ObfuscatedErrorText(w, err) {
 			return nil, false
 		}
@@ -92,8 +126,8 @@ func (h handler) loadMatchingResources(w http.ResponseWriter, r *http.Request) (
 			continue
 		}
 		canAccessAnyMatchingProject = true
-		if token.Check(res.AssetType.PolicyRuleForRead()) {
-			allowedResources[res.ID] = res
+		if token.Check(res.Resource.AssetType.PolicyRuleForRead()) {
+			allowedResources[res.Resource.ID] = res
 		}
 	}
 
@@ -121,23 +155,23 @@ var getPendingOpsByResourceIDQuery = sqlext.SimplifyWhitespace(`
 func (h handler) GetPendingOperations(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/operations/pending")
 	ctx := r.Context()
-	dbResources, ok := h.loadMatchingResources(w, r)
+	loadedResources, ok := h.loadMatchingResources(w, r)
 	if !ok {
 		return
 	}
 
 	allOps := []castellum.StandaloneOperation{}
-	for _, dbResource := range dbResources {
+	for _, res := range loadedResources {
 		// find asset UUIDs
-		assetUUIDs, err := h.getAssetUUIDMap(dbResource)
+		assetUUIDs, err := h.getAssetUUIDMap(res.Resource)
 		if respondwith.ObfuscatedErrorText(w, err) {
 			return
 		}
 
 		// find operations
-		err = db.PendingOperationStore.Select(ctx, h.DB, getPendingOpsByResourceIDQuery, dbResource.ID).
+		err = db.PendingOperationStore.Select(ctx, h.DB, getPendingOpsByResourceIDQuery, res.Resource.ID).
 			Foreach(func(op db.PendingOperation) error {
-				allOps = append(allOps, PendingOperationFromDB(op, assetUUIDs[op.AssetID], &dbResource))
+				allOps = append(allOps, PendingOperationFromDB(op, assetUUIDs[op.AssetID], &res.Group, &res.Resource))
 				return nil
 			})
 		if respondwith.ObfuscatedErrorText(w, err) {
@@ -171,18 +205,18 @@ func (h handler) getAssetUUIDMap(res db.Resource) (map[int64]string, error) {
 func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/operations/recently-failed")
 	ctx := r.Context()
-	dbResources, ok := h.loadMatchingResources(w, r)
+	loadedResources, ok := h.loadMatchingResources(w, r)
 	if !ok {
 		return
 	}
 
 	relevantOps := []castellum.StandaloneOperation{}
-	for _, dbResource := range dbResources {
-		_, info := h.Team.ForAssetType(dbResource.AssetType)
+	for _, res := range loadedResources {
+		_, info := h.Team.ForAssetType(res.Resource.AssetType)
 
 		failedOpsByAssetID, err := recentOperationQuery{
 			DB:           h.DB,
-			ResourceID:   dbResource.ID,
+			ResourceID:   res.Resource.ID,
 			Outcomes:     []castellum.OperationOutcome{castellum.OperationOutcomeFailed, castellum.OperationOutcomeErrored},
 			OverriddenBy: `TRUE`,
 		}.execute(ctx)
@@ -191,14 +225,14 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 		}
 
 		// check if the assets in question are still eligible for resizing
-		err = db.AssetStore.SelectWhere(ctx, h.DB, `resource_id = $1 ORDER BY uuid`, dbResource.ID).
+		err = db.AssetStore.SelectWhere(ctx, h.DB, `resource_id = $1 ORDER BY uuid`, res.Resource.ID).
 			Foreach(func(asset db.Asset) error {
 				op, exists := failedOpsByAssetID[asset.ID]
 				if !exists {
 					return nil
 				}
-				if _, exists := core.GetEligibleOperations(core.LogicOfResource(dbResource, info), core.StatusOfAsset(asset, h.Config, dbResource))[op.Reason]; exists {
-					relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &dbResource))
+				if _, exists := core.GetEligibleOperations(core.LogicOfResource(res.Resource, info), core.StatusOfAsset(asset, h.Config, res.Group, res.Resource))[op.Reason]; exists {
+					relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &res.Group, &res.Resource))
 				}
 				return nil
 			})
@@ -216,7 +250,7 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/operations/recently-succeeded")
 	ctx := r.Context()
-	dbResources, ok := h.loadMatchingResources(w, r)
+	loadedResources, ok := h.loadMatchingResources(w, r)
 	if !ok {
 		return
 	}
@@ -228,11 +262,11 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 	maxFinishedAt := h.TimeNow().Add(-maxAge)
 
 	relevantOps := []castellum.StandaloneOperation{}
-	for _, dbResource := range dbResources {
+	for _, res := range loadedResources {
 		// find succeeded operations
 		succeededOpsByAssetID, err := recentOperationQuery{
 			DB:           h.DB,
-			ResourceID:   dbResource.ID,
+			ResourceID:   res.Resource.ID,
 			Outcomes:     []castellum.OperationOutcome{castellum.OperationOutcomeSucceeded},
 			OverriddenBy: fmt.Sprintf(`outcome != '%s'`, castellum.OperationOutcomeCancelled),
 		}.execute(ctx)
@@ -241,13 +275,13 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 		}
 
 		// apply filters and collect response data
-		err = db.AssetStore.SelectWhere(ctx, h.DB, `resource_id = $1 ORDER BY uuid`, dbResource.ID).
+		err = db.AssetStore.SelectWhere(ctx, h.DB, `resource_id = $1 ORDER BY uuid`, res.Resource.ID).
 			Foreach(func(asset db.Asset) error {
 				op, exists := succeededOpsByAssetID[asset.ID]
 				if !exists || op.FinishedAt.Before(maxFinishedAt) {
 					return nil
 				}
-				relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &dbResource))
+				relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &res.Group, &res.Resource))
 				return nil
 			})
 		if respondwith.ObfuscatedErrorText(w, err) {
@@ -283,7 +317,11 @@ var recentOperationQueryStr = sqlext.SimplifyWhitespace(`
 	 WHERE a.resource_id = $1 AND o.outcome IN ('%s')
 `)
 
-var finishedOpByAssetIDIndex = oblast.NewRuntimeIndex(func(op db.FinishedOperation) int64 { return op.AssetID })
+var (
+	finishedOpByAssetIDIndex = oblast.NewRuntimeIndex(func(op db.FinishedOperation) int64 { return op.AssetID })
+	resourceGroupByIDIndex   = oblast.NewRuntimeIndex(func(g db.ResourceGroup) int64 { return g.ID })
+	resourcesByGroupIDIndex  = oblast.NewRuntimeIndex(func(res db.Resource) int64 { return res.ResourceGroupID })
+)
 
 func (q recentOperationQuery) execute(ctx context.Context) (map[int64]db.FinishedOperation, error) {
 	outcomes := make([]string, len(q.Outcomes))
