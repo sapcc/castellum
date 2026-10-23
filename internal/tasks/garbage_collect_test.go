@@ -26,9 +26,13 @@ func TestCollectGarbage(t *testing.T) {
 
 	// setup some minimal scaffolding (we can only insert finished_operations
 	// with valid asset IDs into the DB)
+	must.SucceedT(t, db.ResourceGroupStore.Insert(ctx, s.DB, &db.ResourceGroup{
+		ScopeUUID:    "project1",
+		AssetManager: "static",
+	}))
 	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
-		ScopeUUID: "project1",
-		AssetType: "foo",
+		ResourceGroupID: 1,
+		AssetType:       "foo",
 	}))
 	must.SucceedT(t, db.AssetStore.Insert(ctx, s.DB, &db.Asset{
 		ResourceID: 1,

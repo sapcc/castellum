@@ -9,12 +9,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/sapcc/go-api-declarations/cadf"
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/audittools"
 	"github.com/sapcc/go-bits/httpapi"
 	"github.com/sapcc/go-bits/respondwith"
 	"github.com/sapcc/go-bits/sqlext"
+	"go.xyrillian.de/gg/gsql"
 	. "go.xyrillian.de/gg/option"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -25,7 +27,7 @@ import (
 // conversion and validation methods
 
 // ResourceFromDB converts a db.Resource into an castellum.Resource.
-func (h handler) ResourceFromDB(res db.Resource) (castellum.Resource, error) {
+func (h handler) ResourceFromDB(group db.ResourceGroup, res db.Resource) (castellum.Resource, error) {
 	var assetCount int64
 	err := h.DB.QueryRow(`SELECT COUNT(*) FROM assets WHERE resource_id = $1`, res.ID).Scan(&assetCount)
 	if err != nil {
@@ -39,9 +41,9 @@ func (h handler) ResourceFromDB(res db.Resource) (castellum.Resource, error) {
 	if res.ConfigJSON != "" {
 		result.ConfigJSON = Some(json.RawMessage(res.ConfigJSON))
 	}
-	if res.ScrapeErrorMessage != "" {
+	if group.ScrapeErrorMessage != "" {
 		result.Checked = Some(castellum.Checked{
-			ErrorMessage: res.ScrapeErrorMessage,
+			ErrorMessage: group.ScrapeErrorMessage,
 		})
 	}
 	if res.LowThresholdPercent.IsNonZero() {
@@ -84,21 +86,34 @@ func (h handler) GetProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// preload groups for this scope so we can pass them into ResourceFromDB
+	groupsByID, err := resourceGroupByIDIndex.IndexFrom(
+		db.ResourceGroupStore.SelectWhere(ctx, h.DB, `scope_uuid = $1`, projectUUID),
+	)
+	if respondwith.ObfuscatedErrorText(w, err) {
+		return
+	}
+
 	// show only those resources where there is a corresponding asset manager, and
 	// where the user has permission to see the resource
 	var result struct {
 		Resources map[db.AssetType]castellum.Resource `json:"resources"`
 	}
 	result.Resources = make(map[db.AssetType]castellum.Resource)
-	err := db.ResourceStore.SelectWhere(ctx, h.DB, `scope_uuid = $1 ORDER BY asset_type`, projectUUID).
+	groupIDs := make([]int64, 0, len(groupsByID))
+	for id := range groupsByID {
+		groupIDs = append(groupIDs, id)
+	}
+	err = db.ResourceStore.SelectWhere(ctx, h.DB, `resource_group_id = ANY($1) ORDER BY asset_type`, pq.Array(groupIDs)).
 		Foreach(func(res db.Resource) error {
 			manager, _ := h.Team.ForAssetType(res.AssetType)
 			if manager == nil {
 				return nil
 			}
 			if token.Check(res.AssetType.PolicyRuleForRead()) {
+				group := groupsByID[res.ResourceGroupID]
 				var err error
-				result.Resources[res.AssetType], err = h.ResourceFromDB(res)
+				result.Resources[res.AssetType], err = h.ResourceFromDB(group, res)
 				if err != nil {
 					return err
 				}
@@ -119,12 +134,12 @@ func (h handler) GetResource(w http.ResponseWriter, r *http.Request) {
 	if token == nil {
 		return
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token, false)
+	dbGroup, dbResource := h.LoadResourceAndGroup(w, r, projectUUID, token, false)
 	if dbResource == nil {
 		return
 	}
 
-	resource, err := h.ResourceFromDB(*dbResource)
+	resource, err := h.ResourceFromDB(*dbGroup, *dbResource)
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
@@ -140,14 +155,14 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	if token == nil {
 		return
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token, true)
+	dbGroup, dbResource := h.LoadResourceAndGroup(w, r, projectUUID, token, true)
 	if dbResource == nil {
 		return
 	}
 	if !token.Require(w, dbResource.AssetType.PolicyRuleForWrite()) {
 		return
 	}
-	if h.rejectIfResourceSeeded(w, r, *dbResource) {
+	if h.rejectIfResourceSeeded(w, r, *dbGroup, *dbResource) {
 		return
 	}
 
@@ -177,7 +192,8 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 
 	existingResources := make(map[db.AssetType]struct{})
 	err := sqlext.ForeachRow(h.DB,
-		`SELECT asset_type FROM resources WHERE scope_uuid = $1`, []any{projectUUID},
+		`SELECT res.asset_type FROM resources res JOIN resource_groups rg ON res.resource_group_id = rg.id WHERE rg.scope_uuid = $1`,
+		[]any{projectUUID},
 		func(rows *sql.Rows) error {
 			var assetType db.AssetType
 			err := rows.Scan(&assetType)
@@ -192,17 +208,43 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	errs := core.ApplyResourceSpecInto(r.Context(), dbResource, input, existingResources, h.Config, h.Team)
+	errs := core.ApplyResourceSpecInto(r.Context(), *dbGroup, dbResource, input, existingResources, h.Config, h.Team)
 	if len(errs) > 0 {
 		doAudit(http.StatusUnprocessableEntity)
 		http.Error(w, errs.Join("\n"), http.StatusUnprocessableEntity)
 		return
 	}
 
-	if dbResource.ID == 0 {
-		dbResource.NextScrapeAt = time.Unix(0, 0).UTC() // give new resources a very early next_scrape_at to prioritize them in the scrape queue
-	}
-	err = db.ResourceStore.Upsert(ctx, h.DB, dbResource)
+	err = h.DB.WithinTransaction(ctx, nil, func(tx *gsql.Tx) error {
+		// lock the resource group, so that it cannot be delete it in a race condition
+		groupOrNone, err := gsql.NoneIfNoRows(db.ResourceGroupStore.SelectOneWhere(ctx, tx,
+			`scope_uuid = $1 AND asset_manager = $2 FOR UPDATE`,
+			dbGroup.ScopeUUID, dbGroup.AssetManager,
+		))
+		if err != nil {
+			return err
+		}
+
+		if group, ok := groupOrNone.Unpack(); ok {
+			// reset NextScrapeAt so the new resource gets scraped next
+			if dbResource.ID == 0 {
+				group.NextScrapeAt = time.Unix(0, 0).UTC()
+				if err := db.ResourceGroupStore.Update(ctx, tx, group); err != nil {
+					return err
+				}
+			}
+			*dbGroup = group
+		} else {
+			group, err := db.EnsureResourceGroup(ctx, tx, dbGroup.ScopeUUID, dbGroup.DomainUUID, dbGroup.AssetManager)
+			if err != nil {
+				return err
+			}
+			*dbGroup = group
+		}
+
+		dbResource.ResourceGroupID = dbGroup.ID
+		return db.ResourceStore.Upsert(ctx, tx, dbResource)
+	})
 	if respondwith.ObfuscatedErrorText(w, err) {
 		doAudit(http.StatusInternalServerError)
 		return
@@ -221,14 +263,14 @@ func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
 	if token == nil {
 		return
 	}
-	dbResource := h.LoadResource(w, r, projectUUID, token, false)
+	dbGroup, dbResource := h.LoadResourceAndGroup(w, r, projectUUID, token, false)
 	if dbResource == nil {
 		return
 	}
 	if !token.Require(w, dbResource.AssetType.PolicyRuleForWrite()) {
 		return
 	}
-	if h.rejectIfResourceSeeded(w, r, *dbResource) {
+	if h.rejectIfResourceSeeded(w, r, *dbGroup, *dbResource) {
 		return
 	}
 
@@ -246,7 +288,12 @@ func (h handler) DeleteResource(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	err := db.ResourceStore.Delete(ctx, h.DB, *dbResource)
+	err := h.DB.WithinTransaction(ctx, nil, func(tx *gsql.Tx) error {
+		if err := db.ResourceStore.Delete(ctx, tx, *dbResource); err != nil {
+			return err
+		}
+		return db.GCResourceGroup(ctx, tx, dbGroup.ID)
+	})
 	if respondwith.ObfuscatedErrorText(w, err) {
 		doAudit(http.StatusInternalServerError)
 		return
