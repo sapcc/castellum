@@ -216,31 +216,18 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = h.DB.WithinTransaction(ctx, nil, func(tx *gsql.Tx) error {
-		// lock the resource group, so that it cannot be delete it in a race condition
-		groupOrNone, err := gsql.NoneIfNoRows(db.ResourceGroupStore.SelectOneWhere(ctx, tx,
-			`scope_uuid = $1 AND asset_manager = $2 FOR UPDATE`,
-			dbGroup.ScopeUUID, dbGroup.AssetManager,
-		))
+		group, existed, err := db.EnsureResourceGroup(ctx, tx, dbGroup.ScopeUUID, dbGroup.DomainUUID, dbGroup.AssetManager, requestTime)
 		if err != nil {
 			return err
 		}
-
-		if group, ok := groupOrNone.Unpack(); ok {
-			// reset NextScrapeAt so the new resource gets scraped next
-			if dbResource.ID == 0 {
-				group.NextScrapeAt = requestTime.UTC()
-				if err := db.ResourceGroupStore.Update(ctx, tx, group); err != nil {
-					return err
-				}
-			}
-			*dbGroup = group
-		} else {
-			group, err := db.EnsureResourceGroup(ctx, tx, dbGroup.ScopeUUID, dbGroup.DomainUUID, dbGroup.AssetManager, requestTime)
-			if err != nil {
+		// Reset NextScrapeAt so a newly added resource gets scraped next
+		if existed && dbResource.ID == 0 {
+			group.NextScrapeAt = requestTime.UTC()
+			if err := db.ResourceGroupStore.Update(ctx, tx, group); err != nil {
 				return err
 			}
-			*dbGroup = group
 		}
+		*dbGroup = group
 
 		dbResource.ResourceGroupID = dbGroup.ID
 		return db.ResourceStore.Upsert(ctx, tx, dbResource)

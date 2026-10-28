@@ -185,7 +185,7 @@ func (c *Context) applyProjectSeed(ctx context.Context, projectUUID string, seed
 
 		// Validation passed, now create resource group, if required, and resource atomically
 		err = c.DB.WithinTransaction(ctx, nil, func(tx *gsql.Tx) error {
-			group, err := db.EnsureResourceGroup(ctx, tx, projectUUID, proj.DomainID, assetManager, c.TimeNow())
+			group, _, err := db.EnsureResourceGroup(ctx, tx, projectUUID, proj.DomainID, assetManager, c.TimeNow())
 			if err != nil {
 				return err
 			}

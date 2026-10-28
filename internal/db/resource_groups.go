@@ -13,16 +13,8 @@ import (
 )
 
 // SQLExecutor is the subset of *sql.DB / *sql.Tx used by helpers below.
-// Both *gsql.DB and *gsql.Tx satisfy this via their embedded std sql types.
 type SQLExecutor interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-}
-
-// Handle combines gsql.Handle with SQLExecutor, which is required to run raw
-// ON CONFLICT inserts alongside the oblast-generated store queries.
-type Handle interface {
-	gsql.Handle
-	SQLExecutor
 }
 
 var ensureResourceGroupInsertQuery = sqlext.SimplifyWhitespace(`
@@ -31,17 +23,25 @@ var ensureResourceGroupInsertQuery = sqlext.SimplifyWhitespace(`
 	ON CONFLICT (scope_uuid, asset_manager) DO NOTHING
 `)
 
-// EnsureResourceGroup returns the ResourceGroup for the given
-// (scopeUUID, assetManager), creating one if none exists yet.
-// The insert uses ON CONFLICT to stay race-free under concurrent callers and
-// schedules a newly created group after the existing scrape backlog.
-func EnsureResourceGroup(ctx context.Context, dbi Handle, scopeUUID, domainUUID, assetManager string, now time.Time) (ResourceGroup, error) {
-	_, err := dbi.ExecContext(ctx, ensureResourceGroupInsertQuery, scopeUUID, domainUUID, assetManager, now.UTC())
+// EnsureResourceGroup returns the ResourceGroup for the given (scopeUUID, assetManager), creating one if none exists yet.
+// It reports whether the group existed before this call.
+func EnsureResourceGroup(ctx context.Context, tx *gsql.Tx, scopeUUID, domainUUID, assetManager string, now time.Time) (ResourceGroup, bool, error) {
+	groupOrNone, err := gsql.NoneIfNoRows(ResourceGroupStore.SelectOneWhere(ctx, tx,
+		`scope_uuid = $1 AND asset_manager = $2 FOR UPDATE`, scopeUUID, assetManager))
 	if err != nil {
-		return ResourceGroup{}, err
+		return ResourceGroup{}, false, err
 	}
-	return ResourceGroupStore.SelectOneWhere(ctx, dbi,
-		`scope_uuid = $1 AND asset_manager = $2`, scopeUUID, assetManager)
+	if group, ok := groupOrNone.Unpack(); ok {
+		return group, true, nil
+	}
+
+	_, err = tx.ExecContext(ctx, ensureResourceGroupInsertQuery, scopeUUID, domainUUID, assetManager, now.UTC())
+	if err != nil {
+		return ResourceGroup{}, false, err
+	}
+	group, err := ResourceGroupStore.SelectOneWhere(ctx, tx,
+		`scope_uuid = $1 AND asset_manager = $2 FOR UPDATE`, scopeUUID, assetManager)
+	return group, false, err
 }
 
 // GCResourceGroup deletes the ResourceGroup with the given ID if no Resources reference it anymore.
