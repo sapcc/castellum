@@ -30,6 +30,13 @@ type resourceWithGroup struct {
 	Group    db.ResourceGroup
 }
 
+var resourceGroupConditionQuery = sqlext.SimplifyWhitespace(`
+	resource_group_id IN (
+		SELECT g.id FROM resource_groups g
+		 WHERE %s
+	)
+`)
+
 func (h handler) loadMatchingResources(w http.ResponseWriter, r *http.Request) (map[int64]resourceWithGroup, bool) {
 	// CheckToken discovers project ID in both URL path and query
 	var token *gopherpolicy.Token
@@ -78,12 +85,7 @@ func (h handler) loadMatchingResources(w http.ResponseWriter, r *http.Request) (
 		groupConditions = []string{"TRUE"}
 	}
 
-	resourceQuery := fmt.Sprintf(`
-		resource_group_id IN (
-			SELECT g.id FROM resource_groups g
-			 WHERE %s
-		)
-	`, strings.Join(groupConditions, " AND "))
+	resourceQuery := fmt.Sprintf(resourceGroupConditionQuery, strings.Join(groupConditions, " AND "))
 	if assetTypeStr != "" {
 		resourceQuery += fmt.Sprintf(" AND asset_type = $%d", len(sqlBindValues)+1)
 		sqlBindValues = append(sqlBindValues, assetTypeStr)
