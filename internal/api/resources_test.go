@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sapcc/go-api-declarations/cadf"
 	"github.com/sapcc/go-api-declarations/castellum"
@@ -284,9 +285,36 @@ func TestPutResource(t *testing.T) {
 		httptest.WithJSONBody(newFooResourceJSON2),
 	).ExpectStatus(t, http.StatusAccepted)
 	tr.DBChanges().AssertEqualf(`
-		INSERT INTO resource_groups (id, scope_uuid, domain_uuid, asset_manager, next_scrape_at) VALUES (4, 'project3', 'domain1', 'static', 0);
+		INSERT INTO resource_groups (id, scope_uuid, domain_uuid, asset_manager, next_scrape_at) VALUES (4, 'project3', 'domain1', 'static', %[1]d);
 		INSERT INTO resources (id, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, min_free_size, resource_group_id) VALUES (6, 'foo', '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":98}', 15, 23, 4);
-	`)
+	`, s.Clock.Now().Unix())
+
+	// adding a resource to an existing group should also be scheduled behind the backlog
+	newBarResourceJSON := jsonmatch.Object{
+		"config": jsonmatch.Object{
+			"foo": "bar",
+		},
+		"critical_threshold": jsonmatch.Object{
+			"usage_percent": jsonmatch.Object{
+				"first":  95,
+				"second": 97,
+			},
+		},
+		"size_constraints": jsonmatch.Object{
+			"maximum": 20000,
+		},
+		"size_steps": jsonmatch.Object{
+			"percent": 10,
+		},
+	}
+	s.Clock.StepBy(time.Second)
+	s.Handler.RespondTo(ctx, "PUT /v1/projects/project3/resources/bar",
+		httptest.WithJSONBody(newBarResourceJSON),
+	).ExpectStatus(t, http.StatusAccepted)
+	tr.DBChanges().AssertEqualf(`
+		UPDATE resource_groups SET next_scrape_at = %[1]d WHERE id = 4 AND scope_uuid = 'project3' AND asset_manager = 'static';
+		INSERT INTO resources (id, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, max_size, config_json, resource_group_id) VALUES (7, 'bar', '{"first":0,"second":0}', 0, '{"first":0,"second":0}', 0, '{"first":95,"second":97}', 10, 20000, '{"foo":"bar"}', 4);
+	`, s.Clock.Now().Unix())
 
 	// test setting constraints
 	newFooResourceJSON3 := jsonmatch.Object{

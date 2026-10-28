@@ -103,10 +103,10 @@ func TestResourceSeedingSuccess(t *testing.T) {
 	must.SucceedT(t, job.ProcessOne(ctx))
 	tr.DBChanges().AssertEqualf(`
 		DELETE FROM resource_groups WHERE id = 2 AND scope_uuid = 'project2' AND asset_manager = 'static';
-		INSERT INTO resource_groups (id, scope_uuid, domain_uuid, asset_manager, next_scrape_at) VALUES (3, 'project1', 'domain1', 'static', 0);
+		INSERT INTO resource_groups (id, scope_uuid, domain_uuid, asset_manager, next_scrape_at) VALUES (3, 'project1', 'domain1', 'static', %[1]d);
 		DELETE FROM resources WHERE id = 2 AND asset_type = 'foo' AND resource_group_id = 2;
 		INSERT INTO resources (id, asset_type, low_threshold_percent, low_delay_seconds, high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent, resource_group_id) VALUES (3, 'foo', '{"singular":0}', 0, '{"singular":0}', 0, '{"singular":95}', 20, 3);
-	`)
+	`, s.Clock.Now().Unix())
 
 	// test that the next seeding run does not change anything
 	must.SucceedT(t, job.ProcessOne(ctx))
