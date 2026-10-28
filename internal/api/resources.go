@@ -150,7 +150,7 @@ func (h handler) GetResource(w http.ResponseWriter, r *http.Request) {
 func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/resources/:type")
 	ctx := r.Context()
-	requestTime := time.Now()
+	requestTime := h.TimeNow()
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
 		return
@@ -228,14 +228,14 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 		if group, ok := groupOrNone.Unpack(); ok {
 			// reset NextScrapeAt so the new resource gets scraped next
 			if dbResource.ID == 0 {
-				group.NextScrapeAt = time.Unix(0, 0).UTC()
+				group.NextScrapeAt = requestTime.UTC()
 				if err := db.ResourceGroupStore.Update(ctx, tx, group); err != nil {
 					return err
 				}
 			}
 			*dbGroup = group
 		} else {
-			group, err := db.EnsureResourceGroup(ctx, tx, dbGroup.ScopeUUID, dbGroup.DomainUUID, dbGroup.AssetManager)
+			group, err := db.EnsureResourceGroup(ctx, tx, dbGroup.ScopeUUID, dbGroup.DomainUUID, dbGroup.AssetManager, requestTime)
 			if err != nil {
 				return err
 			}
