@@ -110,7 +110,7 @@ var sqlMigrations = map[int64]string{
 		);
 
 		ALTER TABLE resources ADD COLUMN resource_group_id BIGINT
-			REFERENCES resource_groups ON DELETE CASCADE;
+			REFERENCES resource_groups ON DELETE RESTRICT;
 
 		INSERT INTO resource_groups
 			(scope_uuid, domain_uuid, asset_manager,
