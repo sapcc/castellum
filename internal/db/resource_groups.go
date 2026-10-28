@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/sapcc/go-bits/sqlext"
 	"go.xyrillian.de/gg/gsql"
 )
 
@@ -24,17 +25,18 @@ type Handle interface {
 	SQLExecutor
 }
 
+var ensureResourceGroupInsertQuery = sqlext.SimplifyWhitespace(`
+	INSERT INTO resource_groups (scope_uuid, domain_uuid, asset_manager, scrape_error_message, next_scrape_at, scrape_duration_secs)
+	VALUES ($1, $2, $3, '', $4, 0)
+	ON CONFLICT (scope_uuid, asset_manager) DO NOTHING
+`)
+
 // EnsureResourceGroup returns the ResourceGroup for the given
 // (scopeUUID, assetManager), creating one if none exists yet.
 // The insert uses ON CONFLICT to stay race-free under concurrent callers and
 // schedules a newly created group after the existing scrape backlog.
 func EnsureResourceGroup(ctx context.Context, dbi Handle, scopeUUID, domainUUID, assetManager string, now time.Time) (ResourceGroup, error) {
-	_, err := dbi.ExecContext(ctx,
-		`INSERT INTO resource_groups (scope_uuid, domain_uuid, asset_manager, scrape_error_message, next_scrape_at, scrape_duration_secs)
-			VALUES ($1, $2, $3, '', $4, 0)
-			ON CONFLICT (scope_uuid, asset_manager) DO NOTHING`,
-		scopeUUID, domainUUID, assetManager, now.UTC(),
-	)
+	_, err := dbi.ExecContext(ctx, ensureResourceGroupInsertQuery, scopeUUID, domainUUID, assetManager, now.UTC())
 	if err != nil {
 		return ResourceGroup{}, err
 	}
