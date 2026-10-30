@@ -28,6 +28,7 @@ func commonSetupOptionsForAPITest() test.SetupOption {
 		&plugins.AssetManagerStatic{AssetType: "foo"},
 		&plugins.AssetManagerStatic{AssetType: "bar", UsageMetrics: []castellum.UsageMetric{"first", "second"}, ExpectsConfiguration: true},
 		&plugins.AssetManagerStatic{AssetType: "qux", ConflictsWithAssetType: "foo"},
+		&plugins.AssetManagerStatic{AssetType: "nfs-shares", PluginTypeIDOverride: "nfs-shares"},
 	)
 }
 
@@ -44,11 +45,18 @@ func commonSetupFillDB(t *testing.T, s test.Setup) {
 		return time.Unix(timestamp, 0).UTC()
 	}
 
+	// project1 has two groups; the "nfs-shares" one carries the scrape error
+	groups := []*db.ResourceGroup{
+		{ScopeUUID: "project1", DomainUUID: "domain1", AssetManager: "static", NextScrapeAt: unix(1801)},
+		{ScopeUUID: "project1", DomainUUID: "domain1", AssetManager: "nfs-shares", ScrapeErrorMessage: "datacenter is on fire", NextScrapeAt: unix(1802)},
+		{ScopeUUID: "something-else", DomainUUID: "domain1", AssetManager: "static", ScrapeErrorMessage: "datacenter is on fire", NextScrapeAt: unix(1803)},
+	}
+	must.SucceedT(t, db.ResourceGroupStore.Insert(ctx, s.DB, groups...))
+
 	resources := []*db.Resource{
 		// insert some resources in 'project1' that we can actually list -- both have a different set of thresholds activated to exercise different code paths
 		{
-			ScopeUUID:                "project1",
-			DomainUUID:               "domain1",
+			ResourceGroupID:          groups[0].ID,
 			AssetType:                "foo",
 			LowThresholdPercent:      singular(20),
 			LowDelaySeconds:          3600,
@@ -56,11 +64,9 @@ func commonSetupFillDB(t *testing.T, s test.Setup) {
 			HighDelaySeconds:         1800,
 			CriticalThresholdPercent: singular(0),
 			SizeStepPercent:          20,
-			NextScrapeAt:             unix(1801),
 		},
 		{
-			ScopeUUID:                "project1",
-			DomainUUID:               "domain1",
+			ResourceGroupID:          groups[0].ID,
 			AssetType:                "bar",
 			ConfigJSON:               `{"foo":"bar"}`,
 			LowThresholdPercent:      multi(0, 0),
@@ -70,13 +76,21 @@ func commonSetupFillDB(t *testing.T, s test.Setup) {
 			CriticalThresholdPercent: multi(95, 97),
 			SizeStepPercent:          10,
 			MaximumSize:              Some[uint64](20000),
-			ScrapeErrorMessage:       "datacenter is on fire",
-			NextScrapeAt:             unix(1802),
+		},
+		// This one has a distinct group to isolate scrape error
+		{
+			ResourceGroupID:          groups[1].ID,
+			AssetType:                "nfs-shares",
+			LowThresholdPercent:      singular(20),
+			LowDelaySeconds:          3600,
+			HighThresholdPercent:     singular(80),
+			HighDelaySeconds:         1800,
+			CriticalThresholdPercent: singular(95),
+			SizeStepPercent:          20,
 		},
 		// insert some resources that we should not be able to list
 		{
-			ScopeUUID:                "something-else", // wrong project ID
-			DomainUUID:               "domain1",
+			ResourceGroupID:          groups[2].ID,
 			AssetType:                "foo",
 			LowThresholdPercent:      singular(20),
 			LowDelaySeconds:          3600,
@@ -84,12 +98,9 @@ func commonSetupFillDB(t *testing.T, s test.Setup) {
 			HighDelaySeconds:         1800,
 			CriticalThresholdPercent: singular(95),
 			SizeStepPercent:          20,
-			ScrapeErrorMessage:       "datacenter is on fire",
-			NextScrapeAt:             unix(1803),
 		},
 		{
-			ScopeUUID:                "project1",
-			DomainUUID:               "domain1",
+			ResourceGroupID:          groups[0].ID,
 			AssetType:                "unknown", // unknown asset type
 			LowThresholdPercent:      singular(20),
 			LowDelaySeconds:          3600,
@@ -97,7 +108,6 @@ func commonSetupFillDB(t *testing.T, s test.Setup) {
 			HighDelaySeconds:         1800,
 			CriticalThresholdPercent: singular(95),
 			SizeStepPercent:          20,
-			NextScrapeAt:             unix(1804),
 		},
 	}
 	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, resources...))

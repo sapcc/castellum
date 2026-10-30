@@ -26,10 +26,14 @@ func setupAssetResizeTest(t *testing.T, s test.Setup, assetCount int) jobloop.Jo
 	ctx := t.Context()
 	amStatic := s.ManagerForAssetType("foo")
 
-	// create a resource and assets to test with
+	// create a resource group, resource and assets to test with
+	must.SucceedT(t, db.ResourceGroupStore.Insert(ctx, s.DB, &db.ResourceGroup{
+		ScopeUUID:    "project1",
+		AssetManager: "static",
+	}))
 	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
-		ScopeUUID: "project1",
-		AssetType: "foo",
+		ResourceGroupID: 1,
+		AssetType:       "foo",
 	}))
 	amStatic.Assets = map[string]map[string]plugins.StaticAsset{
 		"project1": {},
