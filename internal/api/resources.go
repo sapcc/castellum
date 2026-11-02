@@ -148,7 +148,7 @@ func (h handler) GetResource(w http.ResponseWriter, r *http.Request) {
 func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/resources/:type")
 	ctx := r.Context()
-	requestTime := h.TimeNow()
+	requestTime := h.TimeNow().UTC()
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
 		return
@@ -220,7 +220,7 @@ func (h handler) PutResource(w http.ResponseWriter, r *http.Request) {
 		}
 		// Reset NextScrapeAt so a newly added resource gets scraped next
 		if existed && dbResource.ID == 0 {
-			group.NextScrapeAt = requestTime.UTC()
+			group.NextScrapeAt = requestTime
 			if err := db.ResourceGroupStore.Update(ctx, tx, group); err != nil {
 				return err
 			}

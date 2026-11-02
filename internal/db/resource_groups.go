@@ -34,7 +34,7 @@ func EnsureResourceGroup(ctx context.Context, tx *gsql.Tx, scopeUUID, domainUUID
 		return group, true, nil
 	}
 
-	_, err = tx.ExecContext(ctx, ensureResourceGroupInsertQuery, scopeUUID, domainUUID, assetManager, now.UTC())
+	_, err = tx.ExecContext(ctx, ensureResourceGroupInsertQuery, scopeUUID, domainUUID, assetManager, now)
 	if err != nil {
 		return ResourceGroup{}, false, err
 	}
