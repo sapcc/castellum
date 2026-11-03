@@ -14,12 +14,9 @@ import (
 	"github.com/sapcc/go-bits/logg"
 	"github.com/sapcc/go-bits/sqlext"
 	"go.xyrillian.de/gg/gsql"
-	"go.xyrillian.de/oblast"
 
 	"github.com/sapcc/castellum/internal/db"
 )
-
-var assetsByResourceIDIndex = oblast.NewRuntimeIndex(func(a db.Asset) int64 { return a.ResourceID })
 
 // query that finds the next resource group that needs to be scraped
 //
@@ -74,7 +71,7 @@ func (c *Context) processResourceGroupScrape(ctx context.Context, tx *gsql.Tx, g
 	for _, res := range dbResources {
 		resourceIDs = append(resourceIDs, res.ID)
 	}
-	assetsByResourceID, err := assetsByResourceIDIndex.PartitionFrom(
+	assetsByResourceID, err := db.AssetByResourceID.PartitionFrom(
 		db.AssetStore.SelectWhere(ctx, tx, `resource_id = ANY($1)`, pq.Array(resourceIDs)),
 	)
 	if err != nil {

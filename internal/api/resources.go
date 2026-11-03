@@ -89,7 +89,7 @@ func (h handler) GetProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// preload groups for this scope so we can pass them into ResourceFromDB
-	groupsByID, err := resourceGroupByIDIndex.IndexFrom(
+	groupsByID, err := db.ResourceGroupByID.IndexFrom(
 		db.ResourceGroupStore.SelectWhere(ctx, h.DB, `scope_uuid = $1`, projectUUID),
 	)
 	if respondwith.ObfuscatedErrorText(w, err) {

@@ -23,6 +23,9 @@ var ResourceGroupStore = oblast.MustNewStore[ResourceGroup](
 	oblast.PrimaryKeyIs("id"),
 )
 
+// ResourceGroupByID is an [oblast.RuntimeIndex] using the [ResourceGroup].ID field.
+var ResourceGroupByID = oblast.NewRuntimeIndex(func(g ResourceGroup) int64 { return g.ID })
+
 // ResourceGroup collects all Resources within one scope that are handled by the
 // same asset manager.
 type ResourceGroup struct {
@@ -47,6 +50,9 @@ var ResourceStore = oblast.MustNewStore[Resource](
 	oblast.TableNameIs("resources"),
 	oblast.PrimaryKeyIs("id"),
 )
+
+// ResourceByGroupID is an [oblast.RuntimeIndex] using the [Resource].GroupID field.
+var ResourceByGroupID = oblast.NewRuntimeIndex(func(res Resource) int64 { return res.ResourceGroupID })
 
 // Resource describes the autoscaling behavior for a single resource in a
 // single project or domain. Note that we reuse Limes terminology here: A
@@ -119,6 +125,9 @@ var AssetStore = oblast.MustNewStore[Asset](
 	oblast.TableNameIs("assets"),
 	oblast.PrimaryKeyIs("id"),
 )
+
+// AssetByResourceID is an [oblast.RuntimeIndex] using the [Asset].ResourceID field.
+var AssetByResourceID = oblast.NewRuntimeIndex(func(a Asset) int64 { return a.ResourceID })
 
 // Asset describes a single thing that can be resized dynamically based on its
 // utilization. Assets are grouped into resources, see type Resource. Each
@@ -254,6 +263,9 @@ var FinishedOperationStore = oblast.MustNewStore[FinishedOperation](
 	oblast.PostgresDialect(),
 	oblast.TableNameIs("finished_operations"),
 )
+
+// FinishedOpByAssetID is an [oblast.RuntimeIndex] using the [FinishedOperation].AssetID field.
+var FinishedOpByAssetID = oblast.NewRuntimeIndex(func(op FinishedOperation) int64 { return op.AssetID })
 
 // FinishedOperation describes a finished resize operation for an asset.
 type FinishedOperation struct {
