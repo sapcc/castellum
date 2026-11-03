@@ -16,6 +16,31 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// ResourceGroupStore provides structured access to the database table "resource_groups".
+var ResourceGroupStore = oblast.MustNewStore[ResourceGroup](
+	oblast.PostgresDialect(),
+	oblast.TableNameIs("resource_groups"),
+	oblast.PrimaryKeyIs("id"),
+)
+
+// ResourceGroup collects all Resources within one scope that are handled by the
+// same asset manager.
+type ResourceGroup struct {
+	// The pair of (.ScopeUUID/.DomainUUID, .AssetManager) uniquely identifies a
+	// ResourceGroup. Other tables reference it by the numeric .ID field.
+	ID           int64  `db:"id,auto"`
+	ScopeUUID    string `db:"scope_uuid"`  // either project UUID or domain UUID
+	DomainUUID   string `db:"domain_uuid"` // for domain resources: equal to .ScopeUUID
+	AssetManager string `db:"asset_manager"`
+
+	// Contains the error message if the last scrape failed, otherwise an empty string.
+	ScrapeErrorMessage string `db:"scrape_error_message"`
+	// The next time when this ResourceGroup should be checked for new or deleted assets.
+	NextScrapeAt time.Time `db:"next_scrape_at"`
+	// Contains the duration of the last scrape, or 0 if the group was never scraped successfully.
+	ScrapeDurationSecs float64 `db:"scrape_duration_secs"`
+}
+
 // ResourceStore provides structured access to the database table "resources".
 var ResourceStore = oblast.MustNewStore[Resource](
 	oblast.PostgresDialect(),
@@ -30,14 +55,13 @@ var ResourceStore = oblast.MustNewStore[Resource](
 // it's an asset. But it *belongs* to the resource "NFS shares", and more
 // specifically, to the project resource "NFS shares for project X".
 type Resource struct {
-	// The pair of (.ScopeUUID, .AssetType) uniquely identifies a Resource on
-	// the API level. Internally, other tables reference Resource by the numeric
-	// .ID field.
-	ID         int64     `db:"id,auto"`
-	ScopeUUID  string    `db:"scope_uuid"`  // either project UUID or domain UUID
-	DomainUUID string    `db:"domain_uuid"` // for domain resources: equal to .ScopeUUID
-	AssetType  AssetType `db:"asset_type"`
-	ConfigJSON string    `db:"config_json"` // (optional) config specifically for this asset type
+	// The pair of (ResourceGroup.ScopeUUID, .AssetType) uniquely identifies a
+	// Resource on the API level. Internally, other tables reference Resource
+	// by the numeric .ID field.
+	ID              int64     `db:"id,auto"`
+	ResourceGroupID int64     `db:"resource_group_id"`
+	AssetType       AssetType `db:"asset_type"`
+	ConfigJSON      string    `db:"config_json"` // (optional) config specifically for this asset type
 
 	// Assets will resize when they have crossed a certain threshold for a certain
 	// time. Those thresholds (in percent of usage) and delays (in seconds) are
@@ -66,13 +90,6 @@ type Resource struct {
 	MinimumFreeSize Option[uint64] `db:"min_free_size"`
 	// When true, upsize operations forced by MinimumFreeSize will be critical actions.
 	MinimumFreeIsCritical bool `db:"min_free_is_critical"`
-
-	// Contains the error message if the last scrape failed, otherwise an empty string.
-	ScrapeErrorMessage string `db:"scrape_error_message"`
-	// The next time when this Resource should be checked for new or deleted assets.
-	NextScrapeAt time.Time `db:"next_scrape_at"`
-	// Contains the duration of the last scrape, or 0 if the resource was never scraped successfully.
-	ScrapeDurationSecs float64 `db:"scrape_duration_secs"`
 }
 
 // AssetType is the type of Resource.AssetType. It extends type string with some

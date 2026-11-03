@@ -275,11 +275,13 @@ PROMPT:
 			continue
 		}
 		var res db.Resource
+		var group db.ResourceGroup
 		if len(fields) > 1 {
 			res.AssetType = assetType
-			res.ScopeUUID = fields[1]
+			group.ScopeUUID = fields[1]
+			group.AssetManager = manager.PluginTypeID()
 			res.ConfigJSON = configJSON
-			err := manager.CheckResourceAllowed(ctx, res.AssetType, res.ScopeUUID, res.ConfigJSON, nil)
+			err := manager.CheckResourceAllowed(ctx, res.AssetType, group.ScopeUUID, res.ConfigJSON, nil)
 			if err != nil {
 				logg.Error("CheckResourceAllowed failed: " + err.Error())
 				continue
@@ -292,7 +294,7 @@ PROMPT:
 				logg.Error("wrong number of arguments")
 				continue
 			}
-			result, err := manager.ListAssets(ctx, res)
+			result, err := manager.ListAssets(ctx, group, res)
 			if err != nil {
 				logg.Error(err.Error())
 				continue
@@ -331,7 +333,7 @@ PROMPT:
 				logg.Error("wrong number of arguments")
 				continue
 			}
-			result, err := manager.GetAssetStatus(ctx, res, fields[2], previousStatus)
+			result, err := manager.GetAssetStatus(ctx, group, res, fields[2], previousStatus)
 			if err != nil {
 				logg.Error(err.Error())
 				continue
@@ -362,7 +364,7 @@ PROMPT:
 				logg.Error(err.Error())
 				continue
 			}
-			outcome, err := manager.SetAssetSize(ctx, res, fields[2], oldSize, newSize)
+			outcome, err := manager.SetAssetSize(ctx, group, res, fields[2], oldSize, newSize)
 			logg.Info("outcome: %s", outcome)
 			if err != nil {
 				logg.Error(err.Error())
