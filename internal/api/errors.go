@@ -22,11 +22,11 @@ import (
 // loadGroupsForResources loads all db.ResourceGroup rows referenced by the
 // given resources in a single query, keyed by group ID.
 func loadGroupsForResources(ctx context.Context, dbi gsql.Handle, dbResources []db.Resource) (map[int64]db.ResourceGroup, error) {
-	resourcesByGroupID := resourcesByGroupIDIndex.Partition(dbResources)
+	resourcesByGroupID := db.ResourceByGroupID.Partition(dbResources)
 	if len(resourcesByGroupID) == 0 {
 		return nil, nil
 	}
-	return resourceGroupByIDIndex.IndexFrom(
+	return db.ResourceGroupByID.IndexFrom(
 		db.ResourceGroupStore.SelectWhere(ctx, dbi, `id = ANY($1)`,
 			pq.Array(slices.Collect(maps.Keys(resourcesByGroupID))),
 		),

@@ -18,7 +18,6 @@ import (
 	"github.com/sapcc/go-bits/respondwith"
 	"github.com/sapcc/go-bits/sqlext"
 	"go.xyrillian.de/gg/gsql"
-	"go.xyrillian.de/oblast"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -97,14 +96,14 @@ func (h handler) loadMatchingResources(w http.ResponseWriter, r *http.Request) (
 	}
 
 	// load referenced groups in one query
-	resourcesByGroupID := resourcesByGroupIDIndex.Partition(dbResources)
+	resourcesByGroupID := db.ResourceByGroupID.Partition(dbResources)
 	groupIDs := make([]int64, 0, len(resourcesByGroupID))
 	for id := range resourcesByGroupID {
 		groupIDs = append(groupIDs, id)
 	}
 	groupsByID := make(map[int64]db.ResourceGroup, len(groupIDs))
 	if len(groupIDs) > 0 {
-		groupsByID, err = resourceGroupByIDIndex.IndexFrom(
+		groupsByID, err = db.ResourceGroupByID.IndexFrom(
 			db.ResourceGroupStore.SelectWhere(ctx, h.DB, `id = ANY($1)`, pq.Array(groupIDs)),
 		)
 		if respondwith.ObfuscatedErrorText(w, err) {
@@ -320,12 +319,6 @@ var recentOperationQueryStr = sqlext.SimplifyWhitespace(`
 	 WHERE a.resource_id = $1 AND o.outcome IN ('%s')
 `)
 
-var (
-	finishedOpByAssetIDIndex = oblast.NewRuntimeIndex(func(op db.FinishedOperation) int64 { return op.AssetID })
-	resourceGroupByIDIndex   = oblast.NewRuntimeIndex(func(g db.ResourceGroup) int64 { return g.ID })
-	resourcesByGroupIDIndex  = oblast.NewRuntimeIndex(func(res db.Resource) int64 { return res.ResourceGroupID })
-)
-
 func (q recentOperationQuery) execute(ctx context.Context) (map[int64]db.FinishedOperation, error) {
 	outcomes := make([]string, len(q.Outcomes))
 	for idx, o := range q.Outcomes {
@@ -337,5 +330,5 @@ func (q recentOperationQuery) execute(ctx context.Context) (map[int64]db.Finishe
 		strings.Join(outcomes, "', '"), // interpolating string constants into the query is safe here because q.Outcomes is always hardcoded
 	)
 
-	return finishedOpByAssetIDIndex.IndexFrom(db.FinishedOperationStore.Select(ctx, q.DB, queryStr, q.ResourceID))
+	return db.FinishedOpByAssetID.IndexFrom(db.FinishedOperationStore.Select(ctx, q.DB, queryStr, q.ResourceID))
 }
