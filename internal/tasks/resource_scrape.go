@@ -79,36 +79,56 @@ func (c *Context) processResourceGroupScrape(ctx context.Context, tx *gsql.Tx, g
 		return err
 	}
 
-	// iterate every resource within the group and let its asset manager discover
-	// the current asset UUIDs; the group row is locked, so no other worker can
-	// scrape the same (scope, asset_manager) pair concurrently
 	startedAt := c.TimeNow()
 	scrapeErrs := []string{}
+
+	// A resource group represents one (scope, asset manager) pair. Give that
+	// manager all supported resources in the group in one discovery call.
+	var manager core.AssetManager
+	for _, candidate := range c.Team {
+		if candidate.PluginTypeID() == group.AssetManager {
+			manager = candidate
+			break
+		}
+	}
+
+	resources := make(map[db.AssetType]core.ResourceInfo)
+	infoByAssetType := make(map[db.AssetType]core.AssetTypeInfo)
 	for _, res := range dbResources {
-		manager, info := c.Team.ForAssetType(res.AssetType)
 		if manager == nil {
 			scrapeErrs = append(scrapeErrs, fmt.Sprintf("no asset manager for asset type %q", res.AssetType))
 			continue
 		}
-		logg.Debug("scraping %s resource in scope %s using manager %v", res.AssetType, group.ScopeUUID, manager)
-
-		resources := make(map[db.AssetType]core.ResourceInfo)
-		for _, otherRes := range dbResources {
-			if _, ok := manager.InfoForAssetType(otherRes.AssetType).Unpack(); !ok {
-				continue
-			}
-			resources[otherRes.AssetType] = core.ResourceInfo{
-				ScopeUUID:  group.ScopeUUID,
-				AssetType:  otherRes.AssetType,
-				ConfigJSON: otherRes.ConfigJSON,
-			}
-		}
-
-		assetsByType, err := manager.ListAssets(ctx, group.ScopeUUID, resources)
-		if err != nil {
-			scrapeErrs = append(scrapeErrs, fmt.Sprintf("cannot list %s assets in scope %s: %s", string(res.AssetType), group.ScopeUUID, err.Error()))
+		info, ok := manager.InfoForAssetType(res.AssetType).Unpack()
+		if !ok {
+			scrapeErrs = append(scrapeErrs, fmt.Sprintf("no asset manager for asset type %q", res.AssetType))
 			continue
 		}
+		resources[res.AssetType] = core.ResourceInfo{
+			ScopeUUID:  group.ScopeUUID,
+			AssetType:  res.AssetType,
+			ConfigJSON: res.ConfigJSON,
+		}
+		infoByAssetType[res.AssetType] = info
+	}
+
+	var assetsByType map[db.AssetType][]string
+	var listAssetsErr error
+	if len(resources) > 0 {
+		assetsByType, listAssetsErr = manager.ListAssets(ctx, group.ScopeUUID, resources)
+		if listAssetsErr != nil {
+			scrapeErrs = append(scrapeErrs, fmt.Sprintf("cannot list assets in scope %s: %s", group.ScopeUUID, listAssetsErr.Error()))
+		}
+	}
+
+	// Reconcile the result by resource. On discovery failure, leave all existing
+	// assets untouched instead of treating the failed scrape as an empty list.
+	for _, res := range dbResources {
+		info, ok := infoByAssetType[res.AssetType]
+		if !ok || listAssetsErr != nil {
+			continue
+		}
+		logg.Debug("scraping %s resource in scope %s using manager %v", res.AssetType, group.ScopeUUID, manager)
 		assetUUIDs := assetsByType[res.AssetType]
 		logg.Debug("scraped %d assets for %s resource for scope %s", len(assetUUIDs), res.AssetType, group.ScopeUUID)
 
