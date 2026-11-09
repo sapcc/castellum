@@ -207,7 +207,7 @@ var (
 )
 
 // SetAssetSize implements the core.AssetManager interface.
-func (m *assetManagerNFS) SetAssetSize(ctx context.Context, group db.ResourceGroup, res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error) {
+func (m *assetManagerNFS) SetAssetSize(ctx context.Context, res core.ResourceInfo, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error) {
 	err := m.resize(ctx, assetUUID, oldSize, newSize /* useReverseOperation = */, false)
 	if err != nil {
 		match := sizeInconsistencyErrorRx.FindStringSubmatch(err.Error())
@@ -250,10 +250,10 @@ func (m *assetManagerNFS) resize(ctx context.Context, assetUUID string, oldSize,
 }
 
 // GetAssetStatus implements the core.AssetManager interface.
-func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, group db.ResourceGroup, res db.Resource, assetUUID string, previousStatus Option[core.AssetStatus]) (core.AssetStatus, error) {
+func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res core.ResourceInfo, assetUUID string, previousStatus Option[core.AssetStatus]) (core.AssetStatus, error) {
 	// query Prometheus metrics for size and usage
 	metrics, err := m.ShareMetrics.Get(ctx, manilaShareMetricsKey{
-		ProjectUUID: group.ScopeUUID,
+		ProjectUUID: res.ScopeUUID,
 		ShareUUID:   assetUUID,
 	})
 	if err != nil {

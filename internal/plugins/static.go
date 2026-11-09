@@ -140,11 +140,11 @@ func (m AssetManagerStatic) ListAssets(_ context.Context, _ string, resources ma
 }
 
 // GetAssetStatus implements the core.AssetManager interface.
-func (m AssetManagerStatic) GetAssetStatus(_ context.Context, group db.ResourceGroup, res db.Resource, assetUUID string, previousStatus Option[core.AssetStatus]) (core.AssetStatus, error) {
+func (m AssetManagerStatic) GetAssetStatus(_ context.Context, res core.ResourceInfo, assetUUID string, previousStatus Option[core.AssetStatus]) (core.AssetStatus, error) {
 	if res.AssetType != m.AssetType {
 		return core.AssetStatus{}, errWrongAssetType
 	}
-	assets, exists := m.Assets[group.ScopeUUID]
+	assets, exists := m.Assets[res.ScopeUUID]
 	if !exists {
 		return core.AssetStatus{}, errUnknownProject
 	}
@@ -177,11 +177,11 @@ func (m AssetManagerStatic) GetAssetStatus(_ context.Context, group db.ResourceG
 }
 
 // SetAssetSize implements the core.AssetManager interface.
-func (m AssetManagerStatic) SetAssetSize(_ context.Context, group db.ResourceGroup, res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error) {
+func (m AssetManagerStatic) SetAssetSize(_ context.Context, res core.ResourceInfo, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error) {
 	if res.AssetType != m.AssetType {
 		return castellum.OperationOutcomeErrored, errWrongAssetType
 	}
-	assets, exists := m.Assets[group.ScopeUUID]
+	assets, exists := m.Assets[res.ScopeUUID]
 	if !exists {
 		return castellum.OperationOutcomeErrored, errUnknownProject
 	}

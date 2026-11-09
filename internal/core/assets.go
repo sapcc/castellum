@@ -134,10 +134,10 @@ type AssetManager interface {
 	ListAssets(ctx context.Context, scopeUUID string, resources map[db.AssetType]ResourceInfo) (map[db.AssetType][]string, error)
 	// The returned Outcome should be either Succeeded, Failed or Errored, but not Cancelled.
 	// The returned error should be nil if and only if the outcome is Succeeded.
-	SetAssetSize(ctx context.Context, group db.ResourceGroup, res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error)
+	SetAssetSize(ctx context.Context, res ResourceInfo, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error)
 	// previousStatus will be nil when this function is called for the first time
 	// for the given asset.
-	GetAssetStatus(ctx context.Context, group db.ResourceGroup, res db.Resource, assetUUID string, previousStatus Option[AssetStatus]) (AssetStatus, error)
+	GetAssetStatus(ctx context.Context, res ResourceInfo, assetUUID string, previousStatus Option[AssetStatus]) (AssetStatus, error)
 }
 
 // AssetManagerRegistry is a pluggable.Registry for AssetManager implementations.
