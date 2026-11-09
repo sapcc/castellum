@@ -18,6 +18,7 @@ import (
 	"github.com/sapcc/go-bits/respondwith"
 	"github.com/sapcc/go-bits/sqlext"
 	"go.xyrillian.de/gg/gsql"
+	. "go.xyrillian.de/gg/option"
 
 	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
@@ -173,7 +174,7 @@ func (h handler) GetPendingOperations(w http.ResponseWriter, r *http.Request) {
 		// find operations
 		err = db.PendingOperationStore.Select(ctx, h.DB, getPendingOpsByResourceIDQuery, res.Resource.ID).
 			Foreach(func(op db.PendingOperation) error {
-				allOps = append(allOps, PendingOperationFromDB(op, assetUUIDs[op.AssetID], &res.Group, &res.Resource))
+				allOps = append(allOps, PendingOperationFromDB(op, assetUUIDs[op.AssetID], Some(res.Group), Some(res.Resource)))
 				return nil
 			})
 		if respondwith.ObfuscatedErrorText(w, err) {
@@ -234,7 +235,7 @@ func (h handler) GetRecentlyFailedOperations(w http.ResponseWriter, r *http.Requ
 					return nil
 				}
 				if _, exists := core.GetEligibleOperations(core.LogicOfResource(res.Resource, info), core.StatusOfAsset(asset, h.Config, res.Group, res.Resource))[op.Reason]; exists {
-					relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &res.Group, &res.Resource))
+					relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, Some(res.Group), Some(res.Resource)))
 				}
 				return nil
 			})
@@ -283,7 +284,7 @@ func (h handler) GetRecentlySucceededOperations(w http.ResponseWriter, r *http.R
 				if !exists || op.FinishedAt.Before(maxFinishedAt) {
 					return nil
 				}
-				relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, &res.Group, &res.Resource))
+				relevantOps = append(relevantOps, FinishedOperationFromDB(op, asset.UUID, Some(res.Group), Some(res.Resource)))
 				return nil
 			})
 		if respondwith.ObfuscatedErrorText(w, err) {
