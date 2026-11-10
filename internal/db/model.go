@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/sapcc/go-api-declarations/castellum"
+	"go.xyrillian.de/gg/oblast"
 	. "go.xyrillian.de/gg/option"
 	"go.xyrillian.de/gg/pgruntime"
-	"go.xyrillian.de/oblast"
 
 	// include DB driver
 	_ "github.com/lib/pq"
