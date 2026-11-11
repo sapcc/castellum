@@ -4,6 +4,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"maps"
@@ -19,6 +20,7 @@ import (
 	"github.com/sapcc/go-bits/respondwith"
 	"github.com/sapcc/go-bits/sqlext"
 	"go.xyrillian.de/gg/gsql"
+	"go.xyrillian.de/gg/oblast"
 	. "go.xyrillian.de/gg/option"
 
 	"github.com/sapcc/castellum/internal/core"
@@ -29,9 +31,8 @@ import (
 // conversion and validation methods
 
 // ResourceFromDB converts a db.Resource into an castellum.Resource.
-func (h handler) ResourceFromDB(group db.ResourceGroup, res db.Resource) (castellum.Resource, error) {
-	var assetCount int64
-	err := h.DB.QueryRow(`SELECT COUNT(*) FROM assets WHERE resource_id = $1`, res.ID).Scan(&assetCount)
+func (h handler) ResourceFromDB(ctx context.Context, group db.ResourceGroup, res db.Resource) (castellum.Resource, error) {
+	assetCount, err := oblast.SelectOne[int64](ctx, h.DB, `SELECT COUNT(*) FROM assets WHERE resource_id = $1`, res.ID)
 	if err != nil {
 		return castellum.Resource{}, err
 	}
@@ -111,7 +112,7 @@ func (h handler) GetProject(w http.ResponseWriter, r *http.Request) {
 			if token.Check(res.AssetType.PolicyRuleForRead()) {
 				group := groupsByID[res.ResourceGroupID]
 				var err error
-				result.Resources[res.AssetType], err = h.ResourceFromDB(group, res)
+				result.Resources[res.AssetType], err = h.ResourceFromDB(ctx, group, res)
 				if err != nil {
 					return err
 				}
@@ -128,6 +129,7 @@ func (h handler) GetProject(w http.ResponseWriter, r *http.Request) {
 // GetResource handles GET /v1/projects/:id/resources/:type.
 func (h handler) GetResource(w http.ResponseWriter, r *http.Request) {
 	httpapi.IdentifyEndpoint(r, "/v1/projects/:id/resources/:type")
+	ctx := r.Context()
 	projectUUID, token := h.CheckToken(w, r)
 	if token == nil {
 		return
@@ -137,7 +139,7 @@ func (h handler) GetResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resource, err := h.ResourceFromDB(*dbGroup, *dbResource)
+	resource, err := h.ResourceFromDB(ctx, *dbGroup, *dbResource)
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}

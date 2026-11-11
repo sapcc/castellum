@@ -15,6 +15,7 @@ import (
 	"github.com/sapcc/go-bits/respondwith"
 	"github.com/sapcc/go-bits/sqlext"
 	"go.xyrillian.de/gg/gsql"
+	"go.xyrillian.de/gg/oblast"
 	. "go.xyrillian.de/gg/option"
 	"go.xyrillian.de/gg/options"
 
@@ -215,13 +216,11 @@ func (h handler) PostAssetErrorResolved(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var (
-		assetID     int64
-		lastReason  castellum.OperationReason
-		lastOutcome castellum.OperationOutcome
-	)
-	err := h.DB.QueryRow(checkLastFinishedOperationQuery, dbResource.ID, mux.Vars(r)["asset_uuid"]).
-		Scan(&assetID, &lastReason, &lastOutcome)
+	data, err := oblast.TupleSelectOne[struct {
+		AssetID     int64
+		LastReason  castellum.OperationReason
+		LastOutcome castellum.OperationOutcome
+	}](ctx, h.DB, checkLastFinishedOperationQuery, dbResource.ID, mux.Vars(r)["asset_uuid"])
 	if errors.Is(err, sql.ErrNoRows) {
 		http.NotFound(w, r)
 		return
@@ -229,7 +228,7 @@ func (h handler) PostAssetErrorResolved(w http.ResponseWriter, r *http.Request) 
 	if respondwith.ObfuscatedErrorText(w, err) {
 		return
 	}
-	if lastOutcome != castellum.OperationOutcomeErrored {
+	if data.LastOutcome != castellum.OperationOutcomeErrored {
 		http.Error(w, "last operation of the asset is not in an errored state and cannot be resolved.", http.StatusConflict)
 		return
 	}
@@ -237,8 +236,8 @@ func (h handler) PostAssetErrorResolved(w http.ResponseWriter, r *http.Request) 
 	now := h.TimeNow()
 	userUUID := token.UserUUID()
 	err = db.FinishedOperationStore.Insert(ctx, h.DB, &db.FinishedOperation{
-		AssetID:            assetID,
-		Reason:             lastReason,
+		AssetID:            data.AssetID,
+		Reason:             data.LastReason,
 		Outcome:            castellum.OperationOutcomeErrorResolved,
 		CreatedAt:          now,
 		ConfirmedAt:        Some(now),
