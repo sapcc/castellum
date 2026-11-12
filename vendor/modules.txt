@@ -111,7 +111,7 @@ github.com/rs/cors/internal
 github.com/sapcc/go-api-declarations/bininfo
 github.com/sapcc/go-api-declarations/cadf
 github.com/sapcc/go-api-declarations/castellum
-# github.com/sapcc/go-bits v0.0.0-20261105181628-13886743d3a7
+# github.com/sapcc/go-bits v0.0.0-20261112110216-dce3761314c8
 ## explicit; go 1.27
 github.com/sapcc/go-bits/audittools
 github.com/sapcc/go-bits/easypg
@@ -149,7 +149,7 @@ go.xyrillian.de/gg/options
 go.xyrillian.de/gg/pathrouter
 go.xyrillian.de/gg/pgruntime
 go.xyrillian.de/gg/testcapture
-# golang.org/x/sys v0.49.0
+# golang.org/x/sys v0.50.0
 ## explicit; go 1.26.0
 golang.org/x/sys/unix
 golang.org/x/sys/windows
