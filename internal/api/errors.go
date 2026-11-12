@@ -45,6 +45,36 @@ func (h handler) GetResourceScrapeErrors(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if r.URL.Query().Get("by") == "group" {
+		dbGroups, err := db.ResourceGroupStore.SelectWhere(ctx, h.DB,
+			`scrape_error_message != '' ORDER BY id`,
+		).Collect()
+		if respondwith.ObfuscatedErrorText(w, err) {
+			return
+		}
+
+		groupScrapeErrs := make([]castellum.ResourceGroupScrapeError, 0, len(dbGroups))
+		for _, group := range dbGroups {
+			projectID := ""
+			if group.ScopeUUID != group.DomainUUID {
+				projectID = group.ScopeUUID
+			}
+			groupScrapeErrs = append(groupScrapeErrs, castellum.ResourceGroupScrapeError{
+				ProjectUUID:  projectID,
+				DomainUUID:   group.DomainUUID,
+				AssetManager: group.AssetManager,
+				Checked: castellum.Checked{
+					ErrorMessage: group.ScrapeErrorMessage,
+				},
+			})
+		}
+
+		respondwith.JSON(w, http.StatusOK, struct {
+			ResourceGroupScrapeErrors []castellum.ResourceGroupScrapeError `json:"resource_group_scrape_errors"`
+		}{groupScrapeErrs})
+		return
+	}
+
 	dbResources, err := db.ResourceStore.Select(ctx, h.DB,
 		`SELECT res.* FROM resources res JOIN resource_groups rg ON res.resource_group_id = rg.id WHERE rg.scrape_error_message != '' ORDER BY rg.id, res.asset_type`,
 	).Collect()

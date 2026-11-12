@@ -486,6 +486,10 @@ additional fields:
   only shown for non-domain resources.
 
 For each resource, at most one error will be listed (the most recent one).
+To report errors once per resource group instead, pass `?by=group`. The response
+then uses `resource_group_scrape_errors`, with each entry identified by its
+`domain_id`, optional `project_id`, and `asset_manager`. Without this query
+parameter, the existing per-resource response is returned.
 
 ## GET /v1/admin/asset-scrape-errors
 
