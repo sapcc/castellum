@@ -157,47 +157,65 @@ func (m *assetManagerNFS) CheckResourceAllowed(ctx context.Context, assetType db
 // ListAssets implements the core.AssetManager interface.
 func (m *assetManagerNFS) ListAssets(ctx context.Context, scopeUUID string, resources map[db.AssetType]core.ResourceInfo) (map[db.AssetType][]string, error) {
 	allShareIDs := make(map[db.AssetType][]string)
+	shareTypeResources := make(map[string]db.AssetType)
+	var allSharesResource db.AssetType
+	hasAllSharesResource := false
 	for _, resource := range resources {
 		assetType, ok := m.parseAssetType(resource.AssetType).Unpack()
 		if !ok {
 			return nil, fmt.Errorf("could not parse asset type %s", resource.AssetType)
 		}
 
-		var promQuery string
 		if assetType.AllShares {
-			promQuery = fmt.Sprintf(
-				`count by (id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error"})`,
-				scopeUUID,
-			)
+			allSharesResource = resource.AssetType
+			hasAllSharesResource = true
 		} else {
-			promQuery = fmt.Sprintf(
-				`count by (id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error",share_type_id="%s"})`,
-				scopeUUID, assetType.ShareTypeID,
-			)
+			shareTypeResources[assetType.ShareTypeID] = resource.AssetType
 		}
-		vector, err := m.Discovery.GetVector(ctx, promQuery)
-		if err != nil {
-			return nil, fmt.Errorf("while discovering shares for project %s in Prometheus: %w", scopeUUID, err)
+	}
+	if len(resources) == 0 {
+		return allShareIDs, nil
+	}
+
+	promQuery := fmt.Sprintf(
+		`count by (id, share_type_id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error"})`,
+		scopeUUID,
+	)
+	vector, err := m.Discovery.GetVector(ctx, promQuery)
+	if err != nil {
+		return nil, fmt.Errorf("while discovering shares for project %s in Prometheus: %w", scopeUUID, err)
+	}
+
+	for _, sample := range vector {
+		shareTypeID := string(sample.Metric["share_type_id"])
+		assetType, matches := matchingNFSAssetType(shareTypeID, shareTypeResources, allSharesResource, hasAllSharesResource)
+		if !matches {
+			continue
 		}
 
-		for _, sample := range vector {
-			shareID := string(sample.Metric["id"])
-			metrics, err := m.ShareMetrics.Get(ctx, manilaShareMetricsKey{
-				ProjectUUID: scopeUUID,
-				ShareUUID:   shareID,
-			})
-			if err != nil {
-				return nil, err
-			}
-			if metrics.ExclusionReason == "" {
-				allShareIDs[resource.AssetType] = append(allShareIDs[resource.AssetType], shareID)
-			} else {
-				logg.Debug("ignoring share %s because of %s", shareID, metrics.ExclusionReason)
-			}
+		shareID := string(sample.Metric["id"])
+		metrics, err := m.ShareMetrics.Get(ctx, manilaShareMetricsKey{
+			ProjectUUID: scopeUUID,
+			ShareUUID:   shareID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if metrics.ExclusionReason == "" {
+			allShareIDs[assetType] = append(allShareIDs[assetType], shareID)
+		} else {
+			logg.Debug("ignoring share %s because of %s", shareID, metrics.ExclusionReason)
 		}
 	}
 
 	return allShareIDs, nil
+}
+
+func matchingNFSAssetType(shareTypeID string, shareTypeResources map[string]db.AssetType, allSharesResource db.AssetType, hasAllSharesResource bool) (db.AssetType, bool) {
+	if assetType, ok := shareTypeResources[shareTypeID]; ok {
+		return assetType, true
+	}
+	return allSharesResource, hasAllSharesResource
 }
 
 var (
