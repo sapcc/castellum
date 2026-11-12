@@ -86,7 +86,11 @@ func (c *Context) processAssetResize(ctx context.Context, tx *gsql.Tx, op db.Pen
 
 	// perform the resize operation (we give asset.Size instead of op.OldSize
 	// since this is the most up-to-date asset size that we have)
-	outcome, err := manager.SetAssetSize(ctx, group, res, asset.UUID, asset.Size, op.NewSize)
+	outcome, err := manager.SetAssetSize(ctx, core.ResourceInfo{
+		ScopeUUID:  group.ScopeUUID,
+		AssetType:  res.AssetType,
+		ConfigJSON: res.ConfigJSON,
+	}, asset.UUID, asset.Size, op.NewSize)
 	errorMessage := ""
 	if err != nil {
 		logg.Error("cannot resize %s %s to size %d: %s", string(res.AssetType), asset.UUID, op.NewSize, err.Error())

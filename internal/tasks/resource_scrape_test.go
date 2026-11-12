@@ -4,19 +4,51 @@
 package tasks_test
 
 import (
+	"context"
 	"database/sql"
 	"errors"
+	"maps"
 	"testing"
 	"time"
 
 	"github.com/sapcc/go-api-declarations/castellum"
 	"github.com/sapcc/go-bits/easypg"
 	"github.com/sapcc/go-bits/must"
+	. "go.xyrillian.de/gg/option"
 
+	"github.com/sapcc/castellum/internal/core"
 	"github.com/sapcc/castellum/internal/db"
 	"github.com/sapcc/castellum/internal/plugins"
 	"github.com/sapcc/castellum/internal/test"
 )
+
+type multiTypeResourceScrapeManager struct {
+	core.AssetManager
+	assetUUIDs          map[db.AssetType][]string
+	listAssetsScopeUUID string
+	listAssetsResources map[db.AssetType]core.ResourceConfig
+	listAssetsErr       error
+}
+
+func (m *multiTypeResourceScrapeManager) InfoForAssetType(assetType db.AssetType) Option[core.AssetTypeInfo] {
+	if assetType != "foo" && assetType != "bar" {
+		return None[core.AssetTypeInfo]()
+	}
+	return Some(core.AssetTypeInfo{
+		AssetType:    assetType,
+		UsageMetrics: []castellum.UsageMetric{castellum.SingularUsageMetric},
+	})
+}
+
+func (m *multiTypeResourceScrapeManager) ListAssets(_ context.Context, scopeUUID string, resources map[db.AssetType]core.ResourceConfig) (map[db.AssetType][]string, error) {
+	m.listAssetsScopeUUID = scopeUUID
+	m.listAssetsResources = make(map[db.AssetType]core.ResourceConfig, len(resources))
+	maps.Copy(m.listAssetsResources, resources)
+	if m.listAssetsErr != nil {
+		return nil, m.listAssetsErr
+	}
+	return m.assetUUIDs, nil
+}
 
 func TestResourceScraping(t *testing.T) {
 	ctx := t.Context()
@@ -153,16 +185,25 @@ func TestResourceScraping(t *testing.T) {
 	)
 }
 
-// TestResourceScrapingMultipleTypesInGroup verifies that a single resource group containing two asset types is scraped in one pass
-// and that when one manager fails the group error is recorded while assets of the successful manager stay correct.
+// TestResourceScrapingMultipleTypesInGroup verifies that all resource types in
+// one group are passed to the asset manager in a single discovery call.
 func TestResourceScrapingMultipleTypesInGroup(t *testing.T) {
 	ctx := t.Context()
+	manager := &multiTypeResourceScrapeManager{
+		AssetManager: &plugins.AssetManagerStatic{AssetType: "foo"},
+		assetUUIDs: map[db.AssetType][]string{
+			"foo": {"fooasset1"},
+			"bar": {"barasset1"},
+		},
+	}
 	s := test.NewSetup(t,
-		commonSetupOptionsForWorkerTest(),
+		test.WithAssetManagers(manager),
 	)
 	job := s.TaskContext.ResourceScrapingJob(s.Registry)
 
 	// single group with two resources of different asset types
+	fooConfigJSON := `{"kind":"foo"}`
+	barConfigJSON := `{"kind":"bar"}`
 	must.SucceedT(t, db.ResourceGroupStore.Insert(ctx, s.DB, &db.ResourceGroup{
 		ScopeUUID:    "project1",
 		DomainUUID:   "domain1",
@@ -172,6 +213,7 @@ func TestResourceScrapingMultipleTypesInGroup(t *testing.T) {
 	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
 		ResourceGroupID:          1,
 		AssetType:                "foo",
+		ConfigJSON:               fooConfigJSON,
 		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 0},
 		HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 0},
 		CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 0},
@@ -179,42 +221,45 @@ func TestResourceScrapingMultipleTypesInGroup(t *testing.T) {
 	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
 		ResourceGroupID:          1,
 		AssetType:                "bar",
+		ConfigJSON:               barConfigJSON,
 		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 0},
 		HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 0},
 		CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 0},
 	}))
 
-	amFoo := s.ManagerForAssetType("foo")
-	amFoo.Assets = map[string]map[string]plugins.StaticAsset{
-		"project1": {
-			"fooasset1": {Size: 1000, Usage: 400},
-		},
-	}
-	amBar := s.ManagerForAssetType("bar")
-	amBar.Assets = map[string]map[string]plugins.StaticAsset{
-		"project1": {
-			"barasset1": {Size: 2000, Usage: 800},
-		},
-	}
 	tr, _ := easypg.NewTracker(t, s.DB.DB)
 
-	// assets for both types should be discovered in one scrape
+	// Assets for both types should be discovered in one manager call with both resources included.
 	s.Clock.StepBy(time.Hour)
 	must.SucceedT(t, job.ProcessOne(ctx))
+	for assetType, wantConfig := range map[db.AssetType]string{
+		"foo": fooConfigJSON,
+		"bar": barConfigJSON,
+	} {
+		resource, ok := manager.listAssetsResources[assetType]
+		if !ok {
+			t.Errorf("ListAssets was not given resource %q", assetType)
+		} else if resource.ConfigJSON != wantConfig {
+			t.Errorf("ListAssets resource %q config = %q, want %q", assetType, resource.ConfigJSON, wantConfig)
+		}
+	}
+	if manager.listAssetsScopeUUID != "project1" {
+		t.Errorf("ListAssets was given scope %q, want %q", manager.listAssetsScopeUUID, "project1")
+	}
 	tr.DBChanges().AssertEqualf(`
 		INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (1, 1, 'fooasset1', 0, '{"singular":0}', %[1]d, TRUE);
 		INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (2, 2, 'barasset1', 0, '{"singular":0}', %[1]d, TRUE);
 		UPDATE resource_groups SET next_scrape_at = %[2]d WHERE id = 1 AND scope_uuid = 'project1' AND asset_manager = 'static';
 	`, s.Clock.Now().Unix(), s.Clock.Now().Add(30*time.Minute).Unix())
 
-	// Simulate the "foo" manager failing for this project
-	delete(amFoo.Assets, "project1")
+	// If discovery fails, assets remain intact and the group records an error.
+	manager.listAssetsErr = errors.New("simulated discovery failure")
 	s.Clock.StepBy(time.Hour)
 	err := job.ProcessOne(ctx)
 	if err == nil {
-		t.Fatal("expected error from failing foo manager, got nil")
+		t.Fatal("expected error from failing manager, got nil")
 	}
 	tr.DBChanges().AssertEqualf(`
-		UPDATE resource_groups SET next_scrape_at = %d, scrape_error_message = 'cannot list foo assets in scope project1: no such project' WHERE id = 1 AND scope_uuid = 'project1' AND asset_manager = 'static';
+		UPDATE resource_groups SET next_scrape_at = %d, scrape_error_message = 'cannot list assets in scope project1: simulated discovery failure' WHERE id = 1 AND scope_uuid = 'project1' AND asset_manager = 'static';
 	`, s.Clock.Now().Add(30*time.Minute).Unix())
 }

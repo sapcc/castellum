@@ -42,7 +42,7 @@ func AssetFromDB(asset db.Asset) castellum.Asset {
 }
 
 // PendingOperationFromDB converts a db.PendingOperation into an api.Operation.
-func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, group *db.ResourceGroup, res *db.Resource) castellum.StandaloneOperation {
+func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, group Option[db.ResourceGroup], res Option[db.Resource]) castellum.StandaloneOperation {
 	op := castellum.StandaloneOperation{
 		AssetID: assetID,
 		State:   dbOp.State(),
@@ -55,9 +55,11 @@ func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, group *db.
 		},
 		Finished: None[castellum.OperationFinish](),
 	}
-	if res != nil && group != nil {
-		op.ProjectUUID = group.ScopeUUID
-		op.AssetType = string(res.AssetType)
+	if group, hasGroup := group.Unpack(); hasGroup {
+		if res, hasResource := res.Unpack(); hasResource {
+			op.ProjectUUID = group.ScopeUUID
+			op.AssetType = string(res.AssetType)
+		}
 	}
 	if t, ok := dbOp.ConfirmedAt.Unpack(); ok {
 		op.Confirmed = Some(castellum.OperationConfirmation{
@@ -74,7 +76,7 @@ func PendingOperationFromDB(dbOp db.PendingOperation, assetID string, group *db.
 }
 
 // FinishedOperationFromDB converts a db.FinishedOperation into an api.Operation.
-func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string, group *db.ResourceGroup, res *db.Resource) castellum.StandaloneOperation {
+func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string, group Option[db.ResourceGroup], res Option[db.Resource]) castellum.StandaloneOperation {
 	op := castellum.StandaloneOperation{
 		AssetID: assetID,
 		State:   dbOp.State(),
@@ -90,9 +92,11 @@ func FinishedOperationFromDB(dbOp db.FinishedOperation, assetID string, group *d
 			ErrorMessage: dbOp.ErrorMessage,
 		}),
 	}
-	if res != nil && group != nil {
-		op.ProjectUUID = group.ScopeUUID
-		op.AssetType = string(res.AssetType)
+	if group, hasGroup := group.Unpack(); hasGroup {
+		if res, hasResource := res.Unpack(); hasResource {
+			op.ProjectUUID = group.ScopeUUID
+			op.AssetType = string(res.AssetType)
+		}
 	}
 	if t, ok := dbOp.ConfirmedAt.Unpack(); ok {
 		op.Confirmed = Some(castellum.OperationConfirmation{
@@ -170,7 +174,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	asset.PendingOperation = options.Map(dbPendingOp, func(op db.PendingOperation) castellum.StandaloneOperation {
-		return PendingOperationFromDB(op, "", nil, nil)
+		return PendingOperationFromDB(op, "", None[db.ResourceGroup](), None[db.Resource]())
 	})
 
 	_, wantsFinishedOps := r.URL.Query()["history"]
@@ -178,7 +182,7 @@ func (h handler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		err = db.FinishedOperationStore.SelectWhere(ctx, h.DB,
 			`asset_id = $1 AND outcome != 'error-resolved' ORDER BY finished_at`, dbAsset.ID).
 			Foreach(func(op db.FinishedOperation) error {
-				asset.FinishedOperations = append(asset.FinishedOperations, FinishedOperationFromDB(op, "", nil, nil))
+				asset.FinishedOperations = append(asset.FinishedOperations, FinishedOperationFromDB(op, "", None[db.ResourceGroup](), None[db.Resource]()))
 				return nil
 			})
 		if respondwith.ObfuscatedErrorText(w, err) {

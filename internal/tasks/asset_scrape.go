@@ -101,7 +101,11 @@ func (c *Context) processAssetScrape(ctx context.Context, tx *gsql.Tx, asset db.
 		})
 	}
 	startedAt := c.TimeNow()
-	status, err := manager.GetAssetStatus(ctx, group, res, asset.UUID, oldStatus)
+	status, err := manager.GetAssetStatus(ctx, core.ResourceInfo{
+		ScopeUUID:  group.ScopeUUID,
+		AssetType:  res.AssetType,
+		ConfigJSON: res.ConfigJSON,
+	}, asset.UUID, oldStatus)
 	finishedAt := c.TimeNow()
 	if err != nil {
 		errMsg := fmt.Errorf("cannot query status of %s %s: %s", string(res.AssetType), asset.UUID, err.Error())
