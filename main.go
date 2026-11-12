@@ -293,10 +293,8 @@ PROMPT:
 				logg.Error("wrong number of arguments")
 				continue
 			}
-			resources := make(map[db.AssetType]core.ResourceInfo)
-			resources[res.AssetType] = core.ResourceInfo{
-				ScopeUUID:  group.ScopeUUID,
-				AssetType:  res.AssetType,
+			resources := make(map[db.AssetType]core.ResourceConfig)
+			resources[res.AssetType] = core.ResourceConfig{
 				ConfigJSON: res.ConfigJSON,
 			}
 			result, err := manager.ListAssets(ctx, group.ScopeUUID, resources)

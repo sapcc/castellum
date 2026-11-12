@@ -155,22 +155,22 @@ func (m *assetManagerNFS) CheckResourceAllowed(ctx context.Context, assetType db
 }
 
 // ListAssets implements the core.AssetManager interface.
-func (m *assetManagerNFS) ListAssets(ctx context.Context, scopeUUID string, resources map[db.AssetType]core.ResourceInfo) (map[db.AssetType][]string, error) {
+func (m *assetManagerNFS) ListAssets(ctx context.Context, scopeUUID string, resources map[db.AssetType]core.ResourceConfig) (map[db.AssetType][]string, error) {
 	allShareIDs := make(map[db.AssetType][]string)
 	shareTypeResources := make(map[string]db.AssetType)
 	var allSharesResource db.AssetType
 	hasAllSharesResource := false
-	for _, resource := range resources {
-		assetType, ok := m.parseAssetType(resource.AssetType).Unpack()
+	for resourceAssetType := range resources {
+		assetType, ok := m.parseAssetType(resourceAssetType).Unpack()
 		if !ok {
-			return nil, fmt.Errorf("could not parse asset type %s", resource.AssetType)
+			return nil, fmt.Errorf("could not parse asset type %s", resourceAssetType)
 		}
 
 		if assetType.AllShares {
-			allSharesResource = resource.AssetType
+			allSharesResource = resourceAssetType
 			hasAllSharesResource = true
 		} else {
-			shareTypeResources[assetType.ShareTypeID] = resource.AssetType
+			shareTypeResources[assetType.ShareTypeID] = resourceAssetType
 		}
 	}
 	if len(resources) == 0 {

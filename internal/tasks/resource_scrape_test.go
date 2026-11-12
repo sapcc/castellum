@@ -25,7 +25,8 @@ import (
 type multiTypeResourceScrapeManager struct {
 	core.AssetManager
 	assetUUIDs          map[db.AssetType][]string
-	listAssetsResources map[db.AssetType]core.ResourceInfo
+	listAssetsScopeUUID string
+	listAssetsResources map[db.AssetType]core.ResourceConfig
 	listAssetsErr       error
 }
 
@@ -39,8 +40,9 @@ func (m *multiTypeResourceScrapeManager) InfoForAssetType(assetType db.AssetType
 	})
 }
 
-func (m *multiTypeResourceScrapeManager) ListAssets(_ context.Context, _ string, resources map[db.AssetType]core.ResourceInfo) (map[db.AssetType][]string, error) {
-	m.listAssetsResources = make(map[db.AssetType]core.ResourceInfo, len(resources))
+func (m *multiTypeResourceScrapeManager) ListAssets(_ context.Context, scopeUUID string, resources map[db.AssetType]core.ResourceConfig) (map[db.AssetType][]string, error) {
+	m.listAssetsScopeUUID = scopeUUID
+	m.listAssetsResources = make(map[db.AssetType]core.ResourceConfig, len(resources))
 	maps.Copy(m.listAssetsResources, resources)
 	if m.listAssetsErr != nil {
 		return nil, m.listAssetsErr
@@ -200,6 +202,8 @@ func TestResourceScrapingMultipleTypesInGroup(t *testing.T) {
 	job := s.TaskContext.ResourceScrapingJob(s.Registry)
 
 	// single group with two resources of different asset types
+	fooConfigJSON := `{"kind":"foo"}`
+	barConfigJSON := `{"kind":"bar"}`
 	must.SucceedT(t, db.ResourceGroupStore.Insert(ctx, s.DB, &db.ResourceGroup{
 		ScopeUUID:    "project1",
 		DomainUUID:   "domain1",
@@ -209,6 +213,7 @@ func TestResourceScrapingMultipleTypesInGroup(t *testing.T) {
 	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
 		ResourceGroupID:          1,
 		AssetType:                "foo",
+		ConfigJSON:               fooConfigJSON,
 		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 0},
 		HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 0},
 		CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 0},
@@ -216,6 +221,7 @@ func TestResourceScrapingMultipleTypesInGroup(t *testing.T) {
 	must.SucceedT(t, db.ResourceStore.Insert(ctx, s.DB, &db.Resource{
 		ResourceGroupID:          1,
 		AssetType:                "bar",
+		ConfigJSON:               barConfigJSON,
 		LowThresholdPercent:      castellum.UsageValues{castellum.SingularUsageMetric: 0},
 		HighThresholdPercent:     castellum.UsageValues{castellum.SingularUsageMetric: 0},
 		CriticalThresholdPercent: castellum.UsageValues{castellum.SingularUsageMetric: 0},
@@ -226,13 +232,19 @@ func TestResourceScrapingMultipleTypesInGroup(t *testing.T) {
 	// Assets for both types should be discovered in one manager call with both resources included.
 	s.Clock.StepBy(time.Hour)
 	must.SucceedT(t, job.ProcessOne(ctx))
-	for _, assetType := range []db.AssetType{"foo", "bar"} {
+	for assetType, wantConfig := range map[db.AssetType]string{
+		"foo": fooConfigJSON,
+		"bar": barConfigJSON,
+	} {
 		resource, ok := manager.listAssetsResources[assetType]
 		if !ok {
 			t.Errorf("ListAssets was not given resource %q", assetType)
-		} else if resource.ScopeUUID != "project1" || resource.AssetType != assetType {
-			t.Errorf("unexpected ResourceInfo for %q: %#v", assetType, resource)
+		} else if resource.ConfigJSON != wantConfig {
+			t.Errorf("ListAssets resource %q config = %q, want %q", assetType, resource.ConfigJSON, wantConfig)
 		}
+	}
+	if manager.listAssetsScopeUUID != "project1" {
+		t.Errorf("ListAssets was given scope %q, want %q", manager.listAssetsScopeUUID, "project1")
 	}
 	tr.DBChanges().AssertEqualf(`
 		INSERT INTO assets (id, resource_id, uuid, size, usage, next_scrape_at, never_scraped) VALUES (1, 1, 'fooasset1', 0, '{"singular":0}', %[1]d, TRUE);

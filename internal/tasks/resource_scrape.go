@@ -92,7 +92,7 @@ func (c *Context) processResourceGroupScrape(ctx context.Context, tx *gsql.Tx, g
 		}
 	}
 
-	resources := make(map[db.AssetType]core.ResourceInfo)
+	resources := make(map[db.AssetType]core.ResourceConfig)
 	infoByAssetType := make(map[db.AssetType]core.AssetTypeInfo)
 	for _, res := range dbResources {
 		if manager == nil {
@@ -104,9 +104,7 @@ func (c *Context) processResourceGroupScrape(ctx context.Context, tx *gsql.Tx, g
 			scrapeErrs = append(scrapeErrs, fmt.Sprintf("no asset manager for asset type %q", res.AssetType))
 			continue
 		}
-		resources[res.AssetType] = core.ResourceInfo{
-			ScopeUUID:  group.ScopeUUID,
-			AssetType:  res.AssetType,
+		resources[res.AssetType] = core.ResourceConfig{
 			ConfigJSON: res.ConfigJSON,
 		}
 		infoByAssetType[res.AssetType] = info
