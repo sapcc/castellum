@@ -155,50 +155,67 @@ func (m *assetManagerNFS) CheckResourceAllowed(ctx context.Context, assetType db
 }
 
 // ListAssets implements the core.AssetManager interface.
-func (m *assetManagerNFS) ListAssets(ctx context.Context, group db.ResourceGroup, res db.Resource) ([]string, error) {
-	// shares are discovered via Prometheus metrics since that is way faster than
-	// going through the Manila API
-	assetType, ok := m.parseAssetType(res.AssetType).Unpack()
-	if !ok {
-		return nil, fmt.Errorf("could not parse asset type %s", res.AssetType)
+func (m *assetManagerNFS) ListAssets(ctx context.Context, scopeUUID string, resources map[db.AssetType]core.ResourceConfig) (map[db.AssetType][]string, error) {
+	allShareIDs := make(map[db.AssetType][]string)
+	shareTypeResources := make(map[string]db.AssetType)
+	var allSharesResource db.AssetType
+	hasAllSharesResource := false
+	for resourceAssetType := range resources {
+		assetType, ok := m.parseAssetType(resourceAssetType).Unpack()
+		if !ok {
+			return nil, fmt.Errorf("could not parse asset type %s", resourceAssetType)
+		}
+
+		if assetType.AllShares {
+			allSharesResource = resourceAssetType
+			hasAllSharesResource = true
+		} else {
+			shareTypeResources[assetType.ShareTypeID] = resourceAssetType
+		}
 	}
-	var promQuery string
-	if assetType.AllShares {
-		promQuery = fmt.Sprintf(
-			`count by (id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error"})`,
-			group.ScopeUUID,
-		)
-	} else {
-		promQuery = fmt.Sprintf(
-			`count by (id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error",share_type_id="%s"})`,
-			group.ScopeUUID, assetType.ShareTypeID,
-		)
+	if len(resources) == 0 {
+		return allShareIDs, nil
 	}
+
+	promQuery := fmt.Sprintf(
+		`count by (id, share_type_id) (openstack_manila_shares_size_gauge{project_id="%s",status!="error"})`,
+		scopeUUID,
+	)
 	vector, err := m.Discovery.GetVector(ctx, promQuery)
 	if err != nil {
-		return nil, fmt.Errorf("while discovering shares for project %s in Prometheus: %w", group.ScopeUUID, err)
+		return nil, fmt.Errorf("while discovering shares for project %s in Prometheus: %w", scopeUUID, err)
 	}
 
-	var allShareIDs []string
 	for _, sample := range vector {
-		shareID := string(sample.Metric["id"])
+		shareTypeID := string(sample.Metric["share_type_id"])
+		assetType, matches := matchingNFSAssetType(shareTypeID, shareTypeResources, allSharesResource, hasAllSharesResource)
+		if !matches {
+			continue
+		}
 
-		// evaluate exclusion rules based on Prometheus metrics
+		shareID := string(sample.Metric["id"])
 		metrics, err := m.ShareMetrics.Get(ctx, manilaShareMetricsKey{
-			ProjectUUID: group.ScopeUUID,
+			ProjectUUID: scopeUUID,
 			ShareUUID:   shareID,
 		})
 		if err != nil {
 			return nil, err
 		}
 		if metrics.ExclusionReason == "" {
-			allShareIDs = append(allShareIDs, shareID)
+			allShareIDs[assetType] = append(allShareIDs[assetType], shareID)
 		} else {
 			logg.Debug("ignoring share %s because of %s", shareID, metrics.ExclusionReason)
 		}
 	}
 
 	return allShareIDs, nil
+}
+
+func matchingNFSAssetType(shareTypeID string, shareTypeResources map[string]db.AssetType, allSharesResource db.AssetType, hasAllSharesResource bool) (db.AssetType, bool) {
+	if assetType, ok := shareTypeResources[shareTypeID]; ok {
+		return assetType, true
+	}
+	return allSharesResource, hasAllSharesResource
 }
 
 var (
@@ -208,7 +225,7 @@ var (
 )
 
 // SetAssetSize implements the core.AssetManager interface.
-func (m *assetManagerNFS) SetAssetSize(ctx context.Context, group db.ResourceGroup, res db.Resource, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error) {
+func (m *assetManagerNFS) SetAssetSize(ctx context.Context, res core.ResourceInfo, assetUUID string, oldSize, newSize uint64) (castellum.OperationOutcome, error) {
 	err := m.resize(ctx, assetUUID, oldSize, newSize /* useReverseOperation = */, false)
 	if err != nil {
 		match := sizeInconsistencyErrorRx.FindStringSubmatch(err.Error())
@@ -251,10 +268,10 @@ func (m *assetManagerNFS) resize(ctx context.Context, assetUUID string, oldSize,
 }
 
 // GetAssetStatus implements the core.AssetManager interface.
-func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, group db.ResourceGroup, res db.Resource, assetUUID string, previousStatus Option[core.AssetStatus]) (core.AssetStatus, error) {
+func (m *assetManagerNFS) GetAssetStatus(ctx context.Context, res core.ResourceInfo, assetUUID string, previousStatus Option[core.AssetStatus]) (core.AssetStatus, error) {
 	// query Prometheus metrics for size and usage
 	metrics, err := m.ShareMetrics.Get(ctx, manilaShareMetricsKey{
-		ProjectUUID: group.ScopeUUID,
+		ProjectUUID: res.ScopeUUID,
 		ShareUUID:   assetUUID,
 	})
 	if err != nil {

@@ -279,7 +279,6 @@ PROMPT:
 		if len(fields) > 1 {
 			res.AssetType = assetType
 			group.ScopeUUID = fields[1]
-			group.AssetManager = manager.PluginTypeID()
 			res.ConfigJSON = configJSON
 			err := manager.CheckResourceAllowed(ctx, res.AssetType, group.ScopeUUID, res.ConfigJSON, nil)
 			if err != nil {
@@ -294,13 +293,19 @@ PROMPT:
 				logg.Error("wrong number of arguments")
 				continue
 			}
-			result, err := manager.ListAssets(ctx, group, res)
+			resources := make(map[db.AssetType]core.ResourceConfig)
+			resources[res.AssetType] = core.ResourceConfig{
+				ConfigJSON: res.ConfigJSON,
+			}
+			result, err := manager.ListAssets(ctx, group.ScopeUUID, resources)
 			if err != nil {
 				logg.Error(err.Error())
 				continue
 			}
-			for idx, assetUUID := range result {
-				logg.Info("result[%d] = %q", idx, assetUUID)
+			for assetType, assetUUIDs := range result {
+				for idx, assetUUID := range assetUUIDs {
+					logg.Info("result[%s][%d] = %q", assetType, idx, assetUUID)
+				}
 			}
 
 		case "show":
@@ -333,7 +338,11 @@ PROMPT:
 				logg.Error("wrong number of arguments")
 				continue
 			}
-			result, err := manager.GetAssetStatus(ctx, group, res, fields[2], previousStatus)
+			result, err := manager.GetAssetStatus(ctx, core.ResourceInfo{
+				ScopeUUID:  group.ScopeUUID,
+				AssetType:  res.AssetType,
+				ConfigJSON: res.ConfigJSON,
+			}, fields[2], previousStatus)
 			if err != nil {
 				logg.Error(err.Error())
 				continue
@@ -364,7 +373,11 @@ PROMPT:
 				logg.Error(err.Error())
 				continue
 			}
-			outcome, err := manager.SetAssetSize(ctx, group, res, fields[2], oldSize, newSize)
+			outcome, err := manager.SetAssetSize(ctx, core.ResourceInfo{
+				ScopeUUID:  group.ScopeUUID,
+				AssetType:  res.AssetType,
+				ConfigJSON: res.ConfigJSON,
+			}, fields[2], oldSize, newSize)
 			logg.Info("outcome: %s", outcome)
 			if err != nil {
 				logg.Error(err.Error())

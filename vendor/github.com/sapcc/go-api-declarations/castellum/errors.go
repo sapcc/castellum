@@ -11,6 +11,14 @@ type ResourceScrapeError struct {
 	Checked     Checked `json:"checked"`
 }
 
+// ResourceGroupScrapeError is the API representation for a resource group scrape error.
+type ResourceGroupScrapeError struct {
+	ProjectUUID  string  `json:"project_id,omitempty"`
+	DomainUUID   string  `json:"domain_id"`
+	AssetManager string  `json:"asset_manager"`
+	Checked      Checked `json:"checked"`
+}
+
 // AssetScrapeError is the API representation for an asset scrape error.
 type AssetScrapeError struct {
 	AssetUUID   string  `json:"asset_id"`

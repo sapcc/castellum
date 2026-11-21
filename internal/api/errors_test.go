@@ -30,10 +30,28 @@ func TestGetResourceScrapeErrors(t *testing.T) {
 		ExpectStatus(t, http.StatusForbidden)
 	s.Validator.Enforcer.Allow("cluster:access")
 
+	// Add another resource in the errored group to distinguish per-resource
+	// reporting from per-group reporting.
+	must.SucceedT(t, s.DBExec(`
+		INSERT INTO resources (resource_group_id, asset_type, low_threshold_percent, low_delay_seconds,
+		                      high_threshold_percent, high_delay_seconds, critical_threshold_percent, size_step_percent)
+		SELECT id, 'other:bar', '{}', 0, '{}', 0, '{}', 0
+		  FROM resource_groups
+		 WHERE scope_uuid = 'project1' AND asset_manager = 'other-static'
+	`))
+
 	// happy path
 	s.Handler.RespondTo(ctx, "GET /v1/admin/resource-scrape-errors").
 		ExpectJSON(t, http.StatusOK, jsonmatch.Object{
 			"resource_scrape_errors": []jsonmatch.Object{
+				{
+					"asset_type": "other:bar",
+					"checked": jsonmatch.Object{
+						"error": "datacenter is on fire",
+					},
+					"domain_id":  "domain1",
+					"project_id": "project1",
+				},
 				{
 					"asset_type": "other:foo",
 					"checked": jsonmatch.Object{
@@ -44,6 +62,29 @@ func TestGetResourceScrapeErrors(t *testing.T) {
 				},
 				{
 					"asset_type": "foo",
+					"checked": jsonmatch.Object{
+						"error": "datacenter is on fire",
+					},
+					"domain_id":  "domain1",
+					"project_id": "something-else",
+				},
+			},
+		})
+
+	// The group-level mode returns each errored resource group only once.
+	s.Handler.RespondTo(ctx, "GET /v1/admin/resource-scrape-errors?by=group").
+		ExpectJSON(t, http.StatusOK, jsonmatch.Object{
+			"resource_group_scrape_errors": []jsonmatch.Object{
+				{
+					"asset_manager": "other-static",
+					"checked": jsonmatch.Object{
+						"error": "datacenter is on fire",
+					},
+					"domain_id":  "domain1",
+					"project_id": "project1",
+				},
+				{
+					"asset_manager": "static",
 					"checked": jsonmatch.Object{
 						"error": "datacenter is on fire",
 					},
